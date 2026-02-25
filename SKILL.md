@@ -1,6 +1,11 @@
 ---
 name: building-flutter-apps
-description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, and GoRouter. Use when building, reviewing, or refactoring Flutter apps. Covers architecture layers, state management, testing, performance, and common patterns like pagination, search, and forms.
+description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, and GoRouter. Use when building, reviewing, or refactoring Flutter apps with Riverpod state management. Covers architecture layers, state management, testing, performance, pagination, search, and forms.
+license: MIT
+metadata:
+  author: sgaabdu4
+  version: "3.0.0"
+  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart
 ---
 
 # Flutter Best Practices
