@@ -6,6 +6,8 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B.svg)](https://flutter.dev)
 [![Riverpod](https://img.shields.io/badge/Riverpod-3.x-00B4D8.svg)](https://riverpod.dev)
 
+> **Disclaimer:** This is an unofficial community resource. It is not affiliated with, endorsed by, or sponsored by Google, the Flutter team, or the Riverpod maintainers. "Flutter" is a trademark of Google LLC. "Riverpod" is maintained by Remi Rousselet.
+
 ## Installation
 
 ```bash
