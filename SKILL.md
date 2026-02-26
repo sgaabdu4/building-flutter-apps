@@ -1,11 +1,11 @@
 ---
 name: building-flutter-apps
-description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, and GoRouter. Use when building, reviewing, or refactoring Flutter apps with Riverpod state management. Covers architecture layers, state management, testing, performance, pagination, search, and forms.
+description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, and Hive CE persistence. Use when building, reviewing, or refactoring Flutter apps with Riverpod state management. Covers architecture layers, state management, local storage with Hive TypeAdapters, testing, performance, pagination, search, and forms.
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "3.0.0"
-  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart
+  version: "3.1.0"
+  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage
 ---
 
 # Flutter Best Practices
@@ -181,3 +181,4 @@ part 'routes.g.dart';
 | Performance, rebuilds, optimization | [performance.md](references/performance.md) |
 | Keys, slivers, animations, isolates, accessibility, adaptive | [flutter-optimizations.md](references/flutter-optimizations.md) |
 | Context extensions, string/date utils, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) |
+| Hive CE persistence, @GenerateAdapters, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) |

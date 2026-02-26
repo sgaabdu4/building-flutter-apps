@@ -1,6 +1,6 @@
 # Flutter Riverpod Clean Architecture Skill
 
-> Flutter clean architecture patterns with Riverpod 3.x codegen, Freezed 3.x sealed classes, and GoRouter.
+> Flutter clean architecture patterns with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, and Hive CE persistence.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B.svg)](https://flutter.dev)
@@ -32,6 +32,7 @@ This skill provides AI agents with comprehensive guidance for Flutter developmen
 | riverpod_generator | 3.x | Provider code generation |
 | freezed | 3.2.5+ | Immutable data classes, unions |
 | go_router | 17.1.0+ | Declarative routing |
+| hive_ce | 2.19.3+ | Binary local persistence |
 
 ### Architecture
 Four-layer clean architecture:
@@ -68,6 +69,7 @@ lib/
 | Performance optimization | [performance.md](references/performance.md) |
 | Flutter optimizations | [flutter-optimizations.md](references/flutter-optimizations.md) |
 | Extensions & utilities | [extensions-utilities.md](references/extensions-utilities.md) |
+| Hive CE persistence, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) |
 
 ## Compatible Agents
 
