@@ -164,6 +164,7 @@ part 'routes.g.dart';
 | Rely only on GoRouter redirect for post-login nav | Add `ref.listen(authProvider)` in auth pages as fallback | `refreshListenable` timing is unreliable; explicit navigation from login/signup guarantees the transition |
 | Setting auth-level `isLoading` during OAuth | Use per-button loading (`isGoogleLoading`) | Auth `isLoading` triggers `SetupStatus.loading` → premature splash redirect before OAuth completes |
 | `ref.watch()` inside GoRouter redirect | `ref.listen()` + `refreshListenable` + `ref.read()` in redirect | `ref.watch` recreates router on every state change, resetting route stack |
+| Full re-fetch every sync | `mergeAll` + ID-diff `deleteByIds` | O(all) → O(changed) |
 | `Theme.of(context).colorScheme` | `context.colors` | Use context extensions |
 | `ScaffoldMessenger.of(context)` | `SnackBarUtils.showSuccess()` | Centralized, context-free |
 
@@ -177,7 +178,7 @@ part 'routes.g.dart';
 | Freezed sealed classes, unions | [freezed-sealed.md](references/freezed-sealed.md) |
 | State management, async, notifiers | [state-management.md](references/state-management.md) |
 | Testing with ProviderContainer.test | [testing.md](references/testing.md) |
-| Pagination, search, forms, debounce | [common-patterns.md](references/common-patterns.md) |
+| Pagination, search, forms, delta sync | [common-patterns.md](references/common-patterns.md) |
 | Performance, rebuilds, optimization | [performance.md](references/performance.md) |
 | Keys, slivers, animations, isolates, accessibility, adaptive | [flutter-optimizations.md](references/flutter-optimizations.md) |
 | Context extensions, string/date utils, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) |

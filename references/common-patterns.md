@@ -451,3 +451,108 @@ class MyApp extends ConsumerWidget {
 }
 ```
 
+---
+
+## Delta Sync (Incremental Remote Pull)
+
+Fetch only rows changed since the last sync instead of re-downloading all data. Requires per-table timestamps stored locally and `mergeAll`/`deleteByIds` on repositories.
+
+### Repository Interface Additions
+
+```dart
+abstract interface class IExerciseRepository {
+  // ... existing CRUD ...
+
+  /// Upserts changed items into local storage by ID.
+  Future<void> mergeAll(List<Exercise> items);
+
+  /// Removes locally-stored items whose IDs are no longer present remotely.
+  Future<void> deleteByIds(Set<String> ids);
+}
+```
+
+### mergeAll Implementation
+
+```dart
+@override
+Future<void> mergeAll(List<Exercise> items) async {
+  final current = await _local.getAll();
+  final updated = [...current];
+
+  for (final item in items) {
+    final index = updated.indexWhere((e) => e.id == item.id);
+    if (index >= 0) {
+      updated[index] = item;
+    } else {
+      updated.add(item);
+    }
+  }
+
+  await _local.saveAll(updated);
+}
+```
+
+### deleteByIds Implementation
+
+```dart
+@override
+Future<void> deleteByIds(Set<String> ids) async {
+  final current = await _local.getAll();
+  final filtered = current.where((e) => !ids.contains(e.id)).toList();
+  await _local.saveAll(filtered);
+}
+```
+
+### Sync Service Flow
+
+```dart
+// Per-table delta sync:
+// 1. Read per-table lastSyncDate from settings
+// 2. If null → full getAll + saveAll (backward compat, first delta)
+// 3. If exists → getUpdatedSince(lastSyncDate) + mergeAll
+// 4. getAllIds from remote, compare to local IDs, deleteByIds for missing
+// 5. Store new per-table lastSyncDate
+
+final lastTableSync = await settingsRepo.getTableSyncDate(tableKey);
+
+if (lastTableSync == null) {
+  final all = await remote.getAll(userId);
+  if (all.isNotEmpty) await repo.saveAll(all.map((m) => m.toEntity()).toList());
+} else {
+  final changed = await remote.getUpdatedSince(userId, lastTableSync);
+  if (changed.isNotEmpty) await repo.mergeAll(changed.map((m) => m.toEntity()).toList());
+
+  final remoteIds = (await remote.getAllIds(userId)).toSet();
+  final localIds = (await repo.getAll()).map((e) => e.id).toSet();
+  final deleted = localIds.difference(remoteIds);
+  if (deleted.isNotEmpty) await repo.deleteByIds(deleted);
+}
+
+await settingsRepo.setTableSyncDate(tableKey, DateTime.now().toUtc());
+```
+
+### Per-Table Sync Date Storage
+
+```dart
+// In settings repository:
+static const exerciseSyncDateKey = 'sync_date_exercises';
+
+Future<DateTime?> getTableSyncDate(String key) async {
+  final ms = await _storage.read<int>(key);
+  return ms != null ? DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true) : null;
+}
+
+Future<void> setTableSyncDate(String key, DateTime date) async {
+  await _storage.save(key, date.millisecondsSinceEpoch);
+}
+```
+
+### When to Use
+
+| Scenario | Approach |
+|----------|----------|
+| Data rarely changes | Delta sync — fetches nothing when no changes |
+| Frequent small edits | Delta sync — fetches only changed rows |
+| Full data refresh needed | Full pull with `saveAll` |
+| Real-time updates | Realtime subscriptions (not delta) |
+
