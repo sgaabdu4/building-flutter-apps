@@ -94,9 +94,16 @@ void initState() {
 
 @override
 Widget build(BuildContext context) {
+  final isLoading = ref.watch(myProvider.select((s) => s.isLoading));
+
+  // Catch the loading → loaded transition.
   ref.listen(myProvider.select((s) => s.isLoading), (prev, next) {
     if (prev == true && next == false) scheduleShowcase();
   });
+
+  // Handle already-cached data (prev is null on first listen attachment).
+  if (!isLoading) scheduleShowcase();
+
   // ...
 }
 ```
