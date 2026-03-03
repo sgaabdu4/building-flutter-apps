@@ -111,9 +111,20 @@ Widget build(BuildContext context) {
 ### How the mixin works
 
 1. `initShowcase()` calls `ShowcaseView.register(scope:, enableAutoScroll: true, onFinish:, onDismiss:)`.
-2. Post-frame callback reads `showcaseServiceProvider` to check if tour was already seen.
-3. If unseen, calls `ShowcaseView.getNamed(scope).startShowCase(keys, delay: Duration(milliseconds: 300))`.
-4. `onFinish` and `onDismiss` both call `completeInProgressTour()` on the service, persisting completion.
+2. Post-frame callback checks `TickerMode.of(context)`. If `false` (offstage tab), defers via `_needsShowcaseRetry`.
+3. If active, reads `showcaseServiceProvider` to check if tour was already seen.
+4. If unseen, calls `ShowcaseView.getNamed(scope).startShowCase(keys, delay: Duration(milliseconds: 300))`.
+5. `onFinish` and `onDismiss` both call `completeInProgressTour()` on the service, persisting completion.
+
+### TickerMode and offstage branches
+
+`StatefulShellRoute` keeps all branch screens alive but wraps inactive ones in `TickerMode(enabled: false)`. Without a guard, offstage screens call `startShowCase()` and fight the active tab's tour.
+
+The mixin handles this with two fields and a `didChangeDependencies` override:
+
+- `_needsShowcaseRetry` — set `true` when `TickerMode` is `false` at schedule time.
+- `_dependenciesInitialised` — skips the first `didChangeDependencies` call (fires before build).
+- On tab activation (`TickerMode` flips to `true`), `didChangeDependencies` re-calls `scheduleShowcase()`.
 
 ## AppShowcaseTarget
 
@@ -127,6 +138,10 @@ AppShowcaseTarget(
   child: const SomeChildWidget(),
 )
 ```
+
+### Target placement
+
+Wrap the *specific* widget you want highlighted — not a parent container. The tooltip anchors to the wrapped widget's bounds. Wrapping a large parent makes the highlight appear on the entire section instead of the intended element.
 
 ### Parameters
 
@@ -279,6 +294,16 @@ final container = ProviderContainer(
 
 `FakeShowcaseService` returns `false` from `shouldShowTour` so no tour runs during tests.
 
+### Widgets containing AppShowcaseTarget
+
+When a widget's `build()` includes `AppShowcaseTarget`, its `Showcase` child calls `ShowcaseService.instance.getScope()` in `initState`. Without a registered scope, tests throw. Add a `setUp` call:
+
+```dart
+setUp(() => ShowcaseView.register());
+```
+
+This registers a default scope so `Showcase` can resolve its parent. No `scope:` argument needed — the default suffices for tests that don't start actual tours.
+
 ## Resetting Tours (Shell Route Caveat)
 
 `StatefulShellRoute` keeps branch screens alive. After `resetAllKnownScopes()` clears storage, each screen's `_hasAttemptedTour` flag is still `true` — so `scheduleShowcase()` returns early. Solution: a reset-signal provider that alive screens listen to.
@@ -301,6 +326,7 @@ The mixin listens and resets on change:
 ref.listenManual(showcaseResetSignalProvider, (prev, next) {
   if (prev != null && prev != next) {
     _hasAttemptedTour = false;
+    _needsShowcaseRetry = true;
     scheduleShowcase();
   }
 });
