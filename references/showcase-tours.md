@@ -17,7 +17,7 @@ Six files form the showcase system:
 |------|------|---------|
 | `showcase_screen_mixin.dart` | Mixin | Lifecycle: register scope, check, start, dispose |
 | `app_showcase_target.dart` | StatelessWidget | Styled `Showcase` wrapper bound to design tokens |
-| `showcase_service.dart` | Interface + Impl | Persists tour completion per user scope |
+| `showcase_service.dart` | Interface + Impl + Signal | Persists tour completion; `ShowcaseResetSignal` notifies alive screens |
 | `showcase_keys.dart` | Abstract final class | `GlobalKey` registry and ordered tour lists |
 | `showcase_constants.dart` | Abstract final class | Scope name constants |
 | `showcase_strings.dart` | Class | Tooltip title/description strings |
@@ -278,6 +278,40 @@ final container = ProviderContainer(
 ```
 
 `FakeShowcaseService` returns `false` from `shouldShowTour` so no tour runs during tests.
+
+## Resetting Tours (Shell Route Caveat)
+
+`StatefulShellRoute` keeps branch screens alive. After `resetAllKnownScopes()` clears storage, each screen's `_hasAttemptedTour` flag is still `true` — so `scheduleShowcase()` returns early. Solution: a reset-signal provider that alive screens listen to.
+
+```dart
+// In showcase_service.dart
+@Riverpod(keepAlive: true)
+class ShowcaseResetSignal extends _$ShowcaseResetSignal {
+  @override
+  int build() => 0;
+
+  void notify() => state++;
+}
+```
+
+The mixin listens and resets on change:
+
+```dart
+// In initShowcase()
+ref.listenManual(showcaseResetSignalProvider, (prev, next) {
+  if (prev != null && prev != next) {
+    _hasAttemptedTour = false;
+    scheduleShowcase();
+  }
+});
+```
+
+After resetting tours, trigger the signal:
+
+```dart
+await service.resetAllKnownScopes();
+ref.read(showcaseResetSignalProvider.notifier).notify();
+```
 
 ## Constraints
 
