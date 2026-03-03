@@ -1,11 +1,11 @@
 ---
 name: building-flutter-apps
-description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, and Hive CE persistence. Use when building, reviewing, or refactoring Flutter apps with Riverpod state management. Covers architecture layers, state management, local storage with Hive TypeAdapters, testing, performance, pagination, search, and forms.
+description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, Hive CE persistence, and showcaseview guided tours. Use when building, reviewing, or refactoring Flutter apps with Riverpod state management. Covers architecture layers, state management, local storage, onboarding tours, testing, performance, pagination, search, and forms.
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "3.1.0"
-  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage
+  version: "3.2.0"
+  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage, showcaseview, guided-tours, onboarding
 ---
 
 # Flutter Best Practices
@@ -23,6 +23,7 @@ Flutter clean architecture skill using Riverpod 3.x (codegen), Freezed 3.x (seal
 | freezed_annotation | 3.x | Freezed annotations |
 | go_router | 17.1.0+ | Declarative routing |
 | go_router_builder | 4.2.0+ | Type-safe route code generation |
+| showcaseview | 5.0.1+ | First-run guided tours |
 | json_serializable | latest | JSON serialization |
 | build_runner | latest | Code generation |
 
@@ -183,3 +184,4 @@ part 'routes.g.dart';
 | Keys, slivers, animations, isolates, accessibility, adaptive | [flutter-optimizations.md](references/flutter-optimizations.md) |
 | Context extensions, string/date utils, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) |
 | Hive CE persistence, @GenerateAdapters, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) |
+| Showcase guided tours, mixin, v5 API | [showcase-tours.md](references/showcase-tours.md) |
