@@ -98,12 +98,14 @@ lib/
 
 ### Domain Layer
 
-Pure Dart. No Flutter imports, no package dependencies. Defines what the data looks like.
+Pure Dart. No Flutter imports, no package dependencies. Defines what the data looks like. Models own behavior derived from their own fields (see [freezed-sealed.md](freezed-sealed.md#rich-models)).
 
 ```dart
 // features/products/domain/entities/product.dart
 @freezed
 sealed class Product with _$Product {
+  const Product._();
+
   const factory Product({
     required String id,
     required String name,
@@ -111,6 +113,9 @@ sealed class Product with _$Product {
     @Default(0) int quantity,
     @Default(true) bool isActive,
   }) = _Product;
+
+  double get totalValue => price * quantity;
+  bool get inStock => quantity > 0;
 }
 ```
 
@@ -118,7 +123,7 @@ Entities never contain `fromJson`/`toJson`. That belongs in the Data layer.
 
 ### Data Layer
 
-Models mirror entities but add serialization. Datasources handle API calls and local storage.
+Models mirror entities but add serialization. Models own their formatting: `toEntity()`, `toNameOnlyRequestBody()`, etc. Datasources handle API calls and local storage.
 
 ```dart
 // features/products/data/models/product_model.dart
@@ -137,7 +142,7 @@ sealed class ProductModel with _$ProductModel {
 
   const ProductModel._();
 
-  /// Map model to domain entity
+  /// Map to domain entity
   Product toEntity() => Product(
         id: id,
         name: name,
@@ -145,6 +150,12 @@ sealed class ProductModel with _$ProductModel {
         quantity: quantity,
         isActive: isActive,
       );
+  
+  /// Map to API request body with only name (for example)
+  Map<String, dynamic> toNameOnlyRequestBody() => {
+        'id': id,
+        'name': name
+  }
 }
 ```
 

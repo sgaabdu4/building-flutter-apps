@@ -78,6 +78,8 @@ Does it need parameters?
 // Simple data class
 @freezed
 sealed class Product with _$Product {
+  const Product._();  // Required for adding methods/getters
+
   const factory Product({
     required String id,
     required String name,
@@ -85,6 +87,9 @@ sealed class Product with _$Product {
   }) = _Product;
 
   factory Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);
+
+  // Rich domain methods — derive from own fields
+  bool get inStock => quantity > 0;
 }
 
 // Union type (exhaustive pattern matching)
@@ -168,6 +173,8 @@ part 'routes.g.dart';
 | Full re-fetch every sync | `mergeAll` + ID-diff `deleteByIds` | O(all) → O(changed) |
 | `Theme.of(context).colorScheme` | `context.colors` | Use context extensions |
 | `ScaffoldMessenger.of(context)` | `SnackBarUtils.showSuccess()` | Centralized, context-free |
+| Anemic model + extraction in repo/datasource | Rich Model with methods on the model | Keep behavior with data |
+| Missing `@JsonSerializable(explicitToJson: true)` on nested Freezed | Add on factory constructor | Release crash: `_XYZ is not a subtype of Map` |
 
 ## Reference Files
 
@@ -176,7 +183,7 @@ part 'routes.g.dart';
 | Architecture layers, file structure | [architecture.md](references/architecture.md) |
 | Atomic design: tokens → pages | [atomic-design.md](references/atomic-design.md) |
 | Riverpod 3.x codegen patterns | [riverpod-codegen.md](references/riverpod-codegen.md) |
-| Freezed sealed classes, unions | [freezed-sealed.md](references/freezed-sealed.md) |
+| Freezed sealed classes, unions, Rich Models | [freezed-sealed.md](references/freezed-sealed.md) |
 | State management, async, notifiers | [state-management.md](references/state-management.md) |
 | Testing with ProviderContainer.test | [testing.md](references/testing.md) |
 | Pagination, search, forms, delta sync | [common-patterns.md](references/common-patterns.md) |

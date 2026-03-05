@@ -319,3 +319,58 @@ analyzer:
   errors:
     invalid_annotation_target: ignore
 ```
+
+## Rich Models
+
+**Rule: If a method reads only its own fields, it belongs on the model.**
+
+Add `const Entity._()` to enable getters and methods on Freezed classes:
+
+```dart
+@freezed
+sealed class Order with _$Order {
+  const Order._();
+
+  const factory Order({
+    required String id,
+    required List<OrderItem> items,
+    required DateTime createdAt,
+  }) = _Order;
+
+  double get total => items.fold(0, (sum, i) => sum + i.price * i.quantity);
+  List<String> get productIds => items.map((i) => i.productId).toList();
+  OrderSummary toSummary() => OrderSummary(id: id, itemCount: items.length, total: total);
+}
+```
+
+| Belongs on model | Goes elsewhere |
+|-----------------|---------------|
+| Computed getters (`total`, `isExpired`) | Needs external deps (API, DB) → Repository |
+| Boolean checks (`inStock`, `isOverdue`) | Reads multiple unrelated models → Repository |
+| Collection flattening (`allResults`) | Needs Ref/providers → Notifier |
+| Transform to another type (`toClaims()`) | Side effects (HTTP, I/O) → Datasource |
+| Format for API (`toFormFields()`) | |
+
+Data models follow the same rule: `toEntity()`, `toRequestBody()`, `toCsvRow()` all belong on the model.
+
+## Deep Serialization (explicitToJson)
+
+Freezed `toJson()` does **not** deep-serialize nested Freezed objects. This causes `type '_XYZ' is not a subtype of type 'Map<String, dynamic>'` in release builds.
+
+**Rule: Add `@JsonSerializable(explicitToJson: true)` on the factory constructor (not the class) when the model has nested Freezed fields.**
+
+```dart
+@freezed
+sealed class Order with _$Order {
+  @JsonSerializable(explicitToJson: true)  // ← on factory, not class
+  const factory Order({
+    required String id,
+    required List<OrderItem> items,  // nested Freezed
+    required Customer customer,       // nested Freezed
+  }) = _Order;
+
+  factory Order.fromJson(Map<String, dynamic> json) => _$OrderFromJson(json);
+}
+```
+
+Add when model has `List<FreezedClass>`, `FreezedClass`, or `FreezedClass?` fields. Skip for primitives, `DateTime`, and enums.
