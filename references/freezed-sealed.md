@@ -85,7 +85,7 @@ sealed class AuthState with _$AuthState {
 
 // Exhaustive switch — compiler enforces all cases
 Widget build(BuildContext context, WidgetRef ref) {
-  final auth = ref.watch(authNotifierProvider);
+  final auth = ref.watch(authProvider);
   return switch (auth) {
     Authenticated(:final user) => HomeScreen(user: user),
     Unauthenticated() => const LoginScreen(),

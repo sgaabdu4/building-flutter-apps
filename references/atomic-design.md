@@ -294,7 +294,7 @@ class ProductGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
-      productNotifierProvider.select((s) => s.items),
+      productProvider.select((s) => s.items),
     );
 
     return GridView.builder(
@@ -408,7 +408,7 @@ class ProductDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isLoading = ref.watch(
-      productNotifierProvider.select((s) => s.isLoading),
+      productProvider.select((s) => s.isLoading),
     );
 
     if (isLoading) {

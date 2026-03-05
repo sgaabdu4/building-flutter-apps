@@ -1,0 +1,78 @@
+{
+    "skill_name": "building-flutter-apps",
+    "evals": [
+        {
+            "id": 1,
+            "prompt": "I need a new 'notifications' feature module for my Flutter app. It should have a Freezed entity NotificationItem with fields: id (String), title (String), body (String), isRead (bool, default false), createdAt (DateTime). Then a NotificationsNotifier using Riverpod codegen that holds a list of NotificationItem, with methods to markAsRead(id) and clearAll(). Wire it up with proper architecture layers. The app uses the stack from the building-flutter-apps skill.",
+            "expected_output": "Creates a properly layered feature module with domain entity (sealed Freezed class with const constructor and Rich Model getter), repository, notifier using @Riverpod(keepAlive: true) codegen, and checks ref.mounted after awaits. No prop drilling, no StateProvider, no abstract class.",
+            "files": [],
+            "expectations": [
+                "NotificationItem uses `sealed class` not `abstract class`",
+                "NotificationItem has `const NotificationItem._()` private constructor for Rich Model methods",
+                "NotificationItem has a Rich Model getter or method derived from its own fields (e.g., `bool get isRead`)",
+                "NotificationsNotifier uses `@Riverpod(keepAlive: true)` annotation",
+                "NotificationsNotifier extends `_$NotificationsNotifier`",
+                "Uses single `Ref` type, not `AutoDisposeRef` or `NotificationsNotifierRef`",
+                "Contains `if (!ref.mounted) return;` after any await",
+                "Feature is organized into domain/, repositories/, presentation/ subdirectories",
+                "Each class is in its own file",
+                "No StateProvider, StateNotifierProvider, or ChangeNotifierProvider used"
+            ]
+        },
+        {
+            "id": 2,
+            "prompt": "Review this notifier for anti-patterns and fix it:\n\n```dart\nimport 'package:flutter_riverpod/flutter_riverpod.dart';\n\nclass CartState {\n  final List<String> items;\n  final bool isLoading;\n  CartState({this.items = const [], this.isLoading = false});\n}\n\nfinal cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) => CartNotifier(ref));\n\nclass CartNotifier extends StateNotifier<CartState> {\n  final Ref ref;\n  CartNotifier(this.ref) : super(CartState());\n\n  Future<void> loadItems() async {\n    state = CartState(isLoading: true);\n    final items = await ref.read(cartRepoProvider).fetchItems();\n    state = CartState(items: items, isLoading: false);\n  }\n\n  void addItem(String item) {\n    state = CartState(items: [...state.items, item]);\n  }\n}\n```",
+            "expected_output": "Identifies multiple anti-patterns: StateNotifierProvider (should use @riverpod codegen), plain class instead of Freezed sealed class, missing ref.mounted check, no copyWith. Rewrites using Freezed + Riverpod codegen.",
+            "files": [],
+            "expectations": [
+                "Identifies StateNotifierProvider as a legacy anti-pattern",
+                "Replaces with @Riverpod(keepAlive: true) codegen annotation",
+                "Converts CartState to a Freezed sealed class",
+                "Adds ref.mounted check after the await in loadItems",
+                "Uses copyWith instead of manual constructor calls for state updates",
+                "Notifier extends _$CartNotifier (codegen pattern)",
+                "Does not use AutoDisposeRef or CartNotifierRef"
+            ]
+        },
+        {
+            "id": 3,
+            "prompt": "I have a Freezed model `Invoice` that contains a nested `List<LineItem>` where LineItem is also a Freezed class. When I serialize Invoice to JSON in release mode, I get `type '_$LineItemImpl' is not a subtype of type 'Map<String, dynamic>'`. How do I fix this? Both models already have fromJson factories.",
+            "expected_output": "Identifies the missing @JsonSerializable(explicitToJson: true) annotation on the Invoice factory constructor (NOT on the class). Explains that without it, Freezed/json_serializable calls toString() on nested objects instead of their toJson(). Shows the correct placement on the factory constructor.",
+            "files": [],
+            "expectations": [
+                "Identifies the root cause as missing explicitToJson",
+                "Shows @JsonSerializable(explicitToJson: true) on the factory constructor, not the class",
+                "Explains that this is a release-mode-only bug (debug mode may use different serialization paths)",
+                "Does NOT suggest putting the annotation on the class declaration line",
+                "Mentions running build_runner after the fix"
+            ]
+        },
+        {
+            "id": 4,
+            "prompt": "I'm building a settings screen in my Flutter app. The parent settings page fetches the user's preferences and I want to pass them down to child widgets like ThemeSelector, NotificationToggle, etc. What's the right way to share this data with child widgets? I'm using Riverpod.",
+            "expected_output": "Advises AGAINST prop drilling — child widgets should watch the provider directly instead of receiving data through constructor parameters. Shows leaf widgets using ref.watch(provider.select(...)) for minimal rebuilds.",
+            "files": [],
+            "expectations": [
+                "Explicitly warns against prop drilling (passing state through constructors)",
+                "Shows child widgets watching the provider directly with ref.watch",
+                "Uses ref.watch(provider.select((s) => s.specificField)) for leaf widgets",
+                "Does not suggest passing the full state object as a constructor parameter",
+                "Each child widget is a ConsumerWidget, not a plain StatelessWidget"
+            ]
+        },
+        {
+            "id": 5,
+            "prompt": "I need to add offline persistence to my Flutter app's MachineConfig data using Hive. The MachineConfig has fields: id (String), name (String), isActive (bool), lastSyncedAt (DateTime?). Set up the Hive adapter registration and a repository that reads/writes to a Hive box. The app uses @GenerateAdapters.",
+            "expected_output": "Creates a Hive-persisted model using @GenerateAdapters with proper TypeId assignment, a repository with box open/close lifecycle, and follows the project's Hive CE patterns.",
+            "files": [],
+            "expectations": [
+                "Uses @GenerateAdapters annotation (not @HiveType/@HiveField manually)",
+                "Assigns a unique TypeId that doesn't conflict with existing ones",
+                "Repository opens the Hive box and provides CRUD operations",
+                "Handles DateTime serialization properly (Hive supports DateTime natively)",
+                "Box name is a constant, not a hardcoded string repeated everywhere",
+                "Repository is a keepAlive Riverpod provider"
+            ]
+        }
+    ]
+}

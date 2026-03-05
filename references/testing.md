@@ -35,12 +35,12 @@ void main() {
     );
 
     // Read the notifier to trigger build()
-    container.read(productNotifierProvider);
+    container.read(productProvider);
 
     // Wait for async operations
     await Future.delayed(const Duration(milliseconds: 100));
 
-    final state = container.read(productNotifierProvider);
+    final state = container.read(productProvider);
     expect(state.items, hasLength(1));
     expect(state.items.first.name, 'Widget');
     verify(mockRepo.fetchAll()).called(1);
@@ -151,14 +151,14 @@ test('deleteItem removes from state', () async {
   );
 
   // Wait for initial load
-  container.read(productNotifierProvider);
+  container.read(productProvider);
   await Future.delayed(const Duration(milliseconds: 100));
 
   // Delete and verify
-  await container.read(productNotifierProvider.notifier).deleteItem('1');
+  await container.read(productProvider.notifier).deleteItem('1');
   await Future.delayed(const Duration(milliseconds: 100));
 
-  final state = container.read(productNotifierProvider);
+  final state = container.read(productProvider);
   expect(state.items, hasLength(1));
   expect(state.items.first.id, '2');
 });
@@ -217,13 +217,13 @@ test('auth state transitions', () async {
   );
 
   // Initial state is loading
-  final initial = container.read(authNotifierProvider);
+  final initial = container.read(authProvider);
   expect(initial, isA<AuthLoading>());
 
   // Wait for session check
   await Future.delayed(const Duration(milliseconds: 100));
 
-  final state = container.read(authNotifierProvider);
+  final state = container.read(authProvider);
   expect(state, isA<Authenticated>());
 
   // Pattern match to verify user

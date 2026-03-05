@@ -25,6 +25,24 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'my_file.g.dart';
 ```
 
+## Generated Provider Names
+
+Riverpod 3.x strips the "Notifier" suffix from class-based provider names:
+
+| Class | Generated Provider |
+|---|---|
+| `CartNotifier` | `cartProvider` |
+| `ProductNotifier` | `productProvider` |
+| `AuthNotifier` | `authProvider` |
+
+Functional providers keep their full name:
+| Function | Generated Provider |
+|---|---|
+| `productRepository(Ref)` | `productRepositoryProvider` |
+| `cartTotal(Ref)` | `cartTotalProvider` |
+
+Never write `xxxNotifierProvider` — it does not exist in codegen output.
+
 ## Provider Types
 
 ### keepAlive Providers (long-lived)
@@ -63,7 +81,7 @@ For computed values, one-time fetches, and derived state:
 // Computed value — disposes when no widget watches it
 @riverpod
 int cartTotal(Ref ref) {
-  final items = ref.watch(cartNotifierProvider.select((s) => s.items));
+  final items = ref.watch(cartProvider.select((s) => s.items));
   return items.fold(0, (sum, item) => sum + item.price.toInt());
 }
 

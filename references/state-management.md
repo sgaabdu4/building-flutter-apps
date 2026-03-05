@@ -177,7 +177,7 @@ class UserNotifier extends _$UserNotifier {
 class UserProfile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(userNotifierProvider);
+    final userAsync = ref.watch(userProvider);
     return switch (userAsync) {
       AsyncData(:final value) => Text(value.name),
       AsyncError(:final error) => Text('Error: $error'),
@@ -197,8 +197,8 @@ class DashboardNotifier extends _$DashboardNotifier {
   @override
   Future<DashboardData> build() async {
     // Both providers load in parallel
-    final user = ref.watch(userNotifierProvider).requireValue;
-    final products = ref.watch(productNotifierProvider).requireValue;
+    final user = ref.watch(userProvider).requireValue;
+    final products = ref.watch(productProvider).requireValue;
 
     return DashboardData(user: user, products: products);
   }
@@ -287,8 +287,8 @@ class OrderNotifier extends _$OrderNotifier {
   OrderState build() => const OrderState();
 
   Future<void> placeOrder() async {
-    final cart = ref.read(cartNotifierProvider);
-    final user = ref.read(authNotifierProvider);
+    final cart = ref.read(cartProvider);
+    final user = ref.read(authProvider);
 
     if (user case Authenticated(:final user)) {
       await ref.read(orderRepositoryProvider).create(
@@ -298,7 +298,7 @@ class OrderNotifier extends _$OrderNotifier {
       if (!ref.mounted) return;
 
       // Reset cart after order
-      ref.read(cartNotifierProvider.notifier).clear();
+      ref.read(cartProvider.notifier).clear();
     }
   }
 }

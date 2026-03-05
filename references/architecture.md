@@ -266,7 +266,7 @@ class ProductListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isLoading = ref.watch(
-      productNotifierProvider.select((s) => s.isLoading),
+      productProvider.select((s) => s.isLoading),
     );
 
     if (isLoading) return const Center(child: CircularProgressIndicator());
@@ -281,7 +281,7 @@ class ProductListView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
-      productNotifierProvider.select((s) => s.items),
+      productProvider.select((s) => s.items),
     );
 
     return ListView.builder(

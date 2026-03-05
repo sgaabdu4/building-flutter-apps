@@ -62,16 +62,16 @@ class PaginatedProductList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
-      paginatedProductNotifierProvider.select((s) => s.items),
+      paginatedProductProvider.select((s) => s.items),
     );
     final hasMore = ref.watch(
-      paginatedProductNotifierProvider.select((s) => s.hasMore),
+      paginatedProductProvider.select((s) => s.hasMore),
     );
 
     return NotificationListener<ScrollNotification>(
       onNotification: (scroll) {
         if (scroll.metrics.pixels >= scroll.metrics.maxScrollExtent - 200) {
-          ref.read(paginatedProductNotifierProvider.notifier).loadMore();
+          ref.read(paginatedProductProvider.notifier).loadMore();
         }
         return false;
       },
@@ -160,7 +160,7 @@ sealed class FilterableState with _$FilterableState {
 
 // Widget — use .select() on the computed getter
 final items = ref.watch(
-  filterableNotifierProvider.select((s) => s.displayItems),
+  filterableProvider.select((s) => s.displayItems),
 );
 ```
 
@@ -271,12 +271,12 @@ class ProductListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
-      productNotifierProvider.select((s) => s.items),
+      productProvider.select((s) => s.items),
     );
 
     return RefreshIndicator(
       onRefresh: () async {
-        await ref.read(productNotifierProvider.notifier).refresh();
+        await ref.read(productProvider.notifier).refresh();
       },
       child: ListView.builder(
         itemCount: items.length,

@@ -13,7 +13,7 @@ Watch providers in the smallest widget possible. Never watch in a parent and pas
 class ParentWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(userNotifierProvider);
+    final user = ref.watch(userProvider);
     return Column(children: [
       UserName(name: user.name),   // prop drilling
       UserEmail(email: user.email),
@@ -28,7 +28,7 @@ class UserName extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final name = ref.watch(
-      userNotifierProvider.select((s) => s.name),
+      userProvider.select((s) => s.name),
     );
     return Text(name);
   }
@@ -42,12 +42,12 @@ class UserName extends ConsumerWidget {
 ```dart
 // Rebuilds only when items change, not when isLoading or error change
 final items = ref.watch(
-  productNotifierProvider.select((s) => s.items),
+  productProvider.select((s) => s.items),
 );
 
 // Watch multiple fields with a record
 final (:isLoading, :error) = ref.watch(
-  productNotifierProvider.select((s) => (isLoading: s.isLoading, error: s.error)),
+  productProvider.select((s) => (isLoading: s.isLoading, error: s.error)),
 );
 ```
 
@@ -184,7 +184,7 @@ FadeInImage.memoryNetwork(
 // WRONG — sorts on every rebuild
 @override
 Widget build(BuildContext context, WidgetRef ref) {
-  final items = ref.watch(productNotifierProvider.select((s) => s.items));
+  final items = ref.watch(productProvider.select((s) => s.items));
   final sorted = items.toList()..sort((a, b) => a.name.compareTo(b.name));
   return ListView(...);
 }
@@ -192,7 +192,7 @@ Widget build(BuildContext context, WidgetRef ref) {
 // RIGHT — compute in notifier or use a computed provider
 @riverpod
 List<Product> sortedProducts(Ref ref) {
-  final items = ref.watch(productNotifierProvider.select((s) => s.items));
+  final items = ref.watch(productProvider.select((s) => s.items));
   return items.toList()..sort((a, b) => a.name.compareTo(b.name));
 }
 ```
