@@ -2,6 +2,8 @@
 
 Flutter clean architecture with four layers. Dependencies flow inward: Presentation → Repository → Domain → Data.
 
+**Contents:** [Full Directory Structure](#full-directory-structure) | [Layer Responsibilities](#layer-responsibilities) | [Complexity Tiers](#complexity-tiers) | [Design Tokens](#design-tokens) | [Atomic Design for Widgets](#atomic-design-for-widgets)
+
 ## Full Directory Structure
 
 ```

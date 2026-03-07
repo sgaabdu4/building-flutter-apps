@@ -2,6 +2,8 @@
 
 Flutter-specific techniques for rendering, scrolling, animations, layout, concurrency, app size, accessibility, and adaptive UI.
 
+**Contents:** [Keys](#keys) | [Slivers](#slivers) | [Animations](#animations) | [Rendering Costs](#rendering-costs) | [Isolates](#isolates) | [App Size](#app-size) | [Accessibility](#accessibility) | [Adaptive & Responsive](#adaptive--responsive) | [Build Modes](#build-modes) | [Impeller](#impeller) | [Frame Budget](#frame-budget) | [RepaintBoundary](#repaintboundary) | [Preserving Tab State](#preserving-tab-state) | [Post-Frame Callbacks](#post-frame-callbacks)
+
 ## Keys
 
 Keys preserve widget state when the widget tree changes.

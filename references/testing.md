@@ -13,6 +13,35 @@ dev_dependencies:
   build_runner: ^2.4.0
 ```
 
+## Mock Generation
+
+Use `@GenerateMocks` to generate mocks. Run `dart run build_runner build -d` after adding annotations:
+
+```dart
+import 'package:mockito/annotations.dart';
+import 'package:mockito/mockito.dart';
+
+@GenerateMocks([ProductRepository, AuthRepository])
+import 'product_notifier_test.mocks.dart';
+```
+
+**Fake vs Mock** — Use mocks (Mockito) when you need to verify interactions (`verify`, `when`). Use fakes (manual subclass) when you need working implementations with controlled behavior:
+
+```dart
+// Fake: real behavior, controlled output
+class FakeProductRepository extends Fake implements ProductRepository {
+  List<Product> items = [];
+
+  @override
+  Future<List<Product>> fetchAll() async => items;
+}
+
+// Mock: verify calls + stub returns
+final mock = MockProductRepository();
+when(mock.fetchAll()).thenAnswer((_) async => [product]);
+verify(mock.fetchAll()).called(1);
+```
+
 ## ProviderContainer.test
 
 Replaces the manual `createContainer` pattern. Auto-disposes after each test:

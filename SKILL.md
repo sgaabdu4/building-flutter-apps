@@ -1,10 +1,10 @@
 ---
 name: building-flutter-apps
-description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, Hive CE persistence, and showcaseview guided tours. Use when building, reviewing, or refactoring Flutter apps with Riverpod state management. Covers architecture layers, state management, local storage, onboarding tours, testing, performance, pagination, search, and forms.
+description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, Hive CE persistence, and ShowcaseView guided tours. Use when building, reviewing, or refactoring Flutter apps that use Riverpod for state management. Covers feature module scaffolding, AsyncNotifier patterns, provider select optimization, Freezed unions and JSON serialization, GoRouter redirects, Hive repositories, pagination, forms, anti-patterns, and testing. Does NOT apply to Provider/BLoC/GetX, non-Flutter frameworks, backend-only Dart, or Firebase-only questions.
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "3.2.0"
+  version: "3.3.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage, showcaseview, guided-tours, onboarding
 ---
 
@@ -14,18 +14,14 @@ Flutter clean architecture skill using Riverpod 3.x (codegen), Freezed 3.x (seal
 
 ## Core Stack
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| flutter_riverpod | 3.2.1+ | State management |
-| riverpod_annotation | 3.x | Codegen annotations |
-| riverpod_generator | 3.x | Provider code generation |
-| freezed | 3.2.5+ | Immutable data classes, unions |
-| freezed_annotation | 3.x | Freezed annotations |
-| go_router | 17.1.0+ | Declarative routing |
-| go_router_builder | 4.2.0+ | Type-safe route code generation |
-| showcaseview | 5.0.1+ | First-run guided tours |
-| json_serializable | latest | JSON serialization |
-| build_runner | latest | Code generation |
+| Package | Purpose |
+|---------|----------|
+| flutter_riverpod + riverpod_annotation + riverpod_generator | State management (codegen) |
+| freezed + freezed_annotation | Immutable data classes, unions |
+| go_router + go_router_builder | Declarative, type-safe routing |
+| json_serializable + build_runner | JSON serialization + code generation |
+| showcaseview | First-run guided tours |
+| hive_ce + hive_ce_flutter | Local persistence |
 
 ## Architecture
 
@@ -43,18 +39,18 @@ lib/
 └── main.dart
 ```
 
-Each layer has one job. Domain holds pure Dart entities. Data holds models and datasources. Repositories bridge them. Presentation manages state and UI.
+Each layer has one job. Domain holds pure Dart entities. Data holds models (with `toEntity()`) and datasources. Repositories bridge them — mapping models→entities. Presentation manages state and UI. **Always create separate data models and domain entities** even for simple features; repositories call `model.toEntity()` to convert.
 
 ## Critical Rules
 
-1. **Codegen only** — Use `@riverpod` / `@Riverpod(keepAlive: true)`. Never use `StateProvider`, `StateNotifierProvider`, or `ChangeNotifierProvider`.
-2. **Sealed classes** — All Freezed classes use `sealed class`, not `abstract class`.
-3. **No prop drilling** — Child widgets watch providers directly. Never pass provider state through constructor parameters.
-4. **Guard async** — Check `if (!ref.mounted) return;` after every `await` in notifiers.
-5. **Single Ref** — Riverpod 3.0 uses one `Ref` type. No `AutoDisposeRef`, no `FutureProviderRef`, no `ExampleRef`.
-6. **Equality filtering** — All providers use `==` to filter notifications. Override `updateShouldNotify` only when needed.
-7. **Select in leaves** — Use `ref.watch(provider.select((s) => s.field))` in leaf widgets. Watch full state only when necessary.
-8. **One file per class** — Each entity, model, notifier, screen, and widget gets its own file.
+1. **Codegen only** — Use `@riverpod` / `@Riverpod(keepAlive: true)`. Legacy providers (`StateProvider`, etc.) are deprecated and lack codegen benefits.
+2. **Sealed classes** — All Freezed classes use `sealed class`, not `abstract class`. Dart's `sealed` enables exhaustive `switch` — the compiler catches missing cases.
+3. **No prop drilling** — Child widgets watch providers directly. Passing state through constructors couples parent-child and bypasses `select()` optimization.
+4. **Guard async** — Check `if (!ref.mounted) return;` after every `await` in notifiers. The notifier may be disposed while the future is in flight.
+5. **Single Ref** — Riverpod 3.0 unified all Ref types. `AutoDisposeRef`, `FutureProviderRef`, `ExampleRef` no longer exist.
+6. **Equality filtering** — Providers use `==` to skip redundant notifications. Override `updateShouldNotify` only when default equality is insufficient.
+7. **Select in leaves** — Use `ref.watch(provider.select((s) => s.field))` in leaf widgets. Watching full state rebuilds the widget on every field change.
+8. **One file per class** — Each entity, model, notifier, screen, and widget gets its own file. Avoids circular imports and keeps codegen output manageable.
 
 ## Provider Decision Tree
 
@@ -139,19 +135,6 @@ dart run build_runner build -d
 dart run build_runner clean && dart run build_runner build -d
 ```
 
-## Quick Imports
-
-```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:go_router/go_router.dart';
-import 'package:my_app/core/extensions/extensions.dart'; // All context/string/date extensions
-
-// In route files
-part 'routes.g.dart';
-```
-
 ## Anti-Patterns
 
 | Wrong | Right | Why |
@@ -165,30 +148,33 @@ part 'routes.g.dart';
 | `ExampleRef ref` in codegen | `Ref ref` in codegen | Ref subclasses removed |
 | Try-catch at every layer | Catch once in notifier | Useless rethrows |
 | `context.go('/path')` string routes | `const MyRoute().go(context)` typed | No compile-time safety |
-| `context.go()` between peer routes for URL update | `GoRouter.optionURLReflectsImperativeAPIs = true` + `push`/`pop` | `go` loses directional animation; this flag makes `push`/`pop` update the browser URL |
-| Redirect to splash during `loading` for all pages | `return null` during loading for non-setup pages | On web refresh, bouncing `/chat` → `/` → `/home` loses the URL; stay on current page until auth resolves |
-| Rely only on GoRouter redirect for post-login nav | Add `ref.listen(authProvider)` in auth pages as fallback | `refreshListenable` timing is unreliable; explicit navigation from login/signup guarantees the transition |
-| Setting auth-level `isLoading` during OAuth | Use per-button loading (`isGoogleLoading`) | Auth `isLoading` triggers `SetupStatus.loading` → premature splash redirect before OAuth completes |
-| `ref.watch()` inside GoRouter redirect | `ref.listen()` + `refreshListenable` + `ref.read()` in redirect | `ref.watch` recreates router on every state change, resetting route stack |
-| Full re-fetch every sync | `mergeAll` + ID-diff `deleteByIds` | O(all) → O(changed) |
-| `Theme.of(context).colorScheme` | `context.colors` | Use context extensions |
-| `ScaffoldMessenger.of(context)` | `SnackBarUtils.showSuccess()` | Centralized, context-free |
 | Anemic model + extraction in repo/datasource | Rich Model with methods on the model | Keep behavior with data |
-| Missing `@JsonSerializable(explicitToJson: true)` on nested Freezed | Add on factory constructor | Release crash: `_XYZ is not a subtype of Map` |
+| Per-class `@JsonSerializable(explicitToJson: true)` | `explicit_to_json: true` in `build.yaml` | One global config; no per-class annotations |
+| Entity directly in datasources | Data `Model` with `toEntity()` in repository | Domain stays pure; repo maps model→entity |
+| `@Freezed(toJson: true)` when `fromJson` exists | Plain `@freezed` | Freezed auto-generates `toJson` when `fromJson` uses `=>` |
+| Using `context` after `await` | `if (!context.mounted) return;` | Context may be invalid after async gap |
+| Raw `Map`/`List` as `.family` param | Use Freezed object or primitives | `==` fails on collections, breaks provider caching |
+| Provider for ephemeral local state | `StatefulWidget` local state | Providers are for shared/cross-widget state |
+
+Router, sync, and utility anti-patterns are in their reference files:
+[common-patterns.md](references/common-patterns.md) (GoRouter redirect, delta sync) |
+[extensions-utilities.md](references/extensions-utilities.md) (context extensions, SnackBarUtils)
 
 ## Reference Files
 
-| Topic | File |
-|-------|------|
-| Architecture layers, file structure | [architecture.md](references/architecture.md) |
-| Atomic design: tokens → pages | [atomic-design.md](references/atomic-design.md) |
-| Riverpod 3.x codegen patterns | [riverpod-codegen.md](references/riverpod-codegen.md) |
-| Freezed sealed classes, unions, Rich Models | [freezed-sealed.md](references/freezed-sealed.md) |
-| State management, async, notifiers | [state-management.md](references/state-management.md) |
-| Testing with ProviderContainer.test | [testing.md](references/testing.md) |
-| Pagination, search, forms, delta sync | [common-patterns.md](references/common-patterns.md) |
-| Performance, rebuilds, optimization | [performance.md](references/performance.md) |
-| Keys, slivers, animations, isolates, accessibility, adaptive | [flutter-optimizations.md](references/flutter-optimizations.md) |
-| Context extensions, string/date utils, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) |
-| Hive CE persistence, @GenerateAdapters, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) |
-| Showcase guided tours, mixin, v5 API | [showcase-tours.md](references/showcase-tours.md) |
+Consult the relevant reference when working on that topic. Each file has a Contents line at the top.
+
+| Topic | File | Consult when |
+|-------|------|--------------|
+| Architecture layers, file structure | [architecture.md](references/architecture.md) | Creating feature modules, choosing layers |
+| Atomic design: tokens → pages | [atomic-design.md](references/atomic-design.md) | Building shared widgets in `core/widgets/` |
+| Riverpod 3.x codegen patterns | [riverpod-codegen.md](references/riverpod-codegen.md) | Writing providers, mutations, lifecycle |
+| Freezed sealed classes, unions, Rich Models | [freezed-sealed.md](references/freezed-sealed.md) | Creating entities, models, unions, serialization |
+| State management, async, notifiers | [state-management.md](references/state-management.md) | Writing notifiers, error handling, cross-provider |
+| Testing with ProviderContainer.test | [testing.md](references/testing.md) | Writing unit or widget tests |
+| Pagination, search, forms, delta sync | [common-patterns.md](references/common-patterns.md) | Lists, search, forms, GoRouter, sync |
+| Performance, rebuilds, optimization | [performance.md](references/performance.md) | Debugging slow rebuilds, memory |
+| Keys, slivers, animations, isolates, accessibility, adaptive | [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency, a11y |
+| Context extensions, string/date utils, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) | Adding utilities, extensions, validators |
+| Hive CE persistence, @GenerateAdapters, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
+| Showcase guided tours, mixin, v5 API | [showcase-tours.md](references/showcase-tours.md) | Adding first-run tours to screens |

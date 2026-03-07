@@ -2,6 +2,8 @@
 
 All Freezed classes use `sealed` for exhaustive pattern matching with Dart's `switch` expressions.
 
+**Contents:** [Setup](#setup) | [Simple Data Classes](#simple-data-classes) | [Adding Methods and Getters](#adding-methods-and-getters) | [Union Types](#union-types) | [AsyncValue Pattern Matching](#asyncvalue-pattern-matching) | [Feature State](#feature-state) | [Deep Copy](#deep-copy) | [JSON Serialization](#json-serialization) | [Non-Constant Default Values](#non-constant-default-values) | [Inheritance](#inheritance) | [Mutable Classes](#mutable-classes) | [Configuration](#configuration) | [Linting](#linting) | [Rich Models](#rich-models) | [Deep Serialization](#deep-serialization)
+
 ## Setup
 
 ```yaml
@@ -105,7 +107,7 @@ final asyncData = ref.watch(myAsyncProvider);
 return switch (asyncData) {
   AsyncData(:final value) => Text(value.toString()),
   AsyncError(:final error) => Text('Error: $error'),
-  AsyncLoading() => const CircularProgressIndicator(),
+  AsyncLoading() => const ShimmerPlaceholder(), // Prefer skeleton/shimmer over bare CircularProgressIndicator
 };
 ```
 
@@ -353,24 +355,39 @@ sealed class Order with _$Order {
 
 Data models follow the same rule: `toEntity()`, `toRequestBody()`, `toCsvRow()` all belong on the model.
 
-## Deep Serialization (explicitToJson)
+## Deep Serialization
 
-Freezed `toJson()` does **not** deep-serialize nested Freezed objects. This causes `type '_XYZ' is not a subtype of type 'Map<String, dynamic>'` in release builds.
+Freezed does not deep-serialize nested objects by default. Without explicit configuration, nested Freezed objects serialize as `Instance of '_XYZ'` instead of JSON maps — causing `type '_XYZ' is not a subtype of Map<String, dynamic>` crashes in release builds.
 
-**Rule: Add `@JsonSerializable(explicitToJson: true)` on the factory constructor (not the class) when the model has nested Freezed fields.**
+### Why build.yaml Is Required
 
-```dart
-@freezed
-sealed class Order with _$Order {
-  @JsonSerializable(explicitToJson: true)  // ← on factory, not class
-  const factory Order({
-    required String id,
-    required List<OrderItem> items,  // nested Freezed
-    required Customer customer,       // nested Freezed
-  }) = _Order;
+Freezed auto-generates `toJson()` when a `fromJson` factory exists (using `=>`). That part works without configuration. But the generated `toJson()` does NOT call `.toJson()` on nested objects unless `explicit_to_json` is enabled.
 
-  factory Order.fromJson(Map<String, dynamic> json) => _$OrderFromJson(json);
-}
+Two separate concerns:
+- **Whether** `toJson()` exists → Freezed handles this automatically when `fromJson` is present
+- **How** `toJson()` serializes nested objects → requires `explicit_to_json: true`
+
+`@Freezed(toJson: true)` only controls the first concern. It is redundant when `fromJson` exists. It does NOT enable deep serialization.
+
+### Global Fix: build.yaml
+
+Set `explicit_to_json: true` once in `build.yaml`. All nested objects serialize correctly project-wide:
+
+```yaml
+# build.yaml (project root)
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          explicit_to_json: true
 ```
 
-Add when model has `List<FreezedClass>`, `FreezedClass`, or `FreezedClass?` fields. Skip for primitives, `DateTime`, and enums.
+### Quick Reference
+
+| Setting | What it does | When needed |
+|---|---|---|
+| `@freezed` + `fromJson` factory | Generates both `fromJson` and `toJson` | Always — standard Freezed pattern |
+| `build.yaml explicit_to_json` | Calls `.toJson()` on nested objects | Always — set once, forget |
+| `@Freezed(toJson: true)` | Forces `toJson` generation | Only if class has NO `fromJson` factory (rare) |
+| `@JsonSerializable(explicitToJson: true)` | Per-class deep serialization (legacy) | Never — build.yaml replaces it |

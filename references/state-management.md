@@ -2,6 +2,8 @@
 
 Notifier patterns to manage mutable state with Riverpod 3.x codegen.
 
+**Contents:** [Notifier Structure](#notifier-structure) | [ref.mounted Guard](#refmounted-guard) | [Optimistic Updates](#optimistic-updates) | [Preventing Duplicate Fetches](#preventing-duplicate-fetches) | [Async Initialization](#async-initialization) | [AsyncNotifier Pattern](#asyncnotifier-pattern) | [AsyncValue.requireValue](#asyncvaluerequirevalue) | [Loading Progress](#loading-progress) | [Cleanup](#cleanup) | [Error Handling Strategy](#error-handling-strategy) | [Domain Error Types](#domain-error-types) | [Cross-Provider Communication](#cross-provider-communication)
+
 ## Notifier Structure
 
 Every feature notifier follows the same pattern:
@@ -164,6 +166,15 @@ class UserNotifier extends _$UserNotifier {
     return repo.getCurrentUser();
   }
 
+  /// Refresh while preserving previous data visible to the UI
+  Future<void> refresh() async {
+    state = const AsyncLoading<User>().copyWithPrevious(state);
+    state = await AsyncValue.guard(() async {
+      final repo = ref.read(userRepositoryProvider);
+      return repo.getCurrentUser();
+    });
+  }
+
   Future<void> updateName(String name) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
@@ -180,12 +191,17 @@ class UserProfile extends ConsumerWidget {
     final userAsync = ref.watch(userProvider);
     return switch (userAsync) {
       AsyncData(:final value) => Text(value.name),
-      AsyncError(:final error) => Text('Error: $error'),
-      AsyncLoading() => const CircularProgressIndicator(),
+      AsyncError(:final error) => ErrorRetry(
+        message: error.toString(),
+        onRetry: () => ref.invalidate(userProvider),
+      ),
+      AsyncLoading() => const ShimmerPlaceholder(), // Prefer shimmer over bare spinner
     };
   }
 }
 ```
+
+**Key:** `AsyncValue.guard` wraps try-catch and assigns `AsyncData` or `AsyncError` atomically. No explicit `ref.mounted` check needed — guard handles the state assignment in one step. Use `copyWithPrevious` during refresh to keep previous data visible while loading.
 
 ## AsyncValue.requireValue
 
@@ -274,6 +290,42 @@ Future<void> _load() async {
     state = state.copyWith(error: e.toString());
   }
 }
+```
+
+### Domain Error Types
+
+Define a sealed error hierarchy for typed error handling in notifiers:
+
+```dart
+// core/domain/app_error.dart
+@freezed
+sealed class AppError with _$AppError {
+  const factory AppError.network(String message) = NetworkError;
+  const factory AppError.validation(String field, String message) = ValidationError;
+  const factory AppError.notFound(String resource) = NotFoundError;
+  const factory AppError.unauthorized() = UnauthorizedError;
+  const factory AppError.unexpected(Object error) = UnexpectedError;
+}
+```
+
+Use in notifier state and pattern-match in UI:
+
+```dart
+// State holds typed error instead of raw string
+@freezed
+sealed class ProductState with _$ProductState {
+  const factory ProductState({
+    @Default([]) List<Product> items,
+    @Default(false) bool isLoading,
+    AppError? error,
+  }) = _ProductState;
+}
+
+// UI pattern-matches for user-friendly display
+if (state.error case NetworkError(:final message))
+  ErrorBanner(message: message, onRetry: () => ref.read(productProvider.notifier).refresh())
+else if (state.error case NotFoundError(:final resource))
+  Text('$resource not found')
 ```
 
 ## Cross-Provider Communication

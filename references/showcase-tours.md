@@ -2,6 +2,8 @@
 
 First-run guided tours using `showcaseview` v5. Each screen manages its own tour via a shared mixin, a styled wrapper widget, and a persistence service.
 
+**Contents:** [Package](#package) | [Architecture](#architecture) | [ShowcaseScreenMixin](#showcasescreenmixin) | [AppShowcaseTarget](#appshowasetarget) | [ShowcaseService](#showcaseservice) | [ShowcaseKeys](#showcasekeys) | [Adding a Tour to a New Screen](#adding-a-tour-to-a-new-screen) | [Testing](#testing) | [Resetting Tours](#resetting-tours-shell-route-caveat) | [Constraints](#constraints)
+
 ## Package
 
 ```yaml

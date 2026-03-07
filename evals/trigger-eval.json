@@ -1,0 +1,82 @@
+[
+    {
+        "query": "I'm building a new user profile feature for my Flutter app — it needs a ProfileNotifier to manage the state, a Freezed entity for the user data, and a repository that fetches from a REST API. Can you set up the feature module with proper architecture layers?",
+        "should_trigger": true
+    },
+    {
+        "query": "my riverpod provider keeps rebuilding everything when only one field changes, how do I use select() to minimize rebuilds in leaf widgets? I'm using riverpod 3.x with codegen",
+        "should_trigger": true
+    },
+    {
+        "query": "I have a GoRouter redirect that uses ref.watch and it keeps resetting my route stack whenever auth state changes. What's going wrong and how do I fix it?",
+        "should_trigger": true
+    },
+    {
+        "query": "can you review this notifier for anti-patterns? it's using StateNotifierProvider and an abstract class with Freezed, and I don't think it's following best practices for Riverpod 3.x:\n\nclass CartNotifier extends StateNotifier<CartState> { ... }",
+        "should_trigger": true
+    },
+    {
+        "query": "I need to add Hive persistence to my Flutter app for caching machine configs locally. The model has id, name, isActive, lastSyncedAt fields. How do I set up @GenerateAdapters and a repository?",
+        "should_trigger": true
+    },
+    {
+        "query": "When I serialize my Freezed model to JSON in release mode, nested objects come out as 'Instance of _XYZ' instead of proper JSON maps. Both models have fromJson factories. How do I fix the nested serialization?",
+        "should_trigger": true
+    },
+    {
+        "query": "I want to add a first-run guided tour to my settings screen using showcaseview. How do I set up the mixin and showcase targets?",
+        "should_trigger": true
+    },
+    {
+        "query": "what's the right way to structure a Flutter feature module? I keep putting everything in one file and it's getting messy. Using riverpod for state management",
+        "should_trigger": true
+    },
+    {
+        "query": "I need to implement pagination with infinite scroll in my product list. The API returns pages of 20 items, and I need isLoadingMore and hasMore state tracking in my notifier",
+        "should_trigger": true
+    },
+    {
+        "query": "Should I use abstract class or sealed class for my Freezed union types? My team lead says sealed is better for Dart 3 but I'm not sure why",
+        "should_trigger": true
+    },
+    {
+        "query": "I'm setting up a new React Native project with Redux Toolkit and React Navigation. Can you create the folder structure with feature-based architecture and set up the store?",
+        "should_trigger": false
+    },
+    {
+        "query": "How do I implement server-side rendering with Next.js 14 app router? I need to fetch data on the server and pass it to client components",
+        "should_trigger": false
+    },
+    {
+        "query": "I need to build a REST API in Dart using shelf package with middleware for authentication and logging. No Flutter, just a backend server",
+        "should_trigger": false
+    },
+    {
+        "query": "Can you help me set up Provider (not Riverpod) for state management in my Flutter app? I want to use ChangeNotifierProvider and Consumer widgets",
+        "should_trigger": false
+    },
+    {
+        "query": "I'm using GetX for my Flutter app — can you help me create a GetxController with reactive state and GetMaterialApp routing?",
+        "should_trigger": false
+    },
+    {
+        "query": "Write a Dart CLI tool that reads a CSV file and generates a JSON report. No Flutter, no UI — just a command-line script that uses dart:io",
+        "should_trigger": false
+    },
+    {
+        "query": "I need to configure my Flutter app's Firebase Cloud Messaging for push notifications. How do I set up the firebase_messaging plugin and handle background messages?",
+        "should_trigger": false
+    },
+    {
+        "query": "Help me write unit tests for a pure Dart function that calculates shipping costs. No Flutter widgets or state management involved, just testing business logic",
+        "should_trigger": false
+    },
+    {
+        "query": "I'm using BLoC pattern with flutter_bloc package for my app's state management. How do I create a Cubit with states and emit changes?",
+        "should_trigger": false
+    },
+    {
+        "query": "Can you help me set up a SwiftUI app with MVVM architecture and Combine for reactive data binding? I'm building an iOS-only app",
+        "should_trigger": false
+    }
+]

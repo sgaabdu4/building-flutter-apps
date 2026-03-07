@@ -2,6 +2,8 @@
 
 Context extensions, type extensions, and reusable utilities that eliminate boilerplate. For snackbars, use the centralized `SnackBarUtils` instead of `ScaffoldMessenger.of(context)`.
 
+**Contents:** [Context Extensions](#context-extensions) | [String Extensions](#string-extensions) | [DateTime Extensions](#datetime-extensions) | [Iterable Extensions](#iterable-extensions) | [Widget List Extensions](#widget-list-extensions) | [SnackBar Utility](#snackbar-utility) | [Debouncer](#debouncer) | [Validators](#validators) | [Result Type](#result-type) | [Barrel Export](#barrel-export)
+
 ## Context Extensions
 
 ```dart

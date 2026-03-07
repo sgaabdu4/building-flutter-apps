@@ -37,13 +37,13 @@
         {
             "id": 3,
             "prompt": "I have a Freezed model `Invoice` that contains a nested `List<LineItem>` where LineItem is also a Freezed class. When I serialize Invoice to JSON in release mode, I get `type '_$LineItemImpl' is not a subtype of type 'Map<String, dynamic>'`. How do I fix this? Both models already have fromJson factories.",
-            "expected_output": "Identifies the missing @JsonSerializable(explicitToJson: true) annotation on the Invoice factory constructor (NOT on the class). Explains that without it, Freezed/json_serializable calls toString() on nested objects instead of their toJson(). Shows the correct placement on the factory constructor.",
+            "expected_output": "Identifies the root cause as missing explicit_to_json configuration. Recommends adding `explicit_to_json: true` in build.yaml under json_serializable options as the project-wide fix. Explains that without it, json_serializable calls toString() on nested objects instead of toJson(). Mentions running build_runner after the fix.",
             "files": [],
             "expectations": [
-                "Identifies the root cause as missing explicitToJson",
-                "Shows @JsonSerializable(explicitToJson: true) on the factory constructor, not the class",
+                "Identifies the root cause as missing explicitToJson / explicit_to_json configuration",
+                "Recommends build.yaml with explicit_to_json: true as the global fix",
                 "Explains that this is a release-mode-only bug (debug mode may use different serialization paths)",
-                "Does NOT suggest putting the annotation on the class declaration line",
+                "Does NOT suggest per-class @JsonSerializable(explicitToJson: true) as the primary fix",
                 "Mentions running build_runner after the fix"
             ]
         },
@@ -72,6 +72,300 @@
                 "Handles DateTime serialization properly (Hive supports DateTime natively)",
                 "Box name is a constant, not a hardcoded string repeated everywhere",
                 "Repository is a keepAlive Riverpod provider"
+            ]
+        },
+        {
+            "id": 6,
+            "prompt": "I'm starting a new Flutter project for a small clinic. It needs: patient list, patient detail, and an 'add patient' form. I'm using Riverpod, Freezed, GoRouter, and Hive. Can you set up the project architecture — folder structure, entities, routing — just the scaffolding, no actual API calls yet.",
+            "expected_output": "Creates a 4-layer architecture (data/domain/repositories/presentation) under a 'patients' feature module. Patient entity uses Freezed sealed class with Rich Model methods. GoRouter with typed routes for list, detail, and add screens. Main.dart bootstraps with ProviderScope and MaterialApp.router.",
+            "files": [],
+            "expectations": [
+                "Creates lib/features/patients/ with data/, domain/, repositories/, presentation/ subdirectories",
+                "Patient entity is a Freezed sealed class with const constructor",
+                "GoRouter uses typed routes (go_router_builder), not string paths",
+                "main.dart wraps app in ProviderScope",
+                "Uses MaterialApp.router with routerConfig",
+                "Each class is in its own file",
+                "No StateProvider or legacy provider patterns"
+            ]
+        },
+        {
+            "id": 7,
+            "prompt": "I have a product list screen and I want to add a search bar that filters products as the user types. It should debounce the input so we're not firing a filter on every keystroke. The products come from a Riverpod provider. Show me how to wire this up.",
+            "expected_output": "Creates a SearchNotifier with debounce using a Debouncer utility. State holds query and filtered results. Uses ref.onDispose to cancel the debouncer. Search bar widget watches the notifier directly (no prop drilling).",
+            "files": [],
+            "expectations": [
+                "Uses a Debouncer utility (Timer-based) for debouncing input",
+                "Debouncer is disposed via ref.onDispose in the notifier",
+                "SearchState is a Freezed sealed class with query and results fields",
+                "Search bar widget is a ConsumerWidget that watches the notifier",
+                "No prop drilling — widgets watch providers directly",
+                "Uses @riverpod or @Riverpod codegen annotation",
+                "Contains ref.mounted check if there's an async operation"
+            ]
+        },
+        {
+            "id": 8,
+            "prompt": "I need to write tests for my OrderNotifier. It has methods: loadOrders(), placeOrder(order), and cancelOrder(id). The notifier depends on an OrderRepository provider. Show me the full test file with mocks and different test cases.",
+            "expected_output": "Creates a test file with @GenerateMocks for OrderRepository. Uses ProviderContainer.test() with overrides. Tests each method including state transitions, error handling, and verifying repository calls.",
+            "files": [],
+            "expectations": [
+                "Uses @GenerateMocks([OrderRepository]) for mock generation",
+                "Uses ProviderContainer.test() with overrides",
+                "Tests loadOrders: verifies state transitions (loading → loaded)",
+                "Tests placeOrder: verifies repository.create is called",
+                "Tests cancelOrder: verifies item removal from state",
+                "Tests error case: verifies error is set in state on failure",
+                "Uses when/thenAnswer for stubbing, verify for assertions",
+                "Uses Future.delayed or pump for async state updates"
+            ]
+        },
+        {
+            "id": 9,
+            "prompt": "My Flutter app crashes sometimes after awaiting a network call in a notifier. The error says something about using a disposed ref. Also, I have a form screen where tapping submit after navigating away crashes too. What's going on and how do I fix both?",
+            "expected_output": "Identifies both as async gap issues. Notifier needs ref.mounted check after await. Widget form needs context.mounted check after await before using BuildContext (e.g., for navigation or showing snackbar). Shows the correct patterns for both.",
+            "files": [],
+            "expectations": [
+                "Identifies the notifier crash as missing ref.mounted check after await",
+                "Shows if (!ref.mounted) return; pattern after await in notifier",
+                "Identifies the widget crash as BuildContext used after async gap",
+                "Shows if (!context.mounted) return; pattern after await in widget",
+                "Explains that the widget/notifier may be disposed while the future is in flight",
+                "Does not suggest wrapping everything in try-catch as the fix"
+            ]
+        },
+        {
+            "id": 10,
+            "prompt": "I need auth-protected routes in my Flutter app using GoRouter. Users should be redirected to /login if not authenticated, and back to the page they were trying to access after login. I have an AuthNotifier with states: Authenticated(user), Unauthenticated, and AuthLoading. Show me the router setup with redirect logic.",
+            "expected_output": "Creates a GoRouter with typed routes and a redirect function that checks authState. Uses ref.read (not ref.watch) in redirect. Redirects to login when unauthenticated, back to intended route after login. AuthState is a Freezed sealed union with pattern matching.",
+            "files": [],
+            "expectations": [
+                "Uses typed GoRouter routes (go_router_builder), not string paths",
+                "Redirect function uses ref.read, NOT ref.watch (watching in redirect is an anti-pattern)",
+                "AuthState is a Freezed sealed union with Authenticated, Unauthenticated, AuthLoading",
+                "Pattern matches AuthState in redirect (switch or if-case)",
+                "Redirects unauthenticated users to login route",
+                "Preserves intended destination after login (redirect back)",
+                "Uses @Riverpod(keepAlive: true) for auth notifier"
+            ]
+        },
+        {
+            "id": 11,
+            "prompt": "I'm building a product catalog with infinite scroll. The API returns paginated data with a cursor. I need a notifier that fetches the first page on init, then loads more when the user scrolls near the bottom. Show me the notifier, state, and the scroll detection in the widget.",
+            "expected_output": "Creates a paginated notifier with cursor-based pagination state, loadMore method with duplicate fetch prevention, and a widget that detects scroll position to trigger loading.",
+            "files": [],
+            "expectations": [
+                "State has a cursor/nextPage field and hasMore flag",
+                "State has isLoadingMore separate from initial isLoading",
+                "loadMore method guards against duplicate fetches (if already loading or !hasMore, return)",
+                "Appends new items to existing list (does not replace)",
+                "Widget uses ScrollController or NotificationListener to detect near-bottom",
+                "Uses ref.mounted check after await",
+                "Uses @Riverpod codegen"
+            ]
+        },
+        {
+            "id": 12,
+            "prompt": "My app has a registration form with: email, password, confirm password, and phone number. Password must be at least 8 chars with one uppercase and one number. Confirm password must match. Phone is optional but if provided must be valid. Show me the form notifier with validation and the form UI.",
+            "expected_output": "Creates a FormNotifier with per-field validation, cross-field validation (confirm matches password), computed isValid, and a submit guard. Form UI uses leaf ConsumerWidgets for each field.",
+            "files": [],
+            "expectations": [
+                "FormState is a Freezed sealed class with per-field error strings",
+                "Has isValid computed getter that checks all fields",
+                "Password validation: min 8 chars, one uppercase, one number",
+                "Confirm password validates against password field (cross-field)",
+                "Phone validation only runs if value is non-empty",
+                "Submit method validates all fields first, then guards with isValid",
+                "Each form field is a separate ConsumerWidget (no prop drilling)",
+                "Uses ref.mounted check after async submit"
+            ]
+        },
+        {
+            "id": 13,
+            "prompt": "I want to add proper error handling to my Flutter app. Right now I'm just doing error: e.toString() everywhere. I need a typed error hierarchy that I can pattern match on in the UI to show different messages. For network errors show retry, for validation errors show the field, for auth errors redirect to login.",
+            "expected_output": "Creates an AppError sealed union with NetworkError, ValidationError, UnauthorizedError variants. Shows notifier catching and mapping exceptions to AppError types. Shows UI pattern matching with different widgets per error type.",
+            "files": [],
+            "expectations": [
+                "AppError is a Freezed sealed class with multiple variants",
+                "Has at least NetworkError, ValidationError, UnauthorizedError variants",
+                "Notifier catches exceptions and maps to AppError types (not raw strings)",
+                "State uses AppError? instead of String? for error field",
+                "UI uses pattern matching (switch or if-case) on AppError variants",
+                "NetworkError shows retry button",
+                "UnauthorizedError triggers navigation to login",
+                "Catch is only in the notifier (error handling strategy)"
+            ]
+        },
+        {
+            "id": 14,
+            "prompt": "My list screen is really janky — it rebuilds every widget in the list whenever any state changes. I have a parent widget watching the full notifier state and passing items to children. The notifier state has items, selectedId, and isLoading. How do I optimize this?",
+            "expected_output": "Identifies the problem as watching full state and prop drilling. Fixes by having leaf widgets watch providers directly with .select(). Separates concerns so list items only rebuild when their specific data changes.",
+            "files": [],
+            "expectations": [
+                "Identifies watching full state as the cause of unnecessary rebuilds",
+                "Uses ref.watch(provider.select((s) => s.specificField)) to watch only needed data",
+                "List items are separate ConsumerWidgets that watch their own data",
+                "Does NOT pass state through constructors (no prop drilling)",
+                "Uses const constructors where possible to prevent rebuilds",
+                "Mentions or demonstrates that select() uses == to skip identical values"
+            ]
+        },
+        {
+            "id": 15,
+            "prompt": "I need a provider that takes a user ID parameter and fetches that user's profile. Multiple screens might request different user IDs. How do I set this up with Riverpod codegen?",
+            "expected_output": "Creates a family provider via codegen by adding the userId parameter to the generated function or notifier build method. Shows proper usage in widgets.",
+            "files": [],
+            "expectations": [
+                "Uses codegen family: parameter on the generated function or build() method",
+                "Does NOT use .family modifier (legacy pattern)",
+                "Parameter is a primitive type (String) for proper == equality",
+                "Each userId gets its own cached provider instance",
+                "Widget passes the parameter when watching: ref.watch(userProfileProvider(userId))",
+                "Uses @riverpod (auto-dispose) since profile is short-lived per screen"
+            ]
+        },
+        {
+            "id": 16,
+            "prompt": "I want to add a first-run guided tour to my dashboard screen using showcaseview. There are 3 things to highlight: the search bar, the filter button, and the add button. The tour should only show once per user.",
+            "expected_output": "Uses ShowCaseWidget with GlobalKeys for each target, ShowcaseViewMixin for the screen, and persists tour completion to Hive so it only shows once.",
+            "files": [],
+            "expectations": [
+                "Uses ShowCaseWidget wrapping the screen",
+                "Each target has a GlobalKey",
+                "Uses Showcase widget to wrap each target element",
+                "Checks Hive/local storage for tour completion flag before showing",
+                "Saves tour completion after finishing",
+                "Tour starts via ShowCaseWidget.of(context).startShowCase()"
+            ]
+        },
+        {
+            "id": 17,
+            "prompt": "I have a Product entity and I need to fetch products from an API but also cache them locally in Hive so the app works offline. When online, fetch from API and update cache. When offline, fall back to cache. Show me the repository pattern.",
+            "expected_output": "Creates a repository with remote and local datasources. Fetches from remote first, caches results locally. On remote failure, falls back to local cache. Uses the skill's repository bridge pattern.",
+            "files": [],
+            "expectations": [
+                "Repository has both remote and local datasource dependencies",
+                "fetchAll tries remote first, then caches results locally on success",
+                "On remote failure, falls back to local cache",
+                "Model has toEntity() mapping (data layer → domain layer)",
+                "Repository is a @Riverpod(keepAlive: true) provider",
+                "Local datasource uses Hive box for persistence",
+                "No try-catch in datasources — repository or notifier handles errors"
+            ]
+        },
+        {
+            "id": 18,
+            "prompt": "I have an OrderNotifier that needs to read the current user from AuthNotifier and the cart items from CartNotifier when placing an order. How should notifiers communicate with each other in Riverpod?",
+            "expected_output": "Shows cross-provider communication using ref.read to access other providers. Does NOT create circular dependencies. Uses ref.listen if reactive updates are needed.",
+            "files": [],
+            "expectations": [
+                "OrderNotifier uses ref.read(authProvider) to get current auth state",
+                "OrderNotifier uses ref.read(cartProvider) to get cart items",
+                "Pattern matches AuthState to extract user (if case Authenticated)",
+                "Uses ref.read (not ref.watch) inside notifier methods for one-time reads",
+                "Uses ref.listen or ref.watch in build() if reactive updates are needed",
+                "No direct notifier-to-notifier references (goes through providers)",
+                "Has ref.mounted check after async operations"
+            ]
+        },
+        {
+            "id": 19,
+            "prompt": "I have a config entity stored in Hive: AppConfig with fields theme (String), language (String), measurementUnit (String, default 'metric'), lastUpdated (DateTime). I need to add a new field notificationsEnabled (bool, default true) without breaking existing data. What's the migration approach?",
+            "expected_output": "Shows how to add a new field to a Hive-persisted entity with a default value so existing data reads correctly. Uses @Default annotation and explains Hive's null-safety behavior for new fields.",
+            "files": [],
+            "expectations": [
+                "New field uses @Default(true) so existing records get the default when read",
+                "Adds the field to @GenerateAdapters model",
+                "Mentions running build_runner to regenerate the adapter",
+                "Explains that Hive returns null for fields not present in stored data",
+                "Default annotation handles backward compatibility automatically",
+                "Does NOT suggest clearing/deleting the Hive box as the migration strategy"
+            ]
+        },
+        {
+            "id": 20,
+            "prompt": "I need an AsyncNotifier that fetches user settings on initialization. While loading, show a shimmer placeholder. On error, show a retry button. On success, show the settings form. Show me the notifier and the UI that handles all three states.",
+            "expected_output": "Creates an AsyncNotifier using @riverpod codegen. UI uses AsyncValue pattern matching (when/switch) to handle loading, error, and data states separately.",
+            "files": [],
+            "expectations": [
+                "Notifier extends AsyncNotifier pattern (returns Future from build)",
+                "Uses @riverpod or @Riverpod codegen annotation",
+                "UI pattern matches AsyncValue: loading, error, data",
+                "Loading state shows placeholder/shimmer (not just CircularProgressIndicator)",
+                "Error state shows error message with retry button",
+                "Data state shows the settings form",
+                "Retry calls ref.invalidate or ref.refresh on the provider",
+                "Has ref.mounted check in notifier methods after await, OR uses AsyncValue.guard (which handles lifecycle internally)"
+            ]
+        },
+        {
+            "id": 21,
+            "prompt": "I have a chat screen with a TextEditingController and a ScrollController. Where do I put these controllers when using Riverpod? My screen is a ConsumerWidget right now but I need to dispose the controllers properly.",
+            "expected_output": "Explains that controllers need lifecycle management → use ConsumerStatefulWidget. Controllers are created in initState, disposed in dispose. Chat state itself lives in a Riverpod notifier, but controllers are local widget state.",
+            "files": [],
+            "expectations": [
+                "Recommends ConsumerStatefulWidget (not ConsumerWidget) for controllers",
+                "TextEditingController created in initState or field initializer",
+                "Both controllers disposed in dispose() method",
+                "Chat messages/state managed by a Riverpod notifier (not local state)",
+                "Controllers are NOT stored in a provider (they're ephemeral widget state)",
+                "Uses ref.watch in build() for chat state, ref.read for actions"
+            ]
+        },
+        {
+            "id": 22,
+            "prompt": "I need bottom tab navigation with 3 tabs: Home, Search, Profile. Each tab should keep its own scroll position and state when switching between tabs. How do I set this up with GoRouter?",
+            "expected_output": "Uses StatefulShellRoute with GoRouter for persistent tab navigation. Each tab has its own navigation stack. Uses NavigationShell/StatefulNavigationShell.",
+            "files": [],
+            "expectations": [
+                "Uses StatefulShellRoute from GoRouter for tab navigation",
+                "Three separate branches for Home, Search, Profile",
+                "Each branch maintains its own navigation stack",
+                "Uses typed GoRoute routes (go_router_builder)",
+                "Tab bar uses StatefulNavigationShell or ScaffoldWithNavBar pattern",
+                "Each tab's state persists when switching (IndexedStack or similar)"
+            ]
+        },
+        {
+            "id": 23,
+            "prompt": "I have separate providers for userProvider (returns User) and cartProvider (returns CartState with items). I need a computed provider that calculates the order summary: user's name, total items, total price, and whether the user has a discount. How do I create this derived provider?",
+            "expected_output": "Creates a functional @riverpod provider that watches both userProvider and cartProvider, computes the OrderSummary from their values. Auto-disposes when unused.",
+            "files": [],
+            "expectations": [
+                "Uses @riverpod functional provider (not class-based)",
+                "Watches both providers: ref.watch(userProvider) and ref.watch(cartProvider)",
+                "Returns a computed Freezed data class (OrderSummary)",
+                "Auto-disposes (uses @riverpod not @Riverpod(keepAlive: true))",
+                "Does NOT duplicate data from source providers",
+                "Recomputes automatically when either source changes"
+            ]
+        },
+        {
+            "id": 24,
+            "prompt": "I need to write a widget test for my ProductListScreen. It depends on a ProductNotifier provider. The screen shows a list of products and a loading spinner. Test that it shows the spinner when loading and the product names when loaded.",
+            "expected_output": "Creates a widget test with ProviderScope overrides, mocked ProductNotifier, pumpWidget, and finder assertions for loading and loaded states.",
+            "files": [],
+            "expectations": [
+                "Uses ProviderScope with overrides in test",
+                "Overrides productProvider with test state",
+                "Tests loading state: expects CircularProgressIndicator (or shimmer)",
+                "Tests loaded state: expects product names in Text widgets",
+                "Uses find.text() or find.byType() for assertions",
+                "Wraps widget in MaterialApp for proper rendering"
+            ]
+        },
+        {
+            "id": 25,
+            "prompt": "I'm building a checkout flow with 4 steps: Cart Review → Shipping Address → Payment → Confirmation. Each step can go back to the previous one. The user shouldn't be able to jump to Payment without completing Shipping. How do I model this as state?",
+            "expected_output": "Models checkout as a Freezed sealed union with one variant per step. Uses a notifier that enforces step ordering. GoRouter routes map to each step with redirect guards.",
+            "files": [],
+            "expectations": [
+                "CheckoutState is a Freezed sealed union with one variant per step",
+                "Each variant holds step-specific data (e.g., ShippingStep has address)",
+                "Notifier enforces step ordering (can't skip ahead)",
+                "goBack method returns to previous step preserving entered data",
+                "Uses pattern matching (switch) on CheckoutState variants",
+                "Step transitions are protected: either GoRouter redirect guards prevent accessing step URLs directly, or notifier enforces ordering via type checks when using in-screen state machine"
             ]
         }
     ]

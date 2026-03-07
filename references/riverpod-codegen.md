@@ -2,6 +2,8 @@
 
 Generate all providers with annotations. Never write providers manually. Never import from `package:riverpod/legacy.dart`.
 
+**Contents:** [Setup](#setup) | [Generated Provider Names](#generated-provider-names) | [Provider Types](#provider-types) | [Unified Ref](#unified-ref) | [Automatic Retry](#automatic-retry) | [ProviderException](#providerexception) | [Mutations](#mutations-experimental) | [Offline Persistence](#offline-persistence-experimental) | [Pause/Resume](#pauseresume) | [Weak Listeners](#weak-listeners) | [Lifecycle Listeners](#lifecycle-listeners-return-unsubscribe-functions) | [Scoping](#scoping-codegen-only)
+
 ## Setup
 
 ```yaml

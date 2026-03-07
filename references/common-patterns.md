@@ -2,6 +2,8 @@
 
 Reusable patterns for pagination, search, forms, debouncing, and batch processing.
 
+**Contents:** [Pagination](#pagination) | [Search with Debounce](#search-with-debounce) | [Local Filter](#local-filter-no-api-call) | [Form Validation](#form-validation) | [Batch Processing](#batch-processing) | [Pull-to-Refresh](#pull-to-refresh) | [Navigation with Typed GoRouter](#navigation-with-typed-gorouter) | [Delta Sync](#delta-sync-incremental-remote-pull)
+
 ## Pagination
 
 ```dart
