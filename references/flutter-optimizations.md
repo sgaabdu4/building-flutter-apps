@@ -2,7 +2,7 @@
 
 Flutter-specific techniques for rendering, scrolling, animations, layout, concurrency, app size, accessibility, and adaptive UI.
 
-**Contents:** [Keys](#keys) | [Slivers](#slivers) | [Animations](#animations) | [Rendering Costs](#rendering-costs) | [Isolates](#isolates) | [App Size](#app-size) | [Accessibility](#accessibility) | [Adaptive & Responsive](#adaptive--responsive) | [Build Modes](#build-modes) | [Impeller](#impeller) | [Frame Budget](#frame-budget) | [RepaintBoundary](#repaintboundary) | [Preserving Tab State](#preserving-tab-state) | [Post-Frame Callbacks](#post-frame-callbacks)
+**Contents:** [Keys](#keys) | [Slivers](#slivers) | [Avoid shrinkWrap](#avoid-shrinkwrap-true) | [Animations](#animations) | [Rendering Costs](#rendering-costs) | [Isolates](#isolates) | [App Size](#app-size) | [Accessibility](#accessibility) | [Adaptive & Responsive](#adaptive--responsive) | [Build Modes](#build-modes) | [Impeller](#impeller) | [Frame Budget](#frame-budget) | [RepaintBoundary](#repaintboundary) | [Preserving Tab State](#preserving-tab-state) | [Post-Frame Callbacks](#post-frame-callbacks)
 
 ## Keys
 
@@ -65,6 +65,40 @@ CustomScrollView(
 ```
 
 Use `SliverList` when combining multiple scrollable sections. Use `ListView.builder` for simple standalone lists. When all items share the same height, use `SliverFixedExtentList` to skip layout calculation.
+
+## Avoid `shrinkWrap: true`
+
+`shrinkWrap: true` on `ListView`/`GridView` defeats lazy loading. It measures all children upfront — slows large lists.
+
+| Parent Context | Fix |
+|----------------|-----|
+| Column/Row | Wrap in `Expanded` or fixed-height `SizedBox` |
+| Bottom sheet | `DraggableScrollableSheet` with scroll controller |
+| Nested scroll | `CustomScrollView` + `SliverList` (see [Slivers](#slivers)) |
+
+```dart
+// ❌ Measures all children at once
+ListView.builder(
+  shrinkWrap: true,
+  itemBuilder: ...,
+)
+
+// ✅ In a Column
+Column(
+  children: [
+    const Header(),
+    Expanded(child: ListView.builder(itemBuilder: ...)),
+  ],
+)
+
+// ✅ In a bottom sheet
+DraggableScrollableSheet(
+  builder: (context, scrollController) => ListView.builder(
+    controller: scrollController,
+    itemBuilder: ...,
+  ),
+)
+```
 
 ## Animations
 
