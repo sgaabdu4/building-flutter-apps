@@ -2,7 +2,7 @@
 
 First-run guided tours using `showcaseview` v5. Each screen manages its own tour via a shared mixin, a styled wrapper widget, and a persistence service.
 
-**Contents:** [Package](#package) | [Architecture](#architecture) | [ShowcaseScreenMixin](#showcasescreenmixin) | [AppShowcaseTarget](#appshowasetarget) | [ShowcaseService](#showcaseservice) | [ShowcaseKeys](#showcasekeys) | [Adding a Tour to a New Screen](#adding-a-tour-to-a-new-screen) | [Testing](#testing) | [Resetting Tours](#resetting-tours-shell-route-caveat) | [Constraints](#constraints)
+**Contents:** [Package](#package) | [Architecture](#architecture) | [ShowcaseScreenMixin](#showcasescreenmixin) | [AppShowcaseTarget](#appshowasetarget) | [ShowcaseService](#showcaseservice) | [ShowcaseKeys](#showcasekeys) | [Adding a Tour to a New Screen](#adding-a-tour-to-a-new-screen) | [Testing](#testing) | [Resetting Tours](#resetting-tours-shell-route-caveat) | [Sync Integration](#sync-integration) | [Constraints](#constraints)
 
 ## Package
 
@@ -340,6 +340,69 @@ After resetting tours, trigger the signal:
 await service.resetAllKnownScopes();
 ref.read(showcaseResetSignalProvider.notifier).notify();
 ```
+
+## Sync Integration
+
+Tour state is local by default. Apps with remote sync must push and pull tour completion so tours don't replay on new devices.
+
+### The Problem
+
+Tour completion lives in a per-scope local service. Remote settings live in a separate repository. If the settings push omits tour state, every sync silently resets it. If the settings pull restores tour state for only one scope, other screens replay their tours.
+
+### Push: Include Tour State in Remote Settings
+
+The remote settings object must include a `tourCompleted` field (or equivalent boolean). Query the showcase service when constructing the push payload. A callback pattern avoids tight coupling:
+
+```dart
+// Repository interface
+typedef TourCompletionGetter = Future<bool> Function();
+
+abstract interface class ISettingsRepository {
+  void setTourCompletionGetter(TourCompletionGetter getter);
+  // ...
+}
+
+// During sync setup
+settingsRepo.setTourCompletionGetter(
+  () => showcaseService.hasAnyCompletedTour(),
+);
+
+// In the push method
+final tourCompleted = await _tourCompletionGetter?.call() ?? false;
+```
+
+**Rule:** When constructing a remote data object, include every field the schema defines. Omitting a field sends its default value and overwrites the remote copy.
+
+### Pull: Restore All Scopes
+
+A single boolean (`tourCompleted: true`) means the user completed tours on at least one screen. On a new device, mark **every** scope so no screen replays its tour.
+
+```dart
+if (remoteSettings.tourCompleted) {
+  for (final scope in allScopes) {
+    await showcaseService.markAllToursCompleted(scope: scope);
+  }
+}
+```
+
+Maintain a centralized scope list so new scopes are handled automatically.
+
+**Rule:** A boolean that represents multiple scopes must restore all of them. Hardcoding a single scope causes partial restoration.
+
+### Cleanup
+
+Null the callback on logout or remote disconnect. A stale reference to a disposed service causes crashes on the next push.
+
+### Checklist
+
+When syncing tour state (or any cross-service field):
+
+1. Add a callback on the repository interface to query the external service.
+2. Wire the callback during sync setup.
+3. Null it during cleanup.
+4. Include the field in both push and pull paths.
+5. Restore all scopes/variants in the pull path.
+6. Test: push includes field, pull restores all scopes, cleanup nulls callback.
 
 ## Constraints
 

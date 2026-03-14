@@ -4,7 +4,7 @@ description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x s
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "3.3.0"
+  version: "3.4.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage, showcaseview, guided-tours, onboarding
 ---
 
@@ -155,6 +155,8 @@ dart run build_runner clean && dart run build_runner build -d
 | Using `context` after `await` | `if (!context.mounted) return;` | Context may be invalid after async gap |
 | Raw `Map`/`List` as `.family` param | Use Freezed object or primitives | `==` fails on collections, breaks provider caching |
 | Provider for ephemeral local state | `StatefulWidget` local state | Providers are for shared/cross-widget state |
+| Omitting fields in remote data object | Include every schema field in push | Silent default overwrites remote value |
+| Hardcoding one scope in sync restore | Iterate all scopes from centralized list | Partial restore; other screens replay |
 
 Router, sync, and utility anti-patterns are in their reference files:
 [common-patterns.md](references/common-patterns.md) (GoRouter redirect, delta sync) |
@@ -177,4 +179,4 @@ Consult the relevant reference when working on that topic. Each file has a Conte
 | Keys, slivers, animations, isolates, accessibility, adaptive | [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency, a11y |
 | Context extensions, string/date utils, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) | Adding utilities, extensions, validators |
 | Hive CE persistence, @GenerateAdapters, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
-| Showcase guided tours, mixin, v5 API | [showcase-tours.md](references/showcase-tours.md) | Adding first-run tours to screens |
+| Showcase guided tours, mixin, v5 API, sync | [showcase-tours.md](references/showcase-tours.md) | Adding tours, syncing tour state across devices |
