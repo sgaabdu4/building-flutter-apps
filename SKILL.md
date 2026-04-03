@@ -50,7 +50,7 @@ Each layer has one job. Domain holds pure Dart entities. Data holds models (with
 5. **Single Ref** — Riverpod 3.0 unified all Ref types. `AutoDisposeRef`, `FutureProviderRef`, `ExampleRef` no longer exist.
 6. **Equality filtering** — Providers use `==` to skip redundant notifications. Override `updateShouldNotify` only when default equality is insufficient.
 7. **Select in leaves** — Use `ref.watch(provider.select((s) => s.field))` in leaf widgets. Watching full state rebuilds the widget on every field change.
-8. **One file per class** — Each entity, model, notifier, screen, and widget gets its own file. Avoids circular imports and keeps codegen output manageable.
+8. **One primary class per file, with one Riverpod exception** — Keep entities, models, screens, widgets, repositories, datasources, and reusable helpers one-per-file. Exception: a Freezed feature state and its matching Riverpod notifier may share a file when they are tightly coupled and still small. Split them if the file grows or collects unrelated types. Keep StatefulWidget + State together.
 
 ## Provider Decision Tree
 
