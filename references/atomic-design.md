@@ -2,6 +2,24 @@
 
 Build UI from small, composable pieces: tokens → atoms → molecules → organisms → templates → pages.
 
+## Rules — NEVER Violate
+
+1. **MUST** use design tokens for ALL measurements — NEVER hardcode spacing, colors, radii, font sizes, or icon sizes.
+2. **MUST** use `const` constructors on all atoms and molecules.
+3. **NEVER** use `ref.watch` or `ref.read` in atoms, molecules, or templates — provider access ONLY in organisms and pages.
+4. **MUST** use `context.textTheme` and `context.colors` — NEVER raw `TextStyle()` or `Color()`.
+5. **MUST** place shared widgets in `core/widgets/` and feature-specific widgets in `features/x/presentation/widgets/`.
+6. **MUST** promote a widget to `core/widgets/` when 2+ features use it with no feature-specific logic.
+
+```mermaid
+graph LR
+  T[Tokens<br/>colors, spacing, radii] --> A[Atoms<br/>buttons, badges]
+  A --> M[Molecules<br/>tiles, cards]
+  M --> O[Organisms<br/>grids, headers]
+  O --> TP[Templates<br/>layout slots]
+  TP --> P[Pages<br/>screens + state]
+```
+
 **Contents:** [Hierarchy](#hierarchy) | [Tokens](#tokens) | [Atoms](#atoms) | [Molecules](#molecules) | [Organisms](#organisms) | [Templates](#templates) | [Pages](#pages) | [Placement Rules](#placement-rules) | [Promotion Rules](#promotion-rules) | [Accessibility](#accessibility) | [Theming](#theming)
 
 ## Hierarchy
@@ -17,7 +35,7 @@ Pages      →  Screens that compose templates and connect state
 
 ## Tokens
 
-No widget hardcodes a color, spacing, radius, font size, or icon size. Use token classes.
+MUST NEVER hardcode a color, spacing, radius, font size, or icon size. MUST use token classes.
 
 ### Spacing
 
@@ -84,7 +102,7 @@ ThemeData buildAppTheme() {
 }
 ```
 
-Access via `context.textTheme.titleMedium` (see [extensions-utilities.md](extensions-utilities.md)), never a raw `TextStyle(fontSize: 16)`.
+Access via `context.textTheme.titleMedium` (see [extensions-utilities.md](extensions-utilities.md)), NEVER a raw `TextStyle(fontSize: 16)`.
 
 ### Colors
 
@@ -116,11 +134,11 @@ Single-element, stateless widgets. No business logic, no provider access.
 
 ### Rules
 
-- One visual element per atom
-- Accept data through constructor parameters only
-- No `ref.watch` or `ref.read`
-- Always `const` constructor
-- Use tokens for all measurements
+- MUST be one visual element per atom
+- MUST accept data through constructor parameters only
+- NEVER use `ref.watch` or `ref.read`
+- MUST have `const` constructor
+- MUST use tokens for all measurements
 
 ### Example
 
@@ -163,10 +181,10 @@ Combine 2–4 atoms into a unit. No provider access.
 
 ### Rules
 
-- Compose atoms and basic layout/Material widgets (`ListTile`, `Card`, `Column`, `Row`)
-- Wrap frequently restyled Material components as atoms first
-- No `ref.watch` or `ref.read`
-- Accept data via constructor
+- MUST compose atoms and basic layout/Material widgets (`ListTile`, `Card`, `Column`, `Row`)
+- MUST wrap frequently restyled Material components as atoms first
+- NEVER use `ref.watch` or `ref.read`
+- MUST accept data via constructor
 
 ### Examples
 
@@ -319,9 +337,9 @@ Define page structure with slots. No business logic, no provider access.
 
 ### Rules
 
-- No `ref.watch` or `ref.read`
-- Accept widgets via constructor (slots)
-- Handle responsive breakpoints here
+- NEVER use `ref.watch` or `ref.read` in templates
+- MUST accept widgets via constructor (slots)
+- MUST handle responsive breakpoints here
 
 ### Examples
 
@@ -395,10 +413,10 @@ Pages compose templates with organisms. Connect state to layout here.
 
 ### Rules
 
-- Always `ConsumerWidget` or `ConsumerStatefulWidget`
-- Watch providers via `ref.watch` with `.select()`
-- Compose templates and organisms — no raw layout
-- One screen per route
+- MUST be `ConsumerWidget` or `ConsumerStatefulWidget`
+- MUST watch providers via `ref.watch` with `.select()`
+- MUST compose templates and organisms — NEVER raw layout
+- MUST have one screen per route
 
 ### Example
 
@@ -459,7 +477,7 @@ For `Semantics` wrappers, `MergeSemantics`, 48x48 tap targets, and contrast rati
 
 ## Theming
 
-Every widget reads from the theme. No raw constants:
+Every widget MUST read from the theme. NEVER use raw constants:
 
 ```dart
 // WRONG

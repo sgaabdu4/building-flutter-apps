@@ -2,6 +2,29 @@
 
 Reusable patterns for pagination, search, forms, debouncing, and batch processing.
 
+## Rules — NEVER Violate
+
+1. **MUST** use typed GoRouter routes (`const MyRoute().go(context)`) — NEVER string-based `context.go('/path')`.
+2. **NEVER** use `ref.watch()` inside GoRouter `redirect` — it recreates the router on every state change.
+3. **MUST** guard `if (!ref.mounted) return;` after EVERY `await` in notifiers (pagination, search, forms, sync).
+4. **MUST** use `ref.listen()` + `refreshListenable` for GoRouter redirect triggers — NEVER `ref.watch()`.
+5. **MUST** debounce search inputs (500ms minimum) — NEVER call API on every keystroke.
+6. **During loading, stay put.** Return `null` from redirect — NEVER bounce to splash on web refresh.
+
+```mermaid
+graph TD
+  subgraph "GoRouter Redirect State Machine"
+    L[Loading] -->|authenticated on public page| S[Splash]
+    L -->|else| STAY[Stay put — return null]
+    U[Unauthenticated] -->|on protected page| LOGIN[Login]
+    U -->|on public page| STAY
+    NP[Needs Profile] -->|not on profile page| PROFILE[Profile Completion]
+    NP -->|on profile page| STAY
+    C[Setup Complete] -->|on setup page| HOME[Home]
+    C -->|else| STAY
+  end
+```
+
 **Contents:** [Pagination](#pagination) | [Search with Debounce](#search-with-debounce) | [Local Filter](#local-filter-no-api-call) | [Form Validation](#form-validation) | [Batch Processing](#batch-processing) | [Pull-to-Refresh](#pull-to-refresh) | [Navigation with Typed GoRouter](#navigation-with-typed-gorouter) | [Delta Sync](#delta-sync-incremental-remote-pull)
 
 ## Pagination
@@ -357,13 +380,13 @@ class LoginRoute extends GoRouteData with $LoginRoute {
 
 ### Router Provider with Auth Redirect
 
-Create GoRouter once. Use `ref.listen()` + `refreshListenable` to trigger redirect re-evaluation. Never `ref.watch()` in the redirect — it recreates the router on every state change, resetting the route stack.
+Create GoRouter once. Use `ref.listen()` + `refreshListenable` to trigger redirect re-evaluation. NEVER `ref.watch()` in the redirect — it recreates the router on every state change, resetting the route stack.
 
 **Redirect rules for apps with multi-step setup (profile completion, roles):**
 
-- **During loading, stay put.** Return `null` — never bounce to splash. On web refresh, redirecting `/chat` → `/` → `/home` loses the URL. One exception: authenticated users on login/signup should redirect to splash.
-- **Auth pages navigate explicitly.** Add `ref.listen(authProvider)` in login/signup pages that navigates on auth success. `refreshListenable` timing is unreliable; explicit navigation guarantees the transition.
-- **OAuth skips auth-level `isLoading`.** Use per-button loading (`isGoogleLoading`). Auth `isLoading` triggers premature splash redirect.
+- **During loading, MUST stay put.** Return `null` — NEVER bounce to splash. On web refresh, redirecting `/chat` → `/` → `/home` loses the URL. One exception: authenticated users on login/signup should redirect to splash.
+- **Auth pages MUST navigate explicitly.** Add `ref.listen(authProvider)` in login/signup pages that navigates on auth success. `refreshListenable` timing is unreliable; explicit navigation guarantees the transition.
+- **OAuth MUST skip auth-level `isLoading`.** Use per-button loading (`isGoogleLoading`). Auth `isLoading` triggers premature splash redirect.
 - **keepAlive providers survive hot reload.** Redirect closure changes require hot restart.
 
 ```dart
@@ -435,7 +458,7 @@ ProductDetailRoute(id: product.id).push(context);
 // Push with return value
 final result = await ProductDetailRoute(id: product.id).push<bool>(context);
 
-// WRONG — string-based navigation (no type safety)
+// WRONG — NEVER use string-based navigation (no type safety)
 // context.go('/products/${product.id}');
 ```
 

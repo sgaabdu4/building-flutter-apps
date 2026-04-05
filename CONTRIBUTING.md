@@ -23,6 +23,8 @@ Thank you for your interest in contributing! This document provides guidelines f
 ### Documentation Style
 
 - Use clear, concise language
+- Use **MUST/NEVER/ALWAYS** enforcement language for rules — every reference file MUST have a `## Rules — NEVER Violate` section at the top
+- Use Mermaid diagrams over verbose prose where applicable
 - Include working Dart/Flutter code examples
 - Follow existing formatting patterns
 - Keep SKILL.md under 500 lines; add detailed content to `references/`

@@ -1,6 +1,27 @@
 # Freezed 3.x Sealed Classes
 
-All Freezed classes use `sealed` for exhaustive pattern matching with Dart's `switch` expressions.
+All Freezed classes MUST use `sealed class` — NEVER `abstract class`. Dart's `sealed` enables exhaustive pattern matching with `switch` expressions.
+
+## Rules — NEVER Violate
+
+1. **MUST** use `sealed class` with `@freezed` — NEVER `abstract class`.
+2. **MUST** add `const Entity._()` private constructor when adding methods or getters.
+3. **MUST** use `build.yaml` with `explicit_to_json: true` — NEVER per-class `@JsonSerializable(explicitToJson: true)`.
+4. **MUST** use Dart's native `switch` expressions — NEVER Freezed's legacy `when`/`map` (removed in 3.0).
+5. **NEVER** use `@Freezed(toJson: true)` when a `fromJson` factory exists — Freezed auto-generates `toJson`.
+6. **MUST** put `fromJson`/`toJson` ONLY on data models — NEVER on domain entities.
+7. **MUST** place Rich Model methods that derive from own fields on the model — NEVER in the repository.
+
+```mermaid
+graph TD
+  Q1{Has fromJson factory?} -->|Yes| A1["toJson auto-generated — use plain @freezed"]
+  Q1 -->|No| Q2{Needs toJson?}
+  Q2 -->|Yes| A2["Use @Freezed(toJson: true)"]
+  Q2 -->|No| A3["Plain @freezed — no serialization"]
+  A1 --> Q3{Has nested Freezed objects?}
+  Q3 -->|Yes| A4["MUST have explicit_to_json: true in build.yaml"]
+  Q3 -->|No| A5["Works out of the box"]
+```
 
 **Contents:** [Setup](#setup) | [Simple Data Classes](#simple-data-classes) | [Adding Methods and Getters](#adding-methods-and-getters) | [Union Types](#union-types) | [AsyncValue Pattern Matching](#asyncvalue-pattern-matching) | [Feature State](#feature-state) | [Deep Copy](#deep-copy) | [JSON Serialization](#json-serialization) | [Non-Constant Default Values](#non-constant-default-values) | [Inheritance](#inheritance) | [Mutable Classes](#mutable-classes) | [Configuration](#configuration) | [Linting](#linting) | [Rich Models](#rich-models) | [Deep Serialization](#deep-serialization)
 
@@ -96,7 +117,7 @@ Widget build(BuildContext context, WidgetRef ref) {
 }
 ```
 
-Use Dart's native `switch` expressions. Do not use Freezed's legacy `when`/`map` methods (removed in Freezed 3.0).
+Use Dart's native `switch` expressions. NEVER use Freezed's legacy `when`/`map` methods (removed in Freezed 3.0).
 
 ## AsyncValue Pattern Matching
 
@@ -324,9 +345,9 @@ analyzer:
 
 ## Rich Models
 
-**Rule: If a method reads only its own fields, it belongs on the model.**
+**Rule: If a method reads only its own fields, it MUST belong on the model.**
 
-Add `const Entity._()` to enable getters and methods on Freezed classes:
+MUST add `const Entity._()` to enable getters and methods on Freezed classes:
 
 ```dart
 @freezed
@@ -390,4 +411,4 @@ targets:
 | `@freezed` + `fromJson` factory | Generates both `fromJson` and `toJson` | Always — standard Freezed pattern |
 | `build.yaml explicit_to_json` | Calls `.toJson()` on nested objects | Always — set once, forget |
 | `@Freezed(toJson: true)` | Forces `toJson` generation | Only if class has NO `fromJson` factory (rare) |
-| `@JsonSerializable(explicitToJson: true)` | Per-class deep serialization (legacy) | Never — build.yaml replaces it |
+| `@JsonSerializable(explicitToJson: true)` | Per-class deep serialization (legacy) | NEVER — build.yaml replaces it |

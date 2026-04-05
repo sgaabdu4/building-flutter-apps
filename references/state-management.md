@@ -2,6 +2,28 @@
 
 Notifier patterns to manage mutable state with Riverpod 3.x codegen.
 
+## Rules — NEVER Violate
+
+1. **MUST** check `if (!ref.mounted) return;` after EVERY `await` in notifiers.
+2. **MUST** check `if (!context.mounted) return;` after EVERY `await` in widgets.
+3. **MUST** catch errors ONLY in the notifier — NEVER try-catch in datasources or repositories.
+4. **MUST** use `ref.read()` for one-time access in callbacks. MUST use `ref.watch()` to rebuild when dependencies change.
+5. **MUST** dispose timers, controllers, and subscriptions via `ref.onDispose()`.
+6. **NEVER** use `ref.watch()` inside a notifier method — use `ref.read()` or `ref.listen()`.
+7. **NEVER** set state after a mounted check fails — return immediately.
+
+```mermaid
+graph TD
+  A[API call in notifier] --> B{Success?}
+  B -->|Yes| C{ref.mounted?}
+  B -->|No| D[catch error]
+  C -->|Yes| E[Update state with data]
+  C -->|No| F[return — do nothing]
+  D --> G{ref.mounted?}
+  G -->|Yes| H[Set error state]
+  G -->|No| F
+```
+
 **Contents:** [Notifier Structure](#notifier-structure) | [ref.mounted Guard](#refmounted-guard) | [Optimistic Updates](#optimistic-updates) | [Preventing Duplicate Fetches](#preventing-duplicate-fetches) | [Async Initialization](#async-initialization) | [AsyncNotifier Pattern](#asyncnotifier-pattern) | [AsyncValue.requireValue](#asyncvaluerequirevalue) | [Loading Progress](#loading-progress) | [Cleanup](#cleanup) | [Error Handling Strategy](#error-handling-strategy) | [Domain Error Types](#domain-error-types) | [Cross-Provider Communication](#cross-provider-communication)
 
 ## Notifier Structure
@@ -46,7 +68,7 @@ class ProductNotifier extends _$ProductNotifier {
 
 ## ref.mounted Guard
 
-Riverpod 3.0 throws if you interact with a disposed Ref. Always guard after `await`:
+Riverpod 3.0 throws if you interact with a disposed Ref. MUST guard after EVERY `await`:
 
 ```dart
 Future<void> save(Product product) async {
@@ -64,7 +86,7 @@ Future<void> save(Product product) async {
 }
 ```
 
-Guard after every `await`, not just the first one.
+MUST guard after EVERY `await`, not just the first one.
 
 ## Optimistic Updates
 
@@ -267,19 +289,19 @@ removeDispose();
 
 ## Error Handling Strategy
 
-Catch errors once — in the notifier. Let datasources and repositories throw.
+MUST catch errors once — in the notifier. NEVER try-catch in datasources or repositories.
 
 ```dart
-// Datasource — no try-catch
+// Datasource — NEVER try-catch
 Future<List<ProductModel>> fetchAll() => _http.get('/products');
 
-// Repository — no try-catch
+// Repository — NEVER try-catch
 Future<List<Product>> fetchAll() async {
   final models = await _remote.fetchAll();
   return models.map((m) => m.toEntity()).toList();
 }
 
-// Notifier — catch here
+// Notifier — MUST catch here
 Future<void> _load() async {
   try {
     final items = await ref.read(productRepositoryProvider).fetchAll();
@@ -356,4 +378,4 @@ class OrderNotifier extends _$OrderNotifier {
 }
 ```
 
-Use `ref.read` for one-time access. Use `ref.watch` to rebuild when dependencies change. Use `ref.listen` for side effects.
+Use `ref.read` for one-time access. Use `ref.watch` to rebuild when dependencies change. Use `ref.listen` for side effects. NEVER use `ref.watch()` inside a notifier method.

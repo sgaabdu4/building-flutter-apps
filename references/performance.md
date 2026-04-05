@@ -2,14 +2,25 @@
 
 Widget rebuild optimization, provider watching strategy, and memory management. For Flutter-specific rendering, animations, slivers, isolates, and app size techniques, see [flutter-optimizations.md](flutter-optimizations.md).
 
+## Rules — NEVER Violate
+
+1. **MUST** watch providers in leaf widgets — NEVER in parents that pass data down.
+2. **MUST** use `.select()` to watch specific fields in all leaf widgets.
+3. **MUST** extract widget classes — NEVER use helper methods (`_buildXxx()`).
+4. **MUST** use `const` constructors wherever possible.
+5. **MUST** use `ListView.builder` — NEVER `ListView(children: [...])` for dynamic lists.
+6. **NEVER** perform expensive operations (sort, filter, map) in `build()` — use computed providers.
+7. **MUST** dispose timers, controllers, subscriptions via `ref.onDispose()`.
+8. **NEVER** hold raw API responses in state — extract only needed fields.
+
 ## Widget Rebuild Rules
 
 ### Watch in Leaf Widgets
 
-Watch providers in the smallest widget possible. Never watch in a parent and pass data down:
+MUST watch providers in the smallest widget possible. NEVER watch in a parent and pass data down:
 
 ```dart
-// WRONG — parent rebuilds all children
+// WRONG — parent rebuilds all children (prop drilling)
 class ParentWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,10 +65,10 @@ final (:isLoading, :error) = ref.watch(
 ### Extract Widget Classes, Not Helper Methods
 
 ```dart
-// WRONG — helper method creates new function scope, no optimization
+// WRONG — NEVER use helper methods
 Widget _buildHeader() => Container(...);
 
-// RIGHT — widget class supports const, separate build context
+// RIGHT — MUST extract to widget class
 class HeaderWidget extends StatelessWidget {
   const HeaderWidget({super.key});
 
@@ -141,10 +152,10 @@ state = state.copyWith(
 ### Use ListView.builder
 
 ```dart
-// WRONG — builds all items at once
+// WRONG — NEVER build all items at once
 ListView(children: items.map((i) => ItemWidget(i)).toList())
 
-// RIGHT — builds only visible items
+// RIGHT — MUST use builder for lazy loading
 ListView.builder(
   itemCount: items.length,
   itemBuilder: (context, index) => ItemWidget(items[index]),

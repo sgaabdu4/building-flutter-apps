@@ -51,9 +51,13 @@ lib/
 ### Key Patterns
 - **Codegen-only providers** — No `StateProvider`, `StateNotifierProvider`, or legacy providers
 - **Sealed classes** — Exhaustive pattern matching with Dart's native `switch`
+- **Interface contracts** — `abstract interface class` for every repository and datasource
 - **No prop drilling** — Child widgets watch providers directly
 - **Async safety** — `if (!ref.mounted) return;` guards after every `await`
 - **Unified Ref** — Single `Ref` type (no `AutoDisposeRef`, `ExampleRef`)
+- **Widget classes only** — No helper methods (`_buildXxx`)
+- **No `dynamic`** — Use `Object?` or a proper type
+- **Enforcement** — Every reference file has MUST/NEVER rules at the top
 
 ## Reference Files
 
@@ -70,6 +74,7 @@ lib/
 | Flutter optimizations | [flutter-optimizations.md](references/flutter-optimizations.md) |
 | Extensions & utilities | [extensions-utilities.md](references/extensions-utilities.md) |
 | Hive CE persistence, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) |
+| Showcase guided tours | [showcase-tours.md](references/showcase-tours.md) |
 
 ## Compatible Agents
 

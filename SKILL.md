@@ -4,7 +4,7 @@ description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x s
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "4.0.0"
+  version: "4.1.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage, showcaseview, guided-tours, onboarding
 ---
 

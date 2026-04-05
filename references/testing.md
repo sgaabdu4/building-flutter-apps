@@ -2,6 +2,24 @@
 
 Test utilities for Riverpod 3.x with `ProviderContainer.test()`.
 
+## Rules — NEVER Violate
+
+1. **MUST** mock interfaces (`IProductRepository`), NEVER concrete classes (`ProductRepository`).
+2. **MUST** use `ProviderContainer.test()` — NEVER manual `createContainer`.
+3. **MUST** use `UncontrolledProviderScope` for widget tests — NEVER raw `ProviderScope` with overrides.
+4. **MUST** use `pump(Duration(...))` — NEVER `pumpAndSettle()` (hangs with looping animations).
+5. **MUST** override at the repository/datasource level — NEVER mock notifiers directly.
+
+```mermaid
+graph LR
+  subgraph "Test Targets by Layer"
+    U[Unit Tests] -->|mock interfaces| R[Repositories]
+    U -->|mock repos| N[Notifiers]
+    W[Widget Tests] -->|override repos| S[Screens]
+    W -->|UncontrolledProviderScope| C[ProviderContainer.test]
+  end
+```
+
 ## Setup
 
 ```yaml

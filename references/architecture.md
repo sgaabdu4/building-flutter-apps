@@ -2,6 +2,26 @@
 
 Flutter clean architecture with four layers. Dependencies flow inward: Presentation → Repository → Domain → Data.
 
+## Rules — NEVER Violate
+
+1. **MUST** create separate data models and domain entities — NEVER reuse one class for both.
+2. **MUST** define `abstract interface class` for every repository and datasource. Constructors MUST accept interfaces, NEVER concrete types.
+3. **MUST NEVER** put `fromJson`/`toJson` on domain entities — serialization belongs in the Data layer.
+4. **MUST NEVER** import Flutter in the Domain layer — entities are pure Dart with zero dependencies.
+5. **MUST** use `model.toEntity()` in repositories to map Data → Domain.
+6. **NEVER** try-catch in datasources or domain — catch once in the repository or notifier.
+7. **MUST** place feature-specific widgets in `features/x/presentation/widgets/` — shared widgets go in `core/widgets/`.
+
+```mermaid
+graph LR
+  subgraph "Interface Contract Flow"
+    I1[abstract interface class<br/>IProductRemoteDatasource] --> C1[ProductRemoteDatasource<br/>implements IProductRemoteDatasource]
+    I2[abstract interface class<br/>IProductRepository] --> C2[ProductRepository<br/>implements IProductRepository]
+    C2 -->|constructor takes| I1
+    P[Provider] -->|returns| I2
+  end
+```
+
 **Contents:** [Full Directory Structure](#full-directory-structure) | [Layer Responsibilities](#layer-responsibilities) | [Complexity Tiers](#complexity-tiers) | [Design Tokens](#design-tokens) | [Atomic Design for Widgets](#atomic-design-for-widgets)
 
 ## Full Directory Structure
@@ -100,7 +120,7 @@ lib/
 
 ### Domain Layer
 
-Pure Dart. No Flutter imports, no package dependencies. Defines what the data looks like. Models own behavior derived from their own fields (see [freezed-sealed.md](freezed-sealed.md#rich-models)).
+**MUST be pure Dart.** MUST NOT import Flutter or any package. Defines what the data looks like. Models MUST own behavior derived from their own fields (see [freezed-sealed.md](freezed-sealed.md#rich-models)).
 
 ```dart
 // features/products/domain/entities/product.dart
@@ -121,11 +141,11 @@ sealed class Product with _$Product {
 }
 ```
 
-Entities never contain `fromJson`/`toJson`. That belongs in the Data layer.
+Entities MUST NEVER contain `fromJson`/`toJson`. Serialization belongs in the Data layer.
 
 ### Data Layer
 
-Models mirror entities but add serialization. Models own their formatting: `toEntity()`, `toNameOnlyRequestBody()`, etc. Datasources handle API calls and local storage.
+Models mirror entities but add serialization. Models MUST own their formatting: `toEntity()`, `toNameOnlyRequestBody()`, etc. MUST define `abstract interface class` for every datasource. Provider MUST return the interface type, NEVER the concrete class.
 
 ```dart
 // features/products/data/models/product_model.dart
@@ -203,7 +223,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
 
 ### Repository Layer
 
-Bridges Data and Domain. Orchestrates datasources, maps models to entities.
+Bridges Data and Domain. Orchestrates datasources, maps models to entities. MUST define `abstract interface class`. Constructor MUST accept datasource interfaces, NEVER concrete types. Provider MUST return the interface type.
 
 ```dart
 // features/products/repositories/product_repository.dart
@@ -248,11 +268,11 @@ class ProductRepository implements IProductRepository {
 }
 ```
 
-No try-catch in datasources or domain. Catch once in the repository or notifier.
+NEVER try-catch in datasources or domain. Catch once in the repository or notifier.
 
 ### Presentation Layer
 
-Notifiers manage state. Screens compose widgets. Widgets watch providers directly.
+Notifiers manage state. Screens compose widgets. Widgets MUST watch providers directly — NEVER prop drill.
 
 See [state-management.md](state-management.md) for full notifier patterns.
 
@@ -326,7 +346,7 @@ Start with Tier 2. Simplify to Tier 1 only for trivial apps. Use Tier 3 for regu
 
 ## Design Tokens
 
-Never hardcode spacing, colors, radii, or icon sizes. See [atomic-design.md](atomic-design.md) for all token definitions (`Spacing`, `Radii`, `IconSizes`, typography, `ColorScheme`, semantic colors).
+NEVER hardcode spacing, colors, radii, or icon sizes. See [atomic-design.md](atomic-design.md) for all token definitions (`Spacing`, `Radii`, `IconSizes`, typography, `ColorScheme`, semantic colors).
 
 ```dart
 // Usage
