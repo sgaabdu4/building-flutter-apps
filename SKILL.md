@@ -4,13 +4,26 @@ description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x s
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "3.4.0"
+  version: "4.0.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage, showcaseview, guided-tours, onboarding
 ---
 
 # Flutter Best Practices
 
-Flutter clean architecture skill using Riverpod 3.x (codegen), Freezed 3.x (sealed classes), and GoRouter.
+## MANDATORY — Read Before Writing Any Code
+
+**You MUST follow every rule in this skill. No exceptions. No shortcuts.**
+
+1. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.** It contains required code patterns with interface contracts, layer separation, and directory structure.
+2. **MUST read [freezed-sealed.md](references/freezed-sealed.md) BEFORE creating any Freezed class.** It contains required sealed class patterns, JSON serialization, and build.yaml configuration.
+3. **MUST read [state-management.md](references/state-management.md) BEFORE creating any notifier.** It contains required async patterns, error handling, and cross-provider communication.
+4. **NEVER generate code that violates the Critical Rules below.** If unsure, re-read the relevant reference file.
+5. **NEVER use `dynamic`, helper methods (`_buildXxx`), hardcoded strings, or `shrinkWrap: true`.**
+6. **ALWAYS define `abstract interface class` for every repository and datasource.**
+7. **ALWAYS check `if (!ref.mounted) return;` after every `await` in notifiers.**
+8. **ALWAYS use `sealed class` with Freezed — NEVER `abstract class`.**
+9. **ALWAYS use `ref.watch()` in `build()` for reactive state. `ref.read()` ONLY in callbacks.**
+10. **NEVER prop drill.** Child widgets MUST watch providers directly.
 
 ## Core Stack
 
@@ -25,12 +38,27 @@ Flutter clean architecture skill using Riverpod 3.x (codegen), Freezed 3.x (seal
 
 ## Architecture
 
-Four layers. Dependencies flow inward: Presentation → Repository → Domain → Data.
+```mermaid
+graph LR
+  P[Presentation] --> R[Repository]
+  R --> Do[Domain]
+  R --> Da[Data]
+  Da -.-> Do
+```
+
+Four layers. Dependencies flow inward. Each layer has one job:
+
+| Layer | Contains | Rule |
+|-------|----------|------|
+| Domain | Entities (pure Dart, no deps) | No `fromJson`/`toJson`, no Flutter imports |
+| Data | Models + Datasources | Models own `toEntity()`, datasources handle API/local |
+| Repository | Orchestration | Bridges Data→Domain, maps models→entities |
+| Presentation | Notifiers + Screens + Widgets | Manages state and UI |
 
 ```
 lib/
 ├── core/           # Shared: theme, utils, widgets, navigation, services
-├── features/       # Feature modules (auth, products, home, ...)
+├── features/
 │   └── feature_x/
 │       ├── data/           # Models, datasources (API/local)
 │       ├── domain/         # Entities (pure Dart, no dependencies)
@@ -39,102 +67,37 @@ lib/
 └── main.dart
 ```
 
-Each layer has one job. Domain holds pure Dart entities. Data holds models (with `toEntity()`) and datasources. Repositories bridge them — mapping models→entities. Presentation manages state and UI. **Always create separate data models and domain entities** even for simple features; repositories call `model.toEntity()` to convert.
+**ALWAYS create separate data models and domain entities** — repositories call `model.toEntity()` to convert.
 
 ## Critical Rules
 
-1. **Codegen only** — Use `@riverpod` / `@Riverpod(keepAlive: true)`. Legacy providers (`StateProvider`, etc.) are deprecated and lack codegen benefits.
-2. **Sealed classes** — All Freezed classes use `sealed class`, not `abstract class`. Dart's `sealed` enables exhaustive `switch` — the compiler catches missing cases.
-3. **No prop drilling** — Child widgets watch providers directly. Passing state through constructors couples parent-child and bypasses `select()` optimization.
-4. **Guard async** — Check `if (!ref.mounted) return;` after every `await` in notifiers. The notifier may be disposed while the future is in flight.
-5. **Single Ref** — Riverpod 3.0 unified all Ref types. `AutoDisposeRef`, `FutureProviderRef`, `ExampleRef` no longer exist.
-6. **Equality filtering** — Providers use `==` to skip redundant notifications. Override `updateShouldNotify` only when default equality is insufficient.
-7. **Select in leaves** — Use `ref.watch(provider.select((s) => s.field))` in leaf widgets. Watching full state rebuilds the widget on every field change.
-8. **One primary class per file, with one Riverpod exception** — Keep entities, models, screens, widgets, repositories, datasources, and reusable helpers one-per-file. Exception: a Freezed feature state and its matching Riverpod notifier may share a file when they are tightly coupled and still small. Split them if the file grows or collects unrelated types. Keep StatefulWidget + State together.
-9. **Interface contracts** — Define `abstract interface class` for every repository and datasource. The interface lives in the same file as its implementation, directly above it. Repositories accept datasource interfaces in their constructor; notifiers accept repository interfaces. This enforces clean layer boundaries and enables testing with mocks/fakes without depending on concrete implementations.
-10. **No `dynamic`** — Never use `dynamic` as a type. Use `Object?` when the type is truly unknown, or define a proper type. `dynamic` disables static analysis, hides bugs, and defeats the type system. Exception: `Map<String, dynamic>` in `fromJson`/`toJson` is the standard Dart JSON pattern.
+1. **Codegen only** — MUST use `@riverpod` / `@Riverpod(keepAlive: true)`. NEVER use legacy `StateProvider`, `StateNotifierProvider`, etc.
+2. **Sealed classes** — MUST use `sealed class` with Freezed. NEVER use `abstract class`. Dart's `sealed` enables exhaustive `switch`.
+3. **No prop drilling** — Child widgets MUST watch providers directly. NEVER pass state through constructors.
+4. **Guard async** — MUST check `if (!ref.mounted) return;` after EVERY `await` in notifiers. MUST check `if (!context.mounted) return;` after EVERY `await` in widgets.
+5. **Single Ref** — Riverpod 3.0 unified all Ref types. NEVER use `AutoDisposeRef`, `FutureProviderRef`, `ExampleRef`.
+6. **Equality filtering** — Providers use `==` to skip redundant notifications.
+7. **Select in leaves** — MUST use `ref.watch(provider.select((s) => s.field))` in leaf widgets.
+8. **One primary class per file** — Exception: Freezed state + its notifier may share a file when tightly coupled and small.
+9. **Interface contracts** — MUST define `abstract interface class` for every repository and datasource. Interface lives in the same file, directly above the implementation. Constructors MUST accept interfaces, NEVER concrete types.
+10. **No `dynamic`** — NEVER use `dynamic` as a type. Use `Object?` or a proper type. Exception: `Map<String, dynamic>` in `fromJson`/`toJson`.
+11. **Widget classes only** — NEVER use helper methods like `_buildIcon()`, `_buildContent()`. Extract to separate widget classes. Use `@visibleForTesting` for test-only widgets, not underscore prefix.
+12. **No hardcoded strings** — MUST use `*Strings` constants classes for all user-facing text with `static const`.
+13. **ref.watch in build, ref.read in callbacks** — MUST use `ref.watch()` for reactive state in `build()`. Use `ref.read()` ONLY for notifier access in callbacks.
+14. **Provider naming** — Riverpod 3.x codegen strips "Notifier" suffix: `FooNotifier` → `fooProvider` (NOT `fooNotifierProvider`).
+15. **No `shrinkWrap: true`** — NEVER use `shrinkWrap: true` on `ListView`/`GridView` — defeats lazy loading. Use `Sliver` variants or constrained containers.
 
 ## Provider Decision Tree
 
-```
-Is it a repository, datasource, or service?
-  → @Riverpod(keepAlive: true) — lives forever
-
-Is it a feature notifier (manages mutable state)?
-  → @Riverpod(keepAlive: true) class FeatureNotifier extends _$FeatureNotifier
-
-Is it a computed value or one-time fetch?
-  → @riverpod (auto-disposes when unused)
-
-Does it need parameters?
-  → Add parameters to the generated function (family via codegen)
-```
-
-## Freezed Patterns
-
-```dart
-// Simple data class
-@freezed
-sealed class Product with _$Product {
-  const Product._();  // Required for adding methods/getters
-
-  const factory Product({
-    required String id,
-    required String name,
-    @Default(0) int quantity,
-  }) = _Product;
-
-  factory Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);
-
-  // Rich domain methods — derive from own fields
-  bool get inStock => quantity > 0;
-}
-
-// Union type (exhaustive pattern matching)
-@freezed
-sealed class AuthState with _$AuthState {
-  const factory AuthState.authenticated(User user) = Authenticated;
-  const factory AuthState.unauthenticated() = Unauthenticated;
-  const factory AuthState.loading() = AuthLoading;
-}
-```
-
-## Notifier Pattern
-
-```dart
-@Riverpod(keepAlive: true)
-class ProductNotifier extends _$ProductNotifier {
-  @override
-  ProductState build() {
-    _load();
-    return const ProductState();
-  }
-
-  Future<void> _load() async {
-    state = state.copyWith(isLoading: true);
-    try {
-      final items = await ref.read(productRepositoryProvider).fetchAll();
-      if (!ref.mounted) return;
-      state = state.copyWith(items: items, isLoading: false);
-    } catch (e) {
-      if (!ref.mounted) return;
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
-  }
-}
-```
-
-## Code Generation
-
-```bash
-# Watch mode (recommended during development)
-dart run build_runner watch -d
-
-# One-time build
-dart run build_runner build -d
-
-# Clean build (resolve conflicts)
-dart run build_runner clean && dart run build_runner build -d
+```mermaid
+graph TD
+  Q1{Repository, datasource, or service?} -->|Yes| A1["@Riverpod(keepAlive: true)"]
+  Q1 -->|No| Q2{Feature notifier with mutable state?}
+  Q2 -->|Yes| A2["@Riverpod(keepAlive: true) class XNotifier"]
+  Q2 -->|No| Q3{Computed value or one-time fetch?}
+  Q3 -->|Yes| A3["@riverpod — auto-disposes"]
+  Q3 -->|No| Q4{Needs parameters?}
+  Q4 -->|Yes| A4["Add params to function — family via codegen"]
 ```
 
 ## Anti-Patterns
@@ -145,34 +108,38 @@ dart run build_runner clean && dart run build_runner build -d
 | `abstract class` with Freezed | `sealed class` | Enables exhaustive matching |
 | Parent watches, passes to child | Child watches directly | Prop drilling |
 | Missing `ref.mounted` check | `if (!ref.mounted) return;` | Crash on disposed notifier |
-| `ref.read` in `initState` | `addPostFrameCallback` then read | Provider not ready |
-| `AutoDisposeNotifier` | `Notifier` (unified in 3.0) | Duplicate removed |
-| `ExampleRef ref` in codegen | `Ref ref` in codegen | Ref subclasses removed |
 | Try-catch at every layer | Catch once in notifier | Useless rethrows |
 | `context.go('/path')` string routes | `const MyRoute().go(context)` typed | No compile-time safety |
-| Anemic model + extraction in repo/datasource | Rich Model with methods on the model | Keep behavior with data |
-| Per-class `@JsonSerializable(explicitToJson: true)` | `explicit_to_json: true` in `build.yaml` | One global config; no per-class annotations |
-| Entity directly in datasources | Data `Model` with `toEntity()` in repository | Domain stays pure; repo maps model→entity |
-| `@Freezed(toJson: true)` when `fromJson` exists | Plain `@freezed` | Freezed auto-generates `toJson` when `fromJson` uses `=>` |
+| Entity directly in datasources | Data `Model` with `toEntity()` in repo | Domain stays pure |
+| Per-class `@JsonSerializable(explicitToJson: true)` | `explicit_to_json: true` in `build.yaml` | One global config |
+| `@Freezed(toJson: true)` when `fromJson` exists | Plain `@freezed` | Auto-generates `toJson` when `fromJson` uses `=>` |
+| Concrete repo/datasource in constructor | Depend on `abstract interface class` | Tight coupling, untestable |
+| `dynamic` as a type | `Object?` or a proper type | Disables static analysis |
+| Anemic model + extraction in repo | Rich Model with methods on the model | Keep behavior with data |
 | Using `context` after `await` | `if (!context.mounted) return;` | Context may be invalid after async gap |
-| Raw `Map`/`List` as `.family` param | Use Freezed object or primitives | `==` fails on collections, breaks provider caching |
+| Helper methods `_buildXxx()` | Extract to widget classes | Untestable, violates composition |
+| `ref.read` in `initState` | `addPostFrameCallback` then read | Provider not ready |
+| Raw `Map`/`List` as `.family` param | Use Freezed object or primitives | `==` fails on collections, breaks caching |
 | Provider for ephemeral local state | `StatefulWidget` local state | Providers are for shared/cross-widget state |
 | Omitting fields in remote data object | Include every schema field in push | Silent default overwrites remote value |
-| Hardcoding one scope in sync restore | Iterate all scopes from centralized list | Partial restore; other screens replay |
-| Concrete repo/datasource type in constructor | Depend on `abstract interface class` | Tight coupling, untestable without concrete |
-| `dynamic` as a type | `Object?` or a proper type | Disables static analysis, hides bugs |
 
-Router, sync, and utility anti-patterns are in their reference files:
-[common-patterns.md](references/common-patterns.md) (GoRouter redirect, delta sync) |
-[extensions-utilities.md](references/extensions-utilities.md) (context extensions, SnackBarUtils)
+Full anti-patterns including router, sync, and utility patterns: [common-patterns.md](references/common-patterns.md) | [extensions-utilities.md](references/extensions-utilities.md)
+
+## Code Generation
+
+```bash
+dart run build_runner watch -d   # Watch mode (recommended)
+dart run build_runner build -d   # One-time build
+dart run build_runner clean && dart run build_runner build -d  # Clean build
+```
 
 ## Reference Files
 
-Consult the relevant reference when working on that topic. Each file has a Contents line at the top.
+**MUST read the relevant reference BEFORE generating code for that topic.**
 
-| Topic | File | Consult when |
-|-------|------|--------------|
-| Architecture layers, file structure | [architecture.md](references/architecture.md) | Creating feature modules, choosing layers |
+| Topic | File | MUST read when |
+|-------|------|----------------|
+| Architecture layers, file structure, interfaces | [architecture.md](references/architecture.md) | Creating feature modules, datasources, repositories |
 | Atomic design: tokens → pages | [atomic-design.md](references/atomic-design.md) | Building shared widgets in `core/widgets/` |
 | Riverpod 3.x codegen patterns | [riverpod-codegen.md](references/riverpod-codegen.md) | Writing providers, mutations, lifecycle |
 | Freezed sealed classes, unions, Rich Models | [freezed-sealed.md](references/freezed-sealed.md) | Creating entities, models, unions, serialization |
@@ -180,7 +147,7 @@ Consult the relevant reference when working on that topic. Each file has a Conte
 | Testing with ProviderContainer.test | [testing.md](references/testing.md) | Writing unit or widget tests |
 | Pagination, search, forms, delta sync | [common-patterns.md](references/common-patterns.md) | Lists, search, forms, GoRouter, sync |
 | Performance, rebuilds, optimization | [performance.md](references/performance.md) | Debugging slow rebuilds, memory |
-| Keys, slivers, animations, isolates, accessibility, adaptive | [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency, a11y |
-| Context extensions, string/date utils, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) | Adding utilities, extensions, validators |
-| Hive CE persistence, @GenerateAdapters, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
-| Showcase guided tours, mixin, v5 API, sync | [showcase-tours.md](references/showcase-tours.md) | Adding tours, syncing tour state across devices |
+| Keys, slivers, animations, isolates, a11y | [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency |
+| Context extensions, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) | Adding utilities, extensions |
+| Hive CE persistence, @GenerateAdapters | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
+| Showcase guided tours, sync | [showcase-tours.md](references/showcase-tours.md) | Adding tours, syncing tour state |
