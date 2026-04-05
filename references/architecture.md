@@ -24,6 +24,8 @@ graph LR
 
 **Contents:** [Full Directory Structure](#full-directory-structure) | [Layer Responsibilities](#layer-responsibilities) | [Complexity Tiers](#complexity-tiers) | [Design Tokens](#design-tokens) | [Atomic Design for Widgets](#atomic-design-for-widgets)
 
+For mixin vs interface vs extension guidance, see [mixins.md](mixins.md).
+
 ## Full Directory Structure
 
 ```
@@ -41,6 +43,8 @@ lib/
 │   │   ├── date_time_extensions.dart     # timeAgo, isToday, startOfDay
 │   │   ├── iterable_extensions.dart      # firstWhereOrNull, groupBy
 │   │   └── widget_extensions.dart        # separatedBy
+│   ├── mixins/
+│   │   └── connectivity_mixin.dart      # Cross-cutting behavior mixins
 │   ├── navigation/
 │   │   ├── routes.dart                  # Typed GoRouter route classes
 │   │   ├── routes.g.dart

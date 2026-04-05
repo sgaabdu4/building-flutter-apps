@@ -86,6 +86,7 @@ lib/
 13. **ref.watch in build, ref.read in callbacks** — MUST use `ref.watch()` for reactive state in `build()`. Use `ref.read()` ONLY for notifier access in callbacks.
 14. **Provider naming** — Riverpod 3.x codegen strips "Notifier" suffix: `FooNotifier` → `fooProvider` (NOT `fooNotifierProvider`).
 15. **No `shrinkWrap: true`** — NEVER use `shrinkWrap: true` on `ListView`/`GridView` — defeats lazy loading. Use `Sliver` variants or constrained containers.
+16. **Mixins for capabilities, interfaces for contracts** — MUST use `mixin` to share behavior across unrelated classes. MUST use `abstract interface class` for dependency injection contracts. NEVER use inheritance for cross-cutting capabilities. See [mixins.md](references/mixins.md).
 
 ## Provider Decision Tree
 
@@ -122,6 +123,10 @@ graph TD
 | Raw `Map`/`List` as `.family` param | Use Freezed object or primitives | `==` fails on collections, breaks caching |
 | Provider for ephemeral local state | `StatefulWidget` local state | Providers are for shared/cross-widget state |
 | Omitting fields in remote data object | Include every schema field in push | Silent default overwrites remote value |
+| Inheritance to share behavior across unrelated classes | `mixin` with `with` keyword | Creates false "is-a" hierarchies |
+| Mixin with mutable state fields | Stateless mixin — pass services as args | Hidden side effects across classes |
+| `mixin class` by default | Pure `mixin` unless also instantiated | Unnecessary coupling |
+| Mixin to add methods to types you don't own | `extension on Type` | Mixins need `with`; extensions are transparent |
 
 Full anti-patterns including router, sync, and utility patterns: [common-patterns.md](references/common-patterns.md) | [extensions-utilities.md](references/extensions-utilities.md)
 
@@ -149,5 +154,6 @@ dart run build_runner clean && dart run build_runner build -d  # Clean build
 | Performance, rebuilds, optimization | [performance.md](references/performance.md) | Debugging slow rebuilds, memory |
 | Keys, slivers, animations, isolates, a11y | [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency |
 | Context extensions, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) | Adding utilities, extensions |
+| Mixin vs interface vs extension | [mixins.md](references/mixins.md) | Choosing between mixin, interface, extension |
 | Hive CE persistence, @GenerateAdapters | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
 | Showcase guided tours, sync | [showcase-tours.md](references/showcase-tours.md) | Adding tours, syncing tour state |
