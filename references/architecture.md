@@ -163,15 +163,24 @@ sealed class ProductModel with _$ProductModel {
 
 ```dart
 // features/products/data/datasources/product_remote_datasource.dart
+
+/// Interface contract — depend on this, not the concrete class
+abstract interface class IProductRemoteDatasource {
+  Future<List<ProductModel>> fetchAll();
+  Future<ProductModel> fetchById(String id);
+  Future<void> create(ProductModel model);
+}
+
 @Riverpod(keepAlive: true)
-ProductRemoteDatasource productRemoteDatasource(Ref ref) {
+IProductRemoteDatasource productRemoteDatasource(Ref ref) {
   return ProductRemoteDatasource(ref.read(httpServiceProvider));
 }
 
-class ProductRemoteDatasource {
+class ProductRemoteDatasource implements IProductRemoteDatasource {
   ProductRemoteDatasource(this._http);
   final HttpService _http;
 
+  @override
   Future<List<ProductModel>> fetchAll() async {
     final response = await _http.get('/products');
     return (response as List)
@@ -179,11 +188,13 @@ class ProductRemoteDatasource {
         .toList();
   }
 
+  @override
   Future<ProductModel> fetchById(String id) async {
     final json = await _http.get('/products/$id');
     return ProductModel.fromJson(json);
   }
 
+  @override
   Future<void> create(ProductModel model) async {
     await _http.post('/products', body: model.toJson());
   }
@@ -196,19 +207,27 @@ Bridges Data and Domain. Orchestrates datasources, maps models to entities.
 
 ```dart
 // features/products/repositories/product_repository.dart
+
+/// Interface contract — notifiers depend on this, not the concrete class
+abstract interface class IProductRepository {
+  Future<List<Product>> fetchAll();
+  Future<Product> fetchById(String id);
+}
+
 @Riverpod(keepAlive: true)
-ProductRepository productRepository(Ref ref) {
+IProductRepository productRepository(Ref ref) {
   return ProductRepository(
     ref.read(productRemoteDatasourceProvider),
     ref.read(productLocalDatasourceProvider),
   );
 }
 
-class ProductRepository {
+class ProductRepository implements IProductRepository {
   ProductRepository(this._remote, this._local);
-  final ProductRemoteDatasource _remote;
-  final ProductLocalDatasource _local;
+  final IProductRemoteDatasource _remote;
+  final IProductLocalDatasource _local;
 
+  @override
   Future<List<Product>> fetchAll() async {
     try {
       final models = await _remote.fetchAll();
@@ -221,6 +240,7 @@ class ProductRepository {
     }
   }
 
+  @override
   Future<Product> fetchById(String id) async {
     final model = await _remote.fetchById(id);
     return model.toEntity();

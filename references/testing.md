@@ -21,7 +21,7 @@ Use `@GenerateMocks` to generate mocks. Run `dart run build_runner build -d` aft
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 
-@GenerateMocks([ProductRepository, AuthRepository])
+@GenerateMocks([IProductRepository, IAuthRepository])
 import 'product_notifier_test.mocks.dart';
 ```
 
@@ -29,7 +29,7 @@ import 'product_notifier_test.mocks.dart';
 
 ```dart
 // Fake: real behavior, controlled output
-class FakeProductRepository extends Fake implements ProductRepository {
+class FakeProductRepository extends Fake implements IProductRepository {
   List<Product> items = [];
 
   @override
@@ -37,7 +37,7 @@ class FakeProductRepository extends Fake implements ProductRepository {
 }
 
 // Mock: verify calls + stub returns
-final mock = MockProductRepository();
+final mock = MockIProductRepository();
 when(mock.fetchAll()).thenAnswer((_) async => [product]);
 verify(mock.fetchAll()).called(1);
 ```
@@ -52,7 +52,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('fetches products on init', () async {
-    final mockRepo = MockProductRepository();
+    final mockRepo = MockIProductRepository();
     when(mockRepo.fetchAll()).thenAnswer((_) async => [
       const Product(id: '1', name: 'Widget', price: 9.99),
     ]);
@@ -120,7 +120,7 @@ Use `UncontrolledProviderScope` to inject a container:
 
 ```dart
 testWidgets('shows product list', (tester) async {
-  final mockRepo = MockProductRepository();
+  final mockRepo = MockIProductRepository();
   when(mockRepo.fetchAll()).thenAnswer((_) async => [
     const Product(id: '1', name: 'Widget', price: 9.99),
     const Product(id: '2', name: 'Gadget', price: 19.99),
@@ -166,7 +166,7 @@ testWidgets('can access container', (tester) async {
 
 ```dart
 test('deleteItem removes from state', () async {
-  final mockRepo = MockProductRepository();
+  final mockRepo = MockIProductRepository();
   when(mockRepo.fetchAll()).thenAnswer((_) async => [
     const Product(id: '1', name: 'A', price: 10),
     const Product(id: '2', name: 'B', price: 20),
@@ -197,8 +197,8 @@ test('deleteItem removes from state', () async {
 
 ```dart
 test('fetchAll returns entities from remote', () async {
-  final mockRemote = MockProductRemoteDatasource();
-  final mockLocal = MockProductLocalDatasource();
+  final mockRemote = MockIProductRemoteDatasource();
+  final mockLocal = MockIProductLocalDatasource();
 
   when(mockRemote.fetchAll()).thenAnswer((_) async => [
     const ProductModel(id: '1', name: 'Test', price: 9.99),
@@ -214,8 +214,8 @@ test('fetchAll returns entities from remote', () async {
 });
 
 test('falls back to cache on error', () async {
-  final mockRemote = MockProductRemoteDatasource();
-  final mockLocal = MockProductLocalDatasource();
+  final mockRemote = MockIProductRemoteDatasource();
+  final mockLocal = MockIProductLocalDatasource();
 
   when(mockRemote.fetchAll()).thenThrow(Exception('Network error'));
   when(mockLocal.getAll()).thenAnswer((_) async => [
@@ -234,7 +234,7 @@ test('falls back to cache on error', () async {
 
 ```dart
 test('auth state transitions', () async {
-  final mockAuth = MockAuthRepository();
+  final mockAuth = MockIAuthRepository();
   when(mockAuth.getSession()).thenAnswer(
     (_) async => const User(id: '1', name: 'Test'),
   );

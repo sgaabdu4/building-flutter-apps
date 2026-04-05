@@ -51,6 +51,8 @@ Each layer has one job. Domain holds pure Dart entities. Data holds models (with
 6. **Equality filtering** — Providers use `==` to skip redundant notifications. Override `updateShouldNotify` only when default equality is insufficient.
 7. **Select in leaves** — Use `ref.watch(provider.select((s) => s.field))` in leaf widgets. Watching full state rebuilds the widget on every field change.
 8. **One primary class per file, with one Riverpod exception** — Keep entities, models, screens, widgets, repositories, datasources, and reusable helpers one-per-file. Exception: a Freezed feature state and its matching Riverpod notifier may share a file when they are tightly coupled and still small. Split them if the file grows or collects unrelated types. Keep StatefulWidget + State together.
+9. **Interface contracts** — Define `abstract interface class` for every repository and datasource. The interface lives in the same file as its implementation, directly above it. Repositories accept datasource interfaces in their constructor; notifiers accept repository interfaces. This enforces clean layer boundaries and enables testing with mocks/fakes without depending on concrete implementations.
+10. **No `dynamic`** — Never use `dynamic` as a type. Use `Object?` when the type is truly unknown, or define a proper type. `dynamic` disables static analysis, hides bugs, and defeats the type system. Exception: `Map<String, dynamic>` in `fromJson`/`toJson` is the standard Dart JSON pattern.
 
 ## Provider Decision Tree
 
@@ -157,6 +159,8 @@ dart run build_runner clean && dart run build_runner build -d
 | Provider for ephemeral local state | `StatefulWidget` local state | Providers are for shared/cross-widget state |
 | Omitting fields in remote data object | Include every schema field in push | Silent default overwrites remote value |
 | Hardcoding one scope in sync restore | Iterate all scopes from centralized list | Partial restore; other screens replay |
+| Concrete repo/datasource type in constructor | Depend on `abstract interface class` | Tight coupling, untestable without concrete |
+| `dynamic` as a type | `Object?` or a proper type | Disables static analysis, hides bugs |
 
 Router, sync, and utility anti-patterns are in their reference files:
 [common-patterns.md](references/common-patterns.md) (GoRouter redirect, delta sync) |
