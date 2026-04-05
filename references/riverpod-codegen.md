@@ -2,7 +2,7 @@
 
 Generate all providers with annotations. Never write providers manually. Never import from `package:riverpod/legacy.dart`.
 
-**Contents:** [Setup](#setup) | [Generated Provider Names](#generated-provider-names) | [Provider Types](#provider-types) | [Unified Ref](#unified-ref) | [Automatic Retry](#automatic-retry) | [ProviderException](#providerexception) | [Mutations](#mutations-experimental) | [Offline Persistence](#offline-persistence-experimental) | [Pause/Resume](#pauseresume) | [Weak Listeners](#weak-listeners) | [Lifecycle Listeners](#lifecycle-listeners-return-unsubscribe-functions) | [Scoping](#scoping-codegen-only)
+**Contents:** [Setup](#setup) | [Generated Provider Names](#generated-provider-names) | [Provider Types](#provider-types) | [Unified Ref](#unified-ref) | [Automatic Retry](#automatic-retry) | [ProviderException](#providerexception) | [Mutations](#mutations-experimental) | [Offline Persistence](#offline-persistence-experimental) | [Pause/Resume](#pauseresume) | [Weak Listeners](#weak-listeners) | [Lifecycle Listeners](#lifecycle-listeners-return-unsubscribe-functions) | [Scoping](#scoping-codegen-only) | [Backend Client Providers](#backend-client-providers)
 
 ## Setup
 
@@ -331,3 +331,64 @@ ProviderScope(
 ```
 
 Use `@Dependencies([scopedValue])` on widgets that consume scoped providers. The lint rule catches missing overrides at compile time.
+
+## Backend Client Providers
+
+External SDK clients (HTTP, database, auth, storage) follow a **config → client → services** chain. Riverpod providers ARE the dependency injection — no factory classes, service locators, or wrapper layers needed.
+
+### Rules — NEVER Violate
+
+1. **MUST** expose SDK types directly as providers. NEVER wrap them in a factory class or service locator.
+2. **MUST** use `@Riverpod(keepAlive: true)` for all SDK client and service providers — they are singletons.
+3. **MUST** chain providers with `ref.watch()` so services react to config changes.
+4. **MUST** use destructuring for clean config access.
+5. **NEVER** create a `ServiceFactory`, `ServiceLocator`, or `BackendProvider` class — Riverpod providers replace these patterns entirely.
+
+### Provider Chain
+
+```mermaid
+graph LR
+  C[Config Provider] --> CL[Client Provider]
+  CL --> S1[Service A Provider]
+  CL --> S2[Service B Provider]
+  CL --> S3[Service C Provider]
+```
+
+### Pattern
+
+```dart
+// core/providers/backend_providers.dart
+
+/// 1. Config — reads from environment, lives forever
+@Riverpod(keepAlive: true)
+BackendConfig backendConfig(Ref ref) {
+  return BackendConfig.fromEnvironment();
+}
+
+/// 2. Client — depends on config, configured once
+@Riverpod(keepAlive: true)
+HttpClient backendClient(Ref ref) {
+  final BackendConfig(:endpoint, :apiKey) = ref.watch(backendConfigProvider);
+  return HttpClient()
+    ..setEndpoint(endpoint)
+    ..setApiKey(apiKey);
+}
+
+/// 3. Services — each depends on client, one provider per SDK service
+@Riverpod(keepAlive: true)
+AuthService authService(Ref ref) {
+  return AuthService(ref.watch(backendClientProvider));
+}
+
+@Riverpod(keepAlive: true)
+DatabaseService databaseService(Ref ref) {
+  return DatabaseService(ref.watch(backendClientProvider));
+}
+
+@Riverpod(keepAlive: true)
+StorageService storageService(Ref ref) {
+  return StorageService(ref.watch(backendClientProvider));
+}
+```
+
+Datasources and repositories then depend on these service providers — not on the SDK types directly.

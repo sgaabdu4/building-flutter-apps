@@ -127,6 +127,7 @@ graph TD
 | Mixin with mutable state fields | Stateless mixin — pass services as args | Hidden side effects across classes |
 | `mixin class` by default | Pure `mixin` unless also instantiated | Unnecessary coupling |
 | Mixin to add methods to types you don't own | `extension on Type` | Mixins need `with`; extensions are transparent |
+| `ServiceFactory` / `ServiceLocator` for SDK clients | Direct `@Riverpod(keepAlive: true)` providers | Providers ARE the DI — no wrapper needed |
 
 Full anti-patterns including router, sync, and utility patterns: [common-patterns.md](references/common-patterns.md) | [extensions-utilities.md](references/extensions-utilities.md)
 
