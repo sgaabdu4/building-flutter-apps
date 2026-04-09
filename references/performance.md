@@ -95,7 +95,10 @@ return const Padding(padding: EdgeInsets.all(16), child: child);
 |------------------------------|-------------|
 | Repositories, datasources, services | Computed values, derived data |
 | Feature notifiers | One-time fetches |
+| Computed providers whose **all** deps are keepAlive | Computed providers with mixed dep lifecycles |
 | Lives until app terminates | Disposes when no widget watches |
+
+Auto-dispose on an all-keepAlive dep chain breaks pause/resume subscription counting. Match the lifecycle of your dependencies.
 
 ### Equality Filtering
 

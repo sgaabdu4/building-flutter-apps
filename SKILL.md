@@ -96,7 +96,9 @@ graph TD
   Q1 -->|No| Q2{Feature notifier with mutable state?}
   Q2 -->|Yes| A2["@Riverpod(keepAlive: true) class XNotifier"]
   Q2 -->|No| Q3{Computed value or one-time fetch?}
-  Q3 -->|Yes| A3["@riverpod — auto-disposes"]
+  Q3 -->|Yes| Q5{All deps keepAlive?}
+  Q5 -->|Yes| A5["@Riverpod(keepAlive: true)"]
+  Q5 -->|No| A3["@riverpod — auto-disposes"]
   Q3 -->|No| Q4{Needs parameters?}
   Q4 -->|Yes| A4["Add params to function — family via codegen"]
 ```
@@ -109,6 +111,7 @@ graph TD
 | `abstract class` with Freezed | `sealed class` | Enables exhaustive matching |
 | Parent watches, passes to child | Child watches directly | Prop drilling |
 | Missing `ref.mounted` check | `if (!ref.mounted) return;` | Crash on disposed notifier |
+| Auto-dispose on all-keepAlive dep chain | `@Riverpod(keepAlive: true)` | Breaks pause/resume lifecycle |
 | Try-catch at every layer | Catch once in notifier | Useless rethrows |
 | `context.go('/path')` string routes | `const MyRoute().go(context)` typed | No compile-time safety |
 | Entity directly in datasources | Data `Model` with `toEntity()` in repo | Domain stays pure |
