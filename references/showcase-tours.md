@@ -18,7 +18,7 @@ Six files form the showcase system:
 | File | Type | Purpose |
 |------|------|---------|
 | `showcase_screen_mixin.dart` | Mixin | Lifecycle: register scope, check, start, dispose |
-| `app_showcase_target.dart` | StatelessWidget | Styled `Showcase` wrapper bound to design tokens |
+| `app_showcase_target.dart` | StatefulWidget | Styled `Showcase` wrapper that binds the correct named scope before building |
 | `showcase_service.dart` | Interface + Impl + Signal | Persists tour completion; `ShowcaseResetSignal` notifies alive screens |
 | `showcase_keys.dart` | Abstract final class | `GlobalKey` registry and ordered tour lists |
 | `showcase_constants.dart` | Abstract final class | Scope name constants |
@@ -130,10 +130,11 @@ The mixin handles this with two fields and a `didChangeDependencies` override:
 
 ## AppShowcaseTarget
 
-Thin wrapper around `Showcase` that applies design tokens:
+Stateful wrapper around `Showcase`. It must stay aligned with the screen's named scope.
 
 ```dart
 AppShowcaseTarget(
+  scope: ShowcaseConstants.myFeatureScope,
   showcaseKey: ShowcaseKeys.myFeatureStep1,
   title: ShowcaseStrings.myFeatureStep1Title,
   description: ShowcaseStrings.myFeatureStep1Description,
@@ -149,6 +150,7 @@ Wrap the *specific* widget you want highlighted — not a parent container. The 
 
 | Param | Required | Default | Notes |
 |-------|----------|---------|-------|
+| `scope` | Yes | — | Same `ShowcaseConstants.*` value the screen registered in `ShowcaseScreenMixin` |
 | `showcaseKey` | Yes | — | `GlobalKey` from `ShowcaseKeys` |
 | `title` | Yes | — | String from `ShowcaseStrings` |
 | `description` | Yes | — | String from `ShowcaseStrings` |
@@ -172,6 +174,20 @@ disableMovingAnimation: true,
 ```
 
 Arrow color inherits `tooltipBackgroundColor`. No skip/next buttons.
+
+### Scope rule
+
+Named scopes are strict.
+
+- Pass the same `scope` the screen registered in `initShowcase()`.
+- Do not build `Showcase` before that scope exists.
+- If the scope is not registered yet, render the raw `child`.
+
+This avoids the runtime assertion:
+
+```text
+Please register [ShowcaseView] first by calling [ShowcaseView.register()]
+```
 
 ## ShowcaseService
 
@@ -273,6 +289,7 @@ Order in the list determines step order in the guided tour.
 6. **Wrap targets** in `build()`:
    ```dart
    AppShowcaseTarget(
+     scope: ShowcaseConstants.myFeatureScope,
      showcaseKey: ShowcaseKeys.myFeatureStep1,
      title: ShowcaseStrings.myFeatureStep1Title,
      description: ShowcaseStrings.myFeatureStep1Description,
@@ -298,13 +315,15 @@ final container = ProviderContainer(
 
 ### Widgets containing AppShowcaseTarget
 
-When a widget's `build()` includes `AppShowcaseTarget`, its `Showcase` child calls `ShowcaseService.instance.getScope()` in `initState`. Without a registered scope, tests throw. Add a `setUp` call:
+Most widget tests need no extra setup. A scope-aware wrapper can render the raw `child` until the named scope exists.
+
+If the test needs real `Showcase` behavior, register the same named scope as production:
 
 ```dart
-setUp(() => ShowcaseView.register());
+setUp(() => ShowcaseView.register(scope: ShowcaseConstants.myFeatureScope));
 ```
 
-This registers a default scope so `Showcase` can resolve its parent. No `scope:` argument needed — the default suffices for tests that don't start actual tours.
+Do not register the default anonymous scope when production uses a named scope.
 
 ## Resetting Tours (Shell Route Caveat)
 
@@ -410,4 +429,6 @@ When syncing tour state (or any cross-service field):
 - **No skip/next buttons.** Users tap anywhere on the overlay to advance.
 - **Never filter keys** with `key.currentContext != null` before passing to `startShowCase()`. Pass the full list.
 - **`ShowcaseView.getNamed(scope)`** throws if scope is not registered. The mixin wraps this in try-catch.
+- **Every `AppShowcaseTarget` must receive the same named scope** the screen registered in `ShowcaseScreenMixin`. Default and named scopes are not interchangeable.
+- **Do not build `Showcase` before its named scope exists.** Render the plain child until registration completes.
 - **Do not use `disposeOnTap` without `onTargetClick`** — causes assertion failures in tests.

@@ -462,6 +462,47 @@ final result = await ProductDetailRoute(id: product.id).push<bool>(context);
 // context.go('/products/${product.id}');
 ```
 
+### StatefulShellRoute Tabs
+
+Use `StatefulNavigationShell.goBranch()` for main tabs. Do not `push` a tab route.
+
+```dart
+class AppShellScaffold extends StatelessWidget {
+  const AppShellScaffold({required this.navigationShell, super.key});
+
+  final StatefulNavigationShell navigationShell;
+
+  @override
+  Widget build(BuildContext context) {
+    return BottomNavigationBar(
+      currentIndex: navigationShell.currentIndex,
+      onTap: navigationShell.goBranch,
+      items: const [...],
+    );
+  }
+}
+```
+
+- Inside the shell, use `StatefulNavigationShell.of(context).goBranch(index)`.
+- In reusable sheets/overlays, pass a callback from the shell-owned caller instead of routing inside the child.
+- Use route-level `.go(context)` only to enter the shell from outside it, or to intentionally reset a branch to a known root.
+
+```dart
+BentoWorkoutSelectorSheet(
+  onCreateWorkout: () {
+    Navigator.of(sheetContext).pop();
+    navigationShell.goBranch(1);
+  },
+)
+```
+
+Wrong for shell tabs:
+
+```dart
+const ExercisesRoute().push<void>(context); // stacks another route
+const ExercisesRoute().go(context);         // bypasses branch-switch semantics
+```
+
 ### main.dart
 
 ```dart
