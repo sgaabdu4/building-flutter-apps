@@ -188,9 +188,9 @@ class UserNotifier extends _$UserNotifier {
     return repo.getCurrentUser();
   }
 
-  /// Refresh while preserving previous data visible to the UI
+  /// Refresh data
   Future<void> refresh() async {
-    state = const AsyncLoading<User>().copyWithPrevious(state);
+    state = const AsyncLoading<User>();
     state = await AsyncValue.guard(() async {
       final repo = ref.read(userRepositoryProvider);
       return repo.getCurrentUser();
@@ -223,7 +223,7 @@ class UserProfile extends ConsumerWidget {
 }
 ```
 
-**Key:** `AsyncValue.guard` wraps try-catch and assigns `AsyncData` or `AsyncError` atomically. No explicit `ref.mounted` check needed — guard handles the state assignment in one step. Use `copyWithPrevious` during refresh to keep previous data visible while loading.
+**Key:** `AsyncValue.guard` wraps try-catch and assigns `AsyncData` or `AsyncError` atomically. No explicit `ref.mounted` check needed — guard handles state assignment in one step. Avoid `copyWithPrevious`; it is internal in Riverpod 3 dev builds.
 
 ## AsyncValue.requireValue
 

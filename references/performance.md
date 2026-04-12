@@ -102,9 +102,9 @@ Auto-dispose on an all-keepAlive dep chain breaks pause/resume subscription coun
 
 ### Equality Filtering
 
-Riverpod 3.0 uses `==` for all notification filtering. Freezed classes generate `==` automatically.
+Riverpod 3.0 uses `==` for notification filtering. Freezed classes generate `==` automatically.
 
-If a provider produces large objects that override `==`, consider the performance cost. Override `updateShouldNotify` to use `identical` for large state:
+Only override `updateShouldNotify` when you intentionally want reference-equality filtering (`identical`) for performance-sensitive large state:
 
 ```dart
 @override

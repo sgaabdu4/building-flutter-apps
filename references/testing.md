@@ -7,7 +7,7 @@ Test utilities for Riverpod 3.x with `ProviderContainer.test()`.
 1. **MUST** mock interfaces (`IProductRepository`), NEVER concrete classes (`ProductRepository`).
 2. **MUST** use `ProviderContainer.test()` — NEVER manual `createContainer`.
 3. **MUST** use `UncontrolledProviderScope` for widget tests — NEVER raw `ProviderScope` with overrides.
-4. **MUST** use `pump(Duration(...))` — NEVER `pumpAndSettle()` (hangs with looping animations).
+4. **MUST** prefer explicit `pump()` steps. Use `pumpAndSettle()` only for finite animations and async flows; avoid it with infinite/ticking animations.
 5. **MUST** override at the repository/datasource level — NEVER mock notifiers directly.
 
 ```mermaid
@@ -84,8 +84,8 @@ void main() {
     // Read the notifier to trigger build()
     container.read(productProvider);
 
-    // Wait for async operations
-    await Future.delayed(const Duration(milliseconds: 100));
+    // Wait for async operations deterministically
+    await container.read(productProvider.notifier).refresh();
 
     final state = container.read(productProvider);
     expect(state.items, hasLength(1));
@@ -157,7 +157,8 @@ testWidgets('shows product list', (tester) async {
     ),
   );
 
-  // Use pump(), not pumpAndSettle() — avoids hangs with looping animations
+  // Prefer explicit frames: trigger + advance through animation
+  await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
 
   expect(find.text('Widget'), findsOneWidget);
@@ -199,11 +200,10 @@ test('deleteItem removes from state', () async {
 
   // Wait for initial load
   container.read(productProvider);
-  await Future.delayed(const Duration(milliseconds: 100));
+  await container.read(productProvider.notifier).refresh();
 
   // Delete and verify
   await container.read(productProvider.notifier).deleteItem('1');
-  await Future.delayed(const Duration(milliseconds: 100));
 
   final state = container.read(productProvider);
   expect(state.items, hasLength(1));
@@ -268,7 +268,7 @@ test('auth state transitions', () async {
   expect(initial, isA<AuthLoading>());
 
   // Wait for session check
-  await Future.delayed(const Duration(milliseconds: 100));
+  await container.read(authProvider.notifier).checkSession();
 
   final state = container.read(authProvider);
   expect(state, isA<Authenticated>());
@@ -284,7 +284,7 @@ test('auth state transitions', () async {
 
 | Problem | Solution |
 |---------|----------|
-| `pumpAndSettle` hangs | Use `pump(Duration(...))` instead |
+| `pumpAndSettle` hangs | Use explicit `pump()` + bounded `pump(Duration(...))`; use `pumpAndSettle(timeout: ...)` only for finite animations |
 | State not updated after async | Add `await Future.delayed(...)` |
 | Provider not found | Wrap in `UncontrolledProviderScope` |
 | Mock not applied | Verify override matches provider type |

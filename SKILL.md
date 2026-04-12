@@ -135,6 +135,7 @@ graph TD
 | `ServiceFactory` / `ServiceLocator` for SDK clients | Direct `@Riverpod(keepAlive: true)` providers | Providers ARE the DI — no wrapper needed |
 | `value!` null-bang operator | `if (value case final v?)` | Runtime crash; `case final` is compile-time safe |
 | `class Foo { Foo._(); }` | `abstract final class Foo` | Compiler-enforced; `._()` is bypassable in same library |
+| `ref.refresh(provider)` without using its return value | `ref.invalidate(provider)` | `refresh` = `invalidate` + immediate `read`; use `invalidate` when no value is needed |
 
 Full anti-patterns including router, sync, and utility patterns: [common-patterns.md](references/common-patterns.md) | [extensions-utilities.md](references/extensions-utilities.md)
 
