@@ -42,7 +42,9 @@ plugins:
       prefer_returning_shorthands: false
       prefer_switch_expression: false
       prefer_shorthands_with_static_fields: false
-      # prefer_class_destructuring is active — enforces case final patterns
+
+      # Explicitly enable: enforces `case final` destructuring over manual null checks
+      prefer_class_destructuring: true
 
 analyzer:
   exclude:
