@@ -19,7 +19,8 @@ Copy verbatim into every project root:
 # Start with the official Flutter baseline
 include: package:flutter_lints/flutter.yaml
 
-# New Dart 3.10+ Plugin System (auto-downloads)
+# Dart 3.10+ new plugin system (auto-discovered by `dart analyze` / `flutter analyze`)
+# Requires Dart >= 3.10 / Flutter >= 3.38
 plugins:
   many_lints:
     diagnostics:
@@ -44,7 +45,12 @@ plugins:
       prefer_shorthands_with_static_fields: false
 
       # Explicitly enable: enforces `case final` destructuring over manual null checks
+      # (lints from new plugin system are disabled by default — must opt in)
       prefer_class_destructuring: true
+
+  # riverpod_lint 3.1+ uses analysis_server_plugin — NOT custom_lint
+  # All rules are warnings (auto-enabled); disable selectively here if needed
+  riverpod_lint:
 
 analyzer:
   exclude:
@@ -53,7 +59,7 @@ analyzer:
     - "**/*.gr.dart"
     - "**/*.arb"
 
-  # Legacy plugin system (required for custom_lint/riverpod_lint)
+  # Legacy plugin system — still required for freezed_lint (uses custom_lint)
   plugins:
     - custom_lint
 
@@ -93,10 +99,6 @@ linter:
     - cancel_subscriptions
     - close_sinks
     - unawaited_futures
-
-custom_lint:
-  rules:
-    riverpod_avoid_dynamic_provider: error
 ```
 
 ## Required dev_dependencies
@@ -105,11 +107,16 @@ Run these commands to add at the latest versions — never hardcode version numb
 
 ```bash
 flutter pub add dev:flutter_lints
-flutter pub add dev:custom_lint
-flutter pub add dev:riverpod_lint      # Riverpod-specific rules
-flutter pub add dev:freezed_lint       # Freezed-specific rules
+flutter pub add dev:custom_lint      # required for freezed_lint (still uses custom_lint)
+flutter pub add dev:freezed_lint     # Freezed-specific rules (via custom_lint)
+flutter pub add dev:riverpod_lint    # Riverpod rules (uses analysis_server_plugin since 3.1.0)
 # many_lints is auto-downloaded via the Dart 3.10+ plugin system — no pub add needed
 ```
+
+> **Note — riverpod_lint 3.1+ (Dart >= 3.10 required)**
+> `riverpod_lint` 3.1+ uses the new `analysis_server_plugin` system — no longer `custom_lint`.
+> Configure it under `plugins: riverpod_lint:` in analysis_options.yaml, not under `custom_lint: rules:`.
+> All riverpod rules are warnings (auto-enabled). Use `diagnostics:` to disable specific rules if needed.
 
 ## Key Rules Explained
 
@@ -122,4 +129,5 @@ flutter pub add dev:freezed_lint       # Freezed-specific rules
 | `unawaited_futures` | Missing `await` is a logic bug — caught at lint time |
 | `prefer_final_locals` | Immutability enforcement at local scope |
 | `strict-raw-types` | No unparameterized `List`, `Map`, etc. |
-| `riverpod_avoid_dynamic_provider: error` | Enforces typed provider usage |
+| `prefer_class_destructuring` | Enforces `case final` pattern destructuring (Dart 3.0+) |
+| `riverpod_lint` warnings | All Riverpod rules auto-enabled (warnings by default in 3.1+) |
