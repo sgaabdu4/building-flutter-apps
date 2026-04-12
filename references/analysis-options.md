@@ -99,13 +99,14 @@ custom_lint:
 
 ## Required dev_dependencies
 
-```yaml
-dev_dependencies:
-  flutter_lints: ^5.0.0
-  custom_lint: ^0.7.0
-  riverpod_lint: ^3.0.0    # Riverpod-specific rules
-  freezed_lint: ^1.0.0     # Freezed-specific rules
-  # many_lints is auto-downloaded via the Dart 3.10+ plugin system
+Run these commands to add at the latest versions — never hardcode version numbers in the skill:
+
+```bash
+flutter pub add dev:flutter_lints
+flutter pub add dev:custom_lint
+flutter pub add dev:riverpod_lint      # Riverpod-specific rules
+flutter pub add dev:freezed_lint       # Freezed-specific rules
+# many_lints is auto-downloaded via the Dart 3.10+ plugin system — no pub add needed
 ```
 
 ## Key Rules Explained
