@@ -17,13 +17,14 @@ metadata:
 1. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.** It contains required code patterns with interface contracts, layer separation, and directory structure.
 2. **MUST read [freezed-sealed.md](references/freezed-sealed.md) BEFORE creating any Freezed class.** It contains required sealed class patterns, JSON serialization, and build.yaml configuration.
 3. **MUST read [state-management.md](references/state-management.md) BEFORE creating any notifier.** It contains required async patterns, error handling, and cross-provider communication.
-4. **NEVER generate code that violates the Critical Rules below.** If unsure, re-read the relevant reference file.
-5. **NEVER use `dynamic`, helper methods (`_buildXxx`), hardcoded strings, or `shrinkWrap: true`.**
-6. **ALWAYS define `abstract interface class` for every repository and datasource.**
-7. **ALWAYS check `if (!ref.mounted) return;` after every `await` in notifiers.**
-8. **ALWAYS use `sealed class` with Freezed — NEVER `abstract class`.**
-9. **ALWAYS use `ref.watch()` in `build()` for reactive state. `ref.read()` ONLY in callbacks.**
-10. **NEVER prop drill.** Child widgets MUST watch providers directly.
+4. **MUST read [performance.md](references/performance.md) BEFORE writing any widget tree or provider.** Performance is the top priority: wrong watching strategy, prop drilling, or missing `.select()` cause silent rebuild storms.
+5. **NEVER generate code that violates the Critical Rules below.** If unsure, re-read the relevant reference file.
+6. **NEVER use `dynamic`, helper methods (`_buildXxx`), hardcoded strings, or `shrinkWrap: true`.**
+7. **ALWAYS define `abstract interface class` for every repository and datasource.**
+8. **ALWAYS check `if (!ref.mounted) return;` after every `await` in notifiers.**
+9. **ALWAYS use `sealed class` with Freezed — NEVER `abstract class`.**
+10. **ALWAYS use `ref.watch()` in `build()` for reactive state. `ref.read()` ONLY in callbacks.**
+11. **NEVER prop drill.** Child widgets MUST watch providers directly.
 
 ## Core Stack
 
@@ -175,6 +176,8 @@ dart run build_runner clean && dart run build_runner build -d  # Clean build
 
 | Topic | File | MUST read when |
 |-------|------|----------------|
+| Performance, rebuilds, `.select()`, computed providers | [performance.md](references/performance.md) | **Always** — before writing any widget or provider |
+| Keys, slivers, animations, isolates, a11y | [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency |
 | Architecture layers, file structure, interfaces | [architecture.md](references/architecture.md) | Creating feature modules, datasources, repositories |
 | Atomic design: tokens → pages | [atomic-design.md](references/atomic-design.md) | Building shared widgets in `core/widgets/` |
 | Riverpod 3.x codegen patterns | [riverpod-codegen.md](references/riverpod-codegen.md) | Writing providers, mutations, lifecycle |
@@ -182,8 +185,6 @@ dart run build_runner clean && dart run build_runner build -d  # Clean build
 | State management, async, notifiers | [state-management.md](references/state-management.md) | Writing notifiers, error handling, cross-provider |
 | Testing with ProviderContainer.test | [testing.md](references/testing.md) | Writing unit or widget tests |
 | Pagination, search, forms, delta sync | [common-patterns.md](references/common-patterns.md) | Lists, search, forms, GoRouter, sync |
-| Performance, rebuilds, optimization | [performance.md](references/performance.md) | Debugging slow rebuilds, memory |
-| Keys, slivers, animations, isolates, a11y | [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency |
 | Context extensions, validators, DRY utilities | [extensions-utilities.md](references/extensions-utilities.md) | Adding utilities, extensions |
 | Mixin vs interface vs extension | [mixins.md](references/mixins.md) | Choosing between mixin, interface, extension |
 | Hive CE persistence, @GenerateAdapters | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
