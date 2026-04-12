@@ -27,23 +27,28 @@ graph LR
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  mockito: ^5.4.0
+  mocktail: ^1.0.4
   build_runner: ^2.4.0
 ```
 
-## Mock Generation
+## Mock Declaration
 
-Use `@GenerateMocks` to generate mocks. Run `dart run build_runner build -d` after adding annotations:
+No code generation needed. Declare mocks at file top:
 
 ```dart
-import 'package:mockito/annotations.dart';
-import 'package:mockito/mockito.dart';
+import 'package:mocktail/mocktail.dart';
 
-@GenerateMocks([IProductRepository, IAuthRepository])
-import 'product_notifier_test.mocks.dart';
+class MockIProductRepository extends Mock implements IProductRepository {}
+class MockIAuthRepository extends Mock implements IAuthRepository {}
 ```
 
-**Fake vs Mock** — Use mocks (Mockito) for interaction verification (`verify`, `when`). Use fakes (manual subclass) for working implementations with controlled behavior:
+For non-nullable argument matchers, register fallback values once in `setUpAll`:
+
+```dart
+setUpAll(() => registerFallbackValue(const Product(id: '', name: '', price: 0)));
+```
+
+**Fake vs Mock** — Use mocks (Mocktail) for interaction verification (`verify`, `when`). Use fakes (manual subclass) for working implementations with controlled behavior:
 
 ```dart
 // Fake: real behavior, controlled output
@@ -54,10 +59,10 @@ class FakeProductRepository extends Fake implements IProductRepository {
   Future<List<Product>> fetchAll() async => items;
 }
 
-// Mock: verify calls + stub returns
+// Mock: stub + verify with closure syntax
 final mock = MockIProductRepository();
-when(mock.fetchAll()).thenAnswer((_) async => [product]);
-verify(mock.fetchAll()).called(1);
+when(() => mock.fetchAll()).thenAnswer((_) async => [product]);
+verify(() => mock.fetchAll()).called(1);
 ```
 
 ## ProviderContainer.test
@@ -71,7 +76,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('fetches products on init', () async {
     final mockRepo = MockIProductRepository();
-    when(mockRepo.fetchAll()).thenAnswer((_) async => [
+    when(() => mockRepo.fetchAll()).thenAnswer((_) async => [
       const Product(id: '1', name: 'Widget', price: 9.99),
     ]);
 
@@ -81,17 +86,13 @@ void main() {
       ],
     );
 
-    // Read the notifier to trigger build()
-    container.read(productProvider);
-
-    // Wait for async operations deterministically
-    await untilCalled(mockRepo.fetchAll());
-    await Future<void>.microtask(() {});
+    // Trigger build() and wait for async state
+    await container.read(productProvider.future);
 
     final state = container.read(productProvider);
     expect(state.items, hasLength(1));
     expect(state.items.first.name, 'Widget');
-    verify(mockRepo.fetchAll()).called(1);
+    verify(() => mockRepo.fetchAll()).called(1);
   });
 }
 ```
@@ -140,7 +141,7 @@ Use `UncontrolledProviderScope` to inject a container:
 ```dart
 testWidgets('shows product list', (tester) async {
   final mockRepo = MockIProductRepository();
-  when(mockRepo.fetchAll()).thenAnswer((_) async => [
+  when(() => mockRepo.fetchAll()).thenAnswer((_) async => [
     const Product(id: '1', name: 'Widget', price: 9.99),
     const Product(id: '2', name: 'Gadget', price: 19.99),
   ]);
@@ -188,11 +189,11 @@ testWidgets('can access container', (tester) async {
 ```dart
 test('deleteItem removes from state', () async {
   final mockRepo = MockIProductRepository();
-  when(mockRepo.fetchAll()).thenAnswer((_) async => [
+  when(() => mockRepo.fetchAll()).thenAnswer((_) async => [
     const Product(id: '1', name: 'A', price: 10),
     const Product(id: '2', name: 'B', price: 20),
   ]);
-  when(mockRepo.delete('1')).thenAnswer((_) async {});
+  when(() => mockRepo.delete(any())).thenAnswer((_) async {});
 
   final container = ProviderContainer.test(
     overrides: [
@@ -201,14 +202,10 @@ test('deleteItem removes from state', () async {
   );
 
   // Wait for initial load
-  container.read(productProvider);
-  await untilCalled(mockRepo.fetchAll());
-  await Future<void>.microtask(() {});
+  await container.read(productProvider.future);
 
   // Delete and verify
   await container.read(productProvider.notifier).deleteItem('1');
-  await untilCalled(mockRepo.delete('1'));
-  await Future<void>.microtask(() {});
 
   final state = container.read(productProvider);
   expect(state.items, hasLength(1));
@@ -223,7 +220,7 @@ test('fetchAll returns entities from remote', () async {
   final mockRemote = MockIProductRemoteDatasource();
   final mockLocal = MockIProductLocalDatasource();
 
-  when(mockRemote.fetchAll()).thenAnswer((_) async => [
+  when(() => mockRemote.fetchAll()).thenAnswer((_) async => [
     const ProductModel(id: '1', name: 'Test', price: 9.99),
   ]);
 
@@ -233,15 +230,15 @@ test('fetchAll returns entities from remote', () async {
   expect(result, hasLength(1));
   expect(result.first.name, 'Test');
   expect(result.first, isA<Product>()); // Entity, not Model
-  verify(mockRemote.fetchAll()).called(1);
+  verify(() => mockRemote.fetchAll()).called(1);
 });
 
 test('falls back to cache on error', () async {
   final mockRemote = MockIProductRemoteDatasource();
   final mockLocal = MockIProductLocalDatasource();
 
-  when(mockRemote.fetchAll()).thenThrow(Exception('Network error'));
-  when(mockLocal.getAll()).thenAnswer((_) async => [
+  when(() => mockRemote.fetchAll()).thenThrow(Exception('Network error'));
+  when(() => mockLocal.getAll()).thenAnswer((_) async => [
     const ProductModel(id: '1', name: 'Cached', price: 5.00),
   ]);
 
@@ -249,7 +246,7 @@ test('falls back to cache on error', () async {
   final result = await repo.fetchAll();
 
   expect(result.first.name, 'Cached');
-  verify(mockLocal.getAll()).called(1);
+  verify(() => mockLocal.getAll()).called(1);
 });
 ```
 
@@ -258,7 +255,7 @@ test('falls back to cache on error', () async {
 ```dart
 test('auth state transitions', () async {
   final mockAuth = MockIAuthRepository();
-  when(mockAuth.getSession()).thenAnswer(
+  when(() => mockAuth.getSession()).thenAnswer(
     (_) async => const User(id: '1', name: 'Test'),
   );
 
@@ -273,7 +270,6 @@ test('auth state transitions', () async {
   expect(initial, isA<AuthLoading>());
 
   // Wait for session check
-  await untilCalled(mockAuth.getSession());
   await Future<void>.microtask(() {});
 
   final state = container.read(authProvider);
@@ -291,7 +287,7 @@ test('auth state transitions', () async {
 | Problem | Solution |
 |---------|----------|
 | `pumpAndSettle` hangs | Use explicit `pump()` + bounded `pump(Duration(...))`; use `pumpAndSettle(timeout: ...)` only for finite animations |
-| State not updated after async | Use deterministic waits (`untilCalled`, provider future/listener), not fixed `Future.delayed(...)` |
+| State not updated after async | Use `await provider.future` (AsyncValue providers) or `await Future.microtask(() {})` for sealed-state providers |
 | Provider not found | Wrap in `UncontrolledProviderScope` |
 | Mock not applied | Verify override matches provider type |
 | Container disposed early | Use `ProviderContainer.test()` — auto-manages |
