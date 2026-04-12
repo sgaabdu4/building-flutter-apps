@@ -4,7 +4,7 @@ description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x s
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "4.1.0"
+  version: "4.2.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage, showcaseview, guided-tours, onboarding
 ---
 
@@ -136,6 +136,9 @@ graph TD
 | `value!` null-bang operator | `if (value case final v?)` | Runtime crash; `case final` is compile-time safe |
 | `class Foo { Foo._(); }` | `abstract final class Foo` | Compiler-enforced; `._()` is bypassable in same library |
 | `ref.refresh(provider)` without using its return value | `ref.invalidate(provider)` | `refresh` = `invalidate` + immediate `read`; use `invalidate` when no value is needed |
+| `@Riverpod(keepAlive: true)` on a family/parameterized provider | `@riverpod` (auto-dispose default) | Creates one persistent state per param combo — memory leak |
+| Storing side-effect loading/error inside notifier state | `Mutation<T>()` (see [riverpod-codegen.md](references/riverpod-codegen.md)) | Pollutes provider state with UI concerns; mutations handle idle/pending/success/error cleanly |
+| Assuming a failing provider stops after one error | Set `@Riverpod(retry: (c, e) => null)` or disable globally in `ProviderScope` | Riverpod 3.x retries up to 10× by default with exponential backoff |
 
 Full anti-patterns including router, sync, and utility patterns: [common-patterns.md](references/common-patterns.md) | [extensions-utilities.md](references/extensions-utilities.md)
 

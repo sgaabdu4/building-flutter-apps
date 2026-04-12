@@ -239,6 +239,8 @@ class AddTodoButton extends ConsumerWidget {
 
 Use `tsx.get` instead of `ref.read` inside mutations — it keeps the provider alive until the mutation completes.
 
+Newer Riverpod dev builds also expose `MutationState` convenience flags (`isPending`, `isIdle`, `hasError`, `isSuccess`) for simple checks when you do not need full pattern matching.
+
 ## Offline Persistence (experimental)
 
 > **Experimental.** This API may change without a major version bump.
