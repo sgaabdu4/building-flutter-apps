@@ -132,7 +132,7 @@ return switch (asyncData) {
 };
 ```
 
-New in Riverpod 3.0: `AsyncLoading(progress: 0.5)` for loading progress, `AsyncValue.isFromCache` for offline persistence data.
+`AsyncLoading(progress: 0.5)` reports loading progress. `AsyncValue.isFromCache` flags offline-persisted data.
 
 ## Feature State
 

@@ -126,7 +126,7 @@ class ProductEditor extends _$ProductEditor {
 
 ### Generic Providers (type parameters)
 
-New in Riverpod 3.0 — generated providers support generics:
+Generated providers support generics:
 
 ```dart
 @riverpod
@@ -141,7 +141,7 @@ double decimal = ref.watch(multiplyProvider<double>(2.5, 3.5));
 
 ## Unified Ref
 
-Riverpod 3.0 uses a single `Ref` type. No more `AutoDisposeRef`, `FutureProviderRef`, or generated `ExampleRef`:
+Use a single `Ref` type. `AutoDisposeRef`, `FutureProviderRef`, and generated `ExampleRef` are removed:
 
 ```dart
 // Riverpod 3.0 — always use Ref
@@ -202,7 +202,7 @@ try {
 
 ## Mutations (experimental)
 
-> **Experimental.** This API may change without a major version bump.
+> API may change without a major version bump.
 
 Mutations track side-effect state (idle, pending, success, error) separately from provider state. They prevent providers from being disposed while a side-effect runs.
 
@@ -239,11 +239,11 @@ class AddTodoButton extends ConsumerWidget {
 
 Use `tsx.get` instead of `ref.read` inside mutations — it keeps the provider alive until the mutation completes.
 
-Newer Riverpod dev builds also expose `MutationState` convenience flags (`isPending`, `isIdle`, `hasError`, `isSuccess`) for simple checks when you do not need full pattern matching.
+`MutationState` exposes convenience flags (`isPending`, `isIdle`, `hasError`, `isSuccess`) for simple checks without full pattern matching.
 
 ## Offline Persistence (experimental)
 
-> **Experimental.** This API may change without a major version bump.
+> API may change without a major version bump.
 
 Providers can persist state to a local database. The official package is `riverpod_sqflite`:
 
