@@ -14,17 +14,18 @@ metadata:
 
 **You MUST follow every rule in this skill. No exceptions. No shortcuts.**
 
-1. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.** It contains required code patterns with interface contracts, layer separation, and directory structure.
+1. **MUST copy [analysis-options.md](references/analysis-options.md) `analysis_options.yaml` verbatim into every project root.** It enforces strict types, const rules, async safety, and Riverpod lint rules — no exceptions, no modifications.
+2. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.** It contains required code patterns with interface contracts, layer separation, and directory structure.
 2. **MUST read [freezed-sealed.md](references/freezed-sealed.md) BEFORE creating any Freezed class.** It contains required sealed class patterns, JSON serialization, and build.yaml configuration.
-3. **MUST read [state-management.md](references/state-management.md) BEFORE creating any notifier.** It contains required async patterns, error handling, and cross-provider communication.
-4. **MUST read [performance.md](references/performance.md) BEFORE writing any widget tree or provider.** Performance is the top priority: wrong watching strategy, prop drilling, or missing `.select()` cause silent rebuild storms.
-5. **NEVER generate code that violates the Critical Rules below.** If unsure, re-read the relevant reference file.
-6. **NEVER use `dynamic`, helper methods (`_buildXxx`), hardcoded strings, or `shrinkWrap: true`.**
-7. **ALWAYS define `abstract interface class` for every repository and datasource.**
-8. **ALWAYS check `if (!ref.mounted) return;` after every `await` in notifiers.**
-9. **ALWAYS use `sealed class` with Freezed — NEVER `abstract class`.**
-10. **ALWAYS use `ref.watch()` in `build()` for reactive state. `ref.read()` ONLY in callbacks.**
-11. **NEVER prop drill.** Child widgets MUST watch providers directly.
+4. **MUST read [state-management.md](references/state-management.md) BEFORE creating any notifier.** It contains required async patterns, error handling, and cross-provider communication.
+5. **MUST read [performance.md](references/performance.md) BEFORE writing any widget tree or provider.** Performance is the top priority: wrong watching strategy, prop drilling, or missing `.select()` cause silent rebuild storms.
+6. **NEVER generate code that violates the Critical Rules below.** If unsure, re-read the relevant reference file.
+7. **NEVER use `dynamic`, helper methods (`_buildXxx`), hardcoded strings, or `shrinkWrap: true`.**
+8. **ALWAYS define `abstract interface class` for every repository and datasource.**
+9. **ALWAYS check `if (!ref.mounted) return;` after every `await` in notifiers.**
+10. **ALWAYS use `sealed class` with Freezed — NEVER `abstract class`.**
+11. **ALWAYS use `ref.watch()` in `build()` for reactive state. `ref.read()` ONLY in callbacks.**
+12. **NEVER prop drill.** Child widgets MUST watch providers directly.
 
 ## Core Stack
 
@@ -190,3 +191,4 @@ dart run build_runner clean && dart run build_runner build -d  # Clean build
 | Hive CE persistence, @GenerateAdapters | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
 | Showcase guided tours, sync | [showcase-tours.md](references/showcase-tours.md) | Adding tours, syncing tour state |
 | Records, patterns, extension types, wildcard, null-aware elements | [dart-patterns-records.md](references/dart-patterns-records.md) | Multiple returns, destructuring, type-safe IDs, pattern matching |
+| Linter config, strict analyzer, custom_lint rules | [analysis-options.md](references/analysis-options.md) | Setting up a new project |
