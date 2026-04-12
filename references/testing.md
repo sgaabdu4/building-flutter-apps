@@ -43,7 +43,7 @@ import 'package:mockito/mockito.dart';
 import 'product_notifier_test.mocks.dart';
 ```
 
-**Fake vs Mock** — Use mocks (Mockito) when you need to verify interactions (`verify`, `when`). Use fakes (manual subclass) when you need working implementations with controlled behavior:
+**Fake vs Mock** — Use mocks (Mockito) for interaction verification (`verify`, `when`). Use fakes (manual subclass) for working implementations with controlled behavior:
 
 ```dart
 // Fake: real behavior, controlled output
