@@ -172,8 +172,7 @@ Centralized, context-free snackbar access. Use everywhere — widgets, notifiers
 
 ```dart
 // core/utils/snack_bar_utils.dart
-class SnackBarUtils {
-  SnackBarUtils._();
+abstract final class SnackBarUtils {
 
   static GlobalKey<ScaffoldMessengerState>? _key;
 

@@ -87,6 +87,8 @@ lib/
 14. **Provider naming** — Riverpod 3.x codegen strips "Notifier" suffix: `FooNotifier` → `fooProvider` (NOT `fooNotifierProvider`).
 15. **No `shrinkWrap: true`** — NEVER use `shrinkWrap: true` on `ListView`/`GridView` — defeats lazy loading. Use `Sliver` variants or constrained containers.
 16. **Mixins for capabilities, interfaces for contracts** — MUST use `mixin` to share behavior across unrelated classes. MUST use `abstract interface class` for dependency injection contracts. NEVER use inheritance for cross-cutting capabilities. See [mixins.md](references/mixins.md).
+17. **No null-bang (`!`)** — Never `value!`. Use `if (value case final v?)` to null-check and bind.
+18. **`abstract final class` for static-only namespaces** — Never `Class._()`. Use `abstract final class`: compiler blocks construction, extension, and implementation. Exception: `const Entity._()` in Freezed classes — required for getters/methods.
 
 ## Provider Decision Tree
 
@@ -131,6 +133,8 @@ graph TD
 | `mixin class` by default | Pure `mixin` unless also instantiated | Unnecessary coupling |
 | Mixin to add methods to types you don't own | `extension on Type` | Mixins need `with`; extensions are transparent |
 | `ServiceFactory` / `ServiceLocator` for SDK clients | Direct `@Riverpod(keepAlive: true)` providers | Providers ARE the DI — no wrapper needed |
+| `value!` null-bang operator | `if (value case final v?)` | Runtime crash; `case final` is compile-time safe |
+| `class Foo { Foo._(); }` | `abstract final class Foo` | Compiler-enforced; `._()` is bypassable in same library |
 
 Full anti-patterns including router, sync, and utility patterns: [common-patterns.md](references/common-patterns.md) | [extensions-utilities.md](references/extensions-utilities.md)
 
