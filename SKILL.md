@@ -142,6 +142,25 @@ graph TD
 
 Full anti-patterns including router, sync, and utility patterns: [common-patterns.md](references/common-patterns.md) | [extensions-utilities.md](references/extensions-utilities.md)
 
+## Class Modifiers Quick Reference
+
+| Modifier | Extend outside lib | Implement outside lib | Instantiate | Use as mixin |
+|---|:---:|:---:|:---:|:---:|
+| `abstract class` | ✓ | ✓ | ✗ | ✗ |
+| `abstract interface class` | ✗ | ✓ | ✗ | ✗ |
+| `abstract final class` | ✗ | ✗ | ✗ | ✗ |
+| `sealed class` | ✗ | ✗ | ✗ | ✗ |
+| `base class` | ✓ | ✗ | ✓ | ✗ |
+| `interface class` | ✗ | ✓ | ✓ | ✗ |
+| `final class` | ✗ | ✗ | ✓ | ✗ |
+| `mixin class` | ✓ | ✓ | ✓ | ✓ |
+
+**Skill defaults:**
+- `abstract interface class` — DI contracts (repositories, datasources). Rule 9.
+- `abstract final class` — static-only namespaces (no construction/extension/implementation). Rule 18.
+- `sealed class` — state unions with exhaustive switch. Rule 2.
+- `final class` — value objects (Money, Percentage) that must never be subtyped.
+
 ## Code Generation
 
 ```bash
@@ -169,3 +188,4 @@ dart run build_runner clean && dart run build_runner build -d  # Clean build
 | Mixin vs interface vs extension | [mixins.md](references/mixins.md) | Choosing between mixin, interface, extension |
 | Hive CE persistence, @GenerateAdapters | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
 | Showcase guided tours, sync | [showcase-tours.md](references/showcase-tours.md) | Adding tours, syncing tour state |
+| Records, patterns, extension types, wildcard, null-aware elements | [dart-patterns-records.md](references/dart-patterns-records.md) | Multiple returns, destructuring, type-safe IDs, pattern matching |

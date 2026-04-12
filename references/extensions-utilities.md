@@ -2,7 +2,7 @@
 
 Context extensions, type extensions, and reusable utilities that eliminate boilerplate. For snackbars, use the centralized `SnackBarUtils` instead of `ScaffoldMessenger.of(context)`.
 
-**Contents:** [Context Extensions](#context-extensions) | [String Extensions](#string-extensions) | [DateTime Extensions](#datetime-extensions) | [Iterable Extensions](#iterable-extensions) | [Widget List Extensions](#widget-list-extensions) | [SnackBar Utility](#snackbar-utility) | [Debouncer](#debouncer) | [Validators](#validators) | [Result Type](#result-type) | [Barrel Export](#barrel-export)
+**Contents:** [Context Extensions](#context-extensions) | [String Extensions](#string-extensions) | [DateTime Extensions](#datetime-extensions) | [Iterable Extensions](#iterable-extensions) | [Widget List Extensions](#widget-list-extensions) | [SnackBar Utility](#snackbar-utility) | [Debouncer](#debouncer) | [Validators](#validators) | [Result Type](#result-type) | [Extension Types](#extension-types) | [Barrel Export](#barrel-export)
 
 ## Context Extensions
 
@@ -381,9 +381,22 @@ switch (result) {
 }
 ```
 
-## Barrel Export
+## Extension Types
 
-Export all extensions from one file. This is the **one exception** to the "avoid barrel exports" rule — extension methods add no bundle cost and tree-shake automatically.
+Zero-cost compile-time wrappers (Dart 3.3). See [dart-patterns-records.md](dart-patterns-records.md#extension-types-dart-33) for full reference.
+
+```dart
+extension type UserId(String value) {}
+extension type ProductId(String value) {}
+
+void deleteProduct(ProductId id) { /* ... */ }
+deleteProduct(UserId('u1'));    // compile-time ERROR
+deleteProduct(ProductId('p1')); // OK
+```
+
+Use for entity IDs, units, currencies. NEVER raw `String`/`int` when multiple ID types coexist.
+
+## Barrel Export
 
 ```dart
 // core/extensions/extensions.dart
