@@ -1,6 +1,6 @@
 ---
 name: building-flutter-apps
-description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, Hive CE persistence, and ShowcaseView guided tours. Use when building, reviewing, or refactoring Flutter apps that use Riverpod for state management. Covers feature module scaffolding, AsyncNotifier patterns, provider select optimization, Freezed unions and JSON serialization, GoRouter redirects, Hive repositories, pagination, forms, anti-patterns, and testing. Does NOT apply to Provider/BLoC/GetX, non-Flutter frameworks, backend-only Dart, or Firebase-only questions.
+description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, Hive CE persistence, and ShowcaseView guided tours. Use when building, reviewing, refactoring, or generating any Flutter code — including widgets, providers, repositories, models, datasources, tests, features, screens, forms, lists, navigation, or project setup. Covers feature module scaffolding, AsyncNotifier patterns, provider select optimization, Freezed unions and JSON serialization, GoRouter redirects, Hive repositories, pagination, forms, anti-patterns, and testing. Does NOT apply to Provider/BLoC/GetX, non-Flutter frameworks, backend-only Dart, or Firebase-only questions.
 license: MIT
 metadata:
   author: sgaabdu4
@@ -12,7 +12,7 @@ metadata:
 
 ## MANDATORY — Read Before Writing Any Code
 
-**You MUST follow every rule in this skill. No exceptions. No shortcuts.**
+**STOP. Read this entire section and all linked references before producing a single line of code. No exceptions.**
 
 1. **MUST copy [analysis-options.md](references/analysis-options.md) `analysis_options.yaml` verbatim into every project root.** It enforces strict types, const rules, async safety, and Riverpod lint rules — no exceptions, no modifications.
 2. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.** It contains required code patterns with interface contracts, layer separation, and directory structure.
@@ -191,4 +191,21 @@ dart run build_runner clean && dart run build_runner build -d  # Clean build
 | Hive CE persistence, @GenerateAdapters | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
 | Showcase guided tours, sync | [showcase-tours.md](references/showcase-tours.md) | Adding tours, syncing tour state |
 | Records, patterns, extension types, wildcard, null-aware elements | [dart-patterns-records.md](references/dart-patterns-records.md) | Multiple returns, destructuring, type-safe IDs, pattern matching |
-| Linter config, strict analyzer, custom_lint rules | [analysis-options.md](references/analysis-options.md) | Setting up a new project |
+| Linter config, strict analyzer, riverpod_lint rules | [analysis-options.md](references/analysis-options.md) | **Every project** — copy verbatim before writing any code |
+
+## Pre-Flight Checklist — Run Before Returning Any Code
+
+Do NOT return generated code without confirming each item:
+
+- [ ] `analysis_options.yaml` copied verbatim from [analysis-options.md](references/analysis-options.md) — exists in project root
+- [ ] Read [architecture.md](references/architecture.md) — feature uses correct `domain/data/repositories/presentation` structure
+- [ ] Read [performance.md](references/performance.md) — no prop drilling, `.select()` in leaves, no `shrinkWrap: true`
+- [ ] Read [riverpod-codegen.md](references/riverpod-codegen.md) — uses `@riverpod` codegen, not legacy providers
+- [ ] Read the relevant domain reference (freezed, state, testing, etc.) for the specific task
+- [ ] `if (!ref.mounted) return;` after EVERY `await` in notifiers
+- [ ] `if (!context.mounted) return;` after EVERY `await` in widgets
+- [ ] No `_buildXxx()` helper methods — extracted to widget classes
+- [ ] No hardcoded strings — uses `*Strings` constants classes
+- [ ] No `dynamic` type — uses `Object?` or proper types
+- [ ] No `value!` null-bang — uses `if (value case final v?)`
+- [ ] `ref.watch()` in `build()` for reactive state — `ref.read()` only in callbacks
