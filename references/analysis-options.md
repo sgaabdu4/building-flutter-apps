@@ -47,7 +47,7 @@ analyzer:
     - "**/*.gr.dart"
     - "**/*.arb"
   plugins:
-    - custom_lint  # legacy system — for freezed_lint only
+    - custom_lint  # archived Mar 2026 — kept for freezed_lint until it migrates
   language:
     strict-casts: true
     strict-inference: true
@@ -82,8 +82,8 @@ linter:
 
 ```bash
 flutter pub add dev:flutter_lints
-flutter pub add dev:custom_lint    # for freezed_lint
-flutter pub add dev:freezed_lint   # via custom_lint
+flutter pub add dev:custom_lint    # archived Mar 2026 — still needed for freezed_lint
+flutter pub add dev:freezed_lint   # uses custom_lint; monitor for migration to analysis_server_plugin
 flutter pub add dev:riverpod_lint  # 3.1+ uses analysis_server_plugin (not custom_lint)
 # many_lints: auto-downloaded by the Dart 3.10+ plugin system
 ```
