@@ -252,11 +252,11 @@ class StatCard extends StatelessWidget {
             ),
             const SizedBox(height: Spacing.s8),
             Text(value, style: context.textTheme.headlineLarge),
-            if (trend != null) ...[
+            if (trend case final trendValue?) ...[
               const SizedBox(height: Spacing.s4),
               AppBadge(
-                label: '${trend! >= 0 ? '+' : ''}${trend!.toStringAsFixed(1)}%',
-                color: trend! >= 0 ? SemanticColors.success : SemanticColors.error,
+                label: '${trendValue >= 0 ? '+' : ''}${trendValue.toStringAsFixed(1)}%',
+                color: trendValue >= 0 ? SemanticColors.success : SemanticColors.error,
               ),
             ],
           ],
