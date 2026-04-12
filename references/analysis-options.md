@@ -50,7 +50,6 @@ analyzer:
     - "**/*.freezed.dart"
     - "**/*.gr.dart"
     - "**/*.arb"
-    - "lib_old/**"
 
   # Legacy plugin system (required for custom_lint/riverpod_lint)
   plugins:
