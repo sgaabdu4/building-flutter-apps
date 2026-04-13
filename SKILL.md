@@ -19,7 +19,7 @@ metadata:
 3. **MUST read [freezed-sealed.md](references/freezed-sealed.md) BEFORE creating any Freezed class.**
 4. **MUST read [state-management.md](references/state-management.md) BEFORE creating any notifier.**
 5. **MUST read [performance.md](references/performance.md) BEFORE writing any widget tree or provider.**
-6. **NEVER** use `dynamic`, `_buildXxx()` helpers, hardcoded strings, `shrinkWrap: true`, `value!`, or `abstract class` with Freezed.
+6. **NEVER** use `dynamic`, `_buildXxx()` helpers, hardcoded strings, `shrinkWrap: true`, value!, or `abstract class` with Freezed.
 7. **ALWAYS** check `if (!ref.mounted) return;` after every `await` in notifiers.
 
 ## Core Stack
@@ -72,7 +72,7 @@ lib/
 13. **Provider naming** — codegen strips "Notifier": `FooNotifier` → `fooProvider`.
 14. **No `shrinkWrap: true`** — use `Sliver` variants or constrained containers.
 15. **Mixins for capabilities, interfaces for contracts** — see [mixins.md](references/mixins.md).
-16. **No null-bang** — NEVER `value!`. Use `if (value case final v?)`.
+16. **No null-bang** — NEVER value!. Use `if (value case final v?)`.
 17. **`abstract final class` for static-only namespaces** — NEVER `Class._()`. Exception: `const Entity._()` in Freezed.
 18. **`ref.invalidate` not `ref.refresh`** when no return value is needed.
 
@@ -106,7 +106,7 @@ graph TD
 | `@JsonSerializable(explicitToJson: true)` per class | `explicit_to_json: true` in `build.yaml` |
 | `@Freezed(toJson: true)` when `fromJson` exists | Plain `@freezed` |
 | Concrete type in constructor | `abstract interface class` |
-| `value!` null-bang | `if (value case final v?)` |
+| value! null-bang | `if (value case final v?)` |
 | `class Foo { Foo._(); }` | `abstract final class Foo` |
 | `ref.refresh(provider)` discarding return | `ref.invalidate(provider)` |
 | `@Riverpod(keepAlive: true)` on family provider | `@riverpod` (auto-dispose) |
@@ -168,5 +168,5 @@ Read before generating code for that topic.
 - [ ] No `_buildXxx()` helpers — extracted to widget classes
 - [ ] No hardcoded strings — `*Strings` constants classes
 - [ ] No `dynamic` — `Object?` or proper types
-- [ ] No `value!` — `if (value case final v?)`
+- [ ] No value! — `if (value case final v?)`
 - [ ] `ref.watch()` in `build()`, `ref.read()` only in callbacks

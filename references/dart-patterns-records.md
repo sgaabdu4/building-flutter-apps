@@ -4,7 +4,7 @@ Rules:
 1. MUST use Records for multiple return values — NEVER `Map<String, dynamic>` or parallel lists.
 2. MUST use Extension Types for entity IDs — NEVER raw `String` when multiple ID types coexist.
 3. MUST use guard clauses in switch — NEVER nest if-else inside a case body.
-4. MUST use `if (value case final v?)` for null-binding — NEVER `value!`.
+4. MUST use `if (value case final v?)` for null-binding — NEVER value!.
 
 ## Records (Dart 3.0)
 
@@ -69,7 +69,7 @@ if (event case AuthEvent(:final userId)) {
 }
 ```
 
-Private `final` fields auto-promote after null checks (Dart 3.2) — no `!` needed:
+Private `final` fields auto-promote after null checks (Dart 3.2) — no ! needed:
 
 ```dart
 class Repo {
