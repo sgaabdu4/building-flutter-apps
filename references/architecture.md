@@ -11,6 +11,8 @@ Flutter clean architecture with four layers. Dependencies flow inward: Presentat
 5. **MUST** use `model.toEntity()` in repositories to map Data → Domain.
 6. **NEVER** try-catch in datasources or domain — catch once in the repository or notifier.
 7. **MUST** place feature-specific widgets in `features/x/presentation/widgets/` — shared widgets go in `core/widgets/`.
+8. **MUST** keep persistence in data/repository layers by default (for example local datasource + repository).
+9. **MUST NEVER** run repository/data persistence and notifier-level persistence as dual sources of truth for the same feature state.
 
 ```mermaid
 graph LR

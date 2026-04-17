@@ -8,11 +8,9 @@ metadata:
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage, showcaseview, guided-tours, onboarding
 ---
 
-# Flutter Best Practices
-
 ## MANDATORY — Read Before Writing Any Code
 
-**STOP. Read this entire section and all linked references before producing a single line of code. No exceptions.**
+**Read this section and linked references before producing code.**
 
 1. **MUST copy [analysis-options.md](references/analysis-options.md) `analysis_options.yaml` verbatim into every project root.**
 2. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.**
@@ -75,6 +73,7 @@ lib/
 16. **No null-bang** — NEVER value!. Use `if (value case final v?)`.
 17. **`abstract final class` for static-only namespaces** — NEVER `Class._()`. Exception: `const Entity._()` in Freezed.
 18. **`ref.invalidate` not `ref.refresh`** when no return value is needed.
+19. **Persistence SSOT** — Default to repository/data persistence. Notifier persistence is opt-in. One persistence owner per feature state.
 
 ## Provider Decision Tree
 

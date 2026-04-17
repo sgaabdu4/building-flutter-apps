@@ -8,6 +8,8 @@
 
 > **Disclaimer:** This is an unofficial community resource. It is not affiliated with, endorsed by, or sponsored by Google, the Flutter team, or the Riverpod maintainers. "Flutter" is a trademark of Google LLC. "Riverpod" is maintained by Remi Rousselet.
 
+> **Opinionated by design:** This skill is fully opinionated and favors strict, consistent patterns over flexible style choices.
+
 ## Installation
 
 ```bash

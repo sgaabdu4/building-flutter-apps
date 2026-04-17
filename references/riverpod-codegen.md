@@ -269,6 +269,25 @@ class TodosNotifier extends _$TodosNotifier {
 
 During the `await`, the persisted value is shown. After the network response, server state takes precedence.
 
+### Persistence Addendum
+
+Keep all points below when using persistence:
+
+Execution order:
+1. Choose persistence owner (repo/data or notifier).
+2. Define key + cache policy.
+3. Choose startup mode (`persist(...)` or `await persist(...).future`).
+4. Add in-memory persistence tests.
+
+1. **One owner per feature state**: use repository/data persistence or notifier persistence, never both.
+2. **Cache policy**: default retention is 2 days; set `StorageOptions(cacheTime: ...)` when needed; use `unsafe_forever` only with cleanup.
+3. **Persist keys**: keys must be unique, stable across restarts, and include family params.
+4. **Schema migration**: use `StorageOptions(destroyKey: ...)` for simple versioned resets.
+5. **Startup mode**: use `persist(...)` for network-first init, or `await persist(...).future` to hydrate state first.
+6. **UI signal**: use `AsyncValue.isFromCache` for cached/offline indicators.
+7. **Tests**: override storage with `Storage.inMemory()` in unit/widget tests.
+8. **Codegen**: use `@JsonPersist()` when JSON-serializable models are available.
+
 ## Pause/Resume
 
 Riverpod 3.0 pauses providers when their listeners are not visible:
