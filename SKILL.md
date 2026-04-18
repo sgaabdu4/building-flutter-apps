@@ -19,6 +19,7 @@ metadata:
 5. **MUST read [performance.md](references/performance.md) BEFORE writing any widget tree or provider.**
 6. **NEVER** use `dynamic`, `_buildXxx()` helpers, hardcoded strings, `shrinkWrap: true`, value!, or `abstract class` with Freezed.
 7. **ALWAYS** check `if (!ref.mounted) return;` after every `await` in notifiers.
+8. **NEVER** read `state` (including `state.copyWith`) in a sync `Notifier` before `build()` returns. Seed via returned constructor and defer async init with `Future.microtask`. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap).
 
 ## Core Stack
 
@@ -111,6 +112,7 @@ graph TD
 | `@Riverpod(keepAlive: true)` on family provider | `@riverpod` (auto-dispose) |
 | Side-effect loading/error in notifier state | `Mutation<T>()` — see [riverpod-codegen.md](references/riverpod-codegen.md) |
 | `ref.read` in `initState` | `addPostFrameCallback` then read |
+| `state.copyWith(...)` before first `state=` in sync `Notifier.build()` (incl. `_load()` called sync from build, or `ref.listen(..., fireImmediately: true)` callback that reads state) | Seed via returned constructor + `Future.microtask(_load)`, OR `state = const FooState()` before `fireImmediately` listener. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap) |
 | `using context` after `await` | `if (!context.mounted) return;` |
 | Mixin vs interface vs extension choices | See [mixins.md](references/mixins.md) |
 
@@ -169,3 +171,4 @@ Read before generating code for that topic.
 - [ ] No `dynamic` — `Object?` or proper types
 - [ ] No value! — `if (value case final v?)`
 - [ ] `ref.watch()` in `build()`, `ref.read()` only in callbacks
+- [ ] Sync `Notifier.build()` never reads `state` before first `state=` — loading flags seeded via returned constructor; async init dispatched with `Future.microtask`; no `fireImmediately: true` listener that reads state without a prior direct `state =` assignment

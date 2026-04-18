@@ -11,6 +11,7 @@ Notifier patterns to manage mutable state with Riverpod 3.x codegen.
 5. **MUST** dispose timers, controllers, and subscriptions via `ref.onDispose()`.
 6. **NEVER** use `ref.watch()` inside a notifier method — use `ref.read()` or `ref.listen()`.
 7. **NEVER** set state after a mounted check fails — return immediately.
+8. **NEVER** read `state` (including `state.copyWith`) inside sync `Notifier.build()` or in any code path that runs synchronously before `build()` returns. First `state` assignment in a sync notifier must be a direct value (e.g. `state = const FooState(isLoading: true)`), or deferred via `Future.microtask`. Reading state before first `state=` throws *"Tried to read the state of an uninitialized provider"*. `AsyncNotifier` is exempt (pre-initialized to `AsyncLoading`). See [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap).
 
 ```mermaid
 graph TD
@@ -24,7 +25,7 @@ graph TD
   G -->|No| F
 ```
 
-**Contents:** [Notifier Structure](#notifier-structure) | [ref.mounted Guard](#refmounted-guard) | [Optimistic Updates](#optimistic-updates) | [Preventing Duplicate Fetches](#preventing-duplicate-fetches) | [Async Initialization](#async-initialization) | [AsyncNotifier Pattern](#asyncnotifier-pattern) | [AsyncValue.requireValue](#asyncvaluerequirevalue) | [Loading Progress](#loading-progress) | [Cleanup](#cleanup) | [Error Handling Strategy](#error-handling-strategy) | [Domain Error Types](#domain-error-types) | [Cross-Provider Communication](#cross-provider-communication)
+**Contents:** [Notifier Structure](#notifier-structure) | [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap) | [ref.mounted Guard](#refmounted-guard) | [Optimistic Updates](#optimistic-updates) | [Preventing Duplicate Fetches](#preventing-duplicate-fetches) | [Async Initialization](#async-initialization) | [AsyncNotifier Pattern](#asyncnotifier-pattern) | [AsyncValue.requireValue](#asyncvaluerequirevalue) | [Loading Progress](#loading-progress) | [Cleanup](#cleanup) | [Error Handling Strategy](#error-handling-strategy) | [Domain Error Types](#domain-error-types) | [Cross-Provider Communication](#cross-provider-communication)
 
 ## Notifier Structure
 
@@ -46,12 +47,14 @@ sealed class ProductState with _$ProductState {
 class ProductNotifier extends _$ProductNotifier {
   @override
   ProductState build() {
-    _load();
-    return const ProductState();
+    // Defer work — avoids reading uninitialized state during build.
+    // See "Sync Notifier Initialization Trap".
+    Future.microtask(_load);
+    return const ProductState(isLoading: true);
   }
 
   Future<void> _load() async {
-    state = state.copyWith(isLoading: true, error: null);
+    if (!ref.mounted) return;
     try {
       final items = await ref.read(productRepositoryProvider).fetchAll();
       if (!ref.mounted) return;
@@ -62,9 +65,102 @@ class ProductNotifier extends _$ProductNotifier {
     }
   }
 
-  Future<void> refresh() async => _load();
+  Future<void> refresh() async {
+    state = state.copyWith(isLoading: true, error: null);
+    await _load();
+  }
 }
 ```
+
+Key points:
+- Initial loading flag set via the returned constant — never `state.copyWith` before `build()` returns.
+- `_load()` is dispatched through `Future.microtask`, so its body runs after `build()` completes and state is initialized.
+- `refresh()` is safe to use `state.copyWith` because it runs after mount.
+
+## Sync Notifier Initialization Trap
+
+A sync `Notifier<T>` has **no initial state** until `build()` returns. Reading `state` before the first `state=` throws:
+
+> `Bad state: Tried to read the state of an uninitialized provider.`
+
+(See `riverpod/src/core/provider/notifier_provider.dart` — the `state` getter explicitly documents this.)
+
+A Dart `async` function body runs **synchronously up to its first `await`**. So calling `_load()` from `build()` executes any code before the first `await` *before* `build()` returns. If that code reads `state` (including `state.copyWith(...)`), it throws.
+
+`AsyncNotifier` is exempt because Riverpod pre-initializes its state to `AsyncLoading` before `build()` runs.
+
+### ❌ Wrong — read before init
+
+```dart
+@Riverpod(keepAlive: true)
+class ProductNotifier extends _$ProductNotifier {
+  @override
+  ProductState build() {
+    _load();                       // body runs sync until first await
+    return const ProductState();
+  }
+
+  Future<void> _load() async {
+    state = state.copyWith(        // ❌ state not yet initialized — throws
+      isLoading: true,
+    );
+    final items = await ref.read(productRepositoryProvider).fetchAll();
+    // ...
+  }
+}
+```
+
+### ❌ Wrong — `fireImmediately: true` with sync state read
+
+```dart
+@override
+FooState build() {
+  ref.listen(authProvider, (prev, next) {
+    state = state.copyWith(...);   // ❌ fires sync during build — throws
+  }, fireImmediately: true);
+  return const FooState();
+}
+```
+
+### ✅ Right — direct-value seed + deferred load
+
+```dart
+@override
+ProductState build() {
+  Future.microtask(_load);                         // runs after build returns
+  return const ProductState(isLoading: true);      // seed via constructor
+}
+```
+
+### ✅ Right — set state before registering `fireImmediately` listener
+
+```dart
+@override
+FooState build() {
+  // A direct-value write primes state so later reads inside listeners are safe.
+  state = const FooState();
+  ref.listen(authProvider, (prev, next) {
+    state = state.copyWith(...);                   // safe
+  }, fireImmediately: true);
+  return state;
+}
+```
+
+### ✅ Right — drop `fireImmediately`, defer initial handling
+
+```dart
+@override
+FooState build() {
+  ref.listen(authProvider, _handleAuthChange);     // no fireImmediately
+  Future.microtask(() {
+    if (!ref.mounted) return;
+    _handleAuthChange(null, ref.read(authProvider));
+  });
+  return const FooState();
+}
+```
+
+Rule of thumb: **first `state =` in a sync notifier must be a direct value, not a `copyWith`.**
 
 ## ref.mounted Guard
 
@@ -125,15 +221,16 @@ class ProductNotifier extends _$ProductNotifier {
 
   @override
   ProductState build() {
-    _load();
-    return const ProductState();
+    Future.microtask(_load);
+    return const ProductState(isLoading: true);
   }
 
   Future<void> _load() async {
     if (_isFetching) return;
     _isFetching = true;
 
-    state = state.copyWith(isLoading: true);
+    // Safe: runs after build returns, so state is initialized.
+    if (ref.mounted) state = state.copyWith(isLoading: true);
     try {
       final items = await ref.read(productRepositoryProvider).fetchAll();
       if (!ref.mounted) return;
@@ -150,15 +247,14 @@ class ProductNotifier extends _$ProductNotifier {
 
 ## Async Initialization
 
-Use the build method for initialization. Riverpod calls `build()` when the provider is first read:
+Use the build method for initialization. Riverpod calls `build()` when the provider is first read. For sync `Notifier`, **dispatch the async init via `Future.microtask`** so nothing reads `state` before `build()` returns (see [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap)):
 
 ```dart
 @Riverpod(keepAlive: true)
 class AuthNotifier extends _$AuthNotifier {
   @override
   AuthState build() {
-    // Start async load — build itself returns sync
-    _checkSession();
+    Future.microtask(_checkSession);
     return const AuthState.loading();
   }
 

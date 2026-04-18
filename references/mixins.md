@@ -68,11 +68,12 @@ mixin ConnectivityMixin {
 class ProductNotifier extends _$ProductNotifier with ConnectivityMixin {
   @override
   ProductState build() {
-    _load();
+    Future.microtask(_load); // Defer — see "Sync Notifier Initialization Trap"
     return const ProductState();
   }
 
   Future<void> _load() async {
+    if (!ref.mounted) return;
     final connected = checkConnectivity(
       ref.read(connectivityServiceProvider),
     );

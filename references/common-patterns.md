@@ -47,11 +47,12 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
 
   @override
   PaginatedState build() {
-    _loadPage(0);
-    return const PaginatedState();
+    Future.microtask(() => _loadPage(0)); // Defer — see state-management.md
+    return const PaginatedState(isLoading: true);
   }
 
   Future<void> _loadPage(int page) async {
+    if (!ref.mounted) return;
     state = state.copyWith(isLoading: page == 0, isLoadingMore: page > 0);
     try {
       final items = await ref.read(productRepositoryProvider).fetchPage(page, _pageSize);
