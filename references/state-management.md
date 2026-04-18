@@ -6,7 +6,7 @@ Notifier patterns to manage mutable state with Riverpod 3.x codegen.
 
 1. **MUST** check `if (!ref.mounted) return;` after EVERY `await` in notifiers.
 2. **MUST** check `if (!context.mounted) return;` after EVERY `await` in widgets.
-3. **MUST** catch errors ONLY in the notifier — NEVER try-catch in datasources or repositories.
+3. **MUST** catch errors in the notifier by default. Datasources and repositories propagate. `try/catch` at the data layer is allowed **only** for: (a) domain error translation, (b) idempotency recovery (404/409), (c) transaction rollback, (d) local-first fire-and-forget sync. Plain log-and-rethrow is forbidden — delete it.
 4. **MUST** use `ref.read()` for one-time access in callbacks. MUST use `ref.watch()` to rebuild when dependencies change.
 5. **MUST** dispose timers, controllers, and subscriptions via `ref.onDispose()`.
 6. **NEVER** use `ref.watch()` inside a notifier method — use `ref.read()` or `ref.listen()`.
@@ -385,18 +385,46 @@ removeDispose();
 
 ## Error Handling Strategy
 
-MUST catch errors once — in the notifier. NEVER try-catch in datasources or repositories.
+Default: catch errors once — in the notifier. Datasources and repositories propagate.
 
 ```dart
-// Datasource — NEVER try-catch
+// Datasource — default: propagate
 Future<List<ProductModel>> fetchAll() => _http.get('/products');
 
-// Repository — NEVER try-catch
+// Repository — default: propagate
 Future<List<Product>> fetchAll() async {
   final models = await _remote.fetchAll();
   return models.map((m) => m.toEntity()).toList();
 }
+```
 
+### Legitimate `try/catch` in data layer
+
+The default rule has four narrow exceptions. Each MUST have a reason beyond "log and rethrow":
+
+1. **Domain error translation** — map a raw SDK exception to a typed domain error so the notifier matches on sealed types.
+2. **Idempotency recovery** — swallow "already exists" / "not found" responses on an operation whose contract is idempotent (e.g. 404 on delete in a batch).
+3. **Transaction rollback** — catch, run compensating writes, then rethrow.
+4. **Local-first fire-and-forget sync** — remote mirror of a local write where the caller intentionally does not await the remote. Swallow + log so a dead backend doesn't break the local path.
+
+❌ WRONG — bare `try { … } catch (e) { log(...); rethrow; }` adds nothing. Delete it; let the notifier catch.
+
+```dart
+// ❌ pointless
+Future<void> remove(String id) async {
+  try {
+    await _remote.remove(id);
+  } on Exception catch (e, s) {
+    Crash.error(e, s, reason: 'remove');
+    rethrow;
+  }
+}
+
+// ✅ propagate
+Future<void> remove(String id) => _remote.remove(id);
+```
+
+```dart
 // Notifier — MUST catch here
 Future<void> _load() async {
   try {

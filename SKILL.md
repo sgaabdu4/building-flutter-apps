@@ -91,6 +91,8 @@ graph TD
   Q4 -->|Yes| A4["Add params to function — family via codegen"]
 ```
 
+**Family + keepAlive caveat.** The Anti-Patterns table flags `@Riverpod(keepAlive: true)` on a family provider because each distinct key is retained forever → unbounded cache. Prefer `@riverpod` (auto-dispose). **Exception:** Riverpod 3.2.x has a TickerMode assertion bug ([rrousselGit/riverpod#4709](https://github.com/rrousselGit/riverpod/issues/4709)) that can fire when an auto-disposed computed provider watches a `keepAlive` parent and is rebuilt at frame boundaries. If you hit this, `keepAlive: true` is an acceptable workaround — document it inline (`// keepAlive: Riverpod 3.2.x #4709 workaround`). Remove once upstream fixes.
+
 ## Anti-Patterns
 
 | Wrong | Right |
