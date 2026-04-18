@@ -1,11 +1,11 @@
 ---
 name: building-flutter-apps
-description: Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, Hive CE persistence, and ShowcaseView guided tours. Use when building, reviewing, refactoring, or generating any Flutter code — including widgets, providers, repositories, models, datasources, tests, features, screens, forms, lists, navigation, or project setup. Covers feature module scaffolding, AsyncNotifier patterns, provider select optimization, Freezed unions and JSON serialization, GoRouter redirects, Hive repositories, pagination, forms, anti-patterns, and testing. Does NOT apply to Provider/BLoC/GetX, non-Flutter frameworks, backend-only Dart, or Firebase-only questions.
+description: Flutter app architecture reference — Riverpod 3.x, Freezed 3.x, GoRouter, Hive CE, Crashlytics, ShowcaseView. Covers state management, navigation and routing, local storage and persistence, data models and serialization, dependency injection, clean architecture layering, feature scaffolding, forms and validation, lists and pagination, search and debouncing, error handling, crash reporting, analytics, logging, fire-and-forget side effects, services and singletons, guided tours and onboarding, testing, and code generation. Use whenever the user mentions any of those topics, any Flutter or Dart file, a new screen or feature, state or data flow, a model or entity, a repository or datasource, a provider or notifier, a widget tree or UI, a bug or crash, or touches `lib/`, `test/`, `pubspec.yaml`, `analysis_options.yaml`, `*.dart`. NOT for Provider/BLoC/GetX, non-Flutter, or backend-only Dart.
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "4.2.0"
-  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, persistence, local-storage, showcaseview, guided-tours, onboarding
+  version: "4.3.0"
+  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, fire-and-forget, singletons
 ---
 
 ## MANDATORY — Read Before Writing Any Code
@@ -160,6 +160,8 @@ Read before generating code for that topic.
 | [extensions-utilities.md](references/extensions-utilities.md) | Utilities, extensions |
 | [mixins.md](references/mixins.md) | Mixin vs interface vs extension |
 | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
+| [services-and-singletons.md](references/services-and-singletons.md) | Static-only class vs singleton vs provider, fire-and-forget pattern, testing each |
+| [crashlytics.md](references/crashlytics.md) | Firebase Crashlytics setup (3 hooks), `Crash` wrapper, non-fatal vs fatal, breadcrumbs, custom keys, symbols |
 | [showcase-tours.md](references/showcase-tours.md) | Guided tours, tour state sync |
 | [dart-patterns-records.md](references/dart-patterns-records.md) | Records, patterns, extension types |
 

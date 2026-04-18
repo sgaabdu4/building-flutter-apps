@@ -8,7 +8,9 @@ Copy verbatim into every project root. No exceptions.
 |------|-----------|
 | `strict-casts/inference/raw-types` | NEVER disable |
 | `avoid_dynamic_calls` | NEVER disable |
-| `unawaited_futures` | NEVER disable — missing await is a logic bug |
+| `unawaited_futures` / `discarded_futures` | NEVER disable — missing await is a logic bug; use `unawaited()` for intentional fire-and-forget |
+| `avoid_void_async` | NEVER disable — `void async` blocks `await` and hides errors |
+| `avoid_print` | NEVER disable — route through `dart:developer` `log()` or `Crash.log` |
 | `cancel_subscriptions` / `close_sinks` | NEVER disable — resource leaks |
 | `invalid_annotation_target: ignore` | NEVER remove — required by Freezed + Riverpod codegen |
 | Generated files excluded | NEVER analyse `*.g.dart`, `*.freezed.dart` |
@@ -71,8 +73,11 @@ linter:
     - prefer_final_locals
     - avoid_redundant_argument_values
     - avoid_dynamic_calls
+    - avoid_print
+    - avoid_void_async
     - cancel_subscriptions
     - close_sinks
+    - discarded_futures
     - unawaited_futures
 ```
 
