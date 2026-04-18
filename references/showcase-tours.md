@@ -189,6 +189,56 @@ This avoids the runtime assertion:
 Please register [ShowcaseView] first by calling [ShowcaseView.register()]
 ```
 
+### Scope identity (5.0.1 re-registration bug)
+
+The `isRegistered` guard is not sufficient on its own. `showcaseview` 5.0.1 replaces the `ShowcaseScope` object in its internal map **every time** `ShowcaseView.register` is called for a scope name that already exists. Existing `Showcase` widgets still hold the old `ShowcaseScope` reference via their `_showCaseWidgetManager` field. On the next `didUpdateWidget`, `_updateControllerValues` detects the identity flip, reassigns the field, then calls the `_controller` getter — which looks up the controller in the **new** (empty) `ShowcaseScope`. Assertion fires:
+
+```text
+'package:showcaseview/src/showcase/showcase_service.dart':
+Failed assertion: line 177 pos 7: 'controller != null'
+```
+
+In debug, the resulting `ErrorWidget` has unbounded intrinsic width and produces massive `RenderFlex overflowed` errors if placed inside a `Row` (e.g. `AppBar.actions`).
+
+Triggers: any code path that calls `ShowcaseView.register` twice for the same scope name during a single widget lifetime (hot reload races, duplicate screen instances during navigation transitions, `MediaQuery` rebuild cascades, etc.).
+
+**Defense in `AppShowcaseTarget`:** track the `ShowcaseScope` object's `identityHashCode` between builds. When it changes, skip rendering `Showcase` for one frame so the stale `_ShowcaseState` disposes cleanly, then remount so its `initState` re-registers the controller under the new scope.
+
+```dart
+class _AppShowcaseTargetState extends State<AppShowcaseTarget> {
+  int? _lastScopeIdentity;
+  bool _skipShowcaseThisFrame = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final service = ShowcaseService.instance;
+    if (!service.isRegistered(scope: widget.scope)) {
+      _lastScopeIdentity = null;
+      return widget.child;
+    }
+
+    final currentIdentity =
+        identityHashCode(service.getScope(scope: widget.scope));
+    if (_lastScopeIdentity != null &&
+        _lastScopeIdentity != currentIdentity &&
+        !_skipShowcaseThisFrame) {
+      _skipShowcaseThisFrame = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _skipShowcaseThisFrame = false);
+      });
+    }
+    _lastScopeIdentity = currentIdentity;
+
+    if (_skipShowcaseThisFrame) return widget.child;
+
+    return Showcase(/* ... */);
+  }
+}
+```
+
+`Showcase`'s `GlobalKey` tolerates a one-frame absence from the tree. Do not wrap in `KeyedSubtree` with a swapped key — the `GlobalKey` migrates state across the remount and the bug persists.
+
 ## ShowcaseService
 
 Riverpod provider wrapping `SharedPreferences`. Tracks tour completion per user scope with session and persistent keys.
