@@ -4,7 +4,7 @@ description: Flutter app architecture reference — Riverpod 3.x, Freezed 3.x, G
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "4.3.0"
+  version: "4.3.1"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, fire-and-forget, singletons
 ---
 
@@ -75,6 +75,7 @@ lib/
 17. **`abstract final class` for static-only namespaces** — NEVER `Class._()`. Exception: `const Entity._()` in Freezed.
 18. **`ref.invalidate` not `ref.refresh`** when no return value is needed.
 19. **Persistence SSOT** — Default to repository/data persistence. Notifier persistence is opt-in. One persistence owner per feature state.
+20. **Pop safely with GoRouter** — For dismiss/back actions on pushable or deep-linkable screens, guard `context.pop()` with `context.canPop()`. If true, pop and return. Otherwise, navigate to a typed fallback route (`const MyRoute().go(context)`).
 
 ## Provider Decision Tree
 
@@ -115,6 +116,7 @@ graph TD
 | Side-effect loading/error in notifier state | `Mutation<T>()` — see [riverpod-codegen.md](references/riverpod-codegen.md) |
 | `ref.read` in `initState` | `addPostFrameCallback` then read |
 | `state.copyWith(...)` before first `state=` in sync `Notifier.build()` (incl. `_load()` called sync from build, or `ref.listen(..., fireImmediately: true)` callback that reads state) | Seed via returned constructor + `Future.microtask(_load)`, OR `state = const FooState()` before `fireImmediately` listener. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap) |
+| `context.pop()` without guard on dismiss/back callbacks | `if (context.canPop()) { context.pop(); return; } const MyRoute().go(context);` |
 | `using context` after `await` | `if (!context.mounted) return;` |
 | Mixin vs interface vs extension choices | See [mixins.md](references/mixins.md) |
 

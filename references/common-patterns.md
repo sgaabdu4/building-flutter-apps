@@ -10,6 +10,7 @@ Reusable patterns for pagination, search, forms, debouncing, and batch processin
 4. **MUST** use `ref.listen()` + `refreshListenable` for GoRouter redirect triggers — NEVER `ref.watch()`.
 5. **MUST** debounce search inputs (500ms minimum) — NEVER call API on every keystroke.
 6. **During loading, stay put.** Return `null` from redirect — NEVER bounce to splash on web refresh.
+7. **MUST** guard dismiss/back `context.pop()` calls with `context.canPop()` and typed fallback route for deep-link/resume safety.
 
 ```mermaid
 graph TD
@@ -458,6 +459,13 @@ ProductDetailRoute(id: product.id).push(context);
 
 // Push with return value
 final result = await ProductDetailRoute(id: product.id).push<bool>(context);
+
+// Safe pop with typed fallback (recommended for dismiss/back actions)
+if (context.canPop()) {
+  context.pop(result);
+  return;
+}
+const ProductListRoute().go(context);
 
 // WRONG — NEVER use string-based navigation (no type safety)
 // context.go('/products/${product.id}');
