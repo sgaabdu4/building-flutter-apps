@@ -78,6 +78,8 @@ lib/
 19. **Persistence SSOT** — Default to repository/data persistence. Notifier persistence opt-in. One persistence owner per feature state.
 20. **Pop safely with GoRouter** — For dismiss/back on pushable or deep-linkable screens, guard `context.pop()` with `context.canPop()`. If true, pop + return. Else navigate to typed fallback (`const MyRoute().go(context)`).
 21. **No silent mutation no-op** — Mutation methods must not return early just because cached repo field null; lazily init deps first, then proceed or fail explicit.
+22. **Route-param safety in widgets** — NEVER throw from widget `build()` for missing route IDs. Use nullable by-id providers + fallback UI. See [common-patterns.md](references/common-patterns.md#route-param-safety--wizard-sequencing).
+23. **Navigation-critical mutation sequencing** — In wizard/deep-link flows: persist write → targeted state sync → navigate. See [common-patterns.md](references/common-patterns.md#route-param-safety--wizard-sequencing) and [state-management.md](references/state-management.md).
 
 ## Provider Decision Tree
 
@@ -121,6 +123,8 @@ graph TD
 | Mutation method (`create*`, `update*`, `delete*`, `set*`) does `if (_repository == null) return ...` | Use `_ensureRepository()`/`_ensureDependencies()` with `await`, then guard with `if (!ref.mounted) return ...` |
 | `context.pop()` without guard on dismiss/back callbacks | `if (context.canPop()) { context.pop(); return; } const MyRoute().go(context);` |
 | `context.pop()` then immediately push route (modal still animating) | `Navigator.of(context).maybePop().then((_) { if (ctx.mounted) nav(); })` — see [common-patterns.md](references/common-patterns.md#dismiss-modal--push-route-bottom-sheet-navigation) |
+| `firstWhere(... orElse: () => throw StateError(...))` in widget `build()` for route IDs | Nullable by-id provider + fallback UI (no throw). See [common-patterns.md](references/common-patterns.md#route-param-safety--wizard-sequencing) |
+| `ref.invalidate(parentProvider)` right after child create/delete in active wizard/deep-link flow | Persist write → targeted parent sync → navigate. See [state-management.md](references/state-management.md) |
 | `using context` after `await` | `if (!context.mounted) return;` |
 | Mixin vs interface vs extension choices | See [mixins.md](references/mixins.md) |
 
@@ -183,3 +187,5 @@ Read before generating code for that topic.
 - [ ] `ref.watch()` in `build()`, `ref.read()` only in callbacks
 - [ ] Sync `Notifier.build()` never reads `state` before first `state=` — loading flags seeded via returned constructor; async init dispatched with `Future.microtask`; no `fireImmediately: true` listener that reads state without prior direct `state =` assignment
 - [ ] Every notifier mutation method lazily inits repositories/deps (`_ensureRepository`/`_ensureDependencies`) before writes
+- [ ] Route-param lookups in widget `build()` are nullable (no throw-on-missing-id)
+- [ ] Wizard/deep-link mutation sequence: persist → targeted sync → navigate

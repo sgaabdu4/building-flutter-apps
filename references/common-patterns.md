@@ -11,6 +11,8 @@ Reusable patterns: pagination, search, forms, debouncing, batch processing.
 5. **MUST** debounce search inputs (500ms min) — NEVER call API on every keystroke.
 6. **During loading, stay put.** Return `null` from redirect — NEVER bounce to splash on web refresh.
 7. **MUST** guard dismiss/back `context.pop()` with `context.canPop()` + typed fallback route for deep-link/resume safety.
+8. **Route-param lookups in widget `build()` MUST be nullable.** Use by-id providers and fallback UI; NEVER throw from `build()` when an entity is temporarily missing.
+9. **Wizard/deep-link mutation sequencing MUST be:** persist write → targeted parent state sync → navigate. NEVER combine navigation with broad invalidation that can clear route-dependent state mid-transition.
 
 ```mermaid
 graph TD
@@ -27,6 +29,31 @@ graph TD
 ```
 
 **Contents:** [Pagination](#pagination) | [Search with Debounce](#search-with-debounce) | [Local Filter](#local-filter-no-api-call) | [Form Validation](#form-validation) | [Batch Processing](#batch-processing) | [Pull-to-Refresh](#pull-to-refresh) | [Navigation with Typed GoRouter](#navigation-with-typed-gorouter) | [Delta Sync](#delta-sync-incremental-remote-pull)
+
+## Route-Param Safety + Wizard Sequencing
+
+Use nullable by-id providers in widgets and sequence mutations before navigation.
+
+```dart
+@Riverpod(keepAlive: true)
+Program? programById(Ref ref, String id) {
+  final state = ref.watch(programsProvider);
+  for (final p in state.items) {
+    if (p.id == id) return p;
+  }
+  return null;
+}
+
+void onNext(BuildContext context, WidgetRef ref, String programId) {
+  final program = ref.read(programByIdProvider(programId));
+  if (program == null) return; // disable CTA / show placeholder while unavailable
+
+  // Sequence in notifier: persist -> targeted sync -> navigate
+  // await repo.save(child);
+  // ref.read(programsProvider.notifier).upsertProgram(updatedParent);
+  // const NextRoute().go(context);
+}
+```
 
 ## Pagination
 
