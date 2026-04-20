@@ -1,15 +1,15 @@
 # Atomic Design
 
-Build UI from small, composable pieces: tokens → atoms → molecules → organisms → templates → pages.
+Build UI from small composable pieces: tokens → atoms → molecules → organisms → templates → pages.
 
 ## Rules — NEVER Violate
 
-1. **MUST** use design tokens for ALL measurements — NEVER hardcode spacing, colors, radii, font sizes, or icon sizes.
+1. **MUST** use design tokens for ALL measurements — NEVER hardcode spacing, colors, radii, font sizes, icon sizes.
 2. **MUST** use `const` constructors on all atoms and molecules.
-3. **NEVER** use `ref.watch` or `ref.read` in atoms, molecules, or templates — provider access ONLY in organisms and pages.
+3. **NEVER** use `ref.watch` or `ref.read` in atoms, molecules, templates — provider access ONLY in organisms and pages.
 4. **MUST** use `context.textTheme` and `context.colors` — NEVER raw `TextStyle()` or `Color()`.
-5. **MUST** place shared widgets in `core/widgets/` and feature-specific widgets in `features/x/presentation/widgets/`.
-6. **MUST** promote a widget to `core/widgets/` when 2+ features use it with no feature-specific logic.
+5. **MUST** place shared widgets in `core/widgets/`, feature-specific in `features/x/presentation/widgets/`.
+6. **MUST** promote widget to `core/widgets/` when 2+ features use it with no feature-specific logic.
 
 ```mermaid
 graph LR
@@ -35,7 +35,7 @@ Pages      →  Screens that compose templates and connect state
 
 ## Tokens
 
-MUST NEVER hardcode a color, spacing, radius, font size, or icon size. MUST use token classes.
+NEVER hardcode color, spacing, radius, font size, icon size. MUST use token classes.
 
 ### Spacing
 
@@ -85,7 +85,7 @@ abstract final class IconSizes {
 
 ### Typography
 
-Extend the Material `TextTheme`:
+Extend Material `TextTheme`:
 
 ```dart
 // core/theme/app_theme.dart
@@ -102,7 +102,7 @@ ThemeData buildAppTheme() {
 }
 ```
 
-Access via `context.textTheme.titleMedium` (see [extensions-utilities.md](extensions-utilities.md)), NEVER a raw `TextStyle(fontSize: 16)`.
+Access via `context.textTheme.titleMedium` (see [extensions-utilities.md](extensions-utilities.md)), NEVER raw `TextStyle(fontSize: 16)`.
 
 ### Colors
 
@@ -116,7 +116,7 @@ Container(
 )
 ```
 
-For semantic constants (status, charts):
+Semantic constants (status, charts):
 
 ```dart
 // core/theme/semantic_colors.dart
@@ -135,7 +135,7 @@ Single-element, stateless widgets. No business logic, no provider access.
 ### Rules
 
 - MUST be one visual element per atom
-- MUST accept data through constructor parameters only
+- MUST accept data via constructor params only
 - NEVER use `ref.watch` or `ref.read`
 - MUST have `const` constructor
 - MUST use tokens for all measurements
@@ -177,7 +177,7 @@ Common atoms: `AppBadge`, `AppIconButton`, `AppTextField`, `LoadingIndicator`, `
 
 ## Molecules
 
-Combine 2–4 atoms into a unit. No provider access.
+Combine 2–4 atoms into unit. No provider access.
 
 ### Rules
 
@@ -269,13 +269,13 @@ class StatCard extends StatelessWidget {
 
 ## Organisms
 
-Groups of molecules and atoms that form a distinct UI section.
+Groups of molecules and atoms forming distinct UI section.
 
 ### Rules
 
-- May use `ref.watch` and `ref.read` (not required — data-only organisms are valid)
+- May use `ref.watch` and `ref.read` (not required — data-only organisms valid)
 - Compose molecules and atoms
-- Represent a distinct page section (header, grid, comment list)
+- Represent distinct page section (header, grid, comment list)
 - Feature-specific: `features/x/presentation/widgets/`
 - Shared: `core/widgets/organisms/`
 
@@ -467,17 +467,17 @@ class ProductDashboardScreen extends ConsumerWidget {
 
 ## Promotion Rules
 
-- Move to `core/widgets/` when two or more features use a widget with no feature-specific logic
-- Extract a new atom when you repeat the same styled element across molecules
-- Split an organism that exceeds ~150 lines or handles two unrelated concerns
+- Move to `core/widgets/` when 2+ features use widget with no feature-specific logic
+- Extract new atom when same styled element repeats across molecules
+- Split organism exceeding ~150 lines or handling two unrelated concerns
 
 ## Accessibility
 
-For `Semantics` wrappers, `MergeSemantics`, 48x48 tap targets, and contrast ratios, see the Accessibility section in [flutter-optimizations.md](flutter-optimizations.md).
+For `Semantics` wrappers, `MergeSemantics`, 48x48 tap targets, contrast ratios, see Accessibility section in [flutter-optimizations.md](flutter-optimizations.md).
 
 ## Theming
 
-Every widget MUST read from the theme. NEVER use raw constants:
+Every widget MUST read from theme. NEVER raw constants:
 
 ```dart
 // WRONG

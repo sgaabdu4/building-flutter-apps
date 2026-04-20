@@ -1,33 +1,33 @@
 # Contributing to Flutter Riverpod Skill
 
-Thank you for your interest in contributing! This document provides guidelines for contributing to this skill.
+Thanks for interest. This doc = guidelines for contributing.
 
 ## How to Contribute
 
 ### Reporting Issues
 
-- **Bug reports**: Open an issue with a clear description, steps to reproduce, and expected vs actual behavior
-- **Feature requests**: Open an issue describing the new pattern or feature you'd like to see
-- **Documentation improvements**: PRs for typos, clarifications, or new examples are always welcome
+- **Bug reports**: Open issue. Clear description, repro steps, expected vs actual.
+- **Feature requests**: Open issue describing new pattern/feature wanted.
+- **Documentation improvements**: PRs for typos, clarifications, new examples welcome.
 
 ### Pull Requests
 
-1. **Fork** the repository
-2. **Create a branch** for your changes (`git checkout -b feature/add-new-pattern`)
-3. **Make your changes** following the guidelines below
-4. **Test** your changes work with Claude Code, Cursor, or another agent
-5. **Submit a PR** with a clear description of your changes
+1. **Fork** repo
+2. **Create branch** (`git checkout -b feature/add-new-pattern`)
+3. **Make changes** per guidelines below
+4. **Test** with Claude Code, Cursor, or other agent
+5. **Submit PR** with clear description
 
 ## Guidelines
 
 ### Documentation Style
 
-- Use clear, concise language
-- Use **MUST/NEVER/ALWAYS** enforcement language for rules — every reference file MUST have a `## Rules — NEVER Violate` section at the top
-- Use Mermaid diagrams over verbose prose where applicable
-- Include working Dart/Flutter code examples
-- Follow existing formatting patterns
-- Keep SKILL.md under 500 lines; add detailed content to `references/`
+- Clear, concise language
+- **MUST/NEVER/ALWAYS** enforcement for rules — every reference file MUST have `## Rules — NEVER Violate` section at top
+- Mermaid diagrams over prose where fit
+- Include working Dart/Flutter examples
+- Follow existing formatting
+- Keep SKILL.md under 500 lines; detailed content goes in `references/`
 
 ### Code Examples
 
@@ -40,29 +40,29 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ### Package Versions
 
-This skill targets:
+Targets:
 - `flutter_riverpod: 3.2.1+`
 - `freezed: 3.2.5+`
 - `go_router: 17.1.0+`
 
-Ensure examples are compatible with these versions.
+Examples must work with these versions.
 
 ### File Structure
 
 - `SKILL.md` - Main skill file (overview, critical rules, quick reference)
-- `references/` - Detailed documentation on specific topics
-- `README.md` - GitHub-facing documentation
+- `references/` - Detailed topic docs
+- `README.md` - GitHub-facing docs
 
 ### Commit Messages
 
-- Use present tense ("Add feature" not "Added feature")
-- Keep first line under 50 characters
+- Present tense ("Add feature" not "Added feature")
+- First line under 50 chars
 - Reference issues when applicable (`Fixes #123`)
 
 ## Code of Conduct
 
-Be respectful, inclusive, and constructive. We're all here to improve AI-assisted development.
+Be respectful, inclusive, constructive. All here to improve AI-assisted dev.
 
 ## Questions?
 
-Open an issue or start a discussion. We're happy to help!
+Open issue or start discussion. Happy to help.

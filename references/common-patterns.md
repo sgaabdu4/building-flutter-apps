@@ -1,16 +1,16 @@
 # Common Patterns
 
-Reusable patterns for pagination, search, forms, debouncing, and batch processing.
+Reusable patterns: pagination, search, forms, debouncing, batch processing.
 
 ## Rules — NEVER Violate
 
 1. **MUST** use typed GoRouter routes (`const MyRoute().go(context)`) — NEVER string-based `context.go('/path')`.
-2. **NEVER** use `ref.watch()` inside GoRouter `redirect` — it recreates the router on every state change.
+2. **NEVER** use `ref.watch()` inside GoRouter `redirect` — recreates router every state change.
 3. **MUST** guard `if (!ref.mounted) return;` after EVERY `await` in notifiers (pagination, search, forms, sync).
 4. **MUST** use `ref.listen()` + `refreshListenable` for GoRouter redirect triggers — NEVER `ref.watch()`.
-5. **MUST** debounce search inputs (500ms minimum) — NEVER call API on every keystroke.
+5. **MUST** debounce search inputs (500ms min) — NEVER call API on every keystroke.
 6. **During loading, stay put.** Return `null` from redirect — NEVER bounce to splash on web refresh.
-7. **MUST** guard dismiss/back `context.pop()` calls with `context.canPop()` and typed fallback route for deep-link/resume safety.
+7. **MUST** guard dismiss/back `context.pop()` with `context.canPop()` + typed fallback route for deep-link/resume safety.
 
 ```mermaid
 graph TD
@@ -165,7 +165,7 @@ class SearchNotifier extends _$SearchNotifier {
 
 ## Local Filter (No API Call)
 
-Filter items already in state without refetching:
+Filter items in state, no refetch:
 
 ```dart
 @freezed
@@ -262,7 +262,7 @@ class ProductFormNotifier extends _$ProductFormNotifier {
 
 ## Batch Processing
 
-Extract to `core/utils/batch_utils.dart` for reuse across features:
+Extract to `core/utils/batch_utils.dart` for cross-feature reuse:
 
 ```dart
 /// Process items in parallel batches to avoid overwhelming the server.
@@ -316,7 +316,7 @@ class ProductListScreen extends ConsumerWidget {
 
 ## Navigation with Typed GoRouter
 
-Use `go_router_builder` for type-safe routes. Every route is a class extending `GoRouteData` with a generated mixin. The compiler catches route parameter errors at build time.
+Use `go_router_builder` for type-safe routes. Every route = class extending `GoRouteData` with generated mixin. Compiler catches route param errors at build time.
 
 ### Route Definitions
 
@@ -382,14 +382,14 @@ class LoginRoute extends GoRouteData with $LoginRoute {
 
 ### Router Provider with Auth Redirect
 
-Create GoRouter once. Use `ref.listen()` + `refreshListenable` to trigger redirect re-evaluation. NEVER `ref.watch()` in the redirect — it recreates the router on every state change, resetting the route stack.
+Create GoRouter once. Use `ref.listen()` + `refreshListenable` to trigger redirect re-evaluation. NEVER `ref.watch()` in redirect — recreates router every state change, resets route stack.
 
 **Redirect rules for apps with multi-step setup (profile completion, roles):**
 
-- **During loading, MUST stay put.** Return `null` — NEVER bounce to splash. On web refresh, redirecting `/chat` → `/` → `/home` loses the URL. One exception: authenticated users on login/signup should redirect to splash.
-- **Auth pages MUST navigate explicitly.** Add `ref.listen(authProvider)` in login/signup pages that navigates on auth success. `refreshListenable` timing is unreliable; explicit navigation guarantees the transition.
+- **During loading, MUST stay put.** Return `null` — NEVER bounce to splash. On web refresh, redirecting `/chat` → `/` → `/home` loses URL. One exception: authenticated users on login/signup redirect to splash.
+- **Auth pages MUST navigate explicitly.** Add `ref.listen(authProvider)` in login/signup pages, navigate on auth success. `refreshListenable` timing unreliable; explicit nav guarantees transition.
 - **OAuth MUST skip auth-level `isLoading`.** Use per-button loading (`isGoogleLoading`). Auth `isLoading` triggers premature splash redirect.
-- **keepAlive providers survive hot reload.** Redirect closure changes require hot restart.
+- **keepAlive providers survive hot reload.** Redirect closure changes need hot restart.
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -473,7 +473,7 @@ const ProductListRoute().go(context);
 
 ### StatefulShellRoute Tabs
 
-Use `StatefulNavigationShell.goBranch()` for main tabs. Do not `push` a tab route.
+Use `StatefulNavigationShell.goBranch()` for main tabs. Don't `push` a tab route.
 
 ```dart
 class AppShellScaffold extends StatelessWidget {
@@ -492,9 +492,9 @@ class AppShellScaffold extends StatelessWidget {
 }
 ```
 
-- Inside the shell, use `StatefulNavigationShell.of(context).goBranch(index)`.
-- In reusable sheets/overlays, pass a callback from the shell-owned caller instead of routing inside the child.
-- Use route-level `.go(context)` only to enter the shell from outside it, or to intentionally reset a branch to a known root.
+- Inside shell, use `StatefulNavigationShell.of(context).goBranch(index)`.
+- In reusable sheets/overlays, pass callback from shell-owned caller, don't route in child.
+- Use route-level `.go(context)` only to enter shell from outside, or to intentionally reset branch to known root.
 
 ```dart
 BentoWorkoutSelectorSheet(
@@ -530,7 +530,7 @@ class MyApp extends ConsumerWidget {
 
 ## Delta Sync (Incremental Remote Pull)
 
-Fetch only rows changed since the last sync instead of re-downloading all data. Requires per-table timestamps stored locally and `mergeAll`/`deleteByIds` on repositories.
+Fetch only rows changed since last sync, not all data. Needs per-table timestamps stored locally + `mergeAll`/`deleteByIds` on repositories.
 
 ### Repository Interface Additions
 
@@ -630,4 +630,3 @@ Future<void> setTableSyncDate(String key, DateTime date) async {
 | Frequent small edits | Delta sync — fetches only changed rows |
 | Full data refresh needed | Full pull with `saveAll` |
 | Real-time updates | Realtime subscriptions (not delta) |
-

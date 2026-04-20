@@ -1,14 +1,14 @@
 # Flutter Riverpod Clean Architecture Skill
 
-> Flutter clean architecture patterns with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, and Hive CE persistence.
+> Flutter clean architecture with Riverpod 3.x codegen, Freezed 3.x sealed classes, GoRouter, Hive CE persistence.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B.svg)](https://flutter.dev)
 [![Riverpod](https://img.shields.io/badge/Riverpod-3.x-00B4D8.svg)](https://riverpod.dev)
 
-> **Disclaimer:** This is an unofficial community resource. It is not affiliated with, endorsed by, or sponsored by Google, the Flutter team, or the Riverpod maintainers. "Flutter" is a trademark of Google LLC. "Riverpod" is maintained by Remi Rousselet.
+> **Disclaimer:** Unofficial community resource. Not affiliated with, endorsed by, or sponsored by Google, Flutter team, or Riverpod maintainers. "Flutter" trademark of Google LLC. "Riverpod" maintained by Remi Rousselet.
 
-> **Opinionated by design:** This skill is fully opinionated and favors strict, consistent patterns over flexible style choices.
+> **Opinionated by design:** Strict consistent patterns over flexible style.
 
 ## Installation
 
@@ -16,7 +16,7 @@
 npx skills add sgaabdu4/building-flutter-apps
 ```
 
-Or manually clone into `~/.claude/skills/`:
+Or clone into `~/.claude/skills/`:
 
 ```bash
 git clone https://github.com/sgaabdu4/building-flutter-apps ~/.claude/skills/building-flutter-apps
@@ -24,7 +24,7 @@ git clone https://github.com/sgaabdu4/building-flutter-apps ~/.claude/skills/bui
 
 ## What's Included
 
-This skill provides AI agents with comprehensive guidance for Flutter development using modern best practices:
+Guidance for Flutter dev with modern best practices:
 
 ### Core Stack
 | Package | Version | Purpose |
@@ -51,15 +51,15 @@ lib/
 ```
 
 ### Key Patterns
-- **Codegen-only providers** — No `StateProvider`, `StateNotifierProvider`, or legacy providers
-- **Sealed classes** — Exhaustive pattern matching with Dart's native `switch`
-- **Interface contracts** — `abstract interface class` for every repository and datasource
-- **No prop drilling** — Child widgets watch providers directly
-- **Async safety** — `if (!ref.mounted) return;` guards after every `await`
-- **Unified Ref** — Single `Ref` type (no `AutoDisposeRef`, `ExampleRef`)
-- **Widget classes only** — No helper methods (`_buildXxx`)
-- **No `dynamic`** — Use `Object?` or a proper type
-- **Enforcement** — Every reference file has MUST/NEVER rules at the top
+- **Codegen-only providers** — no `StateProvider`, `StateNotifierProvider`, legacy providers
+- **Sealed classes** — exhaustive pattern matching with Dart native `switch`
+- **Interface contracts** — `abstract interface class` for every repository, datasource
+- **No prop drilling** — child widgets watch providers directly
+- **Async safety** — `if (!ref.mounted) return;` after every `await`
+- **Unified Ref** — single `Ref` type (no `AutoDisposeRef`, `ExampleRef`)
+- **Widget classes only** — no helper methods (`_buildXxx`)
+- **No `dynamic`** — use `Object?` or proper type
+- **Enforcement** — every reference file has MUST/NEVER rules at top
 
 ## Reference Files
 
@@ -83,12 +83,12 @@ lib/
 - [Claude Code](https://code.claude.com/)
 - [Cursor](https://cursor.sh/)
 - [Windsurf](https://windsurf.ai/)
-- Any agent supporting the [Agent Skills](https://agentskills.io/) standard
+- Any agent supporting [Agent Skills](https://agentskills.io/) standard
 
 ## Usage
 
-Once installed, the skill automatically activates when you:
-- Build, review, or refactor Flutter apps
+Skill auto-activates when you:
+- Build, review, refactor Flutter apps
 - Work with Riverpod state management
 - Implement Freezed data classes
 - Set up GoRouter navigation
@@ -113,19 +113,19 @@ dart run build_runner clean && dart run build_runner build -d
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions welcome:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/add-pattern`)
-3. Follow existing documentation style
-4. Submit a pull request
+1. Fork repo
+2. Create feature branch (`git checkout -b feature/add-pattern`)
+3. Follow existing doc style
+4. Submit PR
 
 ### Guidelines
 - Keep SKILL.md under 500 lines
 - Add detailed patterns to `references/` files
 - Include working code examples
 - Test with Riverpod 3.x and Freezed 3.x
-- Follow the architecture guidelines
+- Follow architecture guidelines
 
 ## License
 

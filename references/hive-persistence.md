@@ -1,6 +1,6 @@
 # Hive CE Persistence
 
-Binary persistence for Flutter using Hive CE with TypeAdapter code generation.
+Binary persistence Flutter. Hive CE + TypeAdapter codegen.
 
 ## Core Stack
 
@@ -12,18 +12,18 @@ Binary persistence for Flutter using Hive CE with TypeAdapter code generation.
 
 ## TypeAdapter Storage vs JSON
 
-TypeAdapters provide significant performance gains.
+TypeAdapters big perf win.
 
 | Mode | Reads | Writes | Size |
 |------|-------|--------|------|
 | Binary (TypeAdapter) | ~10x faster | ~5x faster | ~60% smaller |
 | JSON (no adapter) | Baseline | Baseline | Baseline |
 
-Use TypeAdapters for entities read/written frequently.
+Use TypeAdapters for hot-path entities.
 
 ## @GenerateAdapters Pattern
 
-Generate TypeAdapters for Freezed classes without @HiveType annotations.
+Gen TypeAdapters for Freezed classes sans @HiveType.
 
 ### Step 1: Create Adapter Specification
 
@@ -74,7 +74,7 @@ Future<void> initializeStorage() async {
 
 ## TypeId Management
 
-TypeIds must be unique and stable. Changing a TypeId breaks existing data.
+TypeIds unique + stable. Change TypeId = break existing data.
 
 ```
 // Allocation strategy: Reserve ranges per feature
@@ -85,7 +85,7 @@ TypeIds must be unique and stable. Changing a TypeId breaks existing data.
 
 ## Mixing @HiveType and @GenerateAdapters
 
-Use @HiveType for non-Freezed classes. Use @GenerateAdapters for Freezed classes.
+@HiveType for non-Freezed. @GenerateAdapters for Freezed.
 
 ```dart
 // Non-Freezed class with @HiveType
@@ -166,11 +166,11 @@ Hive.init(path);
 
 ## Critical Rules
 
-1. **TypeIds are permanent** — Never change a TypeId after release
-2. **Reserve TypeId 0** — Use `reservedTypeIds: {0}` if you have @HiveType classes
-3. **Generate after changes** — Run build_runner when adding/modifying entities
+1. **TypeIds permanent** — Never change TypeId post-release
+2. **Reserve TypeId 0** — Use `reservedTypeIds: {0}` if @HiveType classes exist
+3. **Gen after changes** — Run build_runner when add/modify entities
 4. **Idempotent registration** — Check `isAdapterRegistered` in tests
-5. **Store entities, not JSON** — Use TypeAdapters for direct object storage
+5. **Store entities, not JSON** — TypeAdapters for direct object storage
 6. **Close boxes** — Call `Hive.close()` in tearDown
 
 ## File Structure

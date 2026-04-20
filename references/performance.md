@@ -1,15 +1,15 @@
 # Performance
 
-Widget rebuild optimization, provider watching strategy, and memory management. For Flutter-specific rendering, animations, slivers, isolates, and app size techniques, see [flutter-optimizations.md](flutter-optimizations.md).
+Widget rebuild optimization, provider watching, memory management. Flutter-specific rendering, animations, slivers, isolates, app size → see [flutter-optimizations.md](flutter-optimizations.md).
 
 ## Rules — NEVER Violate
 
-1. **MUST** watch providers in leaf widgets — NEVER in parents that pass data down.
-2. **MUST** use `.select()` to watch specific fields in all leaf widgets.
-3. **MUST** extract widget classes — NEVER use helper methods (`_buildXxx()`).
-4. **MUST** use `const` constructors wherever possible.
+1. **MUST** watch providers in leaf widgets — NEVER in parents passing data down.
+2. **MUST** use `.select()` for specific fields in all leaf widgets.
+3. **MUST** extract widget classes — NEVER helper methods (`_buildXxx()`).
+4. **MUST** use `const` constructors where possible.
 5. **MUST** use `ListView.builder` — NEVER `ListView(children: [...])` for dynamic lists.
-6. **NEVER** perform expensive operations (sort, filter, map) in `build()` — use computed providers.
+6. **NEVER** expensive ops (sort, filter, map) in `build()` — use computed providers.
 7. **MUST** dispose timers, controllers, subscriptions via `ref.onDispose()`.
 8. **NEVER** hold raw API responses in state — extract only needed fields.
 
@@ -17,7 +17,7 @@ Widget rebuild optimization, provider watching strategy, and memory management. 
 
 ### Watch in Leaf Widgets
 
-MUST watch providers in the smallest widget possible. NEVER watch in a parent and pass data down:
+Watch in smallest widget possible. NEVER watch in parent, pass down:
 
 ```dart
 // WRONG — parent rebuilds all children (prop drilling)
@@ -98,13 +98,13 @@ return const Padding(padding: EdgeInsets.all(16), child: child);
 | Computed providers whose **all** deps are keepAlive | Computed providers with mixed dep lifecycles |
 | Lives until app terminates | Disposes when no widget watches |
 
-Auto-dispose on an all-keepAlive dep chain breaks pause/resume subscription counting. Match the lifecycle of your dependencies.
+Auto-dispose on all-keepAlive dep chain breaks pause/resume subscription counting. Match lifecycle of deps.
 
 ### Equality Filtering
 
-Riverpod 3.0 uses `==` for notification filtering. Freezed classes generate `==` automatically.
+Riverpod 3.0 uses `==` for notification filtering. Freezed generates `==` auto.
 
-Only override `updateShouldNotify` when you intentionally want reference-equality filtering (`identical`) for performance-sensitive large state:
+Override `updateShouldNotify` only when intentionally want reference-equality (`identical`) for perf-sensitive large state:
 
 ```dart
 @override
@@ -215,14 +215,14 @@ List<Product> sortedProducts(Ref ref) {
 
 ### Widget Rebuilds
 - Watch providers in leaf widgets, not parents
-- Use `.select()` for specific properties
+- Use `.select()` for specific props
 - Extract widget classes, not helper methods
-- Use `const` constructors wherever possible
-- Never override `operator ==` on Widget — causes O(N²) rebuild checks; rely on `const` and caching instead
+- Use `const` constructors where possible
+- Never override `operator ==` on Widget — causes O(N²) rebuild checks; use `const` + caching
 
 ### State Management
 - `@Riverpod(keepAlive: true)` for repos, datasources, services, notifiers
-- `@riverpod` for computed values and one-time fetches
+- `@riverpod` for computed values, one-time fetches
 - `if (!ref.mounted) return;` after every `await`
 
 ### Data Loading
@@ -230,9 +230,9 @@ List<Product> sortedProducts(Ref ref) {
 - Paginate large lists
 - Debounce search inputs (500ms)
 - Prevent duplicate fetches with boolean flags
-- Use `Future.wait()` for parallel operations
+- Use `Future.wait()` for parallel ops
 
 ### Memory
 - Dispose timers, controllers, subscriptions in `ref.onDispose()`
-- Don't hold raw API responses in state
-- Use auto-dispose for temporary state
+- No raw API responses in state
+- Auto-dispose for temporary state

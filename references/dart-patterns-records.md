@@ -3,7 +3,7 @@
 Rules:
 1. MUST use Records for multiple return values — NEVER `Map<String, dynamic>` or parallel lists.
 2. MUST use Extension Types for entity IDs — NEVER raw `String` when multiple ID types coexist.
-3. MUST use guard clauses in switch — NEVER nest if-else inside a case body.
+3. MUST use guard clauses in switch — NEVER nest if-else inside case body.
 4. MUST use `if (value case final v?)` for null-binding — NEVER value!.
 
 ## Records (Dart 3.0)
@@ -35,7 +35,7 @@ final (:items, :hasMore) = await repo.fetchPage(1);
 
 ## Extension Types (Dart 3.3)
 
-Zero-cost compile-time wrapper. No runtime overhead — identical to the underlying type at runtime.
+Zero-cost compile-time wrapper. No runtime overhead — identical to underlying type at runtime.
 
 ```dart
 extension type UserId(String value) {
@@ -49,9 +49,9 @@ deleteProduct(UserId('u1'));    // compile-time ERROR — wrong type
 deleteProduct(ProductId('p1')); // OK
 ```
 
-Use for: entity IDs, units (Meters, Grams), currencies (USD, EUR). Prevents mixing up `userId` with `productId` at zero cost.
+Use for: entity IDs, units (Meters, Grams), currencies (USD, EUR). Prevents mixing `userId` with `productId` at zero cost.
 
-NEVER use raw `String`/`int` IDs when multiple distinct ID types exist in the same feature.
+NEVER raw `String`/`int` IDs when multiple distinct ID types exist in same feature.
 
 ## Patterns
 
@@ -122,7 +122,7 @@ var [_, second] = topTwo; // _ discards first
 
 ## Wildcard Variables (Dart 3.7)
 
-`_` is non-binding — can be declared multiple times without collision:
+`_` non-binding — declare multiple times, no collision:
 
 ```dart
 // Discard positional values in destructuring

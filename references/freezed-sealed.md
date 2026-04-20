@@ -1,16 +1,16 @@
 # Freezed 3.x Sealed Classes
 
-All Freezed classes MUST use `sealed class` — NEVER `abstract class`. Dart's `sealed` enables exhaustive pattern matching with `switch` expressions.
+All Freezed classes MUST use `sealed class` — NEVER `abstract class`. Dart `sealed` enable exhaustive pattern matching with `switch` expressions.
 
 ## Rules — NEVER Violate
 
 1. **MUST** use `sealed class` with `@freezed` — NEVER `abstract class`.
 2. **MUST** add `const Entity._()` private constructor when adding methods or getters.
 3. **MUST** use `build.yaml` with `explicit_to_json: true` — NEVER per-class `@JsonSerializable(explicitToJson: true)`.
-4. **MUST** use Dart's native `switch` expressions — NEVER Freezed's legacy `when`/`map` (removed in 3.0).
-5. **NEVER** use `@Freezed(toJson: true)` when a `fromJson` factory exists — Freezed auto-generates `toJson`.
+4. **MUST** use Dart native `switch` expressions — NEVER Freezed legacy `when`/`map` (removed in 3.0).
+5. **NEVER** use `@Freezed(toJson: true)` when `fromJson` factory exists — Freezed auto-generates `toJson`.
 6. **MUST** put `fromJson`/`toJson` ONLY on data models — NEVER on domain entities.
-7. **MUST** place Rich Model methods that derive from own fields on the model — NEVER in the repository.
+7. **MUST** put Rich Model methods deriving from own fields on model — NEVER in repository.
 
 ```mermaid
 graph TD
@@ -39,7 +39,7 @@ dev_dependencies:
   json_serializable: ^6.0.0
 ```
 
-Every file needs:
+Every file need:
 
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -72,7 +72,7 @@ Generated: `copyWith`, `toString`, `==`, `hashCode`, `toJson`.
 
 ## Adding Methods and Getters
 
-Add a private constructor first:
+Add private constructor first:
 
 ```dart
 @freezed
@@ -117,11 +117,11 @@ Widget build(BuildContext context, WidgetRef ref) {
 }
 ```
 
-Use Dart's native `switch` expressions. NEVER use Freezed's legacy `when`/`map` methods (removed in Freezed 3.0).
+Use Dart native `switch` expressions. NEVER use Freezed legacy `when`/`map` (removed in Freezed 3.0).
 
 ## AsyncValue Pattern Matching
 
-Riverpod's `AsyncValue` is also sealed:
+Riverpod `AsyncValue` also sealed:
 
 ```dart
 final asyncData = ref.watch(myAsyncProvider);
@@ -132,11 +132,11 @@ return switch (asyncData) {
 };
 ```
 
-`AsyncLoading(progress: 0.5)` reports loading progress. `AsyncValue.isFromCache` flags offline-persisted data.
+`AsyncLoading(progress: 0.5)` report loading progress. `AsyncValue.isFromCache` flag offline-persisted data.
 
 ## Feature State
 
-Combine a state class with a union for multi-state features:
+Combine state class with union for multi-state features:
 
 ```dart
 @freezed
@@ -153,7 +153,7 @@ sealed class ProductState with _$ProductState {
 }
 ```
 
-Use `copyWith` to update individual fields:
+Use `copyWith` to update fields:
 
 ```dart
 state = state.copyWith(isLoading: true);
@@ -222,7 +222,7 @@ sealed class ApiResponse with _$ApiResponse {
 }
 ```
 
-Customize the discriminator key:
+Customize discriminator key:
 
 ```dart
 @Freezed(unionKey: 'type', unionValueCase: FreezedUnionCase.pascal)
@@ -257,7 +257,7 @@ sealed class Paginated<T> with _$Paginated<T> {
 
 ## Non-Constant Default Values
 
-Use a private constructor:
+Use private constructor:
 
 ```dart
 @freezed
@@ -345,7 +345,7 @@ analyzer:
 
 ## Rich Models
 
-**Rule: If a method reads only its own fields, it MUST belong on the model.**
+**Rule: If method reads only own fields, MUST belong on model.**
 
 MUST add `const Entity._()` to enable getters and methods on Freezed classes:
 
@@ -374,21 +374,21 @@ sealed class Order with _$Order {
 | Transform to another type (`toClaims()`) | Side effects (HTTP, I/O) → Datasource |
 | Format for API (`toFormFields()`) | |
 
-Data models follow the same rule: `toEntity()`, `toRequestBody()`, `toCsvRow()` all belong on the model.
+Data models follow same rule: `toEntity()`, `toRequestBody()`, `toCsvRow()` all belong on model.
 
 ## Deep Serialization
 
-Freezed does not deep-serialize nested objects by default. Without explicit configuration, nested Freezed objects serialize as `Instance of '_XYZ'` instead of JSON maps — causing `type '_XYZ' is not a subtype of Map<String, dynamic>` crashes in release builds.
+Freezed not deep-serialize nested objects by default. Without explicit config, nested Freezed objects serialize as `Instance of '_XYZ'` instead of JSON maps — cause `type '_XYZ' is not a subtype of Map<String, dynamic>` crashes in release builds.
 
 ### Why build.yaml Is Required
 
-Freezed auto-generates `toJson()` when a `fromJson` factory exists (using `=>`). That part works without configuration. But the generated `toJson()` does NOT call `.toJson()` on nested objects unless `explicit_to_json` is enabled.
+Freezed auto-generates `toJson()` when `fromJson` factory exists (using `=>`). That part work without config. But generated `toJson()` does NOT call `.toJson()` on nested objects unless `explicit_to_json` enabled.
 
 Two separate concerns:
-- **Whether** `toJson()` exists → Freezed handles this automatically when `fromJson` is present
+- **Whether** `toJson()` exists → Freezed handles automatically when `fromJson` present
 - **How** `toJson()` serializes nested objects → requires `explicit_to_json: true`
 
-`@Freezed(toJson: true)` only controls the first concern. It is redundant when `fromJson` exists. It does NOT enable deep serialization.
+`@Freezed(toJson: true)` only controls first concern. Redundant when `fromJson` exists. Does NOT enable deep serialization.
 
 ### Global Fix: build.yaml
 

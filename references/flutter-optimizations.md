@@ -1,12 +1,12 @@
 # Flutter Optimizations
 
-Flutter-specific techniques for rendering, scrolling, animations, layout, concurrency, app size, accessibility, and adaptive UI.
+Flutter techniques for rendering, scrolling, animations, layout, concurrency, app size, accessibility, adaptive UI.
 
 **Contents:** [Keys](#keys) | [Slivers](#slivers) | [Avoid shrinkWrap](#avoid-shrinkwrap-true) | [Animations](#animations) | [Rendering Costs](#rendering-costs) | [Isolates](#isolates) | [App Size](#app-size) | [Accessibility](#accessibility) | [Adaptive & Responsive](#adaptive--responsive) | [Build Modes](#build-modes) | [Impeller](#impeller) | [Frame Budget](#frame-budget) | [RepaintBoundary](#repaintboundary) | [Preserving Tab State](#preserving-tab-state) | [Post-Frame Callbacks](#post-frame-callbacks)
 
 ## Keys
 
-Keys preserve widget state when the widget tree changes.
+Keys preserve widget state when tree changes.
 
 | Situation | Key Type | Example |
 |-----------|----------|---------|
@@ -27,13 +27,13 @@ ListView.builder(
 ```
 
 Rules:
-- Never create a key inside `build()` — defeats the purpose
-- Key only when state preservation matters
+- Never make key inside `build()` — defeat purpose
+- Key only when state preservation matter
 - Prefer `ValueKey` > `ObjectKey` > `UniqueKey` > `GlobalKey`
 
 ## Slivers
 
-Slivers build scrollable layouts where different sections scroll together. Use `CustomScrollView` instead of nesting `ListView` inside `SingleChildScrollView`.
+Slivers build scrollable layouts where sections scroll together. Use `CustomScrollView`, not `ListView` nested in `SingleChildScrollView`.
 
 ```dart
 CustomScrollView(
@@ -64,11 +64,11 @@ CustomScrollView(
 )
 ```
 
-Use `SliverList` when combining multiple scrollable sections. Use `ListView.builder` for simple standalone lists. When all items share the same height, use `SliverFixedExtentList` to skip layout calculation.
+Use `SliverList` for multiple scrollable sections. Use `ListView.builder` for simple standalone lists. Same-height items → `SliverFixedExtentList` skip layout calc.
 
 ## Avoid `shrinkWrap: true`
 
-`shrinkWrap: true` on `ListView`/`GridView` defeats lazy loading. It measures all children upfront — slows large lists.
+`shrinkWrap: true` on `ListView`/`GridView` kill lazy loading. Measure all children upfront — slow big lists.
 
 | Parent Context | Fix |
 |----------------|-----|
@@ -125,7 +125,7 @@ AnimatedContainer(
 
 ### AnimatedBuilder — Pass Child
 
-Pass static subtrees as `child`, not inside `builder`. The builder runs every frame:
+Pass static subtrees as `child`, not in `builder`. Builder run every frame:
 
 ```dart
 AnimatedBuilder(
@@ -142,7 +142,7 @@ AnimatedBuilder(
 
 ### Opacity — Avoid the Widget
 
-`Opacity` triggers `saveLayer()`. Use `FadeTransition` or draw with a semi-transparent color:
+`Opacity` trigger `saveLayer()`. Use `FadeTransition` or semi-transparent color:
 
 ```dart
 // WRONG — calls saveLayer()
@@ -157,7 +157,7 @@ FadeTransition(opacity: _animation, child: child)
 
 ### AnimationController Disposal
 
-Always dispose. Use `SingleTickerProviderStateMixin` for one controller, `TickerProviderStateMixin` for multiple:
+Always dispose. `SingleTickerProviderStateMixin` for one controller, `TickerProviderStateMixin` for many:
 
 ```dart
 class _MyWidgetState extends State<MyWidget>
@@ -195,11 +195,11 @@ class _MyWidgetState extends State<MyWidget>
 
 ### Clipping
 
-Use `borderRadius` on `Container` instead of wrapping in `ClipRRect`. Avoid `Clip.antiAliasWithSaveLayer` — it allocates an off-screen buffer.
+Use `borderRadius` on `Container`, not `ClipRRect` wrap. Avoid `Clip.antiAliasWithSaveLayer` — allocate off-screen buffer.
 
 ### Intrinsic Layout Passes
 
-`IntrinsicWidth` and `IntrinsicHeight` cause double layout passes. Prefer fixed heights or `ConstrainedBox`:
+`IntrinsicWidth` and `IntrinsicHeight` cause double layout pass. Prefer fixed heights or `ConstrainedBox`:
 
 ```dart
 // EXPENSIVE — double layout pass
@@ -211,9 +211,9 @@ SizedBox(height: 72, child: Row(children: [/* children */]))
 
 ## Isolates
 
-Move heavy computation off the main thread. The UI thread must render frames in under 16ms (60fps) or 8ms (120fps).
+Move heavy compute off main thread. UI thread must render frames under 16ms (60fps) or 8ms (120fps).
 
-Use `Isolate.run` (Dart 3.x) for one-shot heavy work. `compute()` is the legacy alternative:
+Use `Isolate.run` (Dart 3.x) for one-shot heavy work. `compute()` legacy alternative:
 
 ```dart
 final products = await Isolate.run(() {
@@ -234,31 +234,31 @@ final products = await Isolate.run(() {
 | Cryptographic hashing | Yes |
 | Simple math / File I/O | No |
 
-Isolates cannot access `ref`, providers, or Flutter widgets. Pass only simple types or serializable objects.
+Isolates cannot access `ref`, providers, Flutter widgets. Pass only simple or serializable objects.
 
 ## App Size
 
 ### --split-debug-info
 
-Strips debug symbols. Reduces app size 30–50%:
+Strip debug symbols. Cut app size 30–50%:
 
 ```bash
 flutter build apk --split-debug-info=build/debug-info --obfuscate
 flutter build ipa --split-debug-info=build/debug-info --obfuscate
 ```
 
-Keep the debug info directory for crash symbolication.
+Keep debug info dir for crash symbolication.
 
 ### Tree Shaking
 
-Help Dart's compiler remove unreachable code:
+Help Dart compiler drop unreachable code:
 - Import specific files, not barrel exports
 - Use `show` to import only needed symbols
-- Remove unused dependencies from `pubspec.yaml`
+- Remove unused deps from `pubspec.yaml`
 
 ### Deferred Loading
 
-Split large features into separate download units:
+Split big features into separate download units:
 
 ```dart
 import 'heavy_feature.dart' deferred as heavy;
@@ -271,7 +271,7 @@ Future<void> loadFeature() async {
 
 ### Platform-Specific Assets
 
-Exclude assets from platforms that don't need them:
+Exclude assets from platforms that don't need:
 
 ```yaml
 flutter:
@@ -289,7 +289,7 @@ flutter:
 flutter build apk --analyze-size
 ```
 
-Open the output JSON in DevTools > App Size tool for per-package breakdown.
+Open output JSON in DevTools > App Size tool for per-package breakdown.
 
 ## Accessibility
 
@@ -306,7 +306,7 @@ Semantics(
 )
 ```
 
-Hide decorative elements: `ExcludeSemantics(child: decorativeWidget)`.
+Hide decorative: `ExcludeSemantics(child: decorativeWidget)`.
 
 ### Checklist
 
@@ -324,7 +324,7 @@ Test with TalkBack (Android) and VoiceOver (iOS) on real devices.
 
 ### MediaQuery.sizeOf
 
-Use `MediaQuery.sizeOf` instead of `MediaQuery.of` — rebuilds only on size changes. With context extensions (see [extensions-utilities.md](extensions-utilities.md)):
+Use `MediaQuery.sizeOf`, not `MediaQuery.of` — rebuild only on size change. With context extensions (see [extensions-utilities.md](extensions-utilities.md)):
 
 ```dart
 @override
@@ -338,7 +338,7 @@ Widget build(BuildContext context) {
 
 ### LayoutBuilder
 
-Use when sizing depends on parent constraints, not the full window:
+Use when sizing depend on parent constraints, not full window:
 
 ```dart
 LayoutBuilder(
@@ -377,7 +377,7 @@ Always profile in **profile mode**. Debug mode has 10x overhead.
 
 ## Impeller
 
-Flutter's rendering engine (default on iOS 3.29+, Android API 29+ in 3.27+). Pre-compiles shaders at build time, eliminating shader compilation jank. No setup required.
+Flutter rendering engine (default iOS 3.29+, Android API 29+ in 3.27+). Pre-compile shaders at build time, kill shader compile jank. No setup needed.
 
 ## Frame Budget
 
@@ -386,11 +386,11 @@ Flutter's rendering engine (default on iOS 3.29+, Android API 29+ in 3.27+). Pre
 | 60Hz | 16ms | 8ms + 8ms |
 | 120Hz | 8ms | 4ms + 4ms |
 
-If frames exceed budget: profile with DevTools, check rebuild counts, look for intrinsic passes and `saveLayer()`, move heavy work to isolates.
+Frames exceed budget: profile with DevTools, check rebuild counts, look for intrinsic passes and `saveLayer()`, move heavy work to isolates.
 
 ## RepaintBoundary
 
-Wraps a subtree in its own compositing layer. Use for custom paints, charts, maps, and widgets that animate independently. Don't use for simple widgets — each boundary adds compositing overhead.
+Wrap subtree in own compositing layer. Use for custom paints, charts, maps, widgets that animate independently. Don't use on simple widgets — each boundary add compositing overhead.
 
 ```dart
 RepaintBoundary(child: ComplexChart(data: chartData))
@@ -398,7 +398,7 @@ RepaintBoundary(child: ComplexChart(data: chartData))
 
 ## Preserving Tab State
 
-Keep tab content alive when switching tabs:
+Keep tab content alive on switch:
 
 ```dart
 class _ProductTabState extends State<ProductTab>
@@ -416,7 +416,7 @@ class _ProductTabState extends State<ProductTab>
 
 ## Post-Frame Callbacks
 
-Defer work until after the current frame renders:
+Defer work until after current frame render:
 
 ```dart
 @override

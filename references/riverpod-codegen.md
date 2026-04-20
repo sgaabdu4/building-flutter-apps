@@ -18,7 +18,7 @@ dev_dependencies:
   riverpod_lint: ^3.0.0
 ```
 
-Every file with providers needs these:
+Every file with providers need these:
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,7 +29,7 @@ part 'my_file.g.dart';
 
 ## Generated Provider Names
 
-Riverpod 3.x strips the "Notifier" suffix from class-based provider names:
+Riverpod 3.x strip "Notifier" suffix from class-based provider names:
 
 | Class | Generated Provider |
 |---|---|
@@ -37,19 +37,19 @@ Riverpod 3.x strips the "Notifier" suffix from class-based provider names:
 | `ProductNotifier` | `productProvider` |
 | `AuthNotifier` | `authProvider` |
 
-Functional providers keep their full name:
+Functional providers keep full name:
 | Function | Generated Provider |
 |---|---|
 | `productRepository(Ref)` | `productRepositoryProvider` |
 | `cartTotal(Ref)` | `cartTotalProvider` |
 
-Never write `xxxNotifierProvider` — it does not exist in codegen output.
+Never write `xxxNotifierProvider` — not exist in codegen output.
 
 ## Provider Types
 
 ### keepAlive Providers (long-lived)
 
-For repositories, datasources, services, and feature notifiers:
+For repositories, datasources, services, feature notifiers:
 
 ```dart
 // Functional provider — returns a value, lives forever
@@ -77,7 +77,7 @@ class CartNotifier extends _$CartNotifier {
 
 ### Auto-dispose Providers (short-lived)
 
-For computed values, one-time fetches, and derived state:
+For computed values, one-time fetches, derived state:
 
 ```dart
 // Computed value — disposes when no widget watches it
@@ -97,7 +97,7 @@ Future<ProductDetail> productDetail(Ref ref, String id) async {
 
 ### Family Providers (parameterized)
 
-Codegen handles family automatically through function parameters:
+Codegen handle family automatically via function parameters:
 
 ```dart
 // Parameters become family args — no FamilyNotifier needed
@@ -141,7 +141,7 @@ double decimal = ref.watch(multiplyProvider<double>(2.5, 3.5));
 
 ## Unified Ref
 
-Use a single `Ref` type. `AutoDisposeRef`, `FutureProviderRef`, and generated `ExampleRef` are removed:
+Use single `Ref` type. `AutoDisposeRef`, `FutureProviderRef`, generated `ExampleRef` removed:
 
 ```dart
 // Riverpod 3.0 — always use Ref
@@ -151,11 +151,11 @@ String greeting(Ref ref) => 'Hello';
 // NOT: String greeting(GreetingRef ref) — removed in 3.0
 ```
 
-`Ref` and `WidgetRef` remain separate. `WidgetRef` is for widgets only.
+`Ref` and `WidgetRef` stay separate. `WidgetRef` for widgets only.
 
 ## Automatic Retry
 
-Providers that fail during initialization retry automatically with exponential backoff (200ms initial, doubling up to 6.4s).
+Providers that fail during init retry automatically with exponential backoff (200ms initial, double up to 6.4s).
 
 Customize globally:
 
@@ -185,7 +185,7 @@ Future<Config> appConfig(Ref ref) async {
 
 ## ProviderException
 
-Provider errors wrap in `ProviderException`. This distinguishes "provider failed" from "dependency of provider failed":
+Provider errors wrap in `ProviderException`. Distinguishes "provider failed" from "dependency of provider failed":
 
 ```dart
 try {
@@ -202,9 +202,9 @@ try {
 
 ## Mutations (experimental)
 
-> API may change without a major version bump.
+> API may change without major version bump.
 
-Mutations track side-effect state (idle, pending, success, error) separately from provider state. They prevent providers from being disposed while a side-effect runs.
+Mutations track side-effect state (idle, pending, success, error) separately from provider state. Prevent providers from being disposed while side-effect runs.
 
 ```dart
 // Declare a mutation as a top-level variable
@@ -237,15 +237,15 @@ class AddTodoButton extends ConsumerWidget {
 }
 ```
 
-Use `tsx.get` instead of `ref.read` inside mutations — it keeps the provider alive until the mutation completes.
+Use `tsx.get` instead of `ref.read` inside mutations — keeps provider alive until mutation completes.
 
 `MutationState` exposes convenience flags (`isPending`, `isIdle`, `hasError`, `isSuccess`) for simple checks without full pattern matching.
 
 ## Offline Persistence (experimental)
 
-> API may change without a major version bump.
+> API may change without major version bump.
 
-Providers can persist state to a local database. The official package is `riverpod_sqflite`:
+Providers can persist state to local database. Official package: `riverpod_sqflite`:
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -267,7 +267,7 @@ class TodosNotifier extends _$TodosNotifier {
 }
 ```
 
-During the `await`, the persisted value is shown. After the network response, server state takes precedence.
+During `await`, persisted value shown. After network response, server state take precedence.
 
 ### Persistence Addendum
 
@@ -280,23 +280,23 @@ Execution order:
 4. Add in-memory persistence tests.
 
 1. **One owner per feature state**: use repository/data persistence or notifier persistence, never both.
-2. **Cache policy**: default retention is 2 days; set `StorageOptions(cacheTime: ...)` when needed; use `unsafe_forever` only with cleanup.
-3. **Persist keys**: keys must be unique, stable across restarts, and include family params.
+2. **Cache policy**: default retention 2 days; set `StorageOptions(cacheTime: ...)` when needed; use `unsafe_forever` only with cleanup.
+3. **Persist keys**: keys must be unique, stable across restarts, include family params.
 4. **Schema migration**: use `StorageOptions(destroyKey: ...)` for simple versioned resets.
 5. **Startup mode**: use `persist(...)` for network-first init, or `await persist(...).future` to hydrate state first.
 6. **UI signal**: use `AsyncValue.isFromCache` for cached/offline indicators.
 7. **Tests**: override storage with `Storage.inMemory()` in unit/widget tests.
-8. **Codegen**: use `@JsonPersist()` when JSON-serializable models are available.
+8. **Codegen**: use `@JsonPersist()` when JSON-serializable models available.
 
 ## Pause/Resume
 
-Riverpod 3.0 pauses providers when their listeners are not visible:
+Riverpod 3.0 pause providers when listeners not visible:
 
 - Widgets off-screen (based on `TickerMode`) pause their providers
-- If a provider is only used by paused providers, it pauses too
-- When a provider rebuilds, previous subscriptions stay until rebuild completes
+- If provider only used by paused providers, it pauses too
+- When provider rebuilds, previous subscriptions stay until rebuild completes
 
-This saves resources. A websocket provider pauses when its screen is not visible.
+Saves resources. Websocket provider pause when screen not visible.
 
 Override pause behavior:
 
@@ -336,7 +336,7 @@ removeListener();
 
 ## Scoping (codegen only)
 
-Scoped providers declare `dependencies: []` and require an override before use:
+Scoped providers declare `dependencies: []` and require override before use:
 
 ```dart
 @Riverpod(dependencies: [])
@@ -351,19 +351,19 @@ ProviderScope(
 )
 ```
 
-Use `@Dependencies([scopedValue])` on widgets that consume scoped providers. The lint rule catches missing overrides at compile time.
+Use `@Dependencies([scopedValue])` on widgets consuming scoped providers. Lint rule catches missing overrides at compile time.
 
 ## Backend Client Providers
 
-External SDK clients (HTTP, database, auth, storage) follow a **config → client → services** chain. Riverpod providers ARE the dependency injection — no factory classes, service locators, or wrapper layers needed.
+External SDK clients (HTTP, database, auth, storage) follow **config → client → services** chain. Riverpod providers ARE dependency injection — no factory classes, service locators, or wrapper layers needed.
 
 ### Rules — NEVER Violate
 
-1. **MUST** expose SDK types directly as providers. NEVER wrap them in a factory class or service locator.
-2. **MUST** use `@Riverpod(keepAlive: true)` for all SDK client and service providers — they are singletons.
+1. **MUST** expose SDK types directly as providers. NEVER wrap in factory class or service locator.
+2. **MUST** use `@Riverpod(keepAlive: true)` for all SDK client and service providers — they singletons.
 3. **MUST** chain providers with `ref.watch()` so services react to config changes.
 4. **MUST** use destructuring for clean config access.
-5. **NEVER** create a `ServiceFactory`, `ServiceLocator`, or `BackendProvider` class — Riverpod providers replace these patterns entirely.
+5. **NEVER** create `ServiceFactory`, `ServiceLocator`, or `BackendProvider` class — Riverpod providers replace these patterns entirely.
 
 ### Provider Chain
 
@@ -412,4 +412,4 @@ StorageService storageService(Ref ref) {
 }
 ```
 
-Datasources and repositories then depend on these service providers — not on the SDK types directly.
+Datasources and repositories then depend on these service providers — not SDK types directly.

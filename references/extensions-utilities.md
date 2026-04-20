@@ -1,6 +1,6 @@
 # Extensions & Utilities
 
-Context extensions, type extensions, and reusable utilities that eliminate boilerplate. For snackbars, use the centralized `SnackBarUtils` instead of `ScaffoldMessenger.of(context)`.
+Context/type extensions + utilities. Kill boilerplate. Snackbars use `SnackBarUtils`, not `ScaffoldMessenger.of(context)`.
 
 **Contents:** [Context Extensions](#context-extensions) | [String Extensions](#string-extensions) | [DateTime Extensions](#datetime-extensions) | [Iterable Extensions](#iterable-extensions) | [Widget List Extensions](#widget-list-extensions) | [SnackBar Utility](#snackbar-utility) | [Debouncer](#debouncer) | [Validators](#validators) | [Result Type](#result-type) | [Extension Types](#extension-types) | [Barrel Export](#barrel-export)
 
@@ -113,7 +113,7 @@ extension DateTimeExtensions on DateTime {
 
 ## Iterable Extensions
 
-These overlap with `package:collection`. Using extensions avoids the dependency and import conflicts.
+Overlap `package:collection`. Extensions skip dep + import conflicts.
 
 ```dart
 // core/extensions/iterable_extensions.dart
@@ -166,7 +166,7 @@ Column(
 
 ## SnackBar Utility
 
-Centralized, context-free snackbar access. Use everywhere — widgets, notifiers, callbacks. Never call `ScaffoldMessenger.of(context)` directly.
+Central, context-free snackbar. Use everywhere — widgets, notifiers, callbacks. Never `ScaffoldMessenger.of(context)` direct.
 
 ### Class
 
@@ -220,7 +220,7 @@ enum _SnackBarType { success, error, info, warning }
 
 ### Styled Content
 
-Customize `_SnackBarContent` to match your design system. Use `SemanticColors` for type-based border/icon colors, `Radii.rounded12` for container radius, and `context.textTheme.bodyMedium` for text:
+Tweak `_SnackBarContent` to match design system. `SemanticColors` for type border/icon, `Radii.rounded12` for radius, `context.textTheme.bodyMedium` for text:
 
 ```dart
 class _SnackBarContent extends StatelessWidget {
@@ -300,7 +300,7 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
 
 ## Debouncer
 
-Timer-based debouncer for search, validation, and auto-save. See [common-patterns.md](common-patterns.md) for usage in a `SearchNotifier`.
+Timer-based debouncer. Search, validation, auto-save. See [common-patterns.md](common-patterns.md) for `SearchNotifier` usage.
 
 ```dart
 // core/utils/debouncer.dart
@@ -326,7 +326,7 @@ class Debouncer {
 
 ## Validators
 
-Composable validation for form fields:
+Composable form field validation:
 
 ```dart
 // core/utils/validators.dart
@@ -361,7 +361,7 @@ abstract final class Validators {
 
 ## Result Type
 
-Typed success/failure wrapper using Freezed sealed class:
+Typed success/failure wrapper. Freezed sealed class:
 
 ```dart
 // core/domain/result.dart
@@ -383,7 +383,7 @@ switch (result) {
 
 ## Extension Types
 
-Zero-cost compile-time wrappers (Dart 3.3). See [dart-patterns-records.md](dart-patterns-records.md#extension-types-dart-33) for full reference.
+Zero-cost compile-time wrappers (Dart 3.3). See [dart-patterns-records.md](dart-patterns-records.md#extension-types-dart-33) for full ref.
 
 ```dart
 extension type UserId(String value) {}

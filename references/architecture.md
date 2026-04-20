@@ -1,18 +1,18 @@
 # Architecture
 
-Flutter clean architecture with four layers. Dependencies flow inward: Presentation → Repository → Domain → Data.
+Flutter clean architecture, four layers. Deps flow inward: Presentation → Repository → Domain → Data.
 
 ## Rules — NEVER Violate
 
-1. **MUST** create separate data models and domain entities — NEVER reuse one class for both.
-2. **MUST** define `abstract interface class` for every repository and datasource. Constructors MUST accept interfaces, NEVER concrete types.
-3. **MUST NEVER** put `fromJson`/`toJson` on domain entities — serialization belongs in the Data layer.
-4. **MUST NEVER** import Flutter in the Domain layer — entities are pure Dart with zero dependencies.
-5. **MUST** use `model.toEntity()` in repositories to map Data → Domain.
-6. **NEVER** try-catch in datasources or domain — catch once in the repository or notifier.
-7. **MUST** place feature-specific widgets in `features/x/presentation/widgets/` — shared widgets go in `core/widgets/`.
-8. **MUST** keep persistence in data/repository layers by default (for example local datasource + repository).
-9. **MUST NEVER** run repository/data persistence and notifier-level persistence as dual sources of truth for the same feature state.
+1. **MUST** separate data models from domain entities — NEVER reuse one class for both.
+2. **MUST** define `abstract interface class` for every repository and datasource. Constructors MUST take interfaces, NEVER concrete types.
+3. **MUST NEVER** put `fromJson`/`toJson` on domain entities — serialization = Data layer.
+4. **MUST NEVER** import Flutter in Domain — entities pure Dart, zero deps.
+5. **MUST** use `model.toEntity()` in repositories for Data → Domain.
+6. **NEVER** try-catch in datasources or domain — catch once in repository or notifier.
+7. **MUST** put feature widgets in `features/x/presentation/widgets/` — shared in `core/widgets/`.
+8. **MUST** keep persistence in data/repository layers by default (e.g. local datasource + repository).
+9. **MUST NEVER** run repository persistence and notifier persistence as dual sources of truth for same state.
 
 ```mermaid
 graph LR
@@ -26,7 +26,7 @@ graph LR
 
 **Contents:** [Full Directory Structure](#full-directory-structure) | [Layer Responsibilities](#layer-responsibilities) | [Complexity Tiers](#complexity-tiers) | [Design Tokens](#design-tokens) | [Atomic Design for Widgets](#atomic-design-for-widgets)
 
-For mixin vs interface vs extension guidance, see [mixins.md](mixins.md).
+Mixin vs interface vs extension: see [mixins.md](mixins.md).
 
 ## Full Directory Structure
 
@@ -126,7 +126,7 @@ lib/
 
 ### Domain Layer
 
-**MUST be pure Dart.** MUST NOT import Flutter or any package. Defines what the data looks like. Models MUST own behavior derived from their own fields (see [freezed-sealed.md](freezed-sealed.md#rich-models)).
+**MUST be pure Dart.** No Flutter, no package imports. Defines data shape. Models MUST own behavior derived from own fields (see [freezed-sealed.md](freezed-sealed.md#rich-models)).
 
 ```dart
 // features/products/domain/entities/product.dart
@@ -147,11 +147,11 @@ sealed class Product with _$Product {
 }
 ```
 
-Entities MUST NEVER contain `fromJson`/`toJson`. Serialization belongs in the Data layer.
+Entities NEVER contain `fromJson`/`toJson`. Serialization = Data layer.
 
 ### Data Layer
 
-Models mirror entities but add serialization. Models MUST own their formatting: `toEntity()`, `toNameOnlyRequestBody()`, etc. MUST define `abstract interface class` for every datasource. Provider MUST return the interface type, NEVER the concrete class.
+Models mirror entities, add serialization. Models own formatting: `toEntity()`, `toNameOnlyRequestBody()`, etc. MUST define `abstract interface class` for every datasource. Provider MUST return interface type, NEVER concrete class.
 
 ```dart
 // features/products/data/models/product_model.dart
@@ -229,7 +229,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
 
 ### Repository Layer
 
-Bridges Data and Domain. Orchestrates datasources, maps models to entities. MUST define `abstract interface class`. Constructor MUST accept datasource interfaces, NEVER concrete types. Provider MUST return the interface type.
+Bridges Data and Domain. Orchestrates datasources, maps models to entities. MUST define `abstract interface class`. Constructor MUST take datasource interfaces, NEVER concrete types. Provider MUST return interface type.
 
 ```dart
 // features/products/repositories/product_repository.dart
@@ -274,13 +274,13 @@ class ProductRepository implements IProductRepository {
 }
 ```
 
-NEVER try-catch in datasources or domain. Catch once in the repository or notifier.
+NEVER try-catch in datasources or domain. Catch once in repository or notifier.
 
 ### Presentation Layer
 
 Notifiers manage state. Screens compose widgets. Widgets MUST watch providers directly — NEVER prop drill.
 
-See [state-management.md](state-management.md) for full notifier patterns.
+Full notifier patterns: [state-management.md](state-management.md).
 
 ```dart
 // features/products/presentation/notifiers/product_notifier.dart
@@ -348,11 +348,11 @@ class ProductListView extends ConsumerWidget {
 | 2 | Public data | Basic | Social, catalogs | Remote + local datasources, HTTP |
 | 3 | PII, financial | Full | Banking, health | Full architecture, domain errors |
 
-Start with Tier 2. Simplify to Tier 1 only for trivial apps. Use Tier 3 for regulated industries.
+Start Tier 2. Drop to Tier 1 only for trivial apps. Tier 3 for regulated industries.
 
 ## Design Tokens
 
-NEVER hardcode spacing, colors, radii, or icon sizes. See [atomic-design.md](atomic-design.md) for all token definitions (`Spacing`, `Radii`, `IconSizes`, typography, `ColorScheme`, semantic colors).
+NEVER hardcode spacing, colors, radii, icon sizes. See [atomic-design.md](atomic-design.md) for all tokens (`Spacing`, `Radii`, `IconSizes`, typography, `ColorScheme`, semantic colors).
 
 ```dart
 // Usage
@@ -363,6 +363,6 @@ Container(color: Theme.of(context).colorScheme.primary)
 
 ## Atomic Design for Widgets
 
-Shared widgets in `core/widgets/` follow atomic design: tokens → atoms → molecules → organisms → templates → pages. See [atomic-design.md](atomic-design.md) for full rules, code examples at each level, and placement guidelines.
+Shared widgets in `core/widgets/` follow atomic design: tokens → atoms → molecules → organisms → templates → pages. See [atomic-design.md](atomic-design.md) for rules, examples, placement.
 
-Feature-specific widgets go in `features/x/presentation/widgets/`, not in `core/widgets/`.
+Feature widgets go in `features/x/presentation/widgets/`, not `core/widgets/`.

@@ -10,7 +10,7 @@ metadata:
 
 ## MANDATORY — Read Before Writing Any Code
 
-**Read this section and linked references before producing code.**
+**Read this section + linked refs before code.**
 
 1. **MUST copy [analysis-options.md](references/analysis-options.md) `analysis_options.yaml` verbatim into every project root.**
 2. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.**
@@ -19,8 +19,8 @@ metadata:
 5. **MUST read [performance.md](references/performance.md) BEFORE writing any widget tree or provider.**
 6. **NEVER** use `dynamic`, `_buildXxx()` helpers, hardcoded strings, `shrinkWrap: true`, value!, or `abstract class` with Freezed.
 7. **ALWAYS** check `if (!ref.mounted) return;` after every `await` in notifiers.
-8. **NEVER** read `state` (including `state.copyWith`) in a sync `Notifier` before `build()` returns. Seed via returned constructor and defer async init with `Future.microtask`. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap).
-9. **ALWAYS** ensure repositories are initialized inside mutation methods (`create*`, `update*`, `delete*`, `set*`, `reorder*`) via an `_ensureRepository()`/`_ensureDependencies()` helper. NEVER rely only on `build()`/`_init()` timing for write paths.
+8. **NEVER** read `state` (incl. `state.copyWith`) in sync `Notifier` before `build()` returns. Seed via returned constructor, defer async init via `Future.microtask`. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap).
+9. **ALWAYS** init repositories inside mutation methods (`create*`, `update*`, `delete*`, `set*`, `reorder*`) via `_ensureRepository()`/`_ensureDependencies()` helper. NEVER rely only on `build()`/`_init()` timing for write paths.
 
 ## Core Stack
 
@@ -59,12 +59,12 @@ lib/
 
 1. **Codegen only** — `@riverpod` / `@Riverpod(keepAlive: true)`. NEVER legacy `StateProvider`, `StateNotifierProvider`.
 2. **Sealed classes** — `sealed class` with Freezed. NEVER `abstract class`.
-3. **No prop drilling** — child widgets watch providers directly.
+3. **No prop drilling** — child widgets watch providers direct.
 4. **Guard async** — `if (!ref.mounted) return;` after EVERY `await` in notifiers. `if (!context.mounted) return;` in widgets.
-5. **Single Ref** — Riverpod 3.0 unified all Ref types. NEVER `AutoDisposeRef`, `FutureProviderRef`.
+5. **Single Ref** — Riverpod 3.0 unified Ref types. NEVER `AutoDisposeRef`, `FutureProviderRef`.
 6. **Select in leaves** — `ref.watch(provider.select((s) => s.field))` in leaf widgets.
-7. **One primary class per file** — exception: Freezed state + notifier may share a file.
-8. **Interface contracts** — `abstract interface class` for every repo and datasource. Constructors accept interfaces, NEVER concrete types.
+7. **One primary class per file** — exception: Freezed state + notifier may share file.
+8. **Interface contracts** — `abstract interface class` for every repo + datasource. Constructors take interfaces, NEVER concrete types.
 9. **No `dynamic`** — use `Object?` or proper type. Exception: `Map<String, dynamic>` in JSON.
 10. **Widget classes only** — NEVER `_buildXxx()` helpers. Extract to named widget classes.
 11. **No hardcoded strings** — `*Strings` constants classes with `static const`.
@@ -74,10 +74,10 @@ lib/
 15. **Mixins for capabilities, interfaces for contracts** — see [mixins.md](references/mixins.md).
 16. **No null-bang** — NEVER value!. Use `if (value case final v?)`.
 17. **`abstract final class` for static-only namespaces** — NEVER `Class._()`. Exception: `const Entity._()` in Freezed.
-18. **`ref.invalidate` not `ref.refresh`** when no return value is needed.
-19. **Persistence SSOT** — Default to repository/data persistence. Notifier persistence is opt-in. One persistence owner per feature state.
-20. **Pop safely with GoRouter** — For dismiss/back actions on pushable or deep-linkable screens, guard `context.pop()` with `context.canPop()`. If true, pop and return. Otherwise, navigate to a typed fallback route (`const MyRoute().go(context)`).
-21. **No silent mutation no-op** — Mutation methods must not return early just because a cached repo field is null; they must lazily initialize dependencies first, then proceed or fail explicitly.
+18. **`ref.invalidate` not `ref.refresh`** when no return value needed.
+19. **Persistence SSOT** — Default to repository/data persistence. Notifier persistence opt-in. One persistence owner per feature state.
+20. **Pop safely with GoRouter** — For dismiss/back on pushable or deep-linkable screens, guard `context.pop()` with `context.canPop()`. If true, pop + return. Else navigate to typed fallback (`const MyRoute().go(context)`).
+21. **No silent mutation no-op** — Mutation methods must not return early just because cached repo field null; lazily init deps first, then proceed or fail explicit.
 
 ## Provider Decision Tree
 
@@ -94,7 +94,7 @@ graph TD
   Q4 -->|Yes| A4["Add params to function — family via codegen"]
 ```
 
-**Family + keepAlive caveat.** The Anti-Patterns table flags `@Riverpod(keepAlive: true)` on a family provider because each distinct key is retained forever → unbounded cache. Prefer `@riverpod` (auto-dispose). **Exception:** Riverpod 3.2.x has a TickerMode assertion bug ([rrousselGit/riverpod#4709](https://github.com/rrousselGit/riverpod/issues/4709)) that can fire when an auto-disposed computed provider watches a `keepAlive` parent and is rebuilt at frame boundaries. If you hit this, `keepAlive: true` is an acceptable workaround — document it inline (`// keepAlive: Riverpod 3.2.x #4709 workaround`). Remove once upstream fixes.
+**Family + keepAlive caveat.** Anti-Patterns table flags `@Riverpod(keepAlive: true)` on family provider — each distinct key retained forever → unbounded cache. Prefer `@riverpod` (auto-dispose). **Exception:** Riverpod 3.2.x has TickerMode assertion bug ([rrousselGit/riverpod#4709](https://github.com/rrousselGit/riverpod/issues/4709)) — fires when auto-disposed computed provider watches `keepAlive` parent + rebuilds at frame boundaries. If hit, `keepAlive: true` acceptable workaround — document inline (`// keepAlive: Riverpod 3.2.x #4709 workaround`). Remove once upstream fixed.
 
 ## Anti-Patterns
 
@@ -180,5 +180,5 @@ Read before generating code for that topic.
 - [ ] No `dynamic` — `Object?` or proper types
 - [ ] No value! — `if (value case final v?)`
 - [ ] `ref.watch()` in `build()`, `ref.read()` only in callbacks
-- [ ] Sync `Notifier.build()` never reads `state` before first `state=` — loading flags seeded via returned constructor; async init dispatched with `Future.microtask`; no `fireImmediately: true` listener that reads state without a prior direct `state =` assignment
-- [ ] Every notifier mutation method lazily initializes repositories/dependencies (`_ensureRepository`/`_ensureDependencies`) before writes
+- [ ] Sync `Notifier.build()` never reads `state` before first `state=` — loading flags seeded via returned constructor; async init dispatched with `Future.microtask`; no `fireImmediately: true` listener that reads state without prior direct `state =` assignment
+- [ ] Every notifier mutation method lazily inits repositories/deps (`_ensureRepository`/`_ensureDependencies`) before writes
