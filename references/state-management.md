@@ -13,7 +13,8 @@ Notifier patterns manage mutable state with Riverpod 3.x codegen.
 7. **NEVER** set state after mounted check fails — return immediately.
 8. **NEVER** read `state` (incl `state.copyWith`) inside sync `Notifier.build()` or any path running sync before `build()` returns. First `state` assignment in sync notifier must be direct value (e.g. `state = const FooState(isLoading: true)`), or deferred via `Future.microtask`. Reading state before first `state=` throws *"Tried to read the state of an uninitialized provider"*. `AsyncNotifier` exempt (pre-initialized to `AsyncLoading`). See [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap).
 9. **MUST** init repositories/deps inside mutation methods before writes (`create*`, `update*`, `delete*`, `set*`, `reorder*`). Never rely only on background `_init*()` timing.
-10. **MUST** avoid broad parent-provider invalidation in navigation-critical flows (wizard/deep-link route params). Prefer targeted notifier sync (`upsert`/replace/remove) to preserve route-entity continuity during rebuilds.
+10. **MUST** avoid broad parent-provider invalidation in navigation-critical flows (wizard/deep-link route params). Use targeted sync (`upsert`/replace/remove).
+11. **NEVER** swap `context.mounted` to `mounted` to suppress lint. Repo style = `context.mounted`. If lint fires, restructure flow (guard, then call sync helper for context work).
 
 ```mermaid
 graph TD
