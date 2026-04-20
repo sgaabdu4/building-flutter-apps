@@ -12,6 +12,7 @@ Notifier patterns to manage mutable state with Riverpod 3.x codegen.
 6. **NEVER** use `ref.watch()` inside a notifier method — use `ref.read()` or `ref.listen()`.
 7. **NEVER** set state after a mounted check fails — return immediately.
 8. **NEVER** read `state` (including `state.copyWith`) inside sync `Notifier.build()` or in any code path that runs synchronously before `build()` returns. First `state` assignment in a sync notifier must be a direct value (e.g. `state = const FooState(isLoading: true)`), or deferred via `Future.microtask`. Reading state before first `state=` throws *"Tried to read the state of an uninitialized provider"*. `AsyncNotifier` is exempt (pre-initialized to `AsyncLoading`). See [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap).
+9. **MUST** initialize repositories/dependencies inside mutation methods before writes (`create*`, `update*`, `delete*`, `set*`, `reorder*`). Never rely only on background `_init*()` timing.
 
 ```mermaid
 graph TD
@@ -25,7 +26,7 @@ graph TD
   G -->|No| F
 ```
 
-**Contents:** [Notifier Structure](#notifier-structure) | [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap) | [ref.mounted Guard](#refmounted-guard) | [Optimistic Updates](#optimistic-updates) | [Preventing Duplicate Fetches](#preventing-duplicate-fetches) | [Async Initialization](#async-initialization) | [AsyncNotifier Pattern](#asyncnotifier-pattern) | [AsyncValue.requireValue](#asyncvaluerequirevalue) | [Loading Progress](#loading-progress) | [Cleanup](#cleanup) | [Error Handling Strategy](#error-handling-strategy) | [Domain Error Types](#domain-error-types) | [Cross-Provider Communication](#cross-provider-communication)
+**Contents:** [Notifier Structure](#notifier-structure) | [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap) | [ref.mounted Guard](#refmounted-guard) | [Dependency Readiness For Mutations](#dependency-readiness-for-mutations) | [Optimistic Updates](#optimistic-updates) | [Preventing Duplicate Fetches](#preventing-duplicate-fetches) | [Async Initialization](#async-initialization) | [AsyncNotifier Pattern](#asyncnotifier-pattern) | [AsyncValue.requireValue](#asyncvaluerequirevalue) | [Loading Progress](#loading-progress) | [Cleanup](#cleanup) | [Error Handling Strategy](#error-handling-strategy) | [Domain Error Types](#domain-error-types) | [Cross-Provider Communication](#cross-provider-communication)
 
 ## Notifier Structure
 
@@ -183,6 +184,39 @@ Future<void> save(Product product) async {
 ```
 
 MUST guard after EVERY `await`, not just the first one.
+
+## Dependency Readiness For Mutations
+
+If a notifier initializes repositories asynchronously in `build()`/`_init()`, mutation methods can run before dependencies are ready and silently no-op.
+
+### ❌ Wrong — null repo short-circuit in user action
+
+```dart
+Future<void> saveThing(Thing thing) async {
+  final repo = _repository;
+  if (repo == null) return; // silently does nothing if init is racing
+  await repo.save(thing);
+}
+```
+
+### ✅ Right — ensure before write
+
+```dart
+Future<IThingRepository?> _ensureRepository() async {
+  _repository ??= await ref.read(thingRepositoryProvider.future);
+  if (!ref.mounted) return null;
+  return _repository;
+}
+
+Future<void> saveThing(Thing thing) async {
+  final repo = await _ensureRepository();
+  if (repo == null) return;
+  await repo.save(thing);
+  if (!ref.mounted) return;
+}
+```
+
+Rule of thumb: if a method mutates data, it must call an `ensure` helper first.
 
 ## Optimistic Updates
 

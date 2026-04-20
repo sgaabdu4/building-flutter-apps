@@ -20,6 +20,7 @@ metadata:
 6. **NEVER** use `dynamic`, `_buildXxx()` helpers, hardcoded strings, `shrinkWrap: true`, value!, or `abstract class` with Freezed.
 7. **ALWAYS** check `if (!ref.mounted) return;` after every `await` in notifiers.
 8. **NEVER** read `state` (including `state.copyWith`) in a sync `Notifier` before `build()` returns. Seed via returned constructor and defer async init with `Future.microtask`. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap).
+9. **ALWAYS** ensure repositories are initialized inside mutation methods (`create*`, `update*`, `delete*`, `set*`, `reorder*`) via an `_ensureRepository()`/`_ensureDependencies()` helper. NEVER rely only on `build()`/`_init()` timing for write paths.
 
 ## Core Stack
 
@@ -76,6 +77,7 @@ lib/
 18. **`ref.invalidate` not `ref.refresh`** when no return value is needed.
 19. **Persistence SSOT** — Default to repository/data persistence. Notifier persistence is opt-in. One persistence owner per feature state.
 20. **Pop safely with GoRouter** — For dismiss/back actions on pushable or deep-linkable screens, guard `context.pop()` with `context.canPop()`. If true, pop and return. Otherwise, navigate to a typed fallback route (`const MyRoute().go(context)`).
+21. **No silent mutation no-op** — Mutation methods must not return early just because a cached repo field is null; they must lazily initialize dependencies first, then proceed or fail explicitly.
 
 ## Provider Decision Tree
 
@@ -116,6 +118,7 @@ graph TD
 | Side-effect loading/error in notifier state | `Mutation<T>()` — see [riverpod-codegen.md](references/riverpod-codegen.md) |
 | `ref.read` in `initState` | `addPostFrameCallback` then read |
 | `state.copyWith(...)` before first `state=` in sync `Notifier.build()` (incl. `_load()` called sync from build, or `ref.listen(..., fireImmediately: true)` callback that reads state) | Seed via returned constructor + `Future.microtask(_load)`, OR `state = const FooState()` before `fireImmediately` listener. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap) |
+| Mutation method (`create*`, `update*`, `delete*`, `set*`) does `if (_repository == null) return ...` | Use `_ensureRepository()`/`_ensureDependencies()` with `await`, then guard with `if (!ref.mounted) return ...` |
 | `context.pop()` without guard on dismiss/back callbacks | `if (context.canPop()) { context.pop(); return; } const MyRoute().go(context);` |
 | `using context` after `await` | `if (!context.mounted) return;` |
 | Mixin vs interface vs extension choices | See [mixins.md](references/mixins.md) |
@@ -178,3 +181,4 @@ Read before generating code for that topic.
 - [ ] No value! — `if (value case final v?)`
 - [ ] `ref.watch()` in `build()`, `ref.read()` only in callbacks
 - [ ] Sync `Notifier.build()` never reads `state` before first `state=` — loading flags seeded via returned constructor; async init dispatched with `Future.microtask`; no `fireImmediately: true` listener that reads state without a prior direct `state =` assignment
+- [ ] Every notifier mutation method lazily initializes repositories/dependencies (`_ensureRepository`/`_ensureDependencies`) before writes
