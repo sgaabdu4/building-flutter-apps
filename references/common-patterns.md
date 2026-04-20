@@ -629,4 +629,33 @@ Future<void> setTableSyncDate(String key, DateTime date) async {
 | Data rarely changes | Delta sync — fetches nothing when no changes |
 | Frequent small edits | Delta sync — fetches only changed rows |
 | Full data refresh needed | Full pull with `saveAll` |
+
+## Dismiss Modal → Push Route (Bottom Sheet Navigation)
+
+**Problem.** Push while `showModalBottomSheet` animates out → sheet flickers or stays visible behind new screen (known Flutter issue).
+
+**NEVER:**
+```dart
+context.pop();
+await CreateExerciseRoute().push(context); // race — modal still animating
+```
+
+**DO — await pop future, then navigate:**
+```dart
+// Sheet widget:
+void _onCreateTapped() {
+  // maybePop() Future resolves AFTER dismiss animation completes.
+  Navigator.of(context).maybePop().then((_) {
+    if (context.mounted) widget.onCreateCallback();
+  });
+}
+
+// Parent widget (outside sheet) — guaranteed post-dismiss:
+Future<void> _onCreateCallback() async {
+  final id = await CreateExerciseRoute().push<String>(context);
+  if (id != null && context.mounted) _useId(id);
+}
+```
+
+**Why `maybePop()`?** Returns `Future<bool>` that completes only after the modal route is fully removed from the stack. `.then()` fires post-dismiss.
 | Real-time updates | Realtime subscriptions (not delta) |
