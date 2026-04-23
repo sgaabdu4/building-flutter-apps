@@ -98,7 +98,12 @@ return const Padding(padding: EdgeInsets.all(16), child: child);
 | Computed providers whose **all** deps are keepAlive | Computed providers with mixed dep lifecycles |
 | Lives until app terminates | Disposes when no widget watches |
 
-Auto-dispose on all-keepAlive dep chain break pause/resume subscription counting. Match dep lifecycle.
+Auto-dispose in all-keepAlive chain can break pause/resume subscription counting. Match lifecycle.
+
+Practical guardrails:
+- all upstream `keepAlive` => downstream computed `keepAlive`
+- no stacked computed hops in pause-sensitive path (`computedA -> computedB -> familyC`)
+- flatten: watch base once, derive with pure helpers
 
 ### Equality Filtering
 

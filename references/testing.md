@@ -9,6 +9,7 @@ Test utils Riverpod 3.x + `ProviderContainer.test()`.
 3. **MUST** use `UncontrolledProviderScope` widget tests — NEVER raw `ProviderScope` w/ overrides.
 4. **MUST** prefer explicit `pump()`. `pumpAndSettle(timeout: ...)` only finite anim/async; avoid infinite/ticking.
 5. **MUST** override repo/datasource level — NEVER mock notifiers direct.
+6. **MUST** use deterministic `ValueKey` selectors for repeated icons, draggable sheets, close/open actions. NEVER use `tapAt(...)`, first-match icon finder, or case-sensitive label text.
 
 ```mermaid
 graph LR

@@ -153,6 +153,10 @@ Entities NEVER contain `fromJson`/`toJson`. Serialization = Data layer.
 
 Models mirror entities, add serialization. Models own formatting: `toEntity()`, `toNameOnlyRequestBody()`, etc. MUST define `abstract interface class` for every datasource. Provider MUST return interface type, NEVER concrete class.
 
+Backend identity contract rule:
+- Never assume domain `id` == backend row/document key.
+- If backend uses internal transport IDs, datasource `update/delete` resolves backend key first (query stable business key), then writes with transport ID.
+
 ```dart
 // features/products/data/models/product_model.dart
 @freezed

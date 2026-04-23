@@ -4,7 +4,7 @@ description: Flutter arch ref — Riverpod 3.x, Freezed 3.x, GoRouter, Hive CE, 
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "4.3.1"
+  version: "4.3.2"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, fire-and-forget, singletons
 ---
 
@@ -96,7 +96,16 @@ graph TD
   Q4 -->|Yes| A4["Add params to function — family via codegen"]
 ```
 
-**Family + keepAlive caveat.** Anti-Patterns table flags `@Riverpod(keepAlive: true)` on family provider — each distinct key retained forever → unbounded cache. Prefer `@riverpod` (auto-dispose). **Exception:** Riverpod 3.2.x has TickerMode assertion bug ([rrousselGit/riverpod#4709](https://github.com/rrousselGit/riverpod/issues/4709)) — fires when auto-disposed computed provider watches `keepAlive` parent + rebuilds at frame boundaries. If hit, `keepAlive: true` acceptable workaround — document inline (`// keepAlive: Riverpod 3.2.x #4709 workaround`). Remove once upstream fixed.
+**Family + keepAlive caveat.** Family + `@Riverpod(keepAlive: true)` keeps every key forever. Cache unbounded. Prefer `@riverpod`.
+
+**Nested computed hop warning.** Avoid computed -> computed chain in pause-sensitive paths (`aProvider` watches `bProvider(param)`). Riverpod 3.2.x offstage nav can throw TickerMode pause/resume assertion.
+
+If chain required, flatten in parent:
+- watch base state direct
+- derive via pure helpers
+- avoid provider -> provider indirection on hot nav paths
+
+**Exception:** Riverpod 3.2.x has TickerMode assertion bug ([rrousselGit/riverpod#4709](https://github.com/rrousselGit/riverpod/issues/4709)). If hit, `keepAlive: true` workaround allowed. Add inline note: `// keepAlive: Riverpod 3.2.x #4709 workaround`. Remove after upstream fix.
 
 ## Anti-Patterns
 
@@ -110,6 +119,7 @@ graph TD
 | Try-catch at every layer | Catch once in notifier |
 | `context.go('/path')` string | `const MyRoute().go(context)` typed |
 | Entity in datasource | `Model` with `toEntity()` in repo |
+| Assume domain `id` equals backend row/document id in datasource update/delete | Keep ids separate. Resolve transport id first, then update/delete |
 | `@JsonSerializable(explicitToJson: true)` per class | `explicit_to_json: true` in `build.yaml` |
 | `@Freezed(toJson: true)` when `fromJson` exists | Plain `@freezed` |
 | Concrete type in constructor | `abstract interface class` |
@@ -166,6 +176,7 @@ Read before generating code for that topic.
 | [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency |
 | [atomic-design.md](references/atomic-design.md) | Shared widgets in `core/widgets/` |
 | [testing.md](references/testing.md) | Unit/widget tests |
+| [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) | Dart MCP runtime E2E flow, logs, device targeting, fail/fix loop |
 | [common-patterns.md](references/common-patterns.md) | Lists, search, forms, GoRouter, sync |
 | [extensions-utilities.md](references/extensions-utilities.md) | Utilities, extensions |
 | [mixins.md](references/mixins.md) | Mixin vs interface vs extension |
