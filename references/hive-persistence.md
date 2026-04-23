@@ -166,12 +166,58 @@ Hive.init(path);
 
 ## Critical Rules
 
-1. **TypeIds permanent** — Never change TypeId post-release
-2. **Reserve TypeId 0** — Use `reservedTypeIds: {0}` if @HiveType classes exist
-3. **Gen after changes** — Run build_runner when add/modify entities
-4. **Idempotent registration** — Check `isAdapterRegistered` in tests
-5. **Store entities, not JSON** — TypeAdapters for direct object storage
-6. **Close boxes** — Call `Hive.close()` in tearDown
+1. **TypeIds permanent** — Never change, rename, or reuse TypeId post-release
+2. **HiveField indices permanent** — Never reuse removed field's index. Append new at `nextIndex`
+3. **Field types permanent** — Never flip type (`String`↔`List`, enum↔int) at same index
+4. **Box names permanent** — Renaming loses data
+5. **Reserve TypeId 0** — Use `reservedTypeIds: {0}` if @HiveType classes exist
+6. **Gen after changes** — Run build_runner when add/modify entities
+7. **Idempotent registration** — Check `isAdapterRegistered` in tests
+8. **Store entities, not JSON** — TypeAdapters for direct object storage
+9. **Close boxes** — Call `Hive.close()` in tearDown
+
+## Retiring entities
+
+Deleting class = retire typeId. Never reuse for successor. Add retired id to `reservedTypeIds`. New class gets fresh id.
+
+```dart
+// WRONG — Program deleted, Routine reused typeId 10
+// Old user data written as Program at id 10 → new RoutineAdapter reads it
+// → cryptic type-cast crash on boot
+
+// RIGHT
+@GenerateAdapters([
+  AdapterSpec<Routine>(),     // new id 12 (next free)
+  AdapterSpec<RoutineDay>(),  // new id 13
+], firstTypeId: 1, reservedTypeIds: {0, 9, 10, 11}) // 9/10/11 retired
+```
+
+Field retirement same rule: remove the field from the class + keep index in `nextIndex` accounting, never reassign.
+
+## Failure signatures
+
+Typeid / field reuse symptoms:
+
+| Error | Cause |
+|-------|-------|
+| `type 'String' is not a subtype of type 'List<dynamic>'` in `BinaryReaderImpl.readFrame` | Field index or typeId reused; new adapter reads old bytes |
+| `HiveError: Cannot read, unknown typeId: N` | Adapter for retired typeId not registered |
+| `RangeError: value not in range` on enum | Enum reordered or cases removed |
+
+Fresh install works, upgrade breaks = binary incompat. Grep commit history for typeId / HiveField index reassignment.
+
+## Evolution cheat sheet
+
+| Change | Safe? | How |
+|--------|-------|-----|
+| Add new field | ✅ | New `@HiveField(nextIndex)`, nullable or default value |
+| Remove field | ✅ | Delete property; leave index retired (never reuse) |
+| Rename class | ✅ | Class name change only — Dart symbol, not serialized |
+| Rename field | ✅ | Dart symbol only; `@HiveField` index unchanged |
+| Change field type | ❌ | Retire old index, add new index with new type |
+| Delete class | ✅ | Retire typeId into `reservedTypeIds` |
+| Replace class (rename + restructure) | ❌ (if typeId reused) | New typeId, retire old |
+| Reorder enum cases | ❌ | Enum encoded by index — retire adapter, new one |
 
 ## File Structure
 
