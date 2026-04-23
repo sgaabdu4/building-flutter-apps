@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: sgaabdu4
   version: "4.3.2"
-  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, fire-and-forget, singletons
+  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, fire-and-forget, singletons, e2e testing
 ---
 
 ## MANDATORY — Read Before Writing Any Code
