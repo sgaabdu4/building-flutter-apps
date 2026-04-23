@@ -395,19 +395,46 @@ Mixin listen + reset on change:
 ```dart
 // In initShowcase()
 ref.listenManual(showcaseResetSignalProvider, (prev, next) {
-  if (prev != null && prev != next) {
-    _hasAttemptedTour = false;
-    _needsShowcaseRetry = true;
-    scheduleShowcase();
-  }
+  if (prev == next) return;
+  _hasAttemptedTour = false;
+  _needsShowcaseRetry = true;
+  scheduleShowcase();
 });
 ```
+
+The `prev == next` guard handles all transitions, including the first
+post-reset signal. Do not require `prev != null`.
 
 After reset tours, trigger signal:
 
 ```dart
 await service.resetAllKnownScopes();
 ref.read(showcaseResetSignalProvider.notifier).notify();
+```
+
+### Replay not starting: first checks
+
+1. `startShowCase()` must receive the full ordered tour key list.
+2. Do not pre-filter with `key.currentContext` or mounted checks.
+3. Reset listener must react on value change (`prev == next` early return),
+   not `prev != null`.
+
+Anti-pattern:
+
+```dart
+final activeKeys = ShowcaseKeys.settingsTour
+    .where((key) => key.currentContext?.mounted ?? false)
+    .toList();
+if (activeKeys.isEmpty) return;
+ShowcaseView.getNamed(scope).startShowCase(activeKeys);
+```
+
+Correct:
+
+```dart
+ShowcaseView.getNamed(scope).startShowCase(
+  List<GlobalKey>.from(ShowcaseKeys.settingsTour),
+);
 ```
 
 ## Sync Integration
@@ -478,6 +505,8 @@ Sync tour state (or any cross-service field):
 - **v5 API only.** No v4 patterns (`ShowCaseWidget.of(context)`).
 - **No skip/next buttons.** User tap anywhere on overlay to advance.
 - **Never filter keys** with `key.currentContext != null` before passing to `startShowCase()`. Pass full list.
+  In `showcaseview` v5, key presence in the internal controller registry is
+  the readiness source; `currentContext` checks can drop valid tour keys.
 - **`ShowcaseView.getNamed(scope)`** throw if scope not registered. Mixin wrap in try-catch.
 - **Every `AppShowcaseTarget` must get same named scope** screen registered in `ShowcaseScreenMixin`. Default and named scopes not interchangeable.
 - **Do not build `Showcase` before named scope exist.** Render plain child until registration done.

@@ -21,6 +21,7 @@ metadata:
 7. **ALWAYS** check `if (!ref.mounted) return;` after every `await` in notifiers.
 8. **NEVER** read `state` (incl. `state.copyWith`) in sync `Notifier` before `build()` returns. Seed via returned constructor, defer async init via `Future.microtask`. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap).
 9. **ALWAYS** init repositories inside mutation methods (`create*`, `update*`, `delete*`, `set*`, `reorder*`) via `_ensureRepository()`/`_ensureDependencies()` helper. NEVER rely only on `build()`/`_init()` timing for write paths.
+10. **When touching guided tours, MUST read [showcase-tours.md](references/showcase-tours.md) first. NEVER filter `startShowCase()` keys with `key.currentContext` checks.**
 
 ## Core Stack
 
@@ -80,6 +81,7 @@ lib/
 21. **No silent mutation no-op** — Mutation methods must not return early just because cached repo field null; lazily init deps first, then proceed or fail explicit.
 22. **Route-param safety in widgets** — NEVER throw from widget `build()` for missing route IDs. Use nullable by-id providers + fallback UI. See [common-patterns.md](references/common-patterns.md#route-param-safety--wizard-sequencing).
 23. **Navigation-critical mutation sequencing** — In wizard/deep-link flows: persist write → targeted state sync → navigate. See [common-patterns.md](references/common-patterns.md#route-param-safety--wizard-sequencing) and [state-management.md](references/state-management.md).
+24. **Showcase replay safety** — Pass full ordered key list to `startShowCase()`. Do not gate by `key.currentContext != null` / mounted checks; readiness is handled by scope registration + scheduling.
 
 ## Provider Decision Tree
 
@@ -200,3 +202,4 @@ Read before generating code for that topic.
 - [ ] Every notifier mutation method lazily inits repositories/deps (`_ensureRepository`/`_ensureDependencies`) before writes
 - [ ] Route-param lookups in widget `build()` are nullable (no throw-on-missing-id)
 - [ ] Wizard/deep-link mutation sequence: persist → targeted sync → navigate
+- [ ] If showcase code changed: `startShowCase()` uses full `ShowcaseKeys.*Tour` list (no `key.currentContext` filtering), and replay/reset path follows [showcase-tours.md](references/showcase-tours.md)
