@@ -1,6 +1,6 @@
 # Atomic Design
 
-Build UI from small composable pieces: tokens → atoms → molecules → organisms → templates → pages.
+Build UI from composable pieces: tokens → atoms → molecules → organisms → templates → pages.
 
 ## Rules — NEVER Violate
 
@@ -9,7 +9,7 @@ Build UI from small composable pieces: tokens → atoms → molecules → organi
 3. **NEVER** use `ref.watch` or `ref.read` in atoms, molecules, templates — provider access ONLY in organisms and pages.
 4. **MUST** use `context.textTheme` and `context.colors` — NEVER raw `TextStyle()` or `Color()`.
 5. **MUST** place shared widgets in `core/widgets/`, feature-specific in `features/x/presentation/widgets/`.
-6. **MUST** promote widget to `core/widgets/` when 2+ features use it with no feature-specific logic.
+6. **MUST** promote widget to `core/widgets/` when 2+ features use it w/ no feature-specific logic.
 
 ```mermaid
 graph LR
@@ -181,7 +181,7 @@ Combine 2–4 atoms into unit. No provider access.
 
 ### Rules
 
-- MUST compose atoms and basic layout/Material widgets (`ListTile`, `Card`, `Column`, `Row`)
+- MUST compose atoms + basic layout/Material widgets (`ListTile`, `Card`, `Column`, `Row`)
 - MUST wrap frequently restyled Material components as atoms first
 - NEVER use `ref.watch` or `ref.read`
 - MUST accept data via constructor
@@ -269,12 +269,12 @@ class StatCard extends StatelessWidget {
 
 ## Organisms
 
-Groups of molecules and atoms forming distinct UI section.
+Groups of molecules + atoms forming distinct UI section.
 
 ### Rules
 
-- May use `ref.watch` and `ref.read` (not required — data-only organisms valid)
-- Compose molecules and atoms
+- May use `ref.watch` + `ref.read` (not required — data-only organisms valid)
+- Compose molecules + atoms
 - Represent distinct page section (header, grid, comment list)
 - Feature-specific: `features/x/presentation/widgets/`
 - Shared: `core/widgets/organisms/`
@@ -333,7 +333,7 @@ class ProductGrid extends ConsumerWidget {
 
 ## Templates
 
-Define page structure with slots. No business logic, no provider access.
+Define page structure w/ slots. No business logic, no provider access.
 
 ### Rules
 
@@ -409,13 +409,13 @@ class DashboardTemplate extends StatelessWidget {
 
 ## Pages
 
-Pages compose templates with organisms. Connect state to layout here.
+Pages compose templates w/ organisms. Connect state to layout here.
 
 ### Rules
 
 - MUST be `ConsumerWidget` or `ConsumerStatefulWidget`
-- MUST watch providers via `ref.watch` with `.select()`
-- MUST compose templates and organisms — NEVER raw layout
+- MUST watch providers via `ref.watch` w/ `.select()`
+- MUST compose templates + organisms — NEVER raw layout
 - MUST have one screen per route
 
 ### Example
@@ -467,7 +467,7 @@ class ProductDashboardScreen extends ConsumerWidget {
 
 ## Promotion Rules
 
-- Move to `core/widgets/` when 2+ features use widget with no feature-specific logic
+- Move to `core/widgets/` when 2+ features use widget w/ no feature-specific logic
 - Extract new atom when same styled element repeats across molecules
 - Split organism exceeding ~150 lines or handling two unrelated concerns
 
@@ -491,4 +491,4 @@ Container(color: Color(0xFF1565C0))
 Container(color: context.colors.primary)
 ```
 
-Exceptions: `SemanticColors` and `Spacing` tokens — static constants independent of theme mode.
+Exceptions: `SemanticColors` + `Spacing` tokens — static constants independent of theme mode.

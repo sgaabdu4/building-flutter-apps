@@ -1,6 +1,6 @@
 # Firebase Crashlytics
 
-Production wiring. Pattern: backend interface + static facade. Handle platform gating, handler chaining, test seams, non-fatal classification.
+Prod wiring. Pattern: backend interface + static facade. Handle platform gating, handler chaining, test seams, non-fatal classify.
 
 > **Swap providers (Sentry, Bugsnag, Datadog, self-hosted).** `ICrashBackend` = seam. New impl (`SentryCrashBackend implements ICrashBackend`), assign in `Crash.init()` instead of `FirebaseCrashBackend`. Facade API (`Crash.error`/`info`/`setUser`/`setKey`), handler chaining, `_isRecoverable`, test seams, every call site stay same. Multi-backend fan-out = `CompositeCrashBackend` forward each method to delegate list. **Never call provider SDK direct from feature code** — only from backend impl.
 
@@ -8,8 +8,8 @@ Production wiring. Pattern: backend interface + static facade. Handle platform g
 
 1. **MUST** split: `abstract interface class ICrashBackend` + concrete backends (`FirebaseCrashBackend`, `ConsoleCrashBackend`) + static facade `abstract final class Crash`. Feature code call `Crash.x`.
 2. **MUST** platform-gate. Web/desktop get console backend, not Firebase.
-3. **MUST** chain handlers — preserve previous `FlutterError.onError` / `PlatformDispatcher.onError`, call too. Replace = hide framework logs.
-4. **MUST** classify recoverable exceptions as non-fatal (RenderFlex overflow, handshake, past-date scheduling, plugin-missing). Else dashboard flood with fake fatals.
+3. **MUST** chain handlers — preserve prior `FlutterError.onError` / `PlatformDispatcher.onError`, call too. Replace = hide framework logs.
+4. **MUST** classify recoverable exceptions non-fatal (RenderFlex overflow, handshake, past-date scheduling, plugin-missing). Else dashboard flood w/ fake fatals.
 5. **MUST** expose `@visibleForTesting` seams: `debugUseBackend`, `debugReset`, `debugConfigure`. Tests swap fake backend — never init Firebase.
 6. **MUST** `debugPrint` alongside every send so local dev see event.
 7. **MUST** `unawaited(...)` non-fatal sends — caller never block.
@@ -258,7 +258,7 @@ Future<void> main() async {
 
 | Situation | Call |
 |---|---|
-| Notifier `catch` before setting error state | `Crash.error(e, s, reason: 'X.load'); state = state.copyWith(error: ...);` |
+| Notifier `catch` before set error state | `Crash.error(e, s, reason: 'X.load'); state = state.copyWith(error: ...);` |
 | Local-first fire-and-forget remote sync | `try { await _remote.sync(); } on Exception catch (e, s) { Crash.error(e, s, reason: 'Feature.sync'); }` |
 | Transaction rollback | `catch (e, s) { await _rollback(); Crash.error(e, s, reason: '...'); rethrow; }` |
 | Breadcrumb before risky work | `Crash.info('Checkout.submit start', extras: {'items': cart.length});` |
@@ -295,7 +295,7 @@ Wire into CI. Missing symbols = unreadable dashboard.
 
 ## Extending the non-fatal classifier
 
-Repeat non-crash appear as fatal in dashboard → add marker string or type to `_isRecoverable`. Examples from real apps: `RenderFlex overflow`, `MissingPluginException`, `HandshakeException`, `scheduledDate` ArgumentError.
+Repeat non-crash appear fatal in dashboard → add marker string or type to `_isRecoverable`. Real-app examples: `RenderFlex overflow`, `MissingPluginException`, `HandshakeException`, `scheduledDate` ArgumentError.
 
 ## Checklist
 
@@ -303,7 +303,7 @@ Repeat non-crash appear as fatal in dashboard → add marker string or type to `
 - [ ] `abstract final class Crash` facade hold backend
 - [ ] `Crash.init()` in `main()` before `runApp`
 - [ ] Platform gate: web/desktop → console backend
-- [ ] Handlers chained (previous handler call first)
+- [ ] Handlers chained (prior handler call first)
 - [ ] `_isRecoverable` classifier in place + maintained
 - [ ] `@visibleForTesting` `debugUseBackend` + `debugReset`
 - [ ] `debugPrint` alongside Firebase sends

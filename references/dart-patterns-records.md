@@ -3,7 +3,7 @@
 Rules:
 1. MUST use Records for multiple return values — NEVER `Map<String, dynamic>` or parallel lists.
 2. MUST use Extension Types for entity IDs — NEVER raw `String` when multiple ID types coexist.
-3. MUST use guard clauses in switch — NEVER nest if-else inside case body.
+3. MUST use guard clauses in switch — NEVER nest if-else in case body.
 4. MUST use `if (value case final v?)` for null-binding — NEVER value!.
 
 ## Records (Dart 3.0)
@@ -49,9 +49,9 @@ deleteProduct(UserId('u1'));    // compile-time ERROR — wrong type
 deleteProduct(ProductId('p1')); // OK
 ```
 
-Use for: entity IDs, units (Meters, Grams), currencies (USD, EUR). Prevents mixing `userId` with `productId` at zero cost.
+Use for: entity IDs, units (Meters, Grams), currencies (USD, EUR). Stops mixing `userId` w/ `productId` at zero cost.
 
-NEVER raw `String`/`int` IDs when multiple distinct ID types exist in same feature.
+NEVER raw `String`/`int` IDs when multiple distinct ID types in same feature.
 
 ## Patterns
 
@@ -122,7 +122,7 @@ var [_, second] = topTwo; // _ discards first
 
 ## Wildcard Variables (Dart 3.7)
 
-`_` non-binding — declare multiple times, no collision:
+`_` non-binding — declare many times, no collision:
 
 ```dart
 // Discard positional values in destructuring

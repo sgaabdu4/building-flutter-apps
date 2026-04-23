@@ -1,6 +1,6 @@
 # Architecture
 
-Flutter clean architecture, four layers. Deps flow inward: Presentation → Repository → Domain → Data.
+Flutter clean arch, four layers. Deps flow inward: Presentation → Repository → Domain → Data.
 
 ## Rules — NEVER Violate
 
@@ -12,7 +12,7 @@ Flutter clean architecture, four layers. Deps flow inward: Presentation → Repo
 6. **NEVER** try-catch in datasources or domain — catch once in repository or notifier.
 7. **MUST** put feature widgets in `features/x/presentation/widgets/` — shared in `core/widgets/`.
 8. **MUST** keep persistence in data/repository layers by default (e.g. local datasource + repository).
-9. **MUST NEVER** run repository persistence and notifier persistence as dual sources of truth for same state.
+9. **MUST NEVER** run repository persistence and notifier persistence as dual SSOT for same state.
 
 ```mermaid
 graph LR
@@ -346,9 +346,9 @@ class ProductListView extends ConsumerWidget {
 |------|------|------|---------|----------------|
 | 1 | Simple, no PII | None | To-do lists, notes | Single repo, no datasources, Hive |
 | 2 | Public data | Basic | Social, catalogs | Remote + local datasources, HTTP |
-| 3 | PII, financial | Full | Banking, health | Full architecture, domain errors |
+| 3 | PII, financial | Full | Banking, health | Full arch, domain errors |
 
-Start Tier 2. Drop to Tier 1 only for trivial apps. Tier 3 for regulated industries.
+Default Tier 2. Drop to Tier 1 only for trivial apps. Tier 3 for regulated industries.
 
 ## Design Tokens
 

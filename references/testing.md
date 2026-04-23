@@ -1,14 +1,14 @@
 # Testing
 
-Test utilities for Riverpod 3.x with `ProviderContainer.test()`.
+Test utils Riverpod 3.x + `ProviderContainer.test()`.
 
 ## Rules — NEVER Violate
 
-1. **MUST** mock interfaces (`IProductRepository`), NEVER concrete classes (`ProductRepository`).
+1. **MUST** mock interfaces (`IProductRepository`), NEVER concrete (`ProductRepository`).
 2. **MUST** use `ProviderContainer.test()` — NEVER manual `createContainer`.
-3. **MUST** use `UncontrolledProviderScope` for widget tests — NEVER raw `ProviderScope` with overrides.
-4. **MUST** prefer explicit `pump()` steps. Use `pumpAndSettle(timeout: ...)` only for finite animations/async flows; avoid with infinite/ticking animations.
-5. **MUST** override at repository/datasource level — NEVER mock notifiers directly.
+3. **MUST** use `UncontrolledProviderScope` widget tests — NEVER raw `ProviderScope` w/ overrides.
+4. **MUST** prefer explicit `pump()`. `pumpAndSettle(timeout: ...)` only finite anim/async; avoid infinite/ticking.
+5. **MUST** override repo/datasource level — NEVER mock notifiers direct.
 
 ```mermaid
 graph LR
@@ -33,7 +33,7 @@ dev_dependencies:
 
 ## Mock Declaration
 
-No codegen needed. Declare mocks at file top:
+No codegen. Declare mocks file top:
 
 ```dart
 import 'package:mocktail/mocktail.dart';
@@ -42,13 +42,13 @@ class MockIProductRepository extends Mock implements IProductRepository {}
 class MockIAuthRepository extends Mock implements IAuthRepository {}
 ```
 
-For non-nullable arg matchers, register fallback values once in `setUpAll`:
+Non-nullable arg matchers → register fallback once `setUpAll`:
 
 ```dart
 setUpAll(() => registerFallbackValue(const Product(id: '', name: '', price: 0)));
 ```
 
-**Fake vs Mock** — Mocks (Mocktail) for interaction verification (`verify`, `when`). Fakes (manual subclass) for working impls with controlled behavior:
+**Fake vs Mock** — Mocks (Mocktail) for interaction verify (`verify`, `when`). Fakes (manual subclass) for working impls w/ controlled behavior:
 
 ```dart
 // Fake: real behavior, controlled output
@@ -67,7 +67,7 @@ verify(() => mock.fetchAll()).called(1);
 
 ## ProviderContainer.test
 
-Replaces manual `createContainer` pattern. Auto-disposes after each test:
+Replace manual `createContainer`. Auto-dispose each test:
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -99,7 +99,7 @@ void main() {
 
 ## overrideWithBuild
 
-Mock only `build()` while keeping notifier methods intact:
+Mock `build()` only, keep notifier methods intact:
 
 ```dart
 test('increment works with custom initial state', () {
@@ -136,7 +136,7 @@ test('handles pre-loaded async data', () {
 
 ## Widget Tests
 
-Use `UncontrolledProviderScope` to inject container:
+`UncontrolledProviderScope` inject container:
 
 ```dart
 testWidgets('shows product list', (tester) async {
@@ -286,8 +286,8 @@ test('auth state transitions', () async {
 
 | Problem | Solution |
 |---------|----------|
-| `pumpAndSettle` hangs | Use explicit `pump()` + bounded `pump(Duration(...))`; `pumpAndSettle(timeout: ...)` only for finite animations |
-| State not updated after async | Use `await provider.future` (AsyncValue providers) or `await Future.microtask(() {})` for sealed-state providers |
-| Provider not found | Wrap in `UncontrolledProviderScope` |
+| `pumpAndSettle` hangs | Explicit `pump()` + bounded `pump(Duration(...))`; `pumpAndSettle(timeout: ...)` finite anim only |
+| State not updated after async | `await provider.future` (AsyncValue) or `await Future.microtask(() {})` sealed-state |
+| Provider not found | Wrap `UncontrolledProviderScope` |
 | Mock not applied | Verify override matches provider type |
-| Container disposed early | Use `ProviderContainer.test()` — auto-manages |
+| Container disposed early | `ProviderContainer.test()` — auto-manages |

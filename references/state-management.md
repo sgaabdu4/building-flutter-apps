@@ -1,20 +1,20 @@
 # State Management
 
-Notifier patterns manage mutable state with Riverpod 3.x codegen.
+Notifier pattern manage mutable state w/ Riverpod 3.x codegen.
 
 ## Rules — NEVER Violate
 
-1. **MUST** check `if (!ref.mounted) return;` after EVERY `await` in notifiers.
-2. **MUST** check `if (!context.mounted) return;` after EVERY `await` in widgets.
-3. **MUST** catch errors in notifier by default. Datasources, repositories propagate. `try/catch` at data layer allowed **only** for: (a) domain error translation, (b) idempotency recovery (404/409), (c) transaction rollback, (d) local-first fire-and-forget sync. Plain log-and-rethrow forbidden — delete it.
-4. **MUST** use `ref.read()` for one-time access in callbacks. MUST use `ref.watch()` to rebuild on dep change.
-5. **MUST** dispose timers, controllers, subscriptions via `ref.onDispose()`.
-6. **NEVER** use `ref.watch()` inside notifier method — use `ref.read()` or `ref.listen()`.
-7. **NEVER** set state after mounted check fails — return immediately.
-8. **NEVER** read `state` (incl `state.copyWith`) inside sync `Notifier.build()` or any path running sync before `build()` returns. First `state` assignment in sync notifier must be direct value (e.g. `state = const FooState(isLoading: true)`), or deferred via `Future.microtask`. Reading state before first `state=` throws *"Tried to read the state of an uninitialized provider"*. `AsyncNotifier` exempt (pre-initialized to `AsyncLoading`). See [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap).
-9. **MUST** init repositories/deps inside mutation methods before writes (`create*`, `update*`, `delete*`, `set*`, `reorder*`). Never rely only on background `_init*()` timing.
-10. **MUST** avoid broad parent-provider invalidation in navigation-critical flows (wizard/deep-link route params). Use targeted sync (`upsert`/replace/remove).
-11. **NEVER** swap `context.mounted` to `mounted` to suppress lint. Repo style = `context.mounted`. If lint fires, restructure flow (guard, then call sync helper for context work).
+1. **MUST** check `if (!ref.mounted) return;` after EVERY `await` in notifier.
+2. **MUST** check `if (!context.mounted) return;` after EVERY `await` in widget.
+3. **MUST** catch error in notifier by default. Datasource, repo propagate. `try/catch` at data layer allowed **only** for: (a) domain error translation, (b) idempotency recovery (404/409), (c) transaction rollback, (d) local-first fire-and-forget sync. Plain log-and-rethrow forbidden — delete.
+4. **MUST** `ref.read()` one-time access in callback. MUST `ref.watch()` rebuild on dep change.
+5. **MUST** dispose timer, controller, subscription via `ref.onDispose()`.
+6. **NEVER** `ref.watch()` inside notifier method — use `ref.read()` or `ref.listen()`.
+7. **NEVER** set state after mounted check fail — return now.
+8. **NEVER** read `state` (incl `state.copyWith`) inside sync `Notifier.build()` or any path sync before `build()` returns. First `state` assign in sync notifier must be direct value (e.g. `state = const FooState(isLoading: true)`), or deferred via `Future.microtask`. Read state before first `state=` throw *"Tried to read the state of an uninitialized provider"*. `AsyncNotifier` exempt (pre-init `AsyncLoading`). See [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap).
+9. **MUST** init repo/dep inside mutation method before write (`create*`, `update*`, `delete*`, `set*`, `reorder*`). Never rely on background `_init*()` timing.
+10. **MUST** avoid broad parent-provider invalidation in nav-critical flow (wizard/deep-link route param). Use targeted sync (`upsert`/replace/remove).
+11. **NEVER** swap `context.mounted` to `mounted` to suppress lint. Repo style = `context.mounted`. Lint fire → restructure flow (guard, then call sync helper for context work).
 
 ```mermaid
 graph TD
@@ -32,7 +32,7 @@ graph TD
 
 ## Notifier Structure
 
-Every feature notifier follows same pattern:
+Every feature notifier follow same pattern:
 
 ```dart
 part 'product_notifier.g.dart';
@@ -75,22 +75,22 @@ class ProductNotifier extends _$ProductNotifier {
 }
 ```
 
-Key points:
+Key:
 - Initial loading flag set via returned constant — never `state.copyWith` before `build()` returns.
-- `_load()` dispatched through `Future.microtask`, so body runs after `build()` completes and state initialized.
-- `refresh()` safe to use `state.copyWith` — runs after mount.
+- `_load()` dispatched via `Future.microtask`, so body runs after `build()` complete + state init.
+- `refresh()` safe w/ `state.copyWith` — runs after mount.
 
 ## Sync Notifier Initialization Trap
 
-Sync `Notifier<T>` has **no initial state** until `build()` returns. Reading `state` before first `state=` throws:
+Sync `Notifier<T>` has **no initial state** until `build()` returns. Read `state` before first `state=` throw:
 
 > `Bad state: Tried to read the state of an uninitialized provider.`
 
 (See `riverpod/src/core/provider/notifier_provider.dart` — `state` getter documents this.)
 
-Dart `async` function body runs **synchronously up to first `await`**. So calling `_load()` from `build()` executes code before first `await` *before* `build()` returns. If that code reads `state` (incl `state.copyWith(...)`), throws.
+Dart `async` body runs **sync up to first `await`**. So calling `_load()` from `build()` executes code before first `await` *before* `build()` returns. If that code reads `state` (incl `state.copyWith(...)`), throw.
 
-`AsyncNotifier` exempt — Riverpod pre-initializes state to `AsyncLoading` before `build()` runs.
+`AsyncNotifier` exempt — Riverpod pre-init state to `AsyncLoading` before `build()` runs.
 
 ### ❌ Wrong — read before init
 
@@ -113,7 +113,7 @@ class ProductNotifier extends _$ProductNotifier {
 }
 ```
 
-### ❌ Wrong — `fireImmediately: true` with sync state read
+### ❌ Wrong — `fireImmediately: true` w/ sync state read
 
 ```dart
 @override
@@ -135,7 +135,7 @@ ProductState build() {
 }
 ```
 
-### ✅ Right — set state before registering `fireImmediately` listener
+### ✅ Right — set state before register `fireImmediately` listener
 
 ```dart
 @override
@@ -149,7 +149,7 @@ FooState build() {
 }
 ```
 
-### ✅ Right — drop `fireImmediately`, defer initial handling
+### ✅ Right — drop `fireImmediately`, defer init handling
 
 ```dart
 @override
@@ -167,7 +167,7 @@ Rule of thumb: **first `state =` in sync notifier must be direct value, not `cop
 
 ## ref.mounted Guard
 
-Riverpod 3.0 throws if you touch disposed Ref. MUST guard after EVERY `await`:
+Riverpod 3.0 throw if touch disposed Ref. MUST guard after EVERY `await`:
 
 ```dart
 Future<void> save(Product product) async {
@@ -189,7 +189,7 @@ MUST guard after EVERY `await`, not just first.
 
 ## Dependency Readiness For Mutations
 
-If notifier inits repositories async in `build()`/`_init()`, mutation methods can run before deps ready and silently no-op.
+Notifier init repo async in `build()`/`_init()` → mutation method can run before dep ready + silently no-op.
 
 ### ❌ Wrong — null repo short-circuit in user action
 
@@ -222,7 +222,7 @@ Rule of thumb: method mutates data → must call `ensure` helper first.
 
 ## Optimistic Updates
 
-Update UI immediately. Revert on failure:
+Update UI now. Revert on fail:
 
 ```dart
 Future<void> deleteItem(String id) async {
@@ -248,7 +248,7 @@ Future<void> deleteItem(String id) async {
 
 ## Preventing Duplicate Fetches
 
-Guard against multiple simultaneous fetches:
+Guard vs multiple simultaneous fetch:
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -283,7 +283,7 @@ class ProductNotifier extends _$ProductNotifier {
 
 ## Async Initialization
 
-Use build method for init. Riverpod calls `build()` when provider first read. For sync `Notifier`, **dispatch async init via `Future.microtask`** so nothing reads `state` before `build()` returns (see [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap)):
+Use build method for init. Riverpod call `build()` when provider first read. For sync `Notifier`, **dispatch async init via `Future.microtask`** so nothing reads `state` before `build()` returns (see [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap)):
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -309,7 +309,7 @@ class AuthNotifier extends _$AuthNotifier {
 
 ## AsyncNotifier Pattern
 
-For providers exposing `AsyncValue` directly:
+Provider expose `AsyncValue` direct:
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -355,11 +355,11 @@ class UserProfile extends ConsumerWidget {
 }
 ```
 
-**Key:** `AsyncValue.guard` wraps try-catch, assigns `AsyncData` or `AsyncError` atomically. No explicit `ref.mounted` check needed — guard handles state assignment in one step. Avoid `copyWithPrevious`; internal in Riverpod 3 dev builds.
+**Key:** `AsyncValue.guard` wraps try-catch, assigns `AsyncData` or `AsyncError` atomically. No explicit `ref.mounted` check — guard handles state assign in one step. Avoid `copyWithPrevious`; internal in Riverpod 3 dev builds.
 
 ## AsyncValue.requireValue
 
-Combine multiple async providers sync when you know loaded:
+Combine multi async provider sync when know loaded:
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -375,11 +375,11 @@ class DashboardNotifier extends _$DashboardNotifier {
 }
 ```
 
-Use `requireValue` only when certain provider has data. Throws if loading or error state.
+Use `requireValue` only when certain provider has data. Throw if loading/error.
 
 ## Loading Progress
 
-Report loading progress with `AsyncLoading.progress`:
+Report progress w/ `AsyncLoading.progress`:
 
 ```dart
 @override
@@ -396,7 +396,7 @@ Future<List<Product>> build() async {
 
 ## Cleanup
 
-Dispose timers, controllers, subscriptions:
+Dispose timer, controller, subscription:
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -411,7 +411,7 @@ class SearchNotifier extends _$SearchNotifier {
 }
 ```
 
-Lifecycle listeners now return unsubscribe functions:
+Lifecycle listener now return unsubscribe fn:
 
 ```dart
 final removeDispose = ref.onDispose(() => cleanup());
@@ -421,7 +421,7 @@ removeDispose();
 
 ## Error Handling Strategy
 
-Default: catch errors once — in notifier. Datasources, repositories propagate.
+Default: catch error once — in notifier. Datasource, repo propagate.
 
 ```dart
 // Datasource — default: propagate
@@ -436,14 +436,14 @@ Future<List<Product>> fetchAll() async {
 
 ### Legitimate `try/catch` in data layer
 
-Default rule has four narrow exceptions. Each MUST have reason beyond "log and rethrow":
+Default rule has four narrow exception. Each MUST have reason beyond "log + rethrow":
 
 1. **Domain error translation** — map raw SDK exception to typed domain error so notifier matches on sealed types.
-2. **Idempotency recovery** — swallow "already exists" / "not found" on operation whose contract is idempotent (e.g. 404 on delete in batch).
-3. **Transaction rollback** — catch, run compensating writes, rethrow.
-4. **Local-first fire-and-forget sync** — remote mirror of local write where caller intentionally doesn't await remote. Swallow + log so dead backend doesn't break local path.
+2. **Idempotency recovery** — swallow "already exists" / "not found" on op whose contract is idempotent (e.g. 404 on delete in batch).
+3. **Transaction rollback** — catch, run compensating write, rethrow.
+4. **Local-first fire-and-forget sync** — remote mirror of local write where caller not await remote. Swallow + log so dead backend no break local path.
 
-❌ WRONG — bare `try { … } catch (e) { log(...); rethrow; }` adds nothing. Delete it; let notifier catch.
+❌ WRONG — bare `try { … } catch (e) { log(...); rethrow; }` add nothing. Delete; let notifier catch.
 
 ```dart
 // ❌ pointless
@@ -476,7 +476,7 @@ Future<void> _load() async {
 
 ### Domain Error Types
 
-Define sealed error hierarchy for typed error handling in notifiers:
+Define sealed error hierarchy for typed error handling in notifier:
 
 ```dart
 // core/domain/app_error.dart
@@ -512,7 +512,7 @@ else if (state.error case NotFoundError(:final resource))
 
 ## Cross-Provider Communication
 
-Read other providers through `ref`:
+Read other provider via `ref`:
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -538,4 +538,4 @@ class OrderNotifier extends _$OrderNotifier {
 }
 ```
 
-Use `ref.read` for one-time access. Use `ref.watch` to rebuild on dep change. Use `ref.listen` for side effects. NEVER use `ref.watch()` inside notifier method.
+Use `ref.read` one-time access. `ref.watch` rebuild on dep change. `ref.listen` side effect. NEVER `ref.watch()` inside notifier method.

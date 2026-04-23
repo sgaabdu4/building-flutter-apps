@@ -1,6 +1,6 @@
 # Services, Singletons, Fire-and-Forget
 
-Three patterns, one topic: code outside widget tree, no `ref.watch`. How structure, how test.
+Three patterns, one topic: code outside widget tree, no `ref.watch`. Structure + test.
 
 ## When & Why
 
@@ -8,11 +8,11 @@ Default = Riverpod provider. Other two = fallback.
 
 ### Static-only class (`abstract final class Foo { static ... }`)
 
-**When.** Pure functions. No state. No I/O. Grouped by topic. Ex: `DateUtils.format`, `StringCasing.camel`, `Bytes.humanize`.
+**When.** Pure fn. No state. No I/O. Grouped by topic. Ex: `DateUtils.format`, `StringCasing.camel`, `Bytes.humanize`.
 
-**Why.** Namespace. No instance = no lifecycle = no test setup. Dart blocks `new Foo()` via `abstract final` — intent enforced.
+**Why.** Namespace. No instance = no lifecycle = no test setup. Dart block `new Foo()` via `abstract final` — intent enforced.
 
-**Not when.** Touches Firebase / disk / network / time / random. Need seam. Static = unseamable = unmockable = flaky tests.
+**Not when.** Touch Firebase/disk/network/time/random. Need seam. Static = unseamable = unmockable = flaky test.
 
 **Exception.** Static facade **over** swappable backend (see [crashlytics.md](crashlytics.md)). Facade static; backend injectable via `debugUseBackend`. Namespace ergonomics + test swap.
 
@@ -20,7 +20,7 @@ Default = Riverpod provider. Other two = fallback.
 
 **When.** Never write new. Use only when SDK force (`FirebaseAuth.instance`, `SharedPreferences.getInstance()`).
 
-**Why avoid.** Global mutable state. Leaks between tests. Hidden dep — caller signature lie. No override path.
+**Why avoid.** Global mutable state. Leak between tests. Hidden dep — caller signature lie. No override path.
 
 **If forced.** Wrap SDK singleton in provider. Feature code watch provider, not SDK.
 
@@ -33,7 +33,7 @@ Now testable: `overrides: [authProvider.overrideWithValue(FakeAuth())]`.
 
 ### Riverpod provider (`@Riverpod(keepAlive: true)`)
 
-**When.** Stateful service. I/O. Anything mockable. Default pick.
+**When.** Stateful service. I/O. Mockable. Default pick.
 
 **Why.** One instance per container. Lifecycle tied to container. Override in tests. Dispose hooks. No global mutation.
 
@@ -45,7 +45,7 @@ Now testable: `overrides: [authProvider.overrideWithValue(FakeAuth())]`.
 
 ## 1. Static-only class (namespace)
 
-`abstract final class` with only `static` members. **Not singleton** — no instance. Use for pure functions grouped by topic.
+`abstract final class` with only `static` members. **Not singleton** — no instance. Pure fn grouped by topic.
 
 ```dart
 abstract final class Crash {
@@ -56,14 +56,14 @@ abstract final class Crash {
 }
 ```
 
-Lint: `prefer-abstract-final-static-class` (DCM) flags static-only classes missing `abstract final`.
+Lint: `prefer-abstract-final-static-class` (DCM) flag static-only class missing `abstract final`.
 
 ### Testing
 
-Hard to seam direct. Two options:
+Hard seam direct. Two options:
 
-- **Inject at boundary.** Don't call `Crash.error` from tests. Keep wrapper thin so tests skip it (e.g. don't init Firebase in tests → call no-ops or throws — wrap in provider below).
-- **Wrap in Riverpod provider** (preferred) — static class becomes impl detail:
+- **Inject at boundary.** No `Crash.error` from tests. Keep wrapper thin so tests skip (e.g. no Firebase init in tests → no-op/throw — wrap in provider below).
+- **Wrap in Riverpod provider** (preferred) — static class = impl detail:
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -73,11 +73,11 @@ CrashReporter crashReporter(Ref ref) => const FirebaseCrashReporter();
 ProviderScope(overrides: [crashReporterProvider.overrideWithValue(FakeCrashReporter())]);
 ```
 
-Rule: static-only class **only** for dep-free helpers (pure math, formatters). Touches Firebase / network / disk → provider.
+Rule: static-only class **only** for dep-free helper (pure math, formatters). Touch Firebase/network/disk → provider.
 
 ## 2. Singleton
 
-One instance, global reach. Use **only** when library force (e.g. SDK holds own singleton).
+One instance, global reach. Use **only** when library force (SDK hold own singleton).
 
 ```dart
 final class AudioPlayer {
@@ -89,7 +89,7 @@ final class AudioPlayer {
 
 ### Testing
 
-Singletons test-hostile. State leaks between tests. Fixes:
+Singleton test-hostile. State leak between tests. Fixes:
 
 - **Wrap in provider** so tests override:
 
@@ -100,24 +100,24 @@ AudioPlayer audio(Ref ref) => AudioPlayer.instance;
 ProviderScope(overrides: [audioProvider.overrideWithValue(FakeAudioPlayer())]);
 ```
 
-- **Reset hook** for tests that must touch real singleton:
+- **Reset hook** for tests must touch real singleton:
 
 ```dart
 @visibleForTesting
 void debugReset() { _queue.clear(); }
 ```
 
-Rule: **don't write new singletons.** Write `final class Foo { ... }` + `keepAlive: true` provider. Riverpod give one instance per container, override for tests, dispose on container dispose.
+Rule: **no new singletons.** Write `final class Foo { ... }` + `keepAlive: true` provider. Riverpod give one instance per container, override for tests, dispose on container dispose.
 
 ## 3. Fire-and-Forget
 
-Future you intentionally don't `await`. Five rules:
+Future intentionally no `await`. Five rules:
 
-1. Mark with `unawaited(foo())` — explicit intent, satisfies `unawaited_futures` + `discarded_futures` lints.
+1. Mark `unawaited(foo())` — explicit intent, satisfy `unawaited_futures` + `discarded_futures` lints.
 2. `Future<void>` signature, never `void async` (`avoid_void_async`).
-3. Catch internally. Uncaught throws leak to `PlatformDispatcher.onError` → logged **fatal** (wrong).
+3. Catch internally. Uncaught throw leak to `PlatformDispatcher.onError` → logged **fatal** (wrong).
 4. No ordering dep on other fire-and-forget calls.
-5. Never fire-and-forget in tests — leaked futures pollute next test.
+5. Never fire-and-forget in tests — leaked future pollute next test.
 
 ### Canonical shape
 
@@ -140,12 +140,12 @@ Analytics, non-fatal `Crash.error`, breadcrumb `Crash.log`, local-first remote m
 
 ### When NOT to
 
-Anything UI awaits, anything surfacing toast, anything caller read return value of.
+UI await, toast surface, caller read return value.
 
 ### Testing
 
-- In tests, `await` future direct — production `unawaited(...)` wrapper not on returned Future itself.
-- Fake service (via provider override) to capture calls sync:
+- Tests `await` future direct — prod `unawaited(...)` wrapper not on returned Future itself.
+- Fake service (via provider override) capture calls sync:
 
 ```dart
 final fake = FakeAnalyticsClient();
@@ -158,7 +158,7 @@ await tester.pumpAndSettle();
 expect(fake.events, contains('sign_in'));
 ```
 
-Never assert against real Firebase backend in unit/widget tests.
+No assert vs real Firebase backend in unit/widget tests.
 
 ## Decision
 
@@ -169,4 +169,4 @@ Never assert against real Firebase backend in unit/widget tests.
 | Library-forced singleton (Firebase, SharedPreferences) | Riverpod provider returning SDK instance |
 | Async side effect not blocking UI | `unawaited(service.method())` with internal catch |
 
-Default: **provider**. Pick static-only or singleton only when provider don't fit.
+Default: **provider**. Static-only or singleton only when provider don't fit.

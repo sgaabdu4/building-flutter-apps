@@ -166,10 +166,10 @@ Hive.init(path);
 
 ## Critical Rules
 
-1. **TypeIds permanent** — Never change, rename, or reuse TypeId post-release
-2. **HiveField indices permanent** — Never reuse removed field's index. Append new at `nextIndex`
+1. **TypeIds permanent** — Never change, rename, reuse TypeId post-release
+2. **HiveField indices permanent** — Never reuse removed field index. Append new at `nextIndex`
 3. **Field types permanent** — Never flip type (`String`↔`List`, enum↔int) at same index
-4. **Box names permanent** — Renaming loses data
+4. **Box names permanent** — Rename loses data
 5. **Reserve TypeId 0** — Use `reservedTypeIds: {0}` if @HiveType classes exist
 6. **Gen after changes** — Run build_runner when add/modify entities
 7. **Idempotent registration** — Check `isAdapterRegistered` in tests
@@ -178,7 +178,7 @@ Hive.init(path);
 
 ## Retiring entities
 
-Deleting class = retire typeId. Never reuse for successor. Add retired id to `reservedTypeIds`. New class gets fresh id.
+Delete class = retire typeId. Never reuse for successor. Add retired id to `reservedTypeIds`. New class gets fresh id.
 
 ```dart
 // WRONG — Program deleted, Routine reused typeId 10
@@ -192,7 +192,7 @@ Deleting class = retire typeId. Never reuse for successor. Add retired id to `re
 ], firstTypeId: 1, reservedTypeIds: {0, 9, 10, 11}) // 9/10/11 retired
 ```
 
-Field retirement same rule: remove the field from the class + keep index in `nextIndex` accounting, never reassign.
+Field retirement same rule: remove field from class + keep index in `nextIndex` accounting, never reassign.
 
 ## Failure signatures
 

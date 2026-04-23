@@ -8,11 +8,11 @@ Copy verbatim every project root. No exception.
 |------|-----------|
 | `strict-casts/inference/raw-types` | NEVER disable |
 | `avoid_dynamic_calls` | NEVER disable |
-| `unawaited_futures` / `discarded_futures` | NEVER disable — missing await = logic bug; use `unawaited()` for intentional fire-and-forget |
+| `unawaited_futures` / `discarded_futures` | NEVER disable — miss await = logic bug; `unawaited()` for intentional fire-and-forget |
 | `avoid_void_async` | NEVER disable — `void async` block `await`, hide errors |
-| `avoid_print` | NEVER disable — route through `dart:developer` `log()` or `Crash.log` |
+| `avoid_print` | NEVER disable — route via `dart:developer` `log()` or `Crash.log` |
 | `cancel_subscriptions` / `close_sinks` | NEVER disable — resource leak |
-| `invalid_annotation_target: ignore` | NEVER remove — required by Freezed + Riverpod codegen |
+| `invalid_annotation_target: ignore` | NEVER remove — required Freezed + Riverpod codegen |
 | Generated files excluded | NEVER analyse `*.g.dart`, `*.freezed.dart` |
 
 ## analysis_options.yaml
@@ -90,4 +90,4 @@ flutter pub add dev:riverpod_lint  # 3.1+ uses analysis_server_plugin
 ```
 
 > **`freezed_lint` / `custom_lint`**: Both archived or stuck on old `analyzer` version.
-> Conflict with `hive_ce_generator ^1.11.0` (requires `analyzer ^10.0.0`). Do not add.
+> Conflict `hive_ce_generator ^1.11.0` (requires `analyzer ^10.0.0`). Do not add.

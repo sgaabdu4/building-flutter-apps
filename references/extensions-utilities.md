@@ -166,7 +166,7 @@ Column(
 
 ## SnackBar Utility
 
-Central, context-free snackbar. Use everywhere — widgets, notifiers, callbacks. Never `ScaffoldMessenger.of(context)` direct.
+Central context-free snackbar. Use everywhere — widgets, notifiers, callbacks. Never `ScaffoldMessenger.of(context)` direct.
 
 ### Class
 
@@ -300,7 +300,7 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
 
 ## Debouncer
 
-Timer-based debouncer. Search, validation, auto-save. See [common-patterns.md](common-patterns.md) for `SearchNotifier` usage.
+Timer debouncer. Search, validation, auto-save. See [common-patterns.md](common-patterns.md) for `SearchNotifier` usage.
 
 ```dart
 // core/utils/debouncer.dart

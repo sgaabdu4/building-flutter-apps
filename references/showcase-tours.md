@@ -1,6 +1,6 @@
 # Showcase Guided Tours
 
-First-run guided tours use `showcaseview` v5. Each screen manage own tour via shared mixin, styled wrapper widget, persistence service.
+First-run tours use `showcaseview` v5. Each screen manage own tour via shared mixin, styled wrapper widget, persistence service.
 
 **Contents:** [Package](#package) | [Architecture](#architecture) | [ShowcaseScreenMixin](#showcasescreenmixin) | [AppShowcaseTarget](#appshowasetarget) | [ShowcaseService](#showcaseservice) | [ShowcaseKeys](#showcasekeys) | [Adding a Tour to a New Screen](#adding-a-tour-to-a-new-screen) | [Testing](#testing) | [Resetting Tours](#resetting-tours-shell-route-caveat) | [Sync Integration](#sync-integration) | [Constraints](#constraints)
 
@@ -18,7 +18,7 @@ Six files form showcase system:
 | File | Type | Purpose |
 |------|------|---------|
 | `showcase_screen_mixin.dart` | Mixin | Lifecycle: register scope, check, start, dispose |
-| `app_showcase_target.dart` | StatefulWidget | Styled `Showcase` wrapper. Binds correct named scope before build |
+| `app_showcase_target.dart` | StatefulWidget | Styled `Showcase` wrapper. Bind named scope before build |
 | `showcase_service.dart` | Interface + Impl + Signal | Persist tour completion. `ShowcaseResetSignal` notify alive screens |
 | `showcase_keys.dart` | Abstract final class | `GlobalKey` registry + ordered tour lists |
 | `showcase_constants.dart` | Abstract final class | Scope name constants |
@@ -79,13 +79,13 @@ class MyFeatureScreenState extends ConsumerState<MyFeatureScreen>
 
 | Method | When to call |
 |--------|-------------|
-| `initShowcase()` | In `initState()`. Pass `autoSchedule: false` when loading gate hides targets. |
-| `scheduleShowcase()` | After loading gate resolves. Trigger tour check manually. |
+| `initShowcase()` | In `initState()`. Pass `autoSchedule: false` when loading gate hide targets. |
+| `scheduleShowcase()` | After loading gate resolve. Trigger tour check manually. |
 | `disposeShowcase()` | In `dispose()`. |
 
 ### Loading gate pattern
 
-Screens showing loading indicator before content:
+Screens show loading indicator before content:
 
 ```dart
 @override
@@ -112,8 +112,8 @@ Widget build(BuildContext context) {
 
 ### How the mixin works
 
-1. `initShowcase()` calls `ShowcaseView.register(scope:, enableAutoScroll: true, onFinish:, onDismiss:)`.
-2. Post-frame callback checks `TickerMode.of(context)`. If `false` (offstage tab), defer via `_needsShowcaseRetry`.
+1. `initShowcase()` call `ShowcaseView.register(scope:, enableAutoScroll: true, onFinish:, onDismiss:)`.
+2. Post-frame callback check `TickerMode.of(context)`. If `false` (offstage tab), defer via `_needsShowcaseRetry`.
 3. If active, read `showcaseServiceProvider`, check if tour seen.
 4. If unseen, call `ShowcaseView.getNamed(scope).startShowCase(keys, delay: Duration(milliseconds: 300))`.
 5. `onFinish` + `onDismiss` both call `completeInProgressTour()` on service, persist completion.
@@ -126,7 +126,7 @@ Mixin handle via two fields + `didChangeDependencies` override:
 
 - `_needsShowcaseRetry` — set `true` when `TickerMode` is `false` at schedule time.
 - `_dependenciesInitialised` — skip first `didChangeDependencies` call (fires before build).
-- On tab activation (`TickerMode` flips to `true`), `didChangeDependencies` re-calls `scheduleShowcase()`.
+- On tab activation (`TickerMode` flips to `true`), `didChangeDependencies` re-call `scheduleShowcase()`.
 
 ## AppShowcaseTarget
 
@@ -144,7 +144,7 @@ AppShowcaseTarget(
 
 ### Target placement
 
-Wrap *specific* widget to highlight — not parent container. Tooltip anchors to wrapped widget bounds. Wrapping big parent → highlight covers whole section not intended element.
+Wrap *specific* widget to highlight — not parent container. Tooltip anchor to wrapped widget bounds. Wrap big parent → highlight cover whole section not intended element.
 
 ### Parameters
 
@@ -183,7 +183,7 @@ Named scopes strict.
 - Do not build `Showcase` before scope exist.
 - Scope not registered yet → render raw `child`.
 
-Avoids runtime assertion:
+Avoid runtime assertion:
 
 ```text
 Please register [ShowcaseView] first by calling [ShowcaseView.register()]
@@ -191,7 +191,7 @@ Please register [ShowcaseView] first by calling [ShowcaseView.register()]
 
 ### Scope identity (5.0.1 re-registration bug)
 
-`isRegistered` guard not enough alone. `showcaseview` 5.0.1 replaces `ShowcaseScope` object in internal map **every time** `ShowcaseView.register` called for existing scope name. Existing `Showcase` widgets still hold old `ShowcaseScope` reference via `_showCaseWidgetManager` field. Next `didUpdateWidget`, `_updateControllerValues` detect identity flip, reassign field, call `_controller` getter — lookup controller in **new** (empty) `ShowcaseScope`. Assertion fires:
+`isRegistered` guard not enough alone. `showcaseview` 5.0.1 replace `ShowcaseScope` object in internal map **every time** `ShowcaseView.register` called for existing scope name. Existing `Showcase` widgets still hold old `ShowcaseScope` ref via `_showCaseWidgetManager` field. Next `didUpdateWidget`, `_updateControllerValues` detect identity flip, reassign field, call `_controller` getter — lookup controller in **new** (empty) `ShowcaseScope`. Assertion fires:
 
 ```text
 'package:showcaseview/src/showcase/showcase_service.dart':
@@ -202,7 +202,7 @@ Debug → resulting `ErrorWidget` has unbounded intrinsic width, produce massive
 
 Triggers: any path calling `ShowcaseView.register` twice for same scope name during single widget lifetime (hot reload races, duplicate screen instances during navigation transitions, `MediaQuery` rebuild cascades, etc.).
 
-**Defense in `AppShowcaseTarget`:** track `ShowcaseScope` object `identityHashCode` between builds. On change, skip rendering `Showcase` one frame so stale `_ShowcaseState` dispose clean, then remount so `initState` re-registers controller under new scope.
+**Defense in `AppShowcaseTarget`:** track `ShowcaseScope` object `identityHashCode` between builds. On change, skip rendering `Showcase` one frame so stale `_ShowcaseState` dispose clean, then remount so `initState` re-register controller under new scope.
 
 ```dart
 class _AppShowcaseTargetState extends State<AppShowcaseTarget> {
@@ -272,8 +272,8 @@ enum ShowcaseTour { screenA, screenB, screenC }
 ### Key storage scheme
 
 Two keys per tour:
-- **Session:** `showcase_session_{tour}_{scope}_v{version}` — prevents re-run during same app session
-- **Persistent:** `showcase_seen_{tour}_{scope}_v{version}` — survives app restart
+- **Session:** `showcase_session_{tour}_{scope}_v{version}` — prevent re-run during same app session
+- **Persistent:** `showcase_seen_{tour}_{scope}_v{version}` — survive app restart
 
 Version bump force clean replay for existing installs.
 
@@ -361,11 +361,11 @@ final container = ProviderContainer(
 );
 ```
 
-`FakeShowcaseService` return `false` from `shouldShowTour` → no tour runs in tests.
+`FakeShowcaseService` return `false` from `shouldShowTour` → no tour run in tests.
 
 ### Widgets containing AppShowcaseTarget
 
-Most widget tests need no extra setup. Scope-aware wrapper render raw `child` until named scope exists.
+Most widget tests need no extra setup. Scope-aware wrapper render raw `child` until named scope exist.
 
 Test need real `Showcase` behavior → register same named scope as production:
 
@@ -403,7 +403,7 @@ ref.listenManual(showcaseResetSignalProvider, (prev, next) {
 });
 ```
 
-After resetting tours, trigger signal:
+After reset tours, trigger signal:
 
 ```dart
 await service.resetAllKnownScopes();
@@ -416,7 +416,7 @@ Tour state local by default. Apps with remote sync must push + pull tour complet
 
 ### The Problem
 
-Tour completion lives in per-scope local service. Remote settings live in separate repository. Settings push omit tour state → every sync silently reset it. Settings pull restore tour state for only one scope → other screens replay tours.
+Tour completion live in per-scope local service. Remote settings live in separate repo. Settings push omit tour state → every sync silently reset it. Settings pull restore tour state for only one scope → other screens replay tours.
 
 ### Push: Include Tour State in Remote Settings
 
@@ -440,7 +440,7 @@ settingsRepo.setTourCompletionGetter(
 final tourCompleted = await _tourCompletionGetter?.call() ?? false;
 ```
 
-**Rule:** Building remote data object → include every field schema defines. Omit field → send default, overwrite remote copy.
+**Rule:** Build remote data object → include every field schema define. Omit field → send default, overwrite remote copy.
 
 ### Pull: Restore All Scopes
 
@@ -456,22 +456,22 @@ if (remoteSettings.tourCompleted) {
 
 Keep centralized scope list → new scopes handled auto.
 
-**Rule:** Boolean representing multiple scopes must restore all. Hardcoding single scope → partial restoration.
+**Rule:** Boolean representing multiple scopes must restore all. Hardcode single scope → partial restoration.
 
 ### Cleanup
 
-Null callback on logout or remote disconnect. Stale reference to disposed service crash next push.
+Null callback on logout or remote disconnect. Stale ref to disposed service crash next push.
 
 ### Checklist
 
-Syncing tour state (or any cross-service field):
+Sync tour state (or any cross-service field):
 
-1. Add callback on repository interface to query external service.
+1. Add callback on repo interface to query external service.
 2. Wire callback during sync setup.
 3. Null it during cleanup.
 4. Include field in both push + pull paths.
 5. Restore all scopes/variants in pull path.
-6. Test: push includes field, pull restores all scopes, cleanup nulls callback.
+6. Test: push include field, pull restore all scopes, cleanup null callback.
 
 ## Constraints
 

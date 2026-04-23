@@ -1,23 +1,23 @@
 # Performance
 
-Widget rebuild optimization, provider watching, memory management. Flutter-specific rendering, animations, slivers, isolates, app size → see [flutter-optimizations.md](flutter-optimizations.md).
+Widget rebuild, provider watch, memory mgmt. Flutter rendering/animations/slivers/isolates/app-size → see [flutter-optimizations.md](flutter-optimizations.md).
 
 ## Rules — NEVER Violate
 
-1. **MUST** watch providers in leaf widgets — NEVER in parents passing data down.
-2. **MUST** use `.select()` for specific fields in all leaf widgets.
+1. **MUST** watch providers in leaf widgets — NEVER parents passing data down.
+2. **MUST** use `.select()` for specific fields in leaf widgets.
 3. **MUST** extract widget classes — NEVER helper methods (`_buildXxx()`).
 4. **MUST** use `const` constructors where possible.
 5. **MUST** use `ListView.builder` — NEVER `ListView(children: [...])` for dynamic lists.
-6. **NEVER** expensive ops (sort, filter, map) in `build()` — use computed providers.
-7. **MUST** dispose timers, controllers, subscriptions via `ref.onDispose()`.
-8. **NEVER** hold raw API responses in state — extract only needed fields.
+6. **NEVER** expensive ops (sort/filter/map) in `build()` — use computed providers.
+7. **MUST** dispose timers/controllers/subscriptions via `ref.onDispose()`.
+8. **NEVER** hold raw API responses in state — extract needed fields only.
 
 ## Widget Rebuild Rules
 
 ### Watch in Leaf Widgets
 
-Watch in smallest widget possible. NEVER watch in parent, pass down:
+Watch in smallest widget. NEVER watch in parent + pass down:
 
 ```dart
 // WRONG — parent rebuilds all children (prop drilling)
@@ -48,7 +48,7 @@ class UserName extends ConsumerWidget {
 
 ### Use .select() to Watch Specific Fields
 
-`select` prevents rebuilds when unrelated fields change:
+`select` skip rebuild when unrelated fields change:
 
 ```dart
 // Rebuilds only when items change, not when isLoading or error change
@@ -98,13 +98,13 @@ return const Padding(padding: EdgeInsets.all(16), child: child);
 | Computed providers whose **all** deps are keepAlive | Computed providers with mixed dep lifecycles |
 | Lives until app terminates | Disposes when no widget watches |
 
-Auto-dispose on all-keepAlive dep chain breaks pause/resume subscription counting. Match lifecycle of deps.
+Auto-dispose on all-keepAlive dep chain break pause/resume subscription counting. Match dep lifecycle.
 
 ### Equality Filtering
 
-Riverpod 3.0 uses `==` for notification filtering. Freezed generates `==` auto.
+Riverpod 3.0 use `==` for notification filter. Freezed gen `==` auto.
 
-Override `updateShouldNotify` only when intentionally want reference-equality (`identical`) for perf-sensitive large state:
+Override `updateShouldNotify` only when want reference-equality (`identical`) for perf-sensitive large state:
 
 ```dart
 @override
@@ -218,7 +218,7 @@ List<Product> sortedProducts(Ref ref) {
 - Use `.select()` for specific props
 - Extract widget classes, not helper methods
 - Use `const` constructors where possible
-- Never override `operator ==` on Widget — causes O(N²) rebuild checks; use `const` + caching
+- Never override `operator ==` on Widget — O(N²) rebuild check; use `const` + caching
 
 ### State Management
 - `@Riverpod(keepAlive: true)` for repos, datasources, services, notifiers
@@ -233,6 +233,6 @@ List<Product> sortedProducts(Ref ref) {
 - Use `Future.wait()` for parallel ops
 
 ### Memory
-- Dispose timers, controllers, subscriptions in `ref.onDispose()`
+- Dispose timers/controllers/subscriptions in `ref.onDispose()`
 - No raw API responses in state
 - Auto-dispose for temporary state
