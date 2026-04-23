@@ -96,14 +96,14 @@ graph TD
   Q4 -->|Yes| A4["Add params to function — family via codegen"]
 ```
 
-**Family + keepAlive caveat.** Family + `@Riverpod(keepAlive: true)` keeps every key forever. Cache unbounded. Prefer `@riverpod`.
+**Family + keepAlive caveat.** Family + `@Riverpod(keepAlive: true)` keeps every key forever. Cache can grow unbounded. Prefer `@riverpod`.
 
 **Nested computed hop warning.** Avoid computed -> computed chain in pause-sensitive paths (`aProvider` watches `bProvider(param)`). Riverpod 3.2.x offstage nav can throw TickerMode pause/resume assertion.
 
-If chain required, flatten in parent:
-- watch base state direct
+If chain required, flatten in parent provider:
+- watch base state directly
 - derive via pure helpers
-- avoid provider -> provider indirection on hot nav paths
+- avoid provider -> provider indirection on hot navigation paths
 
 **Exception:** Riverpod 3.2.x has TickerMode assertion bug ([rrousselGit/riverpod#4709](https://github.com/rrousselGit/riverpod/issues/4709)). If hit, `keepAlive: true` workaround allowed. Add inline note: `// keepAlive: Riverpod 3.2.x #4709 workaround`. Remove after upstream fix.
 

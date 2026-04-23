@@ -101,9 +101,9 @@ return const Padding(padding: EdgeInsets.all(16), child: child);
 Auto-dispose in all-keepAlive chain can break pause/resume subscription counting. Match lifecycle.
 
 Practical guardrails:
-- all upstream `keepAlive` => downstream computed `keepAlive`
-- no stacked computed hops in pause-sensitive path (`computedA -> computedB -> familyC`)
-- flatten: watch base once, derive with pure helpers
+- If all upstream deps are `keepAlive`, keep downstream computed providers `keepAlive`.
+- Do not stack computed hops in pause-sensitive paths (`computedA -> computedB -> familyC`).
+- Flatten: watch base state once, derive with pure helpers.
 
 ### Equality Filtering
 

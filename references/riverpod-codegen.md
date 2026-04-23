@@ -297,9 +297,9 @@ Riverpod 3.0 pause providers when listeners not visible:
 - When provider rebuilds, previous subscriptions stay until rebuild completes
 
 Composition rule for pause-sensitive flows:
-- no nested computed chains (computed watches computed, especially family)
-- prefer one computed provider: watch base state direct, derive via pure helpers
-- if Riverpod 3.2.x pause/resume assertion appears in offstage nav: flatten hops first, lifecycle workaround later
+- Avoid nested computed chains (computed watches computed, especially family).
+- Prefer one computed provider: watch base state directly, derive via pure helpers.
+- If Riverpod 3.2.x pause/resume assertion appears in offstage navigation: flatten hops first, lifecycle workaround later.
 
 Saves resources. Websocket provider pause when screen not visible.
 
