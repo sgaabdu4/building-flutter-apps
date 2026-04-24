@@ -103,3 +103,51 @@ mixin ShowcaseScreenMixin on ConsumerState {
   void disposeShowcase() { /* cleanup */ }
 }
 ```
+
+## Retry-With-Backoff Helper (Data-Layer Mixin)
+
+Bulk-I/O mixin (e.g. `AppwritePaginationMixin.saveAllRows`) → pair w/ **module-level** `retryWithBackoff<T>()` + typed exception. Free-standing, not mixin method — non-mixin sites reuse.
+
+```dart
+// core/services/appwrite_pagination_mixin.dart
+import 'dart:io';
+import 'dart:math' as math;
+
+final _retryRng = math.Random(); // hoisted — no per-call alloc
+
+class SaveRowResult<T> {
+  const SaveRowResult.ok(this.item) : error = null, stackTrace = null;
+  const SaveRowResult.err(this.item, this.error, this.stackTrace);
+  final T item;
+  final Object? error;
+  final StackTrace? stackTrace;
+  bool get isOk => error == null;
+}
+
+class SaveAllRowsException implements Exception {
+  const SaveAllRowsException(this.failures);
+  final List<SaveRowResult<Object?>> failures;
+  @override
+  String toString() =>
+      'SaveAllRowsException: ${failures.length} item(s) failed; first=${failures.first.error}';
+}
+
+/// Retries [fn] on transient failures: Appwrite 429/503, [SocketException],
+/// [HttpException]. Non-retryable errors rethrow immediately.
+/// Base 200ms, doubled each retry, ±50ms jitter. Default 3 attempts.
+Future<T> retryWithBackoff<T>(
+  Future<T> Function() fn, {
+  int maxAttempts = 3,
+  bool Function(Object)? shouldRetry,
+}) async {
+  // implementation: try/catch on AppwriteException (429/503),
+  // SocketException, HttpException → delay + retry.
+}
+```
+
+Rules:
+- **Module-level RNG**: hoist once. No `math.Random()` per call.
+- **Retryable set explicit**: 429/503 + network IO only. Validation/4xx rethrow immediate.
+- **Partial-failure**: bulk op collects `SaveRowResult` per item. `throwOnPartialFailure` → `SaveAllRowsException` w/ failure list. No silent drop.
+- **Concurrency cap**: bulk default 4 (avoid 429 bucket swamp). Each item in `retryWithBackoff`.
+- **Not in widgets**: retry = infra. Notifier → datasource → mixin.

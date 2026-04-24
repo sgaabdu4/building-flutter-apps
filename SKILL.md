@@ -181,11 +181,11 @@ Read before generating code for that topic.
 | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) | Dart MCP runtime E2E flow, logs, device targeting, fail/fix loop |
 | [common-patterns.md](references/common-patterns.md) | Lists, search, forms, GoRouter, sync |
 | [extensions-utilities.md](references/extensions-utilities.md) | Utilities, extensions |
-| [mixins.md](references/mixins.md) | Mixin vs interface vs extension |
+| [mixins.md](references/mixins.md) | Mixin vs interface vs extension, `retryWithBackoff` + `SaveAllRowsException` for bulk I/O |
 | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
 | [services-and-singletons.md](references/services-and-singletons.md) | Static-only class vs singleton vs provider, fire-and-forget pattern, testing each |
 | [crashlytics.md](references/crashlytics.md) | Firebase Crashlytics setup (3 hooks), `Crash` wrapper, non-fatal vs fatal, breadcrumbs, custom keys, symbols |
-| [showcase-tours.md](references/showcase-tours.md) | Guided tours, tour state sync |
+| [showcase-tours.md](references/showcase-tours.md) | Guided tours, tour state sync, `ProviderSubscription` handle, test-env safe service read |
 | [dart-patterns-records.md](references/dart-patterns-records.md) | Records, patterns, extension types |
 
 ## Pre-Flight — Before Returning Any Code

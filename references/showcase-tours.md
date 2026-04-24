@@ -390,16 +390,25 @@ class ShowcaseResetSignal extends _$ShowcaseResetSignal {
 }
 ```
 
-Mixin listen + reset on change:
+Mixin listen + reset on change. MUST store `ProviderSubscription` handle + close in `disposeShowcase()`. Bare `ref.listenManual` leaks across long-lived shell branch lifetime.
 
 ```dart
+ProviderSubscription<int>? _showcaseResetSubscription;
+
 // In initShowcase()
-ref.listenManual(showcaseResetSignalProvider, (prev, next) {
+_showcaseResetSubscription?.close();
+_showcaseResetSubscription = ref.listenManual(showcaseResetSignalProvider, (prev, next) {
   if (prev == next) return;
   _hasAttemptedTour = false;
   _needsShowcaseRetry = true;
   scheduleShowcase();
 });
+
+void disposeShowcase() {
+  _showcaseResetSubscription?.close();
+  _showcaseResetSubscription = null;
+  // ... unregister scope etc.
+}
 ```
 
 The `prev == next` guard handles all transitions, including the first
@@ -435,6 +444,41 @@ Correct:
 ShowcaseView.getNamed(scope).startShowCase(
   List<GlobalKey>.from(ShowcaseKeys.settingsTour),
 );
+```
+
+## Test-Env Safe Service Read
+
+Widget tests lack Hive init. Raw `await ref.read(showcaseServiceProvider.future)` throws `Box not found` → bubbles into fire-and-forget (`onFinish`/`onDismiss`/`scheduleShowcase`), spams logs.
+
+Wrap in mixin-local helper. Fire-and-forget callers null-check + early-return.
+
+```dart
+Future<IShowcaseService?> _readShowcaseServiceOrNull() async {
+  try {
+    return await ref.read(showcaseServiceProvider.future);
+  } on Object catch (e, st) {
+    if (_isTestEnvBoxMissing(e)) return null;
+    Crash.error(e, st, reason: 'ShowcaseScreenMixin.readService');
+    return null;
+  }
+}
+
+bool _isTestEnvBoxMissing(Object e) {
+  final text = e.toString();
+  return text.contains('Box not found') || text.contains('provider that is in error state');
+}
+```
+
+Call sites drop `try/catch`. Null = skip:
+
+```dart
+onFinish: () {
+  unawaited(Future<void>.microtask(() async {
+    final service = await _readShowcaseServiceOrNull();
+    if (service == null) return;
+    await service.completeInProgressTour();
+  }));
+}
 ```
 
 ## Sync Integration
