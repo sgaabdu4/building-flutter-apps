@@ -23,11 +23,13 @@ Thanks for interest. This doc = guidelines for contributing.
 ### Documentation Style
 
 - Clear, concise language
-- **MUST/NEVER/ALWAYS** enforcement for rules — every reference file MUST have `## Rules — NEVER Violate` section at top
+- Use **MUST/NEVER/ALWAYS** only for enforceable rules
 - Mermaid diagrams over prose where fit
 - Include working Dart/Flutter examples
 - Follow existing formatting
 - Keep SKILL.md under 500 lines; detailed content goes in `references/`
+- Run analyzer with `references/analysis_options.yaml`
+- For package/version reviews, verify the documented install path exactly. Analyzer plugins in top-level `plugins:` are not the same as `pubspec.yaml` dependencies.
 
 ### Code Examples
 
@@ -38,14 +40,22 @@ Thanks for interest. This doc = guidelines for contributing.
 // Follow architecture guidelines (data/domain/repositories/presentation)
 ```
 
+Run `ruby tool/verify_markdown_examples.rb` before PR. Dart code belongs in `dart` fences, including examples marked `// WRONG`.
+
 ### Package Versions
 
 Targets:
-- `flutter_riverpod: 3.2.1+`
+- `flutter_riverpod: 3.3.1+`
+- `riverpod_annotation: 4.0.2+`
+- `riverpod_generator: 4.0.3+`
 - `freezed: 3.2.5+`
-- `go_router: 17.1.0+`
+- `go_router: 17.2.3+`
+- `go_router_builder: 4.3.0+`
+- `json_annotation: ^4.11.0`
+- `json_serializable: 6.13.0`
+- `hive_ce_generator: 1.11.0`
 
-Examples must work with these versions.
+Examples must work with these versions. Do not upgrade analyzer-bound generators independently; verify the full solver set first.
 
 ### File Structure
 

@@ -1,2 +1,7 @@
 .DS_Store
-.vscode/settings.json
+.codebase/
+.vscode/
+.dart_tool/
+.packages
+pubspec.lock
+node_modules/

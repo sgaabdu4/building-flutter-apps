@@ -166,7 +166,7 @@ Column(
 
 ## SnackBar Utility
 
-Central context-free snackbar. Use everywhere — widgets, notifiers, callbacks. Never `ScaffoldMessenger.of(context)` direct.
+Central context-free snackbar. Notifiers/services dispatch snackbar side effects. Widgets/screens call notifier methods and render state; they do not call `SnackBarUtils.show*` or `ScaffoldMessenger.of(context)` directly.
 
 ### Class
 
@@ -284,18 +284,17 @@ void main() {
 
 ### Usage
 
+Notifier/service code owns success/error side effects. Widgets/screens do not call snackbar utilities directly.
+
 ```dart
-// Notifier (no BuildContext)
-SnackBarUtils.showSuccess('Product deleted');
-SnackBarUtils.showError('Delete failed');
-
-// Widget callback
+// WRONG — widget bypasses notifier boundary.
 onPressed: () => SnackBarUtils.showInfo('Syncing...');
+```
 
-// initState
-WidgetsBinding.instance.addPostFrameCallback((_) {
-  SnackBarUtils.showInfo('Welcome');
-});
+Widget callbacks should only dispatch:
+
+```dart
+onPressed: () => ref.read(productProvider.notifier).deleteProduct(id);
 ```
 
 ## Debouncer

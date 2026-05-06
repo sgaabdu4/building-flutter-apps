@@ -8,7 +8,20 @@ Binary persistence Flutter. Hive CE + TypeAdapter codegen.
 |---------|---------|---------|
 | hive_ce | 2.19.3+ | Core binary storage |
 | hive_ce_flutter | 2.3.4+ | Flutter integration |
-| hive_ce_generator | 1.9.0+ | TypeAdapter code generation |
+| hive_ce_generator | 1.11.0 pinned | TypeAdapter code generation |
+
+## Setup
+
+```yaml
+# pubspec.yaml
+dependencies:
+  hive_ce: ^2.19.3
+  hive_ce_flutter: ^2.3.4
+
+dev_dependencies:
+  build_runner: ^2.15.0
+  hive_ce_generator: 1.11.0
+```
 
 ## TypeAdapter Storage vs JSON
 
@@ -29,7 +42,7 @@ Gen TypeAdapters for Freezed classes sans @HiveType.
 
 ```dart
 // lib/core/hive/hive_adapters.dart
-import 'package:hive_ce/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:my_app/features/user/domain/entities/user.dart';
 import 'package:my_app/features/order/domain/entities/order.dart';
 

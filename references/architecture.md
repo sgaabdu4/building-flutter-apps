@@ -213,8 +213,8 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
   @override
   Future<List<ProductModel>> fetchAll() async {
     final response = await _http.get('/products');
-    return (response as List)
-        .map((json) => ProductModel.fromJson(json))
+    return (response as List<Object?>)
+        .map((json) => ProductModel.fromJson(json as Map<String, dynamic>))
         .toList();
   }
 

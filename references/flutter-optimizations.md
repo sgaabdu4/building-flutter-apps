@@ -77,25 +77,30 @@ CustomScrollView(
 | Nested scroll | `CustomScrollView` + `SliverList` (see [Slivers](#slivers)) |
 
 ```dart
-// ❌ Measures all children at once
+// WRONG — measures all children at once.
 ListView.builder(
   shrinkWrap: true,
-  itemBuilder: ...,
 )
+```
 
-// ✅ In a Column
+```dart
 Column(
   children: [
     const Header(),
-    Expanded(child: ListView.builder(itemBuilder: ...)),
+    Expanded(
+      child: ListView.builder(
+        itemBuilder: (context, index) => const SizedBox.shrink(),
+      ),
+    ),
   ],
 )
+```
 
-// ✅ In a bottom sheet
+```dart
 DraggableScrollableSheet(
   builder: (context, scrollController) => ListView.builder(
     controller: scrollController,
-    itemBuilder: ...,
+    itemBuilder: (context, index) => const SizedBox.shrink(),
   ),
 )
 ```
@@ -217,7 +222,7 @@ Move heavy compute off main thread. UI thread render frame <16ms (60fps) or <8ms
 
 ```dart
 final products = await Isolate.run(() {
-  final parsed = jsonDecode(jsonString) as List;
+  final parsed = jsonDecode(jsonString) as List<Object?>;
   return parsed
       .cast<Map<String, dynamic>>()
       .map(ProductModel.fromJson)
@@ -423,7 +428,8 @@ Defer work til after current frame render:
 void initState() {
   super.initState();
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    SnackBarUtils.showInfo('Welcome');
+    if (!context.mounted) return;
+    ref.read(welcomeProvider.notifier).maybeShowWelcomeMessage();
   });
 }
 ```

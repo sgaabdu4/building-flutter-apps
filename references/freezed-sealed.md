@@ -30,14 +30,16 @@ graph TD
 ```yaml
 # pubspec.yaml
 dependencies:
-  freezed_annotation: ^3.0.0
-  json_annotation: ^6.8.0
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.11.0
 
 dev_dependencies:
-  build_runner: ^2.4.0
+  build_runner: ^2.15.0
   freezed: ^3.2.5
-  json_serializable: ^6.0.0
+  json_serializable: 6.13.0
 ```
+
+Pin `json_serializable` to `6.13.0`. `6.13.1+` requires analyzer `>=10`, while the current Riverpod generator and Hive CE generator stack resolves on analyzer 9.
 
 Every file need:
 
@@ -214,7 +216,7 @@ Uses `runtimeType` discriminator by default:
 ```dart
 @freezed
 sealed class ApiResponse with _$ApiResponse {
-  const factory ApiResponse.success(dynamic data) = ApiSuccess;
+  const factory ApiResponse.success(Object? data) = ApiSuccess;
   const factory ApiResponse.error(String message) = ApiError;
 
   factory ApiResponse.fromJson(Map<String, dynamic> json) =>
@@ -227,7 +229,7 @@ Customize discriminator key:
 ```dart
 @Freezed(unionKey: 'type', unionValueCase: FreezedUnionCase.pascal)
 sealed class ApiResponse with _$ApiResponse {
-  const factory ApiResponse.success(dynamic data) = ApiSuccess;
+  const factory ApiResponse.success(Object? data) = ApiSuccess;
 
   @FreezedUnionValue('ServerError')
   const factory ApiResponse.error(String message) = ApiError;
@@ -329,19 +331,7 @@ targets:
 
 ## Linting
 
-```yaml
-# pubspec.yaml
-dev_dependencies:
-  custom_lint: ^0.7.0
-  freezed_lint: ^1.0.0
-
-# analysis_options.yaml
-analyzer:
-  plugins:
-    - custom_lint
-  errors:
-    invalid_annotation_target: ignore
-```
+Use the canonical analyzer config from [analysis_options.yaml](analysis_options.yaml). It already sets `invalid_annotation_target: ignore` for Freezed and enables the Dart analyzer plugin system used by this skill.
 
 ## Rich Models
 

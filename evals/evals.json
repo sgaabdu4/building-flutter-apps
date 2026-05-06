@@ -107,17 +107,17 @@
         {
             "id": 8,
             "prompt": "I need to write tests for my OrderNotifier. It has methods: loadOrders(), placeOrder(order), and cancelOrder(id). The notifier depends on an OrderRepository provider. Show me the full test file with mocks and different test cases.",
-            "expected_output": "Creates a test file with @GenerateMocks for OrderRepository. Uses ProviderContainer.test() with overrides. Tests each method including state transitions, error handling, and verifying repository calls.",
+            "expected_output": "Creates a test file with Mocktail mocks for the repository interface. Uses ProviderContainer.test() with overrides. Tests each method including state transitions, error handling, and verifying repository calls.",
             "files": [],
             "expectations": [
-                "Uses @GenerateMocks([OrderRepository]) for mock generation",
+                "Declares a Mocktail mock for IOrderRepository, not a concrete OrderRepository mock",
                 "Uses ProviderContainer.test() with overrides",
                 "Tests loadOrders: verifies state transitions (loading → loaded)",
                 "Tests placeOrder: verifies repository.create is called",
                 "Tests cancelOrder: verifies item removal from state",
                 "Tests error case: verifies error is set in state on failure",
-                "Uses when/thenAnswer for stubbing, verify for assertions",
-                "Uses Future.delayed or pump for async state updates"
+                "Uses Mocktail closure syntax for when/thenAnswer and verify",
+                "Awaits provider.future, uses Future.microtask, or uses explicit tester.pump steps for async state updates"
             ]
         },
         {
@@ -227,15 +227,16 @@
         {
             "id": 16,
             "prompt": "I want to add a first-run guided tour to my dashboard screen using showcaseview. There are 3 things to highlight: the search bar, the filter button, and the add button. The tour should only show once per user.",
-            "expected_output": "Uses ShowCaseWidget with GlobalKeys for each target, ShowcaseViewMixin for the screen, and persists tour completion to Hive so it only shows once.",
+            "expected_output": "Uses showcaseview v5 named scopes with ShowcaseView.register/getNamed, GlobalKeys for each target, an AppShowcaseTarget wrapper, and a persistence service so the tour only shows once.",
             "files": [],
             "expectations": [
-                "Uses ShowCaseWidget wrapping the screen",
+                "Uses ShowcaseView.register with a named scope",
                 "Each target has a GlobalKey",
-                "Uses Showcase widget to wrap each target element",
-                "Checks Hive/local storage for tour completion flag before showing",
+                "Uses AppShowcaseTarget or the project's equivalent wrapper for each target",
+                "Checks the showcase service/local storage for tour completion before showing",
                 "Saves tour completion after finishing",
-                "Tour starts via ShowCaseWidget.of(context).startShowCase()"
+                "Tour starts via ShowcaseView.getNamed(scope).startShowCase(fullKeyList)",
+                "Does not filter keys with key.currentContext before startShowCase"
             ]
         },
         {
@@ -294,8 +295,8 @@
                 "Loading state shows placeholder/shimmer (not just CircularProgressIndicator)",
                 "Error state shows error message with retry button",
                 "Data state shows the settings form",
-                "Retry calls ref.invalidate or ref.refresh on the provider",
-                "Has ref.mounted check in notifier methods after await, OR uses AsyncValue.guard (which handles lifecycle internally)"
+                "Retry calls ref.invalidate on the provider when no return value is needed",
+                "Notifier methods guard ref.mounted after awaited operations before assigning state"
             ]
         },
         {
@@ -343,11 +344,12 @@
         {
             "id": 24,
             "prompt": "I need to write a widget test for my ProductListScreen. It depends on a ProductNotifier provider. The screen shows a list of products and a loading spinner. Test that it shows the spinner when loading and the product names when loaded.",
-            "expected_output": "Creates a widget test with ProviderScope overrides, mocked ProductNotifier, pumpWidget, and finder assertions for loading and loaded states.",
+            "expected_output": "Creates a widget test with ProviderContainer.test, UncontrolledProviderScope, repository/provider overrides, pumpWidget, and finder assertions for loading and loaded states.",
             "files": [],
             "expectations": [
-                "Uses ProviderScope with overrides in test",
-                "Overrides productProvider with test state",
+                "Uses ProviderContainer.test for overrides",
+                "Wraps the widget with UncontrolledProviderScope",
+                "Overrides repository/datasource providers or uses overrideWithBuild; does not mock the notifier directly",
                 "Tests loading state: expects CircularProgressIndicator (or shimmer)",
                 "Tests loaded state: expects product names in Text widgets",
                 "Uses find.text() or find.byType() for assertions",

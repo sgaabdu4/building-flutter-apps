@@ -2,6 +2,8 @@
 
 Generate all providers with annotations. Never write providers manually. Never import from `package:riverpod/legacy.dart`.
 
+Hard rule: this applies to every provider shape: state, computed value, repository, datasource, service/client, family, future, stream, and notifier. Manual `Provider(...)`, `FutureProvider(...)`, `StreamProvider(...)`, `StateProvider(...)`, `NotifierProvider(...)`, `AsyncNotifierProvider(...)`, `StateNotifierProvider(...)`, and `ChangeNotifierProvider(...)` are banned.
+
 **Contents:** [Setup](#setup) | [Generated Provider Names](#generated-provider-names) | [Provider Types](#provider-types) | [Unified Ref](#unified-ref) | [Automatic Retry](#automatic-retry) | [ProviderException](#providerexception) | [Mutations](#mutations-experimental) | [Offline Persistence](#offline-persistence-experimental) | [Pause/Resume](#pauseresume) | [Weak Listeners](#weak-listeners) | [Lifecycle Listeners](#lifecycle-listeners-return-unsubscribe-functions) | [Scoping](#scoping-codegen-only) | [Backend Client Providers](#backend-client-providers)
 
 ## Setup
@@ -9,14 +11,15 @@ Generate all providers with annotations. Never write providers manually. Never i
 ```yaml
 # pubspec.yaml
 dependencies:
-  flutter_riverpod: ^3.2.1
-  riverpod_annotation: ^3.0.0
+  flutter_riverpod: ^3.3.1
+  riverpod_annotation: ^4.0.2
 
 dev_dependencies:
-  build_runner: ^2.4.0
-  riverpod_generator: ^3.0.0
-  riverpod_lint: ^3.0.0
+  build_runner: ^2.15.0
+  riverpod_generator: ^4.0.3
 ```
+
+Canonical [analysis_options.yaml](analysis_options.yaml): `flutter_skill_lints` + `riverpod_lint`. Apply [analysis-options.md](analysis-options.md#install) before `flutter analyze`.
 
 Every file with providers need these:
 
@@ -44,6 +47,8 @@ Functional providers keep full name:
 | `cartTotal(Ref)` | `cartTotalProvider` |
 
 Never write `xxxNotifierProvider` — not exist in codegen output.
+
+Never create an alias/manual provider to "simplify" a generated provider. Rename the annotated function/class instead, regenerate `.g.dart`, and update call sites.
 
 ## Provider Types
 
@@ -257,8 +262,8 @@ class TodosNotifier extends _$TodosNotifier {
       key: 'todos',
       encode: jsonEncode,
       decode: (json) {
-        final decoded = jsonDecode(json) as List;
-        return decoded.map((e) => Todo.fromJson(e as Map<String, Object?>)).toList();
+        final decoded = jsonDecode(json) as List<Object?>;
+        return decoded.map((item) => Todo.fromJson(item as Map<String, Object?>)).toList();
       },
     );
 

@@ -304,7 +304,7 @@ Future<void> parallelBatch<T>({
   required Future<void> Function(T) action,
   int batchSize = 50,
 }) async {
-  for (var i = 0; i < items.length; i += batchSize) {
+  for (int i = 0; i < items.length; i += batchSize) {
     final end = (i + batchSize).clamp(0, items.length);
     final batch = items.sublist(i, end);
     await Future.wait(batch.map(action));
@@ -350,6 +350,18 @@ class ProductListScreen extends ConsumerWidget {
 ## Navigation with Typed GoRouter
 
 Use `go_router_builder` for type-safe routes. Every route = class extending `GoRouteData` with generated mixin. Compiler catches route param errors at build time.
+
+### Setup
+
+```yaml
+# pubspec.yaml
+dependencies:
+  go_router: ^17.2.3
+
+dev_dependencies:
+  build_runner: ^2.15.0
+  go_router_builder: ^4.3.0
+```
 
 ### Route Definitions
 
@@ -417,6 +429,8 @@ class LoginRoute extends GoRouteData with $LoginRoute {
 
 Create GoRouter once. Use `ref.listen()` + `refreshListenable` to trigger redirect re-evaluation. NEVER `ref.watch()` in redirect — recreates router every state change, resets route stack.
 
+Keep redirect decisions pure. The GoRouter closure should read providers, call a pure resolver, and return the result. Matrix-test the resolver.
+
 **Redirect rules for apps with multi-step setup (profile completion, roles):**
 
 - **During loading, MUST stay put.** Return `null` — NEVER bounce to splash. On web refresh, redirecting `/chat` → `/` → `/home` loses URL. One exception: authenticated users on login/signup redirect to splash.
@@ -441,27 +455,34 @@ GoRouter router(Ref ref) {
       final setupStatus = ref.read(setupInfoProvider).status;
       final location = state.matchedLocation;
 
-      switch (setupStatus) {
-        case SetupStatus.loading:
-          // Move authenticated users off login to splash.
-          if (ref.read(authProvider).isAuthenticated && _isPublicPage(location)) {
-            return const SplashRoute().location;
-          }
-          return null; // Stay put — preserves URL on web refresh.
-
-        case SetupStatus.unauthenticated:
-          return _isPublicPage(location) ? null : const LoginRoute().location;
-
-        case SetupStatus.needsProfileCompletion:
-          return location == '/profile-completion' ? null : '/profile-completion';
-
-        case SetupStatus.setupComplete:
-          return _isSetupPage(location) ? const HomeRoute().location : null;
-      }
+      return resolveAppRedirect(location: location, setupStatus: setupStatus);
     },
   );
 }
+```
 
+```dart
+@visibleForTesting
+String? resolveAppRedirect({
+  required String location,
+  required SetupStatus setupStatus,
+}) {
+  switch (setupStatus) {
+    case SetupStatus.loading:
+      return null; // Stay put — preserves URL on web refresh.
+    case SetupStatus.unauthenticated:
+      return _isPublicPage(location) ? null : const LoginRoute().location;
+    case SetupStatus.needsProfileCompletion:
+      return location == '/profile-completion' ? null : '/profile-completion';
+    case SetupStatus.setupComplete:
+      return _isSetupPage(location) ? const HomeRoute().location : null;
+  }
+}
+```
+
+Test the matrix: loading, signed out, signed in, setup incomplete, setup complete, stale deep links, update-required gates, and auth pages.
+
+```dart
 // Belt-and-suspenders: auth pages navigate directly on authentication.
 class AppLoginPage extends ConsumerWidget {
   const AppLoginPage({super.key});
@@ -475,6 +496,38 @@ class AppLoginPage extends ConsumerWidget {
     });
     return const LoginPageContent();
   }
+}
+```
+
+## Long-Running Sync/Auth Cancellation
+
+Sign-in sync, import/export, account deletion, and background upload flows can outlive the user/session that started them. Guard with a generation token or cancellation signal before every state write or remote connection change.
+
+```dart
+class SyncCoordinator {
+  int _generation = 0;
+  String? _activeUserId;
+
+  Future<void> syncFor(String userId) async {
+    final generation = ++_generation;
+    _activeUserId = userId;
+
+    await pull();
+    if (!_isActive(userId, generation)) return;
+
+    await push();
+    if (!_isActive(userId, generation)) return;
+
+    markComplete();
+  }
+
+  void cancel() {
+    _generation++;
+    _activeUserId = null;
+  }
+
+  bool _isActive(String userId, int generation) =>
+      _generation == generation && _activeUserId == userId;
 }
 ```
 

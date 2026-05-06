@@ -9,7 +9,10 @@ Test utils Riverpod 3.x + `ProviderContainer.test()`.
 3. **MUST** use `UncontrolledProviderScope` widget tests — NEVER raw `ProviderScope` w/ overrides.
 4. **MUST** prefer explicit `pump()`. `pumpAndSettle(timeout: ...)` only finite anim/async; avoid infinite/ticking.
 5. **MUST** override repo/datasource level — NEVER mock notifiers direct.
-6. **MUST** use deterministic `ValueKey` selectors for repeated icons, draggable sheets, close/open actions. NEVER use `tapAt(...)`, first-match icon finders, or case-sensitive label text.
+6. **MUST** use deterministic `ValueKey` selectors from a central key registry for repeated icons, draggable sheets, close/open actions. NEVER use inline string keys, `tapAt(...)`, first-match icon finders, or case-sensitive label text.
+7. **MUST** add event-contract tests for streams/realtime/push/sync/shared remote state: exact subscriptions/listeners, every event family, notifier reaction, stale-source refresh, and removal/delete behavior.
+8. **MUST** keep shared fakes, mocks, provider-container factories, platform stubs, and async wait helpers in a test helper SSOT.
+9. **MUST** add contract drift tests when constants/schema/field IDs are copied across Flutter/backend/functions/native runtimes.
 
 ```mermaid
 graph LR
@@ -28,8 +31,8 @@ graph LR
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  mocktail: ^1.0.4
-  build_runner: ^2.4.0
+  mocktail: ^1.0.5
+  build_runner: ^2.15.0
 ```
 
 ## Mock Declaration
@@ -97,6 +100,49 @@ void main() {
   });
 }
 ```
+
+## Test Helper SSOT
+
+Prefer one shared helper module:
+
+```text
+test/helpers/test_fakes.dart
+```
+
+It owns:
+
+- `createTestContainer(...)`
+- fake services and repositories
+- mock classes for interfaces
+- mocktail fallback registration
+- platform stubs
+- async provider wait helpers
+- local database setup/teardown helpers
+
+Do not redefine common fakes in every test file. Feature-specific fakes may live next to that feature only when they are not useful elsewhere.
+
+## Cross-Runtime Contract Drift Tests
+
+If Flutter shares constants with another runtime, test the contract:
+
+- table/collection/bucket/function IDs
+- field names and relationship names
+- enum/string wire values
+- manifest/schema/index requirements
+- copied shared source files
+- platform channel method names
+- deep-link path contracts
+
+Generic pattern:
+
+```dart
+test('app and backend table ids stay in sync', () {
+  expect(AppTableIds.workouts, BackendTableIds.workouts);
+  expect(AppFields.userId, BackendFields.userId);
+});
+```
+
+Keep backend-vendor details in that backend skill. The Flutter rule is: copied runtime contracts need drift tests.
 
 ## overrideWithBuild
 
@@ -170,6 +216,40 @@ testWidgets('shows product list', (tester) async {
 });
 ```
 
+## Widget Key Registry
+
+Default file: `lib/core/testing/app_widget_keys.dart`. Use existing project equivalent if present.
+
+```dart
+abstract final class AppWidgetKeys {
+  static const productCloseButton = 'product.close.button';
+  static const productSaveButton = 'product.save.button';
+}
+```
+
+Widgets:
+
+```dart
+IconButton(
+  key: const ValueKey(AppWidgetKeys.productCloseButton),
+  onPressed: onClose,
+  icon: const Icon(Icons.close),
+)
+```
+
+Tests/E2E:
+
+```dart
+await tester.tap(find.byKey(const ValueKey(AppWidgetKeys.productCloseButton)));
+```
+
+Rules:
+
+- One registry file per app unless the project already has a namespaced equivalent.
+- Prefer feature-prefixed names: `profile.avatar.edit`, `checkout.payment.submit`.
+- No inline `ValueKey('...')` in widgets or tests.
+- Add keys only to real interaction/inspection targets, not every widget.
+
 ## WidgetTester.container
 
 Access `ProviderContainer` from widget tests:
@@ -213,6 +293,68 @@ test('deleteItem removes from state', () async {
   expect(state.items.first.id, '2');
 });
 ```
+
+## Event Contract and Sync Tests
+
+Any stream, realtime, push, subscription, callback, poller, cache invalidation, or source-of-truth refresh path needs tests at two levels:
+
+1. Datasource/service contract test: proves the exact channel/topic/query/filter/listener set is registered.
+2. Notifier/widget reaction test: emits representative events and proves state updates, refetches, or clears correctly.
+
+Do not test only the happy create event. Cover the event families the product depends on:
+
+- create/add/join
+- update/rename/status/order
+- delete/remove/leave/revoke
+- generated/regenerated values
+- permission/ownership changes
+- stale, partial, duplicate, out-of-order, and unrelated events
+
+Minimum contract:
+
+```dart
+test('subscribes to every event family needed for item sync', () async {
+  final source = FakeRemoteEventSource();
+  final datasource = ProductRemoteDatasource(source);
+
+  await datasource.watchProducts(ownerId: 'owner-1').first;
+
+  expect(source.subscriptions, contains('products.owner-1.create'));
+  expect(source.subscriptions, contains('products.owner-1.update'));
+  expect(source.subscriptions, contains('products.owner-1.delete'));
+});
+```
+
+Minimum notifier reaction:
+
+```dart
+test('refetches source of truth after remote update event', () async {
+  final repo = FakeProductRepository()
+    ..items = [const Product(id: 'p1', name: 'Old')];
+  final events = FakeProductEvents();
+
+  final container = ProviderContainer.test(
+    overrides: [
+      productRepositoryProvider.overrideWithValue(repo),
+      productEventsProvider.overrideWithValue(events),
+    ],
+  );
+
+  await container.read(productProvider.future);
+
+  repo.items = [const Product(id: 'p1', name: 'New')];
+  events.emit(const ProductEvent.updated(id: 'p1'));
+  await Future<void>.microtask(() {});
+
+  expect(container.read(productProvider).value?.items.single.name, 'New');
+});
+```
+
+Generated values and read-your-writes:
+
+- If create/update/delete can return stale, partial, or derived values, assert the notifier refreshes from the source of truth before success UI/navigation.
+- If a code/token/link/slug/order/index is generated remotely, mutate it in the fake source first, then assert UI/notifier state eventually shows that exact generated value.
+- If a selected item is deleted or the actor loses access, assert selected state clears and the list/detail route falls back without throwing.
 
 ## Testing Repository Layer
 
@@ -292,3 +434,8 @@ test('auth state transitions', () async {
 | Provider not found | Wrap `UncontrolledProviderScope` |
 | Mock not applied | Verify override matches provider type |
 | Container disposed early | `ProviderContainer.test()` — auto-manages |
+| Inline `ValueKey('close')` strings drift from E2E | Put key strings in `AppWidgetKeys`, use constants in widgets/tests |
+| Realtime join/create not observed | Contract-test exact event families plus notifier reaction test for emitted event |
+| Delete/remove leaves stale detail UI | Emit delete/remove event and assert selected state clears or route fallback appears |
+| Generated code/token stale after mutation | Fake source generates new value; notifier must refetch and expose source-of-truth value |
+| Event test passes but real app does not sync | Add writer/observer Dart MCP E2E from [dart-mcp-e2e-testing.md](dart-mcp-e2e-testing.md) |

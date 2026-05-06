@@ -14,7 +14,7 @@ Notifier pattern manage mutable state w/ Riverpod 3.x codegen.
 8. **NEVER** read `state` (incl `state.copyWith`) inside sync `Notifier.build()` or any path sync before `build()` returns. First `state` assign in sync notifier must be direct value (e.g. `state = const FooState(isLoading: true)`), or deferred via `Future.microtask`. Read state before first `state=` throw *"Tried to read the state of an uninitialized provider"*. `AsyncNotifier` exempt (pre-init `AsyncLoading`). See [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap).
 9. **MUST** init repo/dep inside mutation method before write (`create*`, `update*`, `delete*`, `set*`, `reorder*`). Never rely on background `_init*()` timing.
 10. **MUST** avoid broad parent-provider invalidation in nav-critical flow (wizard/deep-link route param). Use targeted sync (`upsert`/replace/remove).
-11. **NEVER** swap `context.mounted` to `mounted` to suppress lint. Repo style = `context.mounted`. Lint fire → restructure flow (guard, then call sync helper for context work).
+11. **NEVER** swap `context.mounted` to `mounted` to suppress lint. Style = `context.mounted`. In `State` methods, use `final context = this.context;` before `await`, then `if (!context.mounted) return;`.
 
 ```mermaid
 graph TD
@@ -29,6 +29,25 @@ graph TD
 ```
 
 **Contents:** [Notifier Structure](#notifier-structure) | [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap) | [ref.mounted Guard](#refmounted-guard) | [Dependency Readiness For Mutations](#dependency-readiness-for-mutations) | [Optimistic Updates](#optimistic-updates) | [Preventing Duplicate Fetches](#preventing-duplicate-fetches) | [Async Initialization](#async-initialization) | [AsyncNotifier Pattern](#asyncnotifier-pattern) | [AsyncValue.requireValue](#asyncvaluerequirevalue) | [Loading Progress](#loading-progress) | [Cleanup](#cleanup) | [Error Handling Strategy](#error-handling-strategy) | [Domain Error Types](#domain-error-types) | [Cross-Provider Communication](#cross-provider-communication)
+
+## Widget Context After Await
+
+Widgets guard the `BuildContext`, not just `State.mounted`.
+
+```dart
+class ProductPageState extends ConsumerState<ProductPage> {
+  Future<void> save() async {
+    final context = this.context;
+
+    await ref.read(productProvider.notifier).save();
+    if (!context.mounted) return;
+
+    const ProductListRoute().go(context);
+  }
+}
+```
+
+Do not pass `BuildContext` into async helpers just for navigation/snackbars. Prefer notifier-owned business logic, then a small sync UI step after `context.mounted`.
 
 ## Notifier Structure
 
@@ -323,18 +342,22 @@ class UserNotifier extends _$UserNotifier {
   /// Refresh data
   Future<void> refresh() async {
     state = const AsyncLoading<User>();
-    state = await AsyncValue.guard(() async {
+    final nextState = await AsyncValue.guard(() async {
       final repo = ref.read(userRepositoryProvider);
       return repo.getCurrentUser();
     });
+    if (!ref.mounted) return;
+    state = nextState;
   }
 
   Future<void> updateName(String name) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    final nextState = await AsyncValue.guard(() async {
       final repo = ref.read(userRepositoryProvider);
       return repo.updateName(name);
     });
+    if (!ref.mounted) return;
+    state = nextState;
   }
 }
 
@@ -355,7 +378,7 @@ class UserProfile extends ConsumerWidget {
 }
 ```
 
-**Key:** `AsyncValue.guard` wraps try-catch, assigns `AsyncData` or `AsyncError` atomically. No explicit `ref.mounted` check — guard handles state assign in one step. Avoid `copyWithPrevious`; internal in Riverpod 3 dev builds.
+**Key:** `AsyncValue.guard` wraps try-catch and returns `AsyncData` or `AsyncError`. Still guard `ref.mounted` after the awaited guard before assigning `state`. Avoid `copyWithPrevious`; internal in Riverpod 3 dev builds.
 
 ## AsyncValue.requireValue
 

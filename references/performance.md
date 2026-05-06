@@ -12,8 +12,32 @@ Widget rebuild, provider watch, memory mgmt. Flutter rendering/animations/sliver
 6. **NEVER** expensive ops (sort/filter/map) in `build()` — use computed providers.
 7. **MUST** dispose timers/controllers/subscriptions via `ref.onDispose()`.
 8. **NEVER** hold raw API responses in state — extract needed fields only.
+9. **NEVER** clamp text scaling at app root. Fix local responsive layout/overflow instead.
 
 ## Widget Rebuild Rules
+
+### Text Scaling
+
+Do not disable user accessibility globally:
+
+```dart
+// WRONG — app-wide clamp hides layout bugs and blocks accessibility.
+MaterialApp(
+  builder: (context, child) => MediaQuery.withClampedTextScaling(
+    maxScaleFactor: 1,
+    child: child!,
+  ),
+);
+```
+
+Fix the widget:
+
+- allow wrapping
+- use `Flexible`/`Expanded`
+- avoid fixed heights around text
+- use shorter labels
+- make compact controls icon-first
+- test large text sizes on small screens
 
 ### Watch in Leaf Widgets
 
@@ -65,15 +89,16 @@ final (:isLoading, :error) = ref.watch(
 ### Extract Widget Classes, Not Helper Methods
 
 ```dart
-// WRONG — NEVER use helper methods
+// WRONG — helper methods hide rebuild boundaries.
 Widget _buildHeader() => Container(...);
+```
 
-// RIGHT — MUST extract to widget class
+```dart
 class HeaderWidget extends StatelessWidget {
   const HeaderWidget({super.key});
 
   @override
-  Widget build(BuildContext context) => Container(...);
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 ```
 

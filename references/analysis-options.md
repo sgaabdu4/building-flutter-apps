@@ -1,93 +1,40 @@
 # analysis_options.yaml
 
-Copy verbatim every project root. No exception.
+Copy `references/analysis_options.yaml` into every Flutter project root.
 
-## Rules
+## Required Settings
 
-| Rule | Constraint |
-|------|-----------|
-| `strict-casts/inference/raw-types` | NEVER disable |
-| `avoid_dynamic_calls` | NEVER disable |
-| `unawaited_futures` / `discarded_futures` | NEVER disable — miss await = logic bug; `unawaited()` for intentional fire-and-forget |
-| `avoid_void_async` | NEVER disable — `void async` block `await`, hide errors |
-| `avoid_print` | NEVER disable — route via `dart:developer` `log()` or `Crash.log` |
-| `cancel_subscriptions` / `close_sinks` | NEVER disable — resource leak |
-| `invalid_annotation_target: ignore` | NEVER remove — required Freezed + Riverpod codegen |
-| Generated files excluded | NEVER analyse `*.g.dart`, `*.freezed.dart` |
-
-## analysis_options.yaml
-
-```yaml
-include: package:flutter_lints/flutter.yaml
-
-# Dart 3.10+ plugin system (requires Dart >= 3.10 / Flutter >= 3.38)
-plugins:
-  many_lints:
-    diagnostics:
-      prefer_overriding_parent_equality: false  # conflicts with Freezed
-      use_bloc_suffix: false                    # BLoC rules — project uses Riverpod
-      prefer_immutable_bloc_state: false
-      prefer_multi_bloc_provider: false
-      prefer_bloc_extensions: false
-      avoid_bloc_public_methods: false
-      avoid_passing_bloc_to_bloc: false
-      avoid_passing_build_context_to_blocs: false
-      use_gap: false                            # dot-shorthand enforcement
-      prefer_shorthands_with_enums: false
-      prefer_shorthands_with_constructors: false
-      prefer_returning_shorthands: false
-      prefer_switch_expression: false
-      prefer_shorthands_with_static_fields: false
-      prefer_class_destructuring: true          # opt-in: lints are off by default
-
-  riverpod_lint:  # 3.1+ uses analysis_server_plugin; all rules are warnings (auto-enabled)
-
-analyzer:
-  exclude:
-    - "**/*.g.dart"
-    - "**/*.freezed.dart"
-    - "**/*.gr.dart"
-    - "**/*.arb"
-  language:
-    strict-casts: true
-    strict-inference: true
-    strict-raw-types: true
-  errors:
-    missing_required_param: error
-    missing_return: error
-    invalid_annotation_target: ignore
-
-formatter:
-  page_width: 100
-
-linter:
-  rules:
-    - always_use_package_imports
-    - require_trailing_commas
-    - prefer_single_quotes
-    - directives_ordering
-    - avoid_multiple_declarations_per_line
-    - prefer_const_constructors
-    - prefer_const_declarations
-    - prefer_const_literals_to_create_immutables
-    - prefer_final_locals
-    - avoid_redundant_argument_values
-    - avoid_dynamic_calls
-    - avoid_print
-    - avoid_void_async
-    - cancel_subscriptions
-    - close_sinks
-    - discarded_futures
-    - unawaited_futures
-```
+- `strict-casts`, `strict-inference`, `strict-raw-types`: true
+- Async: `unawaited_futures`, `discarded_futures`, `avoid_void_async`
+- Resources/logging: `avoid_print`, `cancel_subscriptions`, `close_sinks`
+- Codegen: `invalid_annotation_target: ignore`
+- Exclude: `*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`
 
 ## Install
 
 ```bash
 flutter pub add dev:flutter_lints
-flutter pub add dev:riverpod_lint  # 3.1+ uses analysis_server_plugin
-# many_lints: auto-downloaded by the Dart 3.10+ plugin system
 ```
 
-> **`freezed_lint` / `custom_lint`**: Both archived or stuck on old `analyzer` version.
-> Conflict `hive_ce_generator ^1.11.0` (requires `analyzer ^10.0.0`). Do not add.
+Canonical plugin block:
+
+```yaml
+plugins:
+  flutter_skill_lints:
+    version: ^0.2.0
+  riverpod_lint: 3.1.4-dev.3
+```
+
+## Rules
+
+- Keep analyzer plugins in top-level `plugins:`, not under `analyzer:` and not in `pubspec.yaml`.
+- Use `flutter_skill_lints` and `riverpod_lint` exactly as shown.
+- Do not write `git:` or `path:` under `plugins:` unless testing a local plugin checkout.
+
+## Verify
+
+1. **Pubspec generator path:** `flutter pub get`
+2. **Top-level plugins path:** `flutter analyze --verbose`
+3. Fail on `server.pluginError`
+4. Require one `flutter_skill_lints` diagnostic
+5. Require one `riverpod_lint` diagnostic

@@ -8,7 +8,7 @@ First-run tours use `showcaseview` v5. Each screen manage own tour via shared mi
 
 ```yaml
 dependencies:
-  showcaseview: ^5.0.1
+  showcaseview: ^5.0.2
 ```
 
 ## Architecture
@@ -189,9 +189,9 @@ Avoid runtime assertion:
 Please register [ShowcaseView] first by calling [ShowcaseView.register()]
 ```
 
-### Scope identity (5.0.1 re-registration bug)
+### Scope identity (v5 re-registration bug)
 
-`isRegistered` guard not enough alone. `showcaseview` 5.0.1 replace `ShowcaseScope` object in internal map **every time** `ShowcaseView.register` called for existing scope name. Existing `Showcase` widgets still hold old `ShowcaseScope` ref via `_showCaseWidgetManager` field. Next `didUpdateWidget`, `_updateControllerValues` detect identity flip, reassign field, call `_controller` getter — lookup controller in **new** (empty) `ShowcaseScope`. Assertion fires:
+`isRegistered` guard not enough alone. `showcaseview` v5 can replace the `ShowcaseScope` object in its internal map when `ShowcaseView.register` is called for an existing scope name. Existing `Showcase` widgets still hold old `ShowcaseScope` ref via `_showCaseWidgetManager` field. Next `didUpdateWidget`, `_updateControllerValues` detect identity flip, reassign field, call `_controller` getter — lookup controller in **new** (empty) `ShowcaseScope`. Assertion fires:
 
 ```text
 'package:showcaseview/src/showcase/showcase_service.dart':
@@ -224,7 +224,7 @@ class _AppShowcaseTargetState extends State<AppShowcaseTarget> {
         !_skipShowcaseThisFrame) {
       _skipShowcaseThisFrame = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+        if (!context.mounted) return;
         setState(() => _skipShowcaseThisFrame = false);
       });
     }

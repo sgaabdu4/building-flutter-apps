@@ -65,7 +65,7 @@
     },
     {
         "query": "I need to configure my Flutter app's Firebase Cloud Messaging for push notifications. How do I set up the firebase_messaging plugin and handle background messages?",
-        "should_trigger": false
+        "should_trigger": true
     },
     {
         "query": "Help me write unit tests for a pure Dart function that calculates shipping costs. No Flutter widgets or state management involved, just testing business logic",

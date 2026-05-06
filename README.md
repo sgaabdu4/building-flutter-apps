@@ -29,12 +29,15 @@ Flutter dev guidance, modern best practices:
 ### Core Stack
 | Package | Version | Purpose |
 |---------|---------|---------|
-| flutter_riverpod | 3.2.1+ | State mgmt |
-| riverpod_annotation | 3.x | Codegen annotations |
-| riverpod_generator | 3.x | Provider codegen |
+| flutter_riverpod | 3.3.1+ | State mgmt |
+| riverpod_annotation | 4.0.2+ | Codegen annotations |
+| riverpod_generator | 4.0.3+ | Provider codegen |
 | freezed | 3.2.5+ | Immutable classes, unions |
-| go_router | 17.1.0+ | Declarative routing |
+| go_router | 17.2.3+ | Declarative routing |
+| go_router_builder | 4.3.0+ | Typed route codegen |
 | hive_ce | 2.19.3+ | Binary local persist |
+
+Generator compatibility note: use `json_annotation: ^4.11.0`, pin `json_serializable` to `6.13.0`, and pin `hive_ce_generator` to `1.11.0` with the current stable Riverpod generator/lint stack. Newer generator releases currently require incompatible analyzer ranges.
 
 ### Architecture
 4-layer clean arch:
@@ -59,13 +62,14 @@ lib/
 - **Unified Ref** — single `Ref` (no `AutoDisposeRef`, `ExampleRef`)
 - **Widget classes only** — no `_buildXxx` helpers
 - **No `dynamic`** — use `Object?` or proper type
-- **Enforcement** — every ref file has MUST/NEVER rules at top
+- **Primary static analysis** — `flutter_skill_lints` + `riverpod_lint`
 
 ## Reference Files
 
 | Topic | File |
 |-------|------|
 | Architecture layers | [architecture.md](references/architecture.md) |
+| Canonical analyzer config | [analysis_options.yaml](references/analysis_options.yaml) |
 | Atomic design (tokens → pages) | [atomic-design.md](references/atomic-design.md) |
 | Riverpod 3.x codegen | [riverpod-codegen.md](references/riverpod-codegen.md) |
 | Freezed 3.x sealed classes | [freezed-sealed.md](references/freezed-sealed.md) |
