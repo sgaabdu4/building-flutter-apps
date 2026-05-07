@@ -9,15 +9,19 @@ Hard rule: this applies to every provider shape: state, computed value, reposito
 ## Setup
 
 ```yaml
-# pubspec.yaml
+# pubspec.yaml — see README.md Core Stack table for canonical versions
 dependencies:
-  flutter_riverpod: ^3.3.1
-  riverpod_annotation: ^4.0.2
+  flutter_riverpod: <version>
+  riverpod_annotation: <version>
 
 dev_dependencies:
-  build_runner: ^2.15.0
-  riverpod_generator: ^4.0.3
+  build_runner: <version>
+  riverpod_generator: <version>
 ```
+
+> **Forward note.** The Riverpod 3.x changelog states *"It is quite possible
+> that a 4.0.0 will be released."* Treat 3.x as short-lived: prefer codegen
+> + `Notifier` shapes over deprecated APIs to minimise the 4.0 migration.
 
 Canonical [analysis_options.yaml](analysis_options.yaml): `flutter_skill_lints` + `riverpod_lint`. Apply [analysis-options.md](analysis-options.md#install) before `dart analyze` (use `dart analyze`, not `flutter analyze` — see [analysis-options.md](analysis-options.md#rule--use-dart-analyze-not-flutter-analyze)).
 
@@ -117,7 +121,7 @@ Future<List<Product>> productsByCategory(Ref ref, String category) async {
 class ProductEditor extends _$ProductEditor {
   @override
   ProductFormState build(String productId) {
-    _loadProduct(productId);
+    Future.microtask(() => _loadProduct(productId));
     return const ProductFormState();
   }
 
@@ -212,11 +216,19 @@ try {
 Mutations track side-effect state (idle, pending, success, error) separately from provider state. Prevent providers from being disposed while side-effect runs.
 
 ```dart
-// Declare a mutation as a top-level variable
-final addTodoMutation = Mutation<void>();
+// features/todos/presentation/widgets/add_todo_button.dart
+//
+// Mutations are declared at **file scope** (top-level), not inside a class —
+// the same instance is shared across rebuilds and consumers. Pattern matches
+// how Riverpod's own mutation docs scope them: one mutation = one file-scope
+// `final`, named `<verb><Noun>Mutation`.
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// Watch mutation state in UI
+final addTodoMutation = Mutation<void>(); // experimental API — may change without major bump
+
 class AddTodoButton extends ConsumerWidget {
+  const AddTodoButton({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final addTodo = ref.watch(addTodoMutation);
@@ -246,11 +258,16 @@ Use `tsx.get` instead of `ref.read` inside mutations — keeps provider alive un
 
 `MutationState` exposes convenience flags (`isPending`, `isIdle`, `hasError`, `isSuccess`) for simple checks without full pattern matching.
 
-## Offline Persistence (experimental)
+## Offline Persistence (preview — not yet on pub.dev)
 
-> API may change without major version bump.
+> The `persist(...)` API and `riverpod_sqflite` package are **preview only**.
+> No stable release on pub.dev as of 2026-05-08. Do **not** add
+> `riverpod_sqflite` to `pubspec.yaml` until it ships. For local persistence
+> today, use Hive CE — see [hive-persistence.md](hive-persistence.md). The
+> snippet below is forward-looking; treat it as API preview, not copy-paste.
 
-Providers can persist state to local database. Official package: `riverpod_sqflite`:
+Providers will (eventually) persist state to local database via the official
+`riverpod_sqflite` package once published:
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -263,7 +280,7 @@ class TodosNotifier extends _$TodosNotifier {
       encode: jsonEncode,
       decode: (json) {
         final decoded = jsonDecode(json) as List<Object?>;
-        return decoded.map((item) => Todo.fromJson(item as Map<String, Object?>)).toList();
+        return decoded.map((item) => Todo.fromJson(item as Map<String, dynamic>)).toList();
       },
     );
 

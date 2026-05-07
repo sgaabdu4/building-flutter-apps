@@ -2,6 +2,52 @@
 
 Flutter clean arch, four layers. Deps flow inward: Presentation → Repository → Domain → Data.
 
+## Scope
+
+In scope: state management, navigation, persistence, models/serialization,
+DI, error handling, forms (via [extensions-utilities.md → Validators](extensions-utilities.md#validators)
++ [common-patterns.md](common-patterns.md) form patterns), atomic widget
+composition, code generation, testing patterns.
+
+Out of scope: HTTP client setup (dio/retrofit, interceptors, retry, auth
+headers — references show `http_service.dart` as a placeholder; bring your
+own), i18n / localization, theming systems, accessibility audits beyond the
+basic `Semantics` callouts in [atomic-design.md](atomic-design.md#accessibility).
+End-to-end wiring uses the diagram below; the http layer is intentionally a
+black box.
+
+```mermaid
+sequenceDiagram
+  participant W as Widget (organism/page)
+  participant N as Notifier
+  participant R as IRepository
+  participant DS as IDatasource
+  participant API as Remote / Hive
+  W->>N: ref.watch / call action
+  N->>R: fetchAll() / save()
+  R->>DS: fetchAll() / save()
+  DS->>API: HTTP / Hive box op
+  API-->>DS: payload / error
+  DS-->>R: model[] / throws
+  R-->>N: entity[] / wrapped error
+  N->>N: state = state.copyWith(...)
+  N-->>W: rebuild from selector
+```
+
+## Tradeoffs
+
+- **Atomic design hierarchy** is overhead-heavy for apps under ~10 screens.
+  For small apps, collapse atoms+molecules into a single `widgets/` folder
+  per feature; promote to full hierarchy only when a shared widget is reused
+  across two features.
+- **`@Riverpod(keepAlive: true)` everywhere** trades startup memory for
+  rebuild predictability. Default to `@riverpod` (auto-dispose) for
+  computed/per-screen providers; reserve `keepAlive: true` for repositories,
+  app-wide services, and notifiers whose state must survive nav.
+- **Interface for every datasource/repository** trades a file per layer for
+  test mockability. On a one-screen prototype it is pure overhead; the rule
+  exists for the multi-feature case where it pays for itself instantly.
+
 ## Rules — NEVER Violate
 
 1. **MUST** separate data models from domain entities — NEVER reuse one class for both.
@@ -29,6 +75,14 @@ graph LR
 Mixin vs interface vs extension: see [mixins.md](mixins.md).
 
 ## Full Directory Structure
+
+**Single Source of Truth.** This tree is the canonical folder layout. Every other reference links here instead of redefining it. Conventions:
+- `features/<feature>/data/` — datasources, models, repository implementations
+- `features/<feature>/domain/` — entities, `IRepository` interfaces (pure Dart)
+- `features/<feature>/repositories/` — concrete repository wiring (kept as a sibling so the boundary is loud at file-tree glance — see [Repository Layer](#repository-layer))
+- `features/<feature>/presentation/notifiers/` — Riverpod notifiers, mutations
+- `features/<feature>/presentation/screens/` — pages
+- `features/<feature>/presentation/widgets/` — feature atoms..organisms (see [atomic-design.md](atomic-design.md))
 
 ```
 lib/
@@ -221,7 +275,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
   @override
   Future<ProductModel> fetchById(String id) async {
     final json = await _http.get('/products/$id');
-    return ProductModel.fromJson(json);
+    return ProductModel.fromJson(json as Map<String, dynamic>);
   }
 
   @override
@@ -293,7 +347,7 @@ sealed class ProductState with _$ProductState {
   const factory ProductState({
     @Default([]) List<Product> items,
     @Default(false) bool isLoading,
-    String? error,
+    AppError? error,
   }) = _ProductState;
 }
 

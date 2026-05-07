@@ -30,14 +30,16 @@ metadata:
 
 ## Core Stack
 
-| Package | Purpose |
-|---------|----------|
-| flutter_riverpod + riverpod_annotation + riverpod_generator | State management (codegen) |
-| freezed + freezed_annotation | Immutable data classes, unions |
-| go_router + go_router_builder | Declarative, type-safe routing |
-| json_serializable + build_runner | JSON serialization + code generation |
-| showcaseview | First-run guided tours |
-| hive_ce + hive_ce_flutter | Local persistence |
+Version SSOT: [README.md → What's Included](README.md#whats-included). Setup snippets in references mirror that table.
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| flutter_riverpod + riverpod_annotation + riverpod_generator | `^3.3.1` / `^4.0.2` / `^4.0.3` | State management (codegen) |
+| freezed + freezed_annotation | `^3.2.5` / `^3.1.0` | Immutable data classes, unions |
+| go_router + go_router_builder | `^17.2.3` / `^4.3.0` | Declarative, type-safe routing |
+| json_serializable + build_runner | `6.13.0` / `^2.15.0` | JSON serialization + code generation |
+| showcaseview | `^5.0.2` | First-run guided tours |
+| hive_ce + hive_ce_flutter + hive_ce_generator | `^2.19.3` / `^2.4.0` / `1.11.0` | Local persistence |
 
 ## Architecture
 
@@ -147,7 +149,7 @@ If chain required, flatten in parent provider:
 | `class Foo { Foo._(); }` | `abstract final class Foo` |
 | `ref.refresh(provider)` discarding return | `ref.invalidate(provider)` |
 | `@Riverpod(keepAlive: true)` on family provider | `@riverpod` (auto-dispose) |
-| Side-effect loading/error in notifier state | `Mutation<T>()` — see [riverpod-codegen.md](references/riverpod-codegen.md) |
+| Side-effect loading/error in notifier state | `Mutation<T>()` (experimental — API may break before Riverpod 4.0) — see [riverpod-codegen.md](references/riverpod-codegen.md) |
 | `ref.read` in `initState` | `addPostFrameCallback` then read |
 | `state.copyWith(...)` before first `state=` in sync `Notifier.build()` (incl. `_load()` called sync from build, or `ref.listen(..., fireImmediately: true)` callback that reads state) | Seed via returned constructor + `Future.microtask(_load)`, OR `state = const FooState()` before `fireImmediately` listener. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap) |
 | Mutation method (`create*`, `update*`, `delete*`, `set*`) does `if (_repository == null) return ...` | Use `_ensureRepository()`/`_ensureDependencies()` with `await`, then guard with `if (!ref.mounted) return ...` |
@@ -185,10 +187,12 @@ Full patterns: [common-patterns.md](references/common-patterns.md) | [extensions
 ## Code Generation
 
 ```bash
-dart run build_runner watch -d   # Watch mode (recommended)
-dart run build_runner build -d   # One-time build
-dart run build_runner clean && dart run build_runner build -d  # Clean build
+dart run build_runner watch --d   # Watch mode (recommended)
+dart run build_runner build --d  # One-time build
+dart run build_runner clean && dart run build_runner build --d  # Clean build
 ```
+
+`-d` is shorthand for `--delete-conflicting-outputs` — overwrites stale generated files when annotations move or rename.
 
 ## References
 

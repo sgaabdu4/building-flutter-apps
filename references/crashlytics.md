@@ -4,11 +4,21 @@ Prod wiring. Pattern: backend interface + static facade. Handle platform gating,
 
 > **Swap providers (Sentry, Bugsnag, Datadog, self-hosted).** `ICrashBackend` = seam. New impl (`SentryCrashBackend implements ICrashBackend`), assign in `Crash.init()` instead of `FirebaseCrashBackend`. Facade API (`Crash.error`/`info`/`setUser`/`setKey`), handler chaining, `_isRecoverable`, test seams, every call site stay same. Multi-backend fan-out = `CompositeCrashBackend` forward each method to delegate list. **Never call provider SDK direct from feature code** — only from backend impl.
 
+## Call-site policy
+
+`Crash.error` is called from the **notifier layer** (or app boundary like
+`FlutterError.onError` / `runZonedGuarded` — legacy pattern, see §Rules below) only. Datasources rethrow raw
+exceptions; repositories may wrap into domain errors but still rethrow;
+notifiers translate to `AppError`, update state, then call `Crash.error`.
+This keeps a single catch site per layer chain and matches the error rule in
+[state-management.md](state-management.md#error-handling-strategy).
+
 ## Rules
 
 1. **MUST** split: `abstract interface class ICrashBackend` + concrete backends (`FirebaseCrashBackend`, `ConsoleCrashBackend`) + static facade `abstract final class Crash`. Feature code call `Crash.x`.
 2. **MUST** platform-gate. Web/desktop get console backend, not Firebase.
 3. **MUST** chain handlers — preserve prior `FlutterError.onError` / `PlatformDispatcher.onError`, call too. Replace = hide framework logs.
+4. **MUST** wire all three hooks: `FlutterError.onError` (UI thread Flutter errors), `PlatformDispatcher.onError` (platform/async), `Isolate.current.addErrorListener` (background isolates). `runZonedGuarded` is a **legacy** pattern that misses platform-channel errors and is not recommended in Flutter 3.3+; the three-hook pattern replaces it.
 4. **MUST** classify recoverable exceptions non-fatal (RenderFlex overflow, handshake, past-date scheduling, plugin-missing). Else dashboard flood w/ fake fatals.
 5. **MUST** expose `@visibleForTesting` seams: `debugUseBackend`, `debugReset`, `debugConfigure`. Tests swap fake backend — never init Firebase.
 6. **MUST** `debugPrint` alongside every send so local dev see event.

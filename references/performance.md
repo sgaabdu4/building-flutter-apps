@@ -106,10 +106,12 @@ class HeaderWidget extends StatelessWidget {
 
 ```dart
 // WRONG — allocates new object on every parent rebuild
-return Padding(padding: EdgeInsets.all(16), child: child);
+return Padding(padding: const EdgeInsets.all(16), child: child);
 
-// RIGHT — reuses existing object
-return const Padding(padding: EdgeInsets.all(16), child: child);
+// RIGHT — reuses existing object. `const` requires every argument be const,
+// so the child must be a concrete const widget (here: SizedBox.shrink()).
+// You CANNOT pass a runtime `child` variable into a const constructor.
+return const Padding(padding: EdgeInsets.all(16), child: SizedBox.shrink());
 ```
 
 ## Provider Lifecycle

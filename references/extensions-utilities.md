@@ -166,6 +166,10 @@ Column(
 
 ## SnackBar Utility
 
+The boundary rule (notifier/service owns snackbar side effects; widgets dispatch
+notifier actions only) is authoritative in [SKILL.md → Snackbar boundary](../SKILL.md).
+This section ships the implementation; the rule is repeated only in passing.
+
 Central context-free snackbar. Notifiers/services dispatch snackbar side effects. Widgets/screens call notifier methods and render state; they do not call `SnackBarUtils.show*` or `ScaffoldMessenger.of(context)` directly.
 
 ### Class
@@ -341,13 +345,13 @@ abstract final class Validators {
     return null;
   }
 
-  static String? minLength(int min) => (String? value) {
+  static String? Function(String?) minLength(int min) => (String? value) {
         if (value == null || value.length < min) return 'Min $min characters';
         return null;
       };
 
   /// Chain validators: `Validators.compose([Validators.required, Validators.email])`
-  static String? compose(List<String? Function(String?)> validators) =>
+  static String? Function(String?) compose(List<String? Function(String?)> validators) =>
       (String? value) {
         for (final v in validators) {
           final error = v(value);

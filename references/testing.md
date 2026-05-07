@@ -90,8 +90,11 @@ void main() {
       ],
     );
 
-    // Trigger build() and wait for async state
-    await container.read(productProvider.future);
+    // Trigger build() and flush the deferred Future.microtask(_load) call.
+    // `.future` only exists on AsyncNotifier — for sync Notifier with
+    // microtask-deferred load, pump the microtask queue instead.
+    container.read(productProvider);
+    await Future<void>.microtask(() {});
 
     final state = container.read(productProvider);
     expect(state.items, hasLength(1));
@@ -282,8 +285,9 @@ test('deleteItem removes from state', () async {
     ],
   );
 
-  // Wait for initial load
-  await container.read(productProvider.future);
+  // Wait for initial load (sync Notifier with deferred microtask load)
+  container.read(productProvider);
+  await Future<void>.microtask(() {});
 
   // Delete and verify
   await container.read(productProvider.notifier).deleteItem('1');
@@ -340,13 +344,14 @@ test('refetches source of truth after remote update event', () async {
     ],
   );
 
-  await container.read(productProvider.future);
+  container.read(productProvider);
+  await Future<void>.microtask(() {});
 
   repo.items = [const Product(id: 'p1', name: 'New')];
   events.emit(const ProductEvent.updated(id: 'p1'));
   await Future<void>.microtask(() {});
 
-  expect(container.read(productProvider).value?.items.single.name, 'New');
+  expect(container.read(productProvider).items.single.name, 'New');
 });
 ```
 

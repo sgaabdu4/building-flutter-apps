@@ -61,7 +61,7 @@ sealed class ProductState with _$ProductState {
   const factory ProductState({
     @Default([]) List<Product> items,
     @Default(false) bool isLoading,
-    String? error,
+    AppError? error,
   }) = _ProductState;
 }
 
@@ -81,9 +81,10 @@ class ProductNotifier extends _$ProductNotifier {
       final items = await ref.read(productRepositoryProvider).fetchAll();
       if (!ref.mounted) return;
       state = state.copyWith(items: items, isLoading: false);
-    } catch (e) {
+    } on Exception catch (e, s) {
       if (!ref.mounted) return;
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: AppError.from(e));
+      Crash.error(e, s, reason: 'ProductNotifier._load');
     }
   }
 
@@ -200,7 +201,9 @@ Future<void> save(Product product) async {
   await ref.read(productRepositoryProvider).refreshCache();
   if (!ref.mounted) return;  // REQUIRED after each await
 
-  state = state.copyWith(items: await _fetchAll());
+  final items = await _fetchAll();
+  if (!ref.mounted) return;  // REQUIRED — `await` inside copyWith still needs guard
+  state = state.copyWith(items: items);
 }
 ```
 
@@ -290,9 +293,10 @@ class ProductNotifier extends _$ProductNotifier {
       final items = await ref.read(productRepositoryProvider).fetchAll();
       if (!ref.mounted) return;
       state = state.copyWith(items: items, isLoading: false);
-    } catch (e) {
+    } on Exception catch (e, s) {
       if (!ref.mounted) return;
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: AppError.from(e));
+      Crash.error(e, s, reason: 'PaginatedProductNotifier._load');
     } finally {
       _isFetching = false;
     }
@@ -484,20 +488,36 @@ Future<void> remove(String id) => _remote.remove(id);
 ```
 
 ```dart
-// Notifier — MUST catch here
+// Notifier — MUST catch here. Translate to typed AppError; never store raw String.
 Future<void> _load() async {
   try {
     final items = await ref.read(productRepositoryProvider).fetchAll();
     if (!ref.mounted) return;
     state = state.copyWith(items: items);
-  } catch (e) {
+  } on Exception catch (e, s) {
     if (!ref.mounted) return;
-    state = state.copyWith(error: e.toString());
+    state = state.copyWith(error: AppError.from(e));
+    Crash.error(e, s, reason: 'ProductNotifier._load');
   }
 }
 ```
 
 ### Domain Error Types
+
+**Rule.** `AppError` is the **sole** error type stored in notifier state.
+Never store `String? error` — pattern-match a typed error in the UI instead.
+Catch in notifier, wrap with `AppError.from(e)`, then call `Crash.error(e, s, reason: …)`.
+
+```dart
+// core/domain/app_error.dart — add a `from` constructor for the notifier-side wrap.
+sealed class AppError {
+  static AppError from(Object e) => switch (e) {
+        SocketException() || TimeoutException() => AppError.network(e.toString()),
+        FormatException() => AppError.unexpected(e),
+        _ => AppError.unexpected(e),
+      };
+}
+```
 
 Define sealed error hierarchy for typed error handling in notifier:
 

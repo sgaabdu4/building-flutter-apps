@@ -4,23 +4,19 @@ Binary persistence Flutter. Hive CE + TypeAdapter codegen.
 
 ## Core Stack
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| hive_ce | 2.19.3+ | Core binary storage |
-| hive_ce_flutter | 2.3.4+ | Flutter integration |
-| hive_ce_generator | 1.11.0 pinned | TypeAdapter code generation |
+`hive_ce`, `hive_ce_flutter`, `hive_ce_generator`. Constraints: see [README.md → Core Stack](../README.md#whats-included).
 
 ## Setup
 
 ```yaml
-# pubspec.yaml
+# pubspec.yaml — see README.md Core Stack for canonical versions
 dependencies:
-  hive_ce: ^2.19.3
-  hive_ce_flutter: ^2.3.4
+  hive_ce: <version>
+  hive_ce_flutter: <version>
 
 dev_dependencies:
-  build_runner: ^2.15.0
-  hive_ce_generator: 1.11.0
+  build_runner: <version>
+  hive_ce_generator: <version>
 ```
 
 ## TypeAdapter Storage vs JSON
@@ -119,24 +115,145 @@ class CacheEntry {
 ], firstTypeId: 1, reservedTypeIds: {0})
 ```
 
-## Repository Pattern
+## IsolatedHive (background-isolate persistence)
+
+Hive CE 2.19+ ships `IsolatedHive` — a parallel API that runs the box on a
+background isolate so large reads/writes don't block the UI. Use it only when
+profiling shows main-isolate jank from Hive I/O on a hot path; for typical
+key/value usage the standard `Hive` API is fine.
 
 ```dart
-@Riverpod(keepAlive: true)
-class OrderRepository extends _$OrderRepository {
-  late Box<Order> _box;
-  
-  @override
-  FutureOr<void> build() async {
-    _box = await Hive.openBox<Order>('orders');
-  }
-  
-  Future<void> save(Order order) async => await _box.put(order.id, order);
-  Order? get(String id) => _box.get(id);
-  List<Order> getAll() => _box.values.toList();
-  Future<void> delete(String id) async => await _box.delete(id);
+final box = await IsolatedHive.openBox<OrderModel>('orders');
+await box.put(order.id, OrderModel.fromDomain(order));
+final all = await box.values; // async — crosses the isolate boundary
+```
+
+Caveats the package surfaces:
+- TypeAdapter registration has to happen on the isolate (registrar generated
+  the same way; call from the spawn callback the package documents).
+- Every read/write is async — no sync `get`. Update repository signatures
+  accordingly.
+- Streaming via `box.watch()` works but events arrive on a port; debounce
+  before driving rebuilds.
+
+## Repository Pattern
+
+Hive is a persistence detail. Follow the canonical chain:
+`HiveOrderDatasource` → `HiveOrderRepository implements IOrderRepository` → `OrderNotifier`.
+Domain `Order` stays Hive-free; persistence-only `OrderModel` carries `@HiveField` indices.
+Provider returns the interface so tests can override with a fake.
+
+```dart
+// features/orders/domain/entities/order.dart — pure domain, no Hive imports
+@freezed
+sealed class Order with _$Order {
+  const factory Order({
+    required String id,
+    required List<OrderItem> items,
+    required OrderStatus status,
+  }) = _Order;
 }
 ```
+
+```dart
+// features/orders/data/models/order_model.dart — Hive persistence model
+@GenerateAdapters([
+  AdapterSpec<OrderModel>(),
+  AdapterSpec<OrderItemModel>(),
+  AdapterSpec<OrderStatus>(),
+], firstTypeId: 20)
+@freezed
+sealed class OrderModel with _$OrderModel {
+  const OrderModel._();
+  const factory OrderModel({
+    required String id,
+    required List<OrderItemModel> items,
+    required OrderStatus status,
+  }) = _OrderModel;
+
+  factory OrderModel.fromDomain(Order o) => OrderModel(
+        id: o.id,
+        items: o.items.map(OrderItemModel.fromDomain).toList(),
+        status: o.status,
+      );
+
+  Order toDomain() => Order(id: id, items: items.map((m) => m.toDomain()).toList(), status: status);
+}
+```
+
+```dart
+// features/orders/data/datasources/hive_order_datasource.dart
+abstract interface class IOrderLocalDatasource {
+  Future<void> save(OrderModel model);
+  OrderModel? get(String id);
+  List<OrderModel> getAll();
+  Future<void> delete(String id);
+}
+
+class HiveOrderDatasource implements IOrderLocalDatasource {
+  HiveOrderDatasource(this._box);
+  final Box<OrderModel> _box;
+
+  @override
+  Future<void> save(OrderModel model) => _box.put(model.id, model);
+  @override
+  OrderModel? get(String id) => _box.get(id);
+  @override
+  List<OrderModel> getAll() => _box.values.toList();
+  @override
+  Future<void> delete(String id) => _box.delete(id);
+}
+
+@Riverpod(keepAlive: true)
+Future<IOrderLocalDatasource> orderLocalDatasource(Ref ref) async {
+  final box = await Hive.openBox<OrderModel>('orders');
+  ref.onDispose(box.close);
+  return HiveOrderDatasource(box);
+}
+```
+
+```dart
+// features/orders/domain/repositories/i_order_repository.dart
+abstract interface class IOrderRepository {
+  Future<void> save(Order order);
+  Order? get(String id);
+  List<Order> getAll();
+  Future<void> delete(String id);
+}
+```
+
+```dart
+// features/orders/data/repositories/hive_order_repository.dart
+class HiveOrderRepository implements IOrderRepository {
+  HiveOrderRepository(this._datasource);
+  final IOrderLocalDatasource _datasource;
+
+  @override
+  Future<void> save(Order order) =>
+      _datasource.save(OrderModel.fromDomain(order));
+
+  @override
+  Order? get(String id) => _datasource.get(id)?.toDomain();
+
+  @override
+  List<Order> getAll() =>
+      _datasource.getAll().map((m) => m.toDomain()).toList();
+
+  @override
+  Future<void> delete(String id) => _datasource.delete(id);
+}
+
+@Riverpod(keepAlive: true)
+Future<IOrderRepository> orderRepository(Ref ref) async {
+  final datasource = await ref.watch(orderLocalDatasourceProvider.future);
+  return HiveOrderRepository(datasource);
+}
+```
+
+Notifier consumes `IOrderRepository` only — never reaches into Hive itself.
+Tests override `orderRepositoryProvider` with `MockIOrderRepository`; no Hive
+init needed in unit tests. See `architecture.md` for the full layer chain and
+`testing.md` for the override pattern.
 
 ## Testing with TypeAdapters
 

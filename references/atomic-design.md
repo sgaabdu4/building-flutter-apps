@@ -341,6 +341,15 @@ Define page structure w/ slots. No business logic, no provider access.
 - MUST accept widgets via constructor (slots)
 - MUST handle responsive breakpoints here
 
+### Provider boundary — reconciling SKILL.md "widgets watch" rule
+
+SKILL.md "widgets MUST watch providers, never prop drill" applies to the
+**provider-entry layer** only: organisms + pages. Atoms, molecules, and
+templates are pure presentation — they accept data via constructor and remain
+trivially testable without `ProviderScope`. Templates are the boundary: they
+hold layout but never read state. The two rules compose — drill props down the
+atom/molecule/template stack from the organism that watched the provider.
+
 ### Examples
 
 ```dart
@@ -461,9 +470,11 @@ class ProductDashboardScreen extends ConsumerWidget {
 | Atoms | `core/widgets/atoms/` | No |
 | Molecules | `core/widgets/molecules/` | No |
 | Organisms (shared) | `core/widgets/organisms/` | Yes |
-| Organisms (feature) | `features/x/widgets/` | Yes |
+| Organisms (feature) | `features/<feature>/presentation/widgets/` | Yes |
 | Templates | `core/widgets/templates/` | No |
-| Pages | `features/x/screens/` | Yes |
+| Pages | `features/<feature>/presentation/screens/` | Yes |
+
+Folder layout SSOT lives in [architecture.md → Full Directory Structure](architecture.md#full-directory-structure). Other references defer to it.
 
 ## Promotion Rules
 

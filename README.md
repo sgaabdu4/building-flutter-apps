@@ -27,17 +27,30 @@ git clone https://github.com/sgaabdu4/building-flutter-apps ~/.claude/skills/bui
 Flutter dev guidance, modern best practices:
 
 ### Core Stack
-| Package | Version | Purpose |
-|---------|---------|---------|
-| flutter_riverpod | 3.3.1+ | State mgmt |
-| riverpod_annotation | 4.0.2+ | Codegen annotations |
-| riverpod_generator | 4.0.3+ | Provider codegen |
-| freezed | 3.2.5+ | Immutable classes, unions |
-| go_router | 17.2.3+ | Declarative routing |
-| go_router_builder | 4.3.0+ | Typed route codegen |
-| hive_ce | 2.19.3+ | Binary local persist |
 
-Generator compatibility note: use `json_annotation: ^4.11.0`, pin `json_serializable` to `6.13.0`, and pin `hive_ce_generator` to `1.11.0` with the current stable Riverpod generator/lint stack. Newer generator releases currently require incompatible analyzer ranges.
+This is the canonical version table (SSOT). Every reference and `CONTRIBUTING.md` mirrors it.
+
+| Package | Constraint | Purpose |
+|---------|-----------|---------|
+| flutter_riverpod | `^3.3.1` | State mgmt |
+| riverpod_annotation | `^4.0.2` | Codegen annotations |
+| riverpod_generator | `^4.0.3` | Provider codegen (dev_dependency) |
+| freezed_annotation | `^3.1.0` | Sealed-union annotations |
+| freezed | `^3.2.5` | Immutable classes (dev_dependency) — needs Dart SDK ≥ 3.8 |
+| json_annotation | `^4.11.0` | JSON annotations |
+| json_serializable | `6.13.0` | JSON codegen (**exact pin** — see note) |
+| go_router | `^17.2.3` | Declarative routing |
+| go_router_builder | `^4.3.0` | Typed route codegen (dev_dependency) |
+| hive_ce | `^2.19.3` | Binary local persist |
+| hive_ce_flutter | `^2.4.0` | Flutter glue for `hive_ce` |
+| hive_ce_generator | `1.11.0` | Hive type adapters (**exact pin** — see note) |
+| build_runner | `^2.15.0` | Codegen runner (dev_dependency) |
+| showcaseview | `^5.0.2` | First-run guided tours |
+
+**Pin note.** `json_serializable` and `hive_ce_generator` stay at exact pins
+because they bind the analyzer version and the Riverpod generator stack
+currently resolves on analyzer 9. Lift to caret ranges only after
+`dart pub deps -s compact | rg analyzer` no longer shows analyzer 9.
 
 ### Architecture
 4-layer clean arch:

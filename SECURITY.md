@@ -2,10 +2,14 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 4.x     | :white_check_mark: |
-| < 4.0   | :x:                |
+This skill tracks the latest stable releases pinned in
+[README.md → What's Included](README.md#whats-included). Only the current
+`master` branch is supported; older snapshots are not patched.
+
+| Skill snapshot | Supported |
+| ----------------------- | ----------------- |
+| `master` (latest)       | :white_check_mark: |
+| Older tagged snapshots  | :x:                |
 
 ## Reporting a Vulnerability
 

@@ -28,18 +28,21 @@ graph TD
 ## Setup
 
 ```yaml
-# pubspec.yaml
+# pubspec.yaml — see README.md Core Stack table for canonical versions
+environment:
+  sdk: '>=3.8.0 <4.0.0'   # freezed requires Dart >= 3.8
+
 dependencies:
-  freezed_annotation: ^3.1.0
-  json_annotation: ^4.11.0
+  freezed_annotation: <version>
+  json_annotation: <version>
 
 dev_dependencies:
-  build_runner: ^2.15.0
-  freezed: ^3.2.5
-  json_serializable: 6.13.0
+  build_runner: <version>
+  freezed: <version>
+  json_serializable: <version>
 ```
 
-Pin `json_serializable` to `6.13.0`. `6.13.1+` requires analyzer `>=10`, while the current Riverpod generator and Hive CE generator stack resolves on analyzer 9.
+Pin `json_serializable` to `6.13.0`. `6.13.1+` requires analyzer `>=10`, while the current Riverpod generator and Hive CE generator stack resolves on analyzer 9. **Re-check this pin** after upgrading the Riverpod or Hive CE generator stack — once both publish releases compatible with analyzer 10, lift the pin to `^6.13.x`. Run `dart pub deps -s compact | rg analyzer` to confirm the resolved analyzer version before lifting.
 
 Every file need:
 
@@ -149,7 +152,7 @@ sealed class ProductState with _$ProductState {
     @Default(false) bool isLoadingMore,
     @Default(false) bool hasMore,
     @Default(0) int page,
-    String? error,
+    AppError? error,
     String? searchQuery,
   }) = _ProductState;
 }

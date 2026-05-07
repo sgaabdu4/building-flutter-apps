@@ -135,13 +135,31 @@ class SaveAllRowsException implements Exception {
 /// Retries [fn] on transient failures: Appwrite 429/503, [SocketException],
 /// [HttpException]. Non-retryable errors rethrow immediately.
 /// Base 200ms, doubled each retry, ±50ms jitter. Default 3 attempts.
+bool _defaultShouldRetry(Object e) {
+  if (e is SocketException || e is HttpException) return true;
+  if (e is AppwriteException) return e.code == 429 || e.code == 503;
+  return false;
+}
+
 Future<T> retryWithBackoff<T>(
   Future<T> Function() fn, {
   int maxAttempts = 3,
+  Duration baseDelay = const Duration(milliseconds: 200),
   bool Function(Object)? shouldRetry,
 }) async {
-  // implementation: try/catch on AppwriteException (429/503),
-  // SocketException, HttpException → delay + retry.
+  final retryable = shouldRetry ?? _defaultShouldRetry;
+  var attempt = 0;
+  while (true) {
+    try {
+      return await fn();
+    } on Object catch (e) {
+      attempt++;
+      if (attempt >= maxAttempts || !retryable(e)) rethrow;
+      final backoff = baseDelay * (1 << (attempt - 1));
+      final jitterMs = _retryRng.nextInt(101) - 50; // [-50, +50] ms
+      await Future<void>.delayed(backoff + Duration(milliseconds: jitterMs));
+    }
+  }
 }
 ```
 

@@ -36,7 +36,9 @@ graph TD
 Use nullable by-id providers. Keep mutation order strict before navigate.
 
 ```dart
-@Riverpod(keepAlive: true)
+// Family + keepAlive caches every key forever — memory leak. Use plain `@riverpod`
+// so each per-id provider auto-disposes when no widget watches it.
+@riverpod
 Program? programById(Ref ref, String id) {
   final state = ref.watch(programsProvider);
   for (final p in state.items) {
@@ -45,15 +47,17 @@ Program? programById(Ref ref, String id) {
   return null;
 }
 
-void onNext(BuildContext context, WidgetRef ref, String programId) {
+Future<void> onNext(BuildContext context, WidgetRef ref, String programId) async {
   final program = ref.read(programByIdProvider(programId));
   if (program == null) return; // disable CTA / show placeholder
 
-  // Sequence: persist -> targeted sync -> navigate
-  // await repo.save(child);
-  // ref.read(programsProvider.notifier).upsertProgram(updatedParent);
-  // if (!context.mounted) return;
-  // _goNext(context);
+  // ✅ DO — sequence is fixed: persist, then targeted sync, then navigate.
+  //    Reordering causes UI flicker (stale parent) or lost writes on dispose.
+  final updatedParent = program.copyWith(/* ...edits... */);
+  await ref.read(programRepositoryProvider).save(updatedParent);
+  ref.read(programsProvider.notifier).upsertProgram(updatedParent);
+  if (!context.mounted) return;
+  _goNext(context);
 }
 
 void _goNext(BuildContext context) {
@@ -354,13 +358,13 @@ Use `go_router_builder` for type-safe routes. Every route = class extending `GoR
 ### Setup
 
 ```yaml
-# pubspec.yaml
+# pubspec.yaml — see README.md Core Stack table for canonical versions
 dependencies:
-  go_router: ^17.2.3
+  go_router: <version>
 
 dev_dependencies:
-  build_runner: ^2.15.0
-  go_router_builder: ^4.3.0
+  build_runner: <version>
+  go_router_builder: <version>
 ```
 
 ### Route Definitions
@@ -580,6 +584,12 @@ class AppShellScaffold extends StatelessWidget {
 
 - Inside shell, use `StatefulNavigationShell.of(context).goBranch(index)`.
 - In reusable sheets/overlays, pass callback from shell-owned caller, don't route in child.
+
+**GoRouter 17.x — `ShellRoute` propagates to root observers.** As of 17.0.0
+`ShellRoute` and `StatefulShellRoute` notify root `NavigatorObserver`s by
+default. Most apps want this (analytics on shell pushes), but if you have a
+root `RouteObserver` that should fire **only** for top-level navigation, pass
+`notifyRootObserver: false` on the `ShellRoute` to opt out.
 - Use route-level `.go(context)` only to enter shell from outside, or to intentionally reset branch to known root.
 
 ```dart
@@ -744,4 +754,3 @@ Future<void> _onCreateCallback() async {
 ```
 
 **Why `maybePop()`?** Returns `Future<bool>` that completes only after the modal route is fully removed from the stack. `.then()` fires post-dismiss.
-| Real-time updates | Realtime subscriptions (not delta) |

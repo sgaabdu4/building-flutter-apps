@@ -44,18 +44,15 @@ Run `ruby tool/verify_markdown_examples.rb` before PR. Dart code belongs in `dar
 
 ### Package Versions
 
-Targets:
-- `flutter_riverpod: 3.3.1+`
-- `riverpod_annotation: 4.0.2+`
-- `riverpod_generator: 4.0.3+`
-- `freezed: 3.2.5+`
-- `go_router: 17.2.3+`
-- `go_router_builder: 4.3.0+`
-- `json_annotation: ^4.11.0`
-- `json_serializable: 6.13.0`
-- `hive_ce_generator: 1.11.0`
+`README.md → Core Stack` is the **single source of truth** (SSOT) for package
+constraints. If you need to change a version, edit `README.md` first; this
+file and the per-reference setup blocks mirror that table. PRs that diverge
+from `README.md` get rejected on the version-table diff.
 
-Examples must work with these versions. Do not upgrade analyzer-bound generators independently; verify the full solver set first.
+Examples must work with the constraints in `README.md`. Do not upgrade
+analyzer-bound generators (`json_serializable`, `hive_ce_generator`)
+independently; verify the full solver set first with
+`dart pub deps -s compact | rg analyzer`.
 
 ### File Structure
 

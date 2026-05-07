@@ -21,9 +21,13 @@ Plugin block:
 ```yaml
 plugins:
   flutter_skill_lints:
-    version: ^0.2.0
+  # Pre-release pin: lift when riverpod_lint 3.2.0 stable lands.
   riverpod_lint: 3.1.4-dev.3
 ```
+
+Match the bundled [`references/analysis_options.yaml`](analysis_options.yaml)
+exactly. Either both files pin a `flutter_skill_lints` version or neither
+does — keep them aligned.
 
 ## Rules
 
@@ -60,3 +64,33 @@ Fix:
 4. `flutter pub get` → restart analysis server (IDE: "Restart Analysis Server"; CLI: re-run `dart analyze`).
 
 Rule: plugins live in `analysis_options.yaml plugins:`. Never both places.
+
+## Troubleshoot — stale `~/.dartServer` cache crash
+
+Symptom: `Bad state: The analysis server crashed unexpectedly` on every `dart analyze` invocation, even single-file. Plugin loads fine; `flutter analyze lib/main.dart` works.
+
+Repro:
+
+```bash
+dart analyze --format=machine lib/main.dart
+# Bad state: The analysis server crashed unexpectedly
+
+dart analyze --cache=$HOME/.dartServer --format=machine lib/main.dart
+# Bad state: The analysis server crashed unexpectedly
+
+dart analyze --cache=/tmp/dart_analysis_cache_fresh --format=machine lib/main.dart
+# works — normal diagnostics
+```
+
+Cause: stale/corrupt analyzer cache + plugin-manager state under `~/.dartServer`. Triggered by recent plugin/dependency churn (add/remove `custom_lint`, `riverpod_lint`, version bumps).
+
+Fix:
+
+```bash
+mv ~/.dartServer ~/.dartServer.bak-$(date +%Y%m%d%H%M%S)
+dart analyze
+```
+
+Caveat: never use relative `--cache=` (e.g. `--cache=.dart_tool/cache`). Dart 3.11 resolves it relative to the SDK analysis-server snapshot dir → `invalid plugin.aot`. Absolute paths only.
+
+After fresh cache: remaining diagnostics are real plugin lints, not crashes.
