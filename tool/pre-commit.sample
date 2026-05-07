@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# pre-commit.sample — sample git pre-commit hook for drift checking
+#
+# Install:
+#   cp tool/pre-commit.sample .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+# This hook runs check_drift.sh against staged .md files only.
+# Unstaged changes in those files are NOT checked.
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CHECKER="$REPO_ROOT/tool/check_drift.sh"
+
+# Collect staged .md files (added or modified)
+staged_md=()
+while IFS= read -r f; do
+  staged_md+=("$REPO_ROOT/$f")
+done < <(git diff --cached --name-only --diff-filter=ACM | grep '\.md$' || true)
+
+if [ ${#staged_md[@]} -eq 0 ]; then
+  # No .md files staged — nothing to check
+  exit 0
+fi
+
+echo "drift-check: scanning ${#staged_md[@]} staged .md file(s)…"
+
+# Pass staged files explicitly as positional args to check_drift.sh
+bash "$CHECKER" "${staged_md[@]}"
