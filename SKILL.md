@@ -13,7 +13,7 @@ metadata:
 **Read this section + linked refs before code.**
 
 1. **MUST copy [analysis_options.yaml](references/analysis_options.yaml) verbatim into every Flutter project root. Guide: [analysis_options.md](references/analysis-options.md).**
-2. **MUST run analyzer with the copied config. `flutter_skill_lints` + `riverpod_lint` are the primary machine gate. Analyzer ERROR = stop. Server crash / `server.pluginError` → see [analysis-options.md](references/analysis-options.md) Troubleshooting (purge analyzer plugins from `pubspec.yaml`).**
+2. **MUST run `dart analyze` from package root (NOT `flutter analyze`, NOT path-scoped like `flutter analyze lib`) with the copied config. `flutter_skill_lints` + `riverpod_lint` are the primary machine gate. Analyzer ERROR = stop. `flutter analyze lib` silently drops plugin diagnostics ([flutter#184190](https://github.com/flutter/flutter/issues/184190)) — see [analysis-options.md](references/analysis-options.md#rule--use-dart-analyze-not-flutter-analyze). Server crash / `server.pluginError` → see [analysis-options.md](references/analysis-options.md) Troubleshooting (purge analyzer plugins from `pubspec.yaml`).**
 3. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.**
 4. **MUST read [freezed-sealed.md](references/freezed-sealed.md) BEFORE creating any Freezed class.**
 5. **MUST read [state-management.md](references/state-management.md) BEFORE creating any notifier.**
@@ -218,7 +218,7 @@ Read before generating code for that topic.
 ## Pre-Flight — Before Returning Any Code
 
 - [ ] `analysis_options.yaml` copied from [analysis_options.yaml](references/analysis_options.yaml) in Flutter project root
-- [ ] Analyzer ran with `flutter_skill_lints` + `riverpod_lint`; no analyzer errors
+- [ ] `dart analyze` (NOT `flutter analyze`, NOT path-scoped) ran from package root with `flutter_skill_lints` + `riverpod_lint`; no analyzer errors
 - [ ] `if (!ref.mounted) return;` after EVERY `await` in notifiers
 - [ ] `if (!context.mounted) return;` after EVERY `await` in widgets
 - [ ] `State` async methods using context after await use `final context = this.context;` before await; no `if (!mounted) return`

@@ -1,12 +1,12 @@
 # analysis_options.yaml
 
-Copy `references/analysis_options.yaml` into every Flutter project root.
+Copy `references/analysis_options.yaml` to every Flutter project root.
 
-## Required Settings
+## Required
 
 - `strict-casts`, `strict-inference`, `strict-raw-types`: true
 - Async: `unawaited_futures`, `discarded_futures`, `avoid_void_async`
-- Resources/logging: `avoid_print`, `cancel_subscriptions`, `close_sinks`
+- Resources: `avoid_print`, `cancel_subscriptions`, `close_sinks`
 - Codegen: `invalid_annotation_target: ignore`
 - Exclude: `*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`
 
@@ -16,7 +16,7 @@ Copy `references/analysis_options.yaml` into every Flutter project root.
 flutter pub add dev:flutter_lints
 ```
 
-Canonical plugin block:
+Plugin block:
 
 ```yaml
 plugins:
@@ -27,28 +27,36 @@ plugins:
 
 ## Rules
 
-- Keep analyzer plugins in top-level `plugins:`, not under `analyzer:` and not in `pubspec.yaml`.
-- Use `flutter_skill_lints` and `riverpod_lint` exactly as shown.
-- Do not write `git:` or `path:` under `plugins:` unless testing a local plugin checkout.
+- Plugins go top-level `plugins:`. Not under `analyzer:`. Not in `pubspec.yaml`.
+- Use `flutter_skill_lints` + `riverpod_lint` as shown.
+- No `git:`/`path:` under `plugins:` unless local checkout.
 
 ## Verify
 
-1. **Pubspec generator path:** `flutter pub get`
-2. **Top-level plugins path:** `flutter analyze --verbose`
+1. `flutter pub get`
+2. `dart analyze --verbose` (package root, no path arg)
 3. Fail on `server.pluginError`
-4. Require one `flutter_skill_lints` diagnostic
-5. Require one `riverpod_lint` diagnostic
+4. One `flutter_skill_lints` diagnostic
+5. One `riverpod_lint` diagnostic
 
-## Troubleshooting — Dart analysis server crash
+## Use `dart analyze`, NOT `flutter analyze`
 
-Symptom: `flutter analyze` errors like `server.pluginError`, `analysis server crashed`, `plugin failed to load`, `IsolateSpawnException`, or analyzer hangs / IDE Dart Analysis pane dies.
+Run `dart analyze` from package root. No path arg. Avoid `flutter analyze` + `flutter analyze lib` + `dart analyze lib`.
 
-Root cause: analyzer plugin packages (`riverpod_lint`, `custom_lint`, `flutter_skill_lints`, etc.) are listed in `pubspec.yaml` under `dependencies:` / `dev_dependencies:` AT THE SAME TIME as the top-level `plugins:` block in `analysis_options.yaml`. Two registration paths conflict → server crash.
+Why: `flutter analyze lib` exits before plugin diagnostics report → plugin lints silently dropped. Repro Flutter 3.41.9 / Dart 3.11.5: `flutter analyze` → 12 plugin diagnostics; `flutter analyze lib` → `No issues found`. Tracking: https://github.com/flutter/flutter/issues/184190.
+
+CI/scripts: `dart analyze`. Never `flutter analyze lib`.
+
+## Troubleshoot — analysis server crash
+
+Symptom: `server.pluginError`, `analysis server crashed`, `plugin failed to load`, `IsolateSpawnException`, hang, IDE Dart pane dies.
+
+Cause: plugin packages (`riverpod_lint`, `custom_lint`, `flutter_skill_lints`, ...) listed in `pubspec.yaml` `dependencies:`/`dev_dependencies:` AND top-level `plugins:` block. Two paths conflict → crash.
 
 Fix:
 1. Open `pubspec.yaml`.
-2. Remove from `dependencies:` and `dev_dependencies:` any of: `riverpod_lint`, `custom_lint`, `custom_lint_builder`, `flutter_skill_lints`, `flutter_lints` (when using top-level plugins), and any other analyzer plugin.
-3. Keep them ONLY in `analysis_options.yaml` `plugins:` block.
-4. `flutter pub get` → restart analysis server (IDE: "Restart Analysis Server"; CLI: re-run `flutter analyze`).
+2. Remove from `dependencies:`/`dev_dependencies:`: `riverpod_lint`, `custom_lint`, `custom_lint_builder`, `flutter_skill_lints`, `flutter_lints` (when top-level plugins used), any other analyzer plugin.
+3. Keep ONLY in `analysis_options.yaml` `plugins:`.
+4. `flutter pub get` → restart analysis server (IDE: "Restart Analysis Server"; CLI: re-run `dart analyze`).
 
-Rule: analyzer plugins live in `analysis_options.yaml plugins:`. Never both places.
+Rule: plugins live in `analysis_options.yaml plugins:`. Never both places.

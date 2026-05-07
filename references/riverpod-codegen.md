@@ -19,7 +19,7 @@ dev_dependencies:
   riverpod_generator: ^4.0.3
 ```
 
-Canonical [analysis_options.yaml](analysis_options.yaml): `flutter_skill_lints` + `riverpod_lint`. Apply [analysis-options.md](analysis-options.md#install) before `flutter analyze`.
+Canonical [analysis_options.yaml](analysis_options.yaml): `flutter_skill_lints` + `riverpod_lint`. Apply [analysis-options.md](analysis-options.md#install) before `dart analyze` (use `dart analyze`, not `flutter analyze` — see [analysis-options.md](analysis-options.md#rule--use-dart-analyze-not-flutter-analyze)).
 
 Every file with providers need these:
 
