@@ -13,7 +13,7 @@ metadata:
 **Read this section + linked refs before code.**
 
 1. **MUST copy [analysis_options.yaml](references/analysis_options.yaml) verbatim into every Flutter project root. Guide: [analysis_options.md](references/analysis-options.md).**
-2. **MUST run analyzer with the copied config. `flutter_skill_lints` + `riverpod_lint` are the primary machine gate. Analyzer ERROR = stop.**
+2. **MUST run analyzer with the copied config. `flutter_skill_lints` + `riverpod_lint` are the primary machine gate. Analyzer ERROR = stop. Server crash / `server.pluginError` → see [analysis-options.md](references/analysis-options.md) Troubleshooting (purge analyzer plugins from `pubspec.yaml`).**
 3. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.**
 4. **MUST read [freezed-sealed.md](references/freezed-sealed.md) BEFORE creating any Freezed class.**
 5. **MUST read [state-management.md](references/state-management.md) BEFORE creating any notifier.**

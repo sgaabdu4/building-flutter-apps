@@ -38,3 +38,17 @@ plugins:
 3. Fail on `server.pluginError`
 4. Require one `flutter_skill_lints` diagnostic
 5. Require one `riverpod_lint` diagnostic
+
+## Troubleshooting — Dart analysis server crash
+
+Symptom: `flutter analyze` errors like `server.pluginError`, `analysis server crashed`, `plugin failed to load`, `IsolateSpawnException`, or analyzer hangs / IDE Dart Analysis pane dies.
+
+Root cause: analyzer plugin packages (`riverpod_lint`, `custom_lint`, `flutter_skill_lints`, etc.) are listed in `pubspec.yaml` under `dependencies:` / `dev_dependencies:` AT THE SAME TIME as the top-level `plugins:` block in `analysis_options.yaml`. Two registration paths conflict → server crash.
+
+Fix:
+1. Open `pubspec.yaml`.
+2. Remove from `dependencies:` and `dev_dependencies:` any of: `riverpod_lint`, `custom_lint`, `custom_lint_builder`, `flutter_skill_lints`, `flutter_lints` (when using top-level plugins), and any other analyzer plugin.
+3. Keep them ONLY in `analysis_options.yaml` `plugins:` block.
+4. `flutter pub get` → restart analysis server (IDE: "Restart Analysis Server"; CLI: re-run `flutter analyze`).
+
+Rule: analyzer plugins live in `analysis_options.yaml plugins:`. Never both places.

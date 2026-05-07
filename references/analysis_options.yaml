@@ -2,11 +2,11 @@ include: package:flutter_lints/flutter.yaml
 
 plugins:
   flutter_skill_lints:
-    version: ^0.2.0
   riverpod_lint: 3.1.4-dev.3
 
 analyzer:
   exclude:
+    - ".dart_tool/**"
     - "**/*.g.dart"
     - "**/*.freezed.dart"
     - "**/*.gr.dart"
