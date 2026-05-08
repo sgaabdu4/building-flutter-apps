@@ -19,9 +19,9 @@ dev_dependencies:
   riverpod_generator: <version>
 ```
 
-> **Forward note.** The Riverpod 3.x changelog states *"It is quite possible
-> that a 4.0.0 will be released."* Treat 3.x as short-lived: prefer codegen
-> + `Notifier` shapes over deprecated APIs to minimise the 4.0 migration.
+> **Forward note.** Riverpod 3.x changelog: *"4.0.0 quite possible."* Treat
+> 3.x as short-lived. Prefer codegen + `Notifier` shapes over deprecated
+> APIs — minimise 4.0 migration.
 
 Canonical [analysis_options.yaml](analysis_options.yaml): `flutter_skill_lints` + `riverpod_lint`. Apply [analysis-options.md](analysis-options.md#install) before `dart analyze` (use `dart analyze`, not `flutter analyze` — see [analysis-options.md](analysis-options.md#rule--use-dart-analyze-not-flutter-analyze)).
 
@@ -218,10 +218,9 @@ Mutations track side-effect state (idle, pending, success, error) separately fro
 ```dart
 // features/todos/presentation/widgets/add_todo_button.dart
 //
-// Mutations are declared at **file scope** (top-level), not inside a class —
-// the same instance is shared across rebuilds and consumers. Pattern matches
-// how Riverpod's own mutation docs scope them: one mutation = one file-scope
-// `final`, named `<verb><Noun>Mutation`.
+// Mutations = **file scope** (top-level), not inside class. Same instance
+// shared across rebuilds + consumers. Matches Riverpod docs: one mutation =
+// one file-scope `final`, named `<verb><Noun>Mutation`.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -260,14 +259,13 @@ Use `tsx.get` instead of `ref.read` inside mutations — keeps provider alive un
 
 ## Offline Persistence (preview — not yet on pub.dev)
 
-> The `persist(...)` API and `riverpod_sqflite` package are **preview only**.
-> No stable release on pub.dev as of 2026-05-08. Do **not** add
-> `riverpod_sqflite` to `pubspec.yaml` until it ships. For local persistence
-> today, use Hive CE — see [hive-persistence.md](hive-persistence.md). The
-> snippet below is forward-looking; treat it as API preview, not copy-paste.
+> `persist(...)` API + `riverpod_sqflite` = **preview only**. No stable
+> release on pub.dev as of 2026-05-08. Do **not** add `riverpod_sqflite` to
+> `pubspec.yaml` until shipped. For local persistence today: Hive CE
+> ([hive-persistence.md](hive-persistence.md)). Snippet below = API preview,
+> not copy-paste.
 
-Providers will (eventually) persist state to local database via the official
-`riverpod_sqflite` package once published:
+Providers will (eventually) persist via official `riverpod_sqflite` once published:
 
 ```dart
 @Riverpod(keepAlive: true)

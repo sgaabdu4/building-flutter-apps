@@ -11,12 +11,11 @@ dependencies:
   showcaseview: ^5.0.2
 ```
 
-**Migrating from showcaseview 4.x.** v5.0.0 removed the `height` and `width`
-parameters from `Showcase` ([#541](https://github.com/SimformSolutionsPvtLtd/showcaseview/issues/541)).
-The tooltip now sizes to its content. If you sized targets via those params,
-wrap the child in a `SizedBox(height: …, width: …)` instead. Pre-5 callers
-compile silently and produce wrong layout — grep `Showcase(.*height:` and
-`Showcase(.*width:` before upgrading.
+**Migrating from 4.x.** v5.0.0 removed `height`/`width` from `Showcase`
+([#541](https://github.com/SimformSolutionsPvtLtd/showcaseview/issues/541)).
+Tooltip now content-sized. Used those params? Wrap child in
+`SizedBox(height: …, width: …)`. Pre-5 callers compile silent, wrong layout
+— grep `Showcase(.*height:` + `Showcase(.*width:` before upgrade.
 
 ## Architecture
 
@@ -164,7 +163,7 @@ Wrap *specific* widget to highlight — not parent container. Tooltip anchor to 
 | `child` | Yes | — | Widget to highlight |
 | `tooltipPosition` | No | Auto | Force tooltip above/below/left/right |
 | `targetPadding` | No | `EdgeInsets.zero` | Padding around highlight |
-| `disposeOnTap` | No | `null` | Dismiss tooltip on tap. **Must pair with `onTargetClick`** — `disposeOnTap` alone asserts in tests (see [Constraints](#constraints)). |
+| `disposeOnTap` | No | `null` | Dismiss on tap. **Must pair w/ `onTargetClick`** — alone asserts in tests (see [Constraints](#constraints)). |
 | `onTargetClick` | No | `null` | Callback when target tapped |
 | `onBarrierClick` | No | `null` | Callback when barrier tapped |
 

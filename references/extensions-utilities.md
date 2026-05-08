@@ -166,9 +166,9 @@ Column(
 
 ## SnackBar Utility
 
-The boundary rule (notifier/service owns snackbar side effects; widgets dispatch
-notifier actions only) is authoritative in [SKILL.md → Snackbar boundary](../SKILL.md).
-This section ships the implementation; the rule is repeated only in passing.
+Boundary rule (notifier/service owns snackbar; widgets dispatch only) =
+authoritative in [SKILL.md → Snackbar boundary](../SKILL.md). This section
+ships the impl; rule repeated only in passing.
 
 Central context-free snackbar. Notifiers/services dispatch snackbar side effects. Widgets/screens call notifier methods and render state; they do not call `SnackBarUtils.show*` or `ScaffoldMessenger.of(context)` directly.
 

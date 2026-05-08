@@ -341,14 +341,13 @@ Define page structure w/ slots. No business logic, no provider access.
 - MUST accept widgets via constructor (slots)
 - MUST handle responsive breakpoints here
 
-### Provider boundary — reconciling SKILL.md "widgets watch" rule
+### Provider boundary — reconciles SKILL.md "widgets watch" rule
 
-SKILL.md "widgets MUST watch providers, never prop drill" applies to the
-**provider-entry layer** only: organisms + pages. Atoms, molecules, and
-templates are pure presentation — they accept data via constructor and remain
-trivially testable without `ProviderScope`. Templates are the boundary: they
-hold layout but never read state. The two rules compose — drill props down the
-atom/molecule/template stack from the organism that watched the provider.
+SKILL.md "widgets MUST watch providers, never prop drill" applies to
+**provider-entry layer** only: organisms + pages. Atoms/molecules/templates
+= pure presentation, ctor-injected data, no `ProviderScope` in tests.
+Templates = boundary: layout, no state read. Rules compose — drill props
+from the organism that watched, down through molecule/atom.
 
 ### Examples
 
@@ -474,7 +473,7 @@ class ProductDashboardScreen extends ConsumerWidget {
 | Templates | `core/widgets/templates/` | No |
 | Pages | `features/<feature>/presentation/screens/` | Yes |
 
-Folder layout SSOT lives in [architecture.md → Full Directory Structure](architecture.md#full-directory-structure). Other references defer to it.
+Folder layout SSOT: [architecture.md → Full Directory Structure](architecture.md#full-directory-structure). Other refs defer.
 
 ## Promotion Rules
 

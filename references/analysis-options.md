@@ -25,9 +25,8 @@ plugins:
   riverpod_lint: 3.1.4-dev.3
 ```
 
-Match the bundled [`references/analysis_options.yaml`](analysis_options.yaml)
-exactly. Either both files pin a `flutter_skill_lints` version or neither
-does — keep them aligned.
+Match bundled [`references/analysis_options.yaml`](analysis_options.yaml)
+exactly. Both pin `flutter_skill_lints` version OR neither — keep aligned.
 
 ## Rules
 

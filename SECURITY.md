@@ -2,9 +2,9 @@
 
 ## Supported Versions
 
-This skill tracks the latest stable releases pinned in
-[README.md → What's Included](README.md#whats-included). Only the current
-`master` branch is supported; older snapshots are not patched.
+Skill tracks latest stable releases pinned in
+[README.md → What's Included](README.md#whats-included). Only `master`
+supported. Older snapshots not patched.
 
 | Skill snapshot | Supported |
 | ----------------------- | ----------------- |

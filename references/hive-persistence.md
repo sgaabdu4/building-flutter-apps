@@ -115,33 +115,29 @@ class CacheEntry {
 ], firstTypeId: 1, reservedTypeIds: {0})
 ```
 
-## IsolatedHive (background-isolate persistence)
+## IsolatedHive (background-isolate)
 
-Hive CE 2.19+ ships `IsolatedHive` — a parallel API that runs the box on a
-background isolate so large reads/writes don't block the UI. Use it only when
-profiling shows main-isolate jank from Hive I/O on a hot path; for typical
-key/value usage the standard `Hive` API is fine.
+Hive CE 2.19+ ships `IsolatedHive` — box on background isolate, no UI block
+on big I/O. Use only when profiling shows main-isolate jank from Hive on a
+hot path. Standard `Hive` fine for typical key/value.
 
 ```dart
 final box = await IsolatedHive.openBox<OrderModel>('orders');
 await box.put(order.id, OrderModel.fromDomain(order));
-final all = await box.values; // async — crosses the isolate boundary
+final all = await box.values; // async — crosses isolate boundary
 ```
 
-Caveats the package surfaces:
-- TypeAdapter registration has to happen on the isolate (registrar generated
-  the same way; call from the spawn callback the package documents).
-- Every read/write is async — no sync `get`. Update repository signatures
-  accordingly.
-- Streaming via `box.watch()` works but events arrive on a port; debounce
-  before driving rebuilds.
+Caveats:
+- TypeAdapter register on isolate. Registrar same; call from spawn callback per package docs.
+- All reads/writes async — no sync `get`. Update repo signatures.
+- `box.watch()` works, events on port — debounce before rebuild.
 
 ## Repository Pattern
 
-Hive is a persistence detail. Follow the canonical chain:
+Hive = persistence detail. Canonical chain:
 `HiveOrderDatasource` → `HiveOrderRepository implements IOrderRepository` → `OrderNotifier`.
-Domain `Order` stays Hive-free; persistence-only `OrderModel` carries `@HiveField` indices.
-Provider returns the interface so tests can override with a fake.
+Domain `Order` Hive-free. Persistence-only `OrderModel` carries `@HiveField`.
+Provider returns iface — tests override w/ fake.
 
 ```dart
 // features/orders/domain/entities/order.dart — pure domain, no Hive imports
@@ -250,10 +246,9 @@ Future<IOrderRepository> orderRepository(Ref ref) async {
 }
 ```
 
-Notifier consumes `IOrderRepository` only — never reaches into Hive itself.
-Tests override `orderRepositoryProvider` with `MockIOrderRepository`; no Hive
-init needed in unit tests. See `architecture.md` for the full layer chain and
-`testing.md` for the override pattern.
+Notifier consumes `IOrderRepository` only — never touches Hive. Tests
+override `orderRepositoryProvider` w/ `MockIOrderRepository`, no Hive init.
+See [architecture.md](architecture.md) for layer chain, [testing.md](testing.md) for override pattern.
 
 ## Testing with TypeAdapters
 

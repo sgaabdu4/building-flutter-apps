@@ -44,15 +44,13 @@ Run `ruby tool/verify_markdown_examples.rb` before PR. Dart code belongs in `dar
 
 ### Package Versions
 
-`README.md → Core Stack` is the **single source of truth** (SSOT) for package
-constraints. If you need to change a version, edit `README.md` first; this
-file and the per-reference setup blocks mirror that table. PRs that diverge
-from `README.md` get rejected on the version-table diff.
+`README.md → Core Stack` = **SSOT** for package constraints. Edit `README.md`
+first to change version. This file + per-ref setup blocks mirror that table.
+PRs diverging from `README.md` rejected on version-table diff.
 
-Examples must work with the constraints in `README.md`. Do not upgrade
-analyzer-bound generators (`json_serializable`, `hive_ce_generator`)
-independently; verify the full solver set first with
-`dart pub deps -s compact | rg analyzer`.
+Examples MUST work w/ constraints in `README.md`. Don't upgrade
+analyzer-bound generators (`json_serializable`, `hive_ce_generator`) alone.
+Verify full solver: `dart pub deps -s compact | rg analyzer`.
 
 ### File Structure
 

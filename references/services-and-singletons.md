@@ -48,17 +48,17 @@ Now testable: `overrides: [authProvider.overrideWithValue(FakeAuth())]`.
 `abstract final class` with only `static` members. **Not singleton** — no instance. Pure fn grouped by topic.
 
 ```dart
-// Pure helper — no I/O, no SDK reference. Safe as static-only.
+// Pure helper — no I/O, no SDK ref. Safe static-only.
 abstract final class StringCasing {
   static String camel(String input) => /* ... */;
   static String snake(String input) => /* ... */;
 }
 ```
 
-For infrastructure facades (`Crash`, `SnackBarUtils`) the static class is a thin
-shim **over a swappable backend** — see [crashlytics.md](crashlytics.md). Static
-class never references `FirebaseCrashlytics.instance` directly; backend is
-injected via `Crash.init(backend)` so tests swap in `FakeCrashBackend`.
+Infrastructure facades (`Crash`, `SnackBarUtils`) = thin shim **over swappable
+backend** — see [crashlytics.md](crashlytics.md). Static never references
+`FirebaseCrashlytics.instance` direct. Backend injected via `Crash.init(backend)`
+— tests swap `FakeCrashBackend`.
 
 Lint: `prefer-abstract-final-static-class` (DCM) flag static-only class missing `abstract final`.
 

@@ -4,17 +4,14 @@ Flutter clean arch, four layers. Deps flow inward: Presentation → Repository �
 
 ## Scope
 
-In scope: state management, navigation, persistence, models/serialization,
-DI, error handling, forms (via [extensions-utilities.md → Validators](extensions-utilities.md#validators)
-+ [common-patterns.md](common-patterns.md) form patterns), atomic widget
-composition, code generation, testing patterns.
+In: state, nav, persistence, models/JSON, DI, errors, forms (via
+[Validators](extensions-utilities.md#validators) + [common-patterns.md](common-patterns.md)),
+atomic widgets, codegen, tests.
 
-Out of scope: HTTP client setup (dio/retrofit, interceptors, retry, auth
-headers — references show `http_service.dart` as a placeholder; bring your
-own), i18n / localization, theming systems, accessibility audits beyond the
-basic `Semantics` callouts in [atomic-design.md](atomic-design.md#accessibility).
-End-to-end wiring uses the diagram below; the http layer is intentionally a
-black box.
+Out: HTTP client (dio/retrofit/interceptors/retry/auth — `http_service.dart`
+placeholder, BYO), i18n, theming, a11y beyond `Semantics` notes in
+[atomic-design.md](atomic-design.md#accessibility). HTTP = black box in
+diagram below.
 
 ```mermaid
 sequenceDiagram
@@ -36,17 +33,13 @@ sequenceDiagram
 
 ## Tradeoffs
 
-- **Atomic design hierarchy** is overhead-heavy for apps under ~10 screens.
-  For small apps, collapse atoms+molecules into a single `widgets/` folder
-  per feature; promote to full hierarchy only when a shared widget is reused
-  across two features.
-- **`@Riverpod(keepAlive: true)` everywhere** trades startup memory for
-  rebuild predictability. Default to `@riverpod` (auto-dispose) for
-  computed/per-screen providers; reserve `keepAlive: true` for repositories,
-  app-wide services, and notifiers whose state must survive nav.
-- **Interface for every datasource/repository** trades a file per layer for
-  test mockability. On a one-screen prototype it is pure overhead; the rule
-  exists for the multi-feature case where it pays for itself instantly.
+- **Atomic hierarchy** — overhead under ~10 screens. Small app: one
+  `widgets/` per feature. Promote to full hierarchy when shared across 2+ features.
+- **`keepAlive: true` everywhere** — startup memory vs rebuild predictability.
+  Default `@riverpod` (auto-dispose) for computed/per-screen. Reserve
+  `keepAlive: true` for repos, app-wide services, nav-surviving notifiers.
+- **Interface per datasource/repo** — file-per-layer cost vs mockability.
+  Pure overhead on one-screen demo; pays off instantly multi-feature.
 
 ## Rules — NEVER Violate
 
@@ -76,13 +69,13 @@ Mixin vs interface vs extension: see [mixins.md](mixins.md).
 
 ## Full Directory Structure
 
-**Single Source of Truth.** This tree is the canonical folder layout. Every other reference links here instead of redefining it. Conventions:
-- `features/<feature>/data/` — datasources, models, repository implementations
-- `features/<feature>/domain/` — entities, `IRepository` interfaces (pure Dart)
-- `features/<feature>/repositories/` — concrete repository wiring (kept as a sibling so the boundary is loud at file-tree glance — see [Repository Layer](#repository-layer))
-- `features/<feature>/presentation/notifiers/` — Riverpod notifiers, mutations
-- `features/<feature>/presentation/screens/` — pages
-- `features/<feature>/presentation/widgets/` — feature atoms..organisms (see [atomic-design.md](atomic-design.md))
+**SSOT.** Canonical layout. Other refs link here, no redefine.
+- `features/<x>/data/` — datasources, models, repo impls
+- `features/<x>/domain/` — entities, `IRepository` ifaces (pure Dart)
+- `features/<x>/repositories/` — concrete repo wiring (sibling = loud boundary, see [Repository Layer](#repository-layer))
+- `features/<x>/presentation/notifiers/` — notifiers, mutations
+- `features/<x>/presentation/screens/` — pages
+- `features/<x>/presentation/widgets/` — feature atoms..organisms (see [atomic-design.md](atomic-design.md))
 
 ```
 lib/

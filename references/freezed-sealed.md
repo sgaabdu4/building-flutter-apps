@@ -42,7 +42,7 @@ dev_dependencies:
   json_serializable: <version>
 ```
 
-Pin `json_serializable` to `6.13.0`. `6.13.1+` requires analyzer `>=10`, while the current Riverpod generator and Hive CE generator stack resolves on analyzer 9. **Re-check this pin** after upgrading the Riverpod or Hive CE generator stack — once both publish releases compatible with analyzer 10, lift the pin to `^6.13.x`. Run `dart pub deps -s compact | rg analyzer` to confirm the resolved analyzer version before lifting.
+Pin `json_serializable` to `6.13.0`. `6.13.1+` needs analyzer `>=10`. Riverpod + Hive CE generator stack resolves on analyzer 9. **Re-check pin** after Riverpod/Hive CE generator upgrade. Both compat w/ analyzer 10 → lift to `^6.13.x`. Run `dart pub deps -s compact | rg analyzer` first.
 
 Every file need:
 

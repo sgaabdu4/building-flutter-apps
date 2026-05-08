@@ -504,12 +504,12 @@ Future<void> _load() async {
 
 ### Domain Error Types
 
-**Rule.** `AppError` is the **sole** error type stored in notifier state.
-Never store `String? error` — pattern-match a typed error in the UI instead.
-Catch in notifier, wrap with `AppError.from(e)`, then call `Crash.error(e, s, reason: …)`.
+**Rule.** `AppError` = **sole** error type in notifier state. Never store
+`String? error` — pattern-match typed error in UI. Catch in notifier, wrap
+`AppError.from(e)`, then `Crash.error(e, s, reason: …)`.
 
 ```dart
-// core/domain/app_error.dart — add a `from` constructor for the notifier-side wrap.
+// core/domain/app_error.dart — `from` ctor for notifier wrap
 sealed class AppError {
   static AppError from(Object e) => switch (e) {
         SocketException() || TimeoutException() => AppError.network(e.toString()),

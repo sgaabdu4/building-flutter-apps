@@ -117,15 +117,17 @@ Or invoke direct:
 
 ## Code Generation
 
+`-d` is shorthand for `--delete-conflicting-outputs` (used below).
+
 ```bash
-# Watch mode (recommended during development)
-dart run build_runner watch -d
+# Watch mode (dev)
+dart run build_runner watch -d   # --delete-conflicting-outputs
 
 # One-time build
-dart run build_runner build -d
+dart run build_runner build -d   # --delete-conflicting-outputs
 
-# Clean build (resolve conflicts)
-dart run build_runner clean && dart run build_runner build -d
+# Clean build
+dart run build_runner clean && dart run build_runner build -d   # --delete-conflicting-outputs
 ```
 
 ## Contributing

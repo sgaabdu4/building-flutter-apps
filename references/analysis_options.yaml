@@ -2,9 +2,9 @@ include: package:flutter_lints/flutter.yaml
 
 plugins:
   flutter_skill_lints:
-  # Pre-release pin: lifts when riverpod_lint 3.2.0 stable lands.
-  # Verify against pub.dev before shipping; promote to the latest stable
-  # tag when you can. Pre-release pins silently adopt dev behavior — review.
+  # Pre-release pin: lift when riverpod_lint 3.2.0 stable lands.
+  # Verify pub.dev before ship. Promote to latest stable when possible.
+  # Pre-release silently adopts dev behavior — review.
   riverpod_lint: 3.1.4-dev.3
 
 analyzer:

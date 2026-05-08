@@ -51,8 +51,8 @@ Future<void> onNext(BuildContext context, WidgetRef ref, String programId) async
   final program = ref.read(programByIdProvider(programId));
   if (program == null) return; // disable CTA / show placeholder
 
-  // ✅ DO — sequence is fixed: persist, then targeted sync, then navigate.
-  //    Reordering causes UI flicker (stale parent) or lost writes on dispose.
+  // ✅ DO — fixed sequence: persist → targeted sync → navigate.
+  //    Reorder = UI flicker (stale parent) OR lost writes on dispose.
   final updatedParent = program.copyWith(/* ...edits... */);
   await ref.read(programRepositoryProvider).save(updatedParent);
   ref.read(programsProvider.notifier).upsertProgram(updatedParent);
@@ -585,11 +585,10 @@ class AppShellScaffold extends StatelessWidget {
 - Inside shell, use `StatefulNavigationShell.of(context).goBranch(index)`.
 - In reusable sheets/overlays, pass callback from shell-owned caller, don't route in child.
 
-**GoRouter 17.x — `ShellRoute` propagates to root observers.** As of 17.0.0
-`ShellRoute` and `StatefulShellRoute` notify root `NavigatorObserver`s by
-default. Most apps want this (analytics on shell pushes), but if you have a
-root `RouteObserver` that should fire **only** for top-level navigation, pass
-`notifyRootObserver: false` on the `ShellRoute` to opt out.
+**GoRouter 17.x — `ShellRoute` propagates to root observers.** Since 17.0.0
+`ShellRoute`/`StatefulShellRoute` notify root `NavigatorObserver`s by default.
+Most want this (analytics on shell push). Root `RouteObserver` should fire
+**only** for top-level nav? Pass `notifyRootObserver: false` on `ShellRoute`.
 - Use route-level `.go(context)` only to enter shell from outside, or to intentionally reset branch to known root.
 
 ```dart
