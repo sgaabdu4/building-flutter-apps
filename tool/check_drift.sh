@@ -480,7 +480,7 @@ rule_w1() {
   # Match: class _Foo extends <widget base>
   # Exempt: State<T> subclasses (Flutter convention requires private).
   hits=$(rg -n --no-heading --pcre2 \
-    'class\s+_\w+\s+extends\s+(StatelessWidget|StatefulWidget|ConsumerWidget|ConsumerStatefulWidget|HookWidget|HookConsumerWidget|StatelessHookConsumerWidget)\b' \
+    '^\s*class\s+_\w+\s+extends\s+(StatelessWidget|StatefulWidget|ConsumerWidget|ConsumerStatefulWidget|HookWidget|HookConsumerWidget|StatelessHookConsumerWidget)\b' \
     "${RG_EXCLUDE[@]}" \
     "${SCAN_PATHS[@]}" 2>/dev/null || true)
   emit_tap "w1" \
