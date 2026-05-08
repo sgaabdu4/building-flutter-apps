@@ -74,7 +74,7 @@ lib/
 7. **One primary class per file** — exception: Freezed state + notifier may share file.
 8. **Interface contracts** — `abstract interface class` for every repo + datasource. Constructors take interfaces, NEVER concrete types.
 9. **No `dynamic`** — use `Object?` or proper type. Exception: `Map<String, dynamic>` in JSON.
-10. **Widget classes only** — NEVER `_buildXxx()` helpers. Extract to named widget classes.
+10. **Widget classes only** — NEVER `_buildXxx()` helpers. Extract to named widget classes. NEVER private widget classes (`class _Foo extends StatelessWidget/StatefulWidget/ConsumerWidget/...`). File-internal widget → make public + `@visibleForTesting`. Reused widget → public class in own file. State subclasses (`class _FooState extends State<Foo>`) stay private — Flutter convention.
 11. **No hardcoded strings** — `*Strings` constants classes with `static const`.
 12. **ref.watch in build, ref.read in callbacks.**
 13. **Provider naming** — codegen strips "Notifier": `FooNotifier` → `fooProvider`.
@@ -164,6 +164,7 @@ If chain required, flatten in parent provider:
 | Mutation writes remote data then trusts cached/local response | Fetch source-of-truth after mutation when values can be generated/stale/derived |
 | Inline `ValueKey('save-button')` | `ValueKey(AppWidgetKeys.saveButton)` from central key registry |
 | Widget calls `SnackBarUtils.showError(...)` | Widget calls notifier method; notifier emits snackbar |
+| `class _Foo extends StatelessWidget` (or Stateful/Consumer/HookConsumer/etc.) private widget in same file | Public `class Foo` + `@visibleForTesting` if file-internal, OR public widget in own file. State subclasses (`_FooState extends State<Foo>`) stay private — Flutter convention |
 | GoRouter redirect logic only inside closure | Pure `resolveAppRedirect(...)` function + matrix tests |
 | App root clamps text scaling | Responsive local layout fixes; no global clamp |
 | One-off test fakes in each test file | Shared `test/helpers/test_fakes.dart` style harness |
@@ -227,6 +228,7 @@ Read before generating code for that topic.
 - [ ] `if (!context.mounted) return;` after EVERY `await` in widgets
 - [ ] `State` async methods using context after await use `final context = this.context;` before await; no `if (!mounted) return`
 - [ ] No `_buildXxx()` helpers — extracted to widget classes
+- [ ] No private widget classes (`class _Foo extends StatelessWidget/StatefulWidget/ConsumerWidget/...`) — public + `@visibleForTesting` if file-internal, public in own file if reused. State subclasses (`_FooState extends State<Foo>`) stay private.
 - [ ] No hardcoded strings — `*Strings` constants classes
 - [ ] No `dynamic` — `Object?` or proper types
 - [ ] No value! — `if (value case final v?)`

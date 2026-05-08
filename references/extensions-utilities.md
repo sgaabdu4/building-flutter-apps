@@ -185,27 +185,27 @@ abstract final class SnackBarUtils {
   }
 
   static void showSuccess(String message) =>
-      _show(message, type: _SnackBarType.success);
+      _show(message, type: SnackBarType.success);
 
   static void showError(String message) =>
-      _show(message, type: _SnackBarType.error);
+      _show(message, type: SnackBarType.error);
 
   static void showInfo(String message) =>
-      _show(message, type: _SnackBarType.info);
+      _show(message, type: SnackBarType.info);
 
   static void showWarning(String message) =>
-      _show(message, type: _SnackBarType.warning);
+      _show(message, type: SnackBarType.warning);
 
   static void hide() => _key?.currentState?.hideCurrentSnackBar();
 
-  static void _show(String message, {required _SnackBarType type}) {
+  static void _show(String message, {required SnackBarType type}) {
     final state = _key?.currentState;
     if (state == null) return;
 
     state
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
-        content: _SnackBarContent(message: message, type: type),
+        content: SnackBarContent(message: message, type: type),
         backgroundColor: Colors.transparent,
         elevation: 0,
         behavior: SnackBarBehavior.floating,
@@ -219,27 +219,28 @@ abstract final class SnackBarUtils {
   }
 }
 
-enum _SnackBarType { success, error, info, warning }
+enum SnackBarType { success, error, info, warning }
 ```
 
 ### Styled Content
 
-Tweak `_SnackBarContent` to match design system. `SemanticColors` for type border/icon, `Radii.rounded12` for radius, `context.textTheme.bodyMedium` for text:
+Tweak `SnackBarContent` to match design system. `SemanticColors` for type border/icon, `Radii.rounded12` for radius, `context.textTheme.bodyMedium` for text. `@visibleForTesting` — public only so widget tests can pump `SnackBarContent` direct without going through `ScaffoldMessenger`:
 
 ```dart
-class _SnackBarContent extends StatelessWidget {
-  const _SnackBarContent({required this.message, required this.type});
+@visibleForTesting
+class SnackBarContent extends StatelessWidget {
+  const SnackBarContent({super.key, required this.message, required this.type});
 
   final String message;
-  final _SnackBarType type;
+  final SnackBarType type;
 
   @override
   Widget build(BuildContext context) {
     final (icon, borderColor) = switch (type) {
-      _SnackBarType.success => (Icons.check_circle_rounded, SemanticColors.success),
-      _SnackBarType.error   => (Icons.error_rounded, SemanticColors.error),
-      _SnackBarType.info    => (Icons.info_rounded, SemanticColors.info),
-      _SnackBarType.warning => (Icons.warning_rounded, SemanticColors.warning),
+      SnackBarType.success => (Icons.check_circle_rounded, SemanticColors.success),
+      SnackBarType.error   => (Icons.error_rounded, SemanticColors.error),
+      SnackBarType.info    => (Icons.info_rounded, SemanticColors.info),
+      SnackBarType.warning => (Icons.warning_rounded, SemanticColors.warning),
     };
 
     return Container(

@@ -29,7 +29,7 @@ run_rule_on_file() {
   local rule_id="$1"
   local filepath="$2"
   # Build the --ignore list: all rules except the one we're testing
-  local all_rules="b3 b7 a4-raw v7 b4 a1 a4-freezed v6 v11 d5 d7 c1"
+  local all_rules="b3 b7 a4-raw v7 b4 a1 a4-freezed v6 v11 d5 d7 c1 w1"
   local ignore_list=""
   for r in $all_rules; do
     if [ "$r" != "$rule_id" ]; then
@@ -115,7 +115,7 @@ test_d5_inline_version() {
 
   # For d5, the inline version sub-check runs on the scanned path.
   # Pass it via the positional path arg, ignore all other rules.
-  local all_rules="b3 b7 a4-raw v7 b4 a1 a4-freezed v6 v11 d7 c1"
+  local all_rules="b3 b7 a4-raw v7 b4 a1 a4-freezed v6 v11 d7 c1 w1"
   local ignore_list
   ignore_list=$(echo "$all_rules" | tr ' ' ',')
 
@@ -161,6 +161,9 @@ test_rule "c1"
 # file-level + inline rules
 test_d5_inline_version
 test_rule "d7"
+
+# widget rules
+test_rule "w1"
 
 TOTAL=$(( PASS + FAIL ))
 echo ""

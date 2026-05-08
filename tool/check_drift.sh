@@ -474,6 +474,21 @@ rule_c1() {
     "Add 'if (!ref.mounted) return;' before 'state =' after any 'await ref.read/watch'"
 }
 
+# ── Rule: W1 — no private widget classes (use public + @visibleForTesting) ───
+rule_w1() {
+  local hits
+  # Match: class _Foo extends <widget base>
+  # Exempt: State<T> subclasses (Flutter convention requires private).
+  hits=$(rg -n --no-heading --pcre2 \
+    'class\s+_\w+\s+extends\s+(StatelessWidget|StatefulWidget|ConsumerWidget|ConsumerStatefulWidget|HookWidget|HookConsumerWidget|StatelessHookConsumerWidget)\b' \
+    "${RG_EXCLUDE[@]}" \
+    "${SCAN_PATHS[@]}" 2>/dev/null || true)
+  emit_tap "w1" \
+    "no private widget classes — extract public + @visibleForTesting or new file" \
+    "$hits" \
+    "Rename 'class _Foo extends StatelessWidget' to public 'class Foo' + @visibleForTesting; State subclasses (_FooState extends State<>) exempt"
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 echo "TAP version 13"
@@ -490,6 +505,7 @@ rule_v11
 rule_d5
 rule_d7
 rule_c1
+rule_w1
 
 echo "1..$_TAP_INDEX"
 
