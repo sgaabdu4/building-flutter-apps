@@ -22,6 +22,8 @@ Plugin block:
 plugins:
   flutter_skill_lints:
   # Pre-release pin: lift when riverpod_lint 3.2.0 stable lands.
+  # Verify pub.dev before ship. Promote to latest stable when possible.
+  # Pre-release silently adopts dev behavior — review.
   riverpod_lint: 3.1.4-dev.3
 ```
 
@@ -41,6 +43,13 @@ exactly. Both pin `flutter_skill_lints` version OR neither — keep aligned.
 3. Fail on `server.pluginError`
 4. One `flutter_skill_lints` diagnostic
 5. One `riverpod_lint` diagnostic
+
+Scope: `dart analyze` is the analyzer/plugin gate. It can surface analyzer-owned
+pubspec diagnostics and plugin diagnostics, but it is not a complete
+`pubspec.yaml` validator. Use `flutter pub get`, dependency solving, and
+publish/dry-run checks for package-resolution and publishing validity.
+`flutter_skill_lints` project-config diagnostics are reported through Dart
+analysis units.
 
 ## Use `dart analyze`, NOT `flutter analyze`
 
