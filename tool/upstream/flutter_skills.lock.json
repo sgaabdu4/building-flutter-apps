@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "source": "https://github.com/flutter/skills.git",
+  "branch": "main",
+  "commit": "a43f55998b56b8b61e82b2ce012a4e4066ba8118",
+  "checked_at": "2026-05-11T06:27:19Z",
+  "skill_count": 10,
+  "skills": {
+    "flutter-add-integration-test": {
+      "path": "skills/flutter-add-integration-test/SKILL.md",
+      "sha256": "8d81b053c5fdf5b61aa7d0165cbc35e7a9a1c5bdcd7a301b8293a108771e6bab",
+      "last_modified": "Tue, 21 Apr 2026 18:29:20 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "flutter-add-widget-preview": {
+      "path": "skills/flutter-add-widget-preview/SKILL.md",
+      "sha256": "88cfeb7084e798714f5ac59cff62e5441759bcbe096c0fdc37abd21111b20212",
+      "last_modified": "Tue, 21 Apr 2026 20:05:23 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "flutter-add-widget-test": {
+      "path": "skills/flutter-add-widget-test/SKILL.md",
+      "sha256": "6c449ebd844e331e661b12630b6ad2a218e84d1bd8ea8377ba9dbd62ffe2798a",
+      "last_modified": "Tue, 21 Apr 2026 21:15:41 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "flutter-apply-architecture-best-practices": {
+      "path": "skills/flutter-apply-architecture-best-practices/SKILL.md",
+      "sha256": "00497869976a903c83f509a59d4b6a501d409fa711eb8e1f89945921e1983b65",
+      "last_modified": "Tue, 21 Apr 2026 20:11:20 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "flutter-build-responsive-layout": {
+      "path": "skills/flutter-build-responsive-layout/SKILL.md",
+      "sha256": "c7a5d18071c625137cad2def9b13f3579d9bdf0aae29621a1825f12b560394c0",
+      "last_modified": "Tue, 21 Apr 2026 20:17:40 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "flutter-fix-layout-issues": {
+      "path": "skills/flutter-fix-layout-issues/SKILL.md",
+      "sha256": "e82c82b4245ef502bd93bc543d4f5968f4ee8043fa7556ffebcb34f30651fc9b",
+      "last_modified": "Tue, 21 Apr 2026 19:45:59 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "flutter-implement-json-serialization": {
+      "path": "skills/flutter-implement-json-serialization/SKILL.md",
+      "sha256": "05a4478e0a3d119f26ae6e6983da3d5c2ea134763aeff59a06cef346bef391b1",
+      "last_modified": "Tue, 21 Apr 2026 21:44:50 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "flutter-setup-declarative-routing": {
+      "path": "skills/flutter-setup-declarative-routing/SKILL.md",
+      "sha256": "3a52fc5663cf37d68b6e096ef3e59f5056a01e9151b64cdf0728672a13398953",
+      "last_modified": "Tue, 21 Apr 2026 21:08:03 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "flutter-setup-localization": {
+      "path": "skills/flutter-setup-localization/SKILL.md",
+      "sha256": "dda4ef8b74976a3e51faa43d7ad00f03eab64d6d5ed0ef89cf4184a04196da17",
+      "last_modified": "Tue, 21 Apr 2026 21:27:35 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "flutter-use-http-package": {
+      "path": "skills/flutter-use-http-package/SKILL.md",
+      "sha256": "6d53f8bac039151166fececdc31cbaf2762abe96a323f697ecbebc347adb10e3",
+      "last_modified": "Tue, 21 Apr 2026 21:36:42 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    }
+  }
+}

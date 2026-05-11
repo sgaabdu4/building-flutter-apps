@@ -75,6 +75,9 @@ lib/
 - **Unified Ref** — single `Ref` (no `AutoDisposeRef`, `ExampleRef`)
 - **Widget classes only** — no `_buildXxx` helpers
 - **No `dynamic`** — use `Object?` or proper type
+- **Data-layer networking** — widgets/notifiers never call HTTP directly
+- **Localized UI copy** — gen-l10n/ARB for user-facing strings
+- **Preview-safe components** — Flutter Widget Previewer with provider fakes
 - **Primary static analysis** — `flutter_skill_lints` + `riverpod_lint`
 
 ## Reference Files
@@ -84,11 +87,16 @@ lib/
 | Architecture layers | [architecture.md](references/architecture.md) |
 | Canonical analyzer config | [analysis_options.yaml](references/analysis_options.yaml) |
 | Atomic design (tokens → pages) | [atomic-design.md](references/atomic-design.md) |
+| Widget previews | [widget-previews.md](references/widget-previews.md) |
 | Riverpod 3.x codegen | [riverpod-codegen.md](references/riverpod-codegen.md) |
 | Freezed 3.x sealed classes | [freezed-sealed.md](references/freezed-sealed.md) |
 | State management patterns | [state-management.md](references/state-management.md) |
 | Testing with ProviderContainer.test | [testing.md](references/testing.md) |
+| HTTP/networking boundaries | [networking.md](references/networking.md) |
+| Localization/gen-l10n | [localization.md](references/localization.md) |
+| Deep linking/App Links/Universal Links | [deep-linking.md](references/deep-linking.md) |
 | Pagination, search, forms | [common-patterns.md](references/common-patterns.md) |
+| Layout diagnostics | [layout-diagnostics.md](references/layout-diagnostics.md) |
 | Performance optimization | [performance.md](references/performance.md) |
 | Flutter optimizations | [flutter-optimizations.md](references/flutter-optimizations.md) |
 | Extensions & utilities | [extensions-utilities.md](references/extensions-utilities.md) |
@@ -129,6 +137,23 @@ dart run build_runner build -d   # --delete-conflicting-outputs
 # Clean build
 dart run build_runner clean && dart run build_runner build -d   # --delete-conflicting-outputs
 ```
+
+## Upstream Drift Check
+
+This repo tracks the upstream `flutter/skills` Flutter skill set by commit and
+per-skill hash in [flutter_skills.lock.json](tool/upstream/flutter_skills.lock.json).
+
+```bash
+# Flag when upstream Flutter skill content changed
+ruby tool/check_upstream_flutter_skills.rb
+
+# Refresh the lock after reviewing/adopting upstream changes
+ruby tool/check_upstream_flutter_skills.rb --update
+```
+
+Default behavior exits non-zero only when upstream skill content changes. Use
+`--strict-commit` if CI should also fail on upstream repo commits that do not
+touch tracked Flutter skill files.
 
 ## Contributing
 

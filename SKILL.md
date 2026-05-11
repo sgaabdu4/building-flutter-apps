@@ -1,6 +1,6 @@
 ---
 name: building-flutter-apps
-description: Flutter arch ref — Riverpod 3.x, Freezed 3.x, GoRouter, Hive CE, Crashlytics, ShowcaseView. Covers state management, navigation, routing, local storage, persistence, data models, serialization, dependency injection, clean architecture, feature scaffolding, forms, validation, lists, pagination, search, debouncing, error handling, crash reporting, analytics, logging, fire-and-forget, services, singletons, guided tours, onboarding, testing, code generation. Use for any Flutter/Dart file, new screen/feature, state/data flow, model/entity, repository/datasource, provider/notifier, widget tree/UI, bug/crash, or touches `lib/`, `test/`, `pubspec.yaml`, `analysis_options.yaml`, `*.dart`. NOT for Provider/BLoC/GetX, non-Flutter, or backend-only Dart.
+description: Flutter app architecture skill for Riverpod 3 codegen, Freezed 3, GoRouter, Hive CE, Crashlytics, ShowcaseView, localization, networking, previews, testing, and E2E. Use for Flutter/Dart app work touching `lib/`, `test/`, `pubspec.yaml`, routing, state, UI, models, repositories, datasources, providers, persistence, or app bugs.
 license: MIT
 metadata:
   author: sgaabdu4
@@ -18,15 +18,20 @@ metadata:
 4. **MUST read [freezed-sealed.md](references/freezed-sealed.md) BEFORE creating any Freezed class.**
 5. **MUST read [state-management.md](references/state-management.md) BEFORE creating any notifier.**
 6. **MUST read [performance.md](references/performance.md) BEFORE writing any widget tree or provider.**
-7. **NEVER** use `dynamic`, `_buildXxx()` helpers, hardcoded strings, `shrinkWrap: true`, value!, or `abstract class` with Freezed.
-8. **ALWAYS** check `if (!ref.mounted) return;` after every `await` in notifiers.
-9. **NEVER** read `state` (incl. `state.copyWith`) in sync `Notifier` before `build()` returns. Seed via returned constructor, defer async init via `Future.microtask`. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap).
-10. **ALWAYS** init repositories inside mutation methods (`create*`, `update*`, `delete*`, `set*`, `reorder*`) via `_ensureRepository()`/`_ensureDependencies()` helper. NEVER rely only on `build()`/`_init()` timing for write paths.
-11. **When touching guided tours, MUST read [showcase-tours.md](references/showcase-tours.md) first. NEVER filter `startShowCase()` keys with `key.currentContext` checks.**
-12. **When touching streams, realtime, push events, subscriptions, sync, shared state, collaboration, remote callbacks, or any source-of-truth refresh path, MUST read [testing.md](references/testing.md#event-contract-and-sync-tests) + [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md). Map event families before code.**
-13. **Remote/shared-state E2E MUST prove writer + observer behavior on real app instances, including create, update, delete/remove, relaunch, source-of-truth verification, and cleanup.**
-14. **When adding E2E-testable UI, MUST use a central widget key registry file, default `lib/core/testing/app_widget_keys.dart` or existing project equivalent. No inline string `ValueKey`s.**
-15. **Widgets/screens MUST NOT dispatch snackbars. Notifiers/services own success/error messaging. See [extensions-utilities.md](references/extensions-utilities.md#snackbar-utility).**
+7. **When touching HTTP/network calls, MUST read [networking.md](references/networking.md). Widgets/notifiers never call HTTP directly.**
+8. **When adding user-facing copy, MUST read [localization.md](references/localization.md). Use gen-l10n, not ad hoc hardcoded UI strings.**
+9. **When adding widget previews, MUST read [widget-previews.md](references/widget-previews.md). Preview dependencies are faked via provider overrides.**
+10. **When touching deep links, platform links, or URL strategy, MUST read [deep-linking.md](references/deep-linking.md).**
+11. **When fixing layout errors or responsive branches, MUST read [layout-diagnostics.md](references/layout-diagnostics.md).**
+12. **NEVER** use `dynamic`, `_buildXxx()` helpers, hardcoded user-facing strings, `shrinkWrap: true`, value!, or `abstract class` with Freezed.
+13. **ALWAYS** check `if (!ref.mounted) return;` after every `await` in notifiers.
+14. **NEVER** read `state` (incl. `state.copyWith`) in sync `Notifier` before `build()` returns. Seed via returned constructor, defer async init via `Future.microtask`. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap).
+15. **ALWAYS** init repositories inside mutation methods (`create*`, `update*`, `delete*`, `set*`, `reorder*`) via `_ensureRepository()`/`_ensureDependencies()` helper. NEVER rely only on `build()`/`_init()` timing for write paths.
+16. **When touching guided tours, MUST read [showcase-tours.md](references/showcase-tours.md) first. NEVER filter `startShowCase()` keys with `key.currentContext` checks.**
+17. **When touching streams, realtime, push events, subscriptions, sync, shared state, collaboration, remote callbacks, or any source-of-truth refresh path, MUST read [testing.md](references/testing.md#event-contract-and-sync-tests) + [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md). Map event families before code.**
+18. **Remote/shared-state E2E MUST prove writer + observer behavior on real app instances, including create, update, delete/remove, relaunch, source-of-truth verification, and cleanup.**
+19. **When adding E2E-testable UI, MUST use a central widget key registry file, default `lib/core/testing/app_widget_keys.dart` or existing project equivalent. No inline string `ValueKey`s.**
+20. **Widgets/screens MUST NOT dispatch snackbars. Notifiers/services own success/error messaging. See [extensions-utilities.md](references/extensions-utilities.md#snackbar-utility).**
 
 ## Core Stack
 
@@ -208,10 +213,15 @@ Read before generating code for that topic.
 | [state-management.md](references/state-management.md) | Notifiers, error handling, cross-provider |
 | [analysis_options.yaml](references/analysis_options.yaml) + [analysis-options.md](references/analysis-options.md) | **Every Flutter project** — linter config |
 | [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency |
+| [layout-diagnostics.md](references/layout-diagnostics.md) | Layout exceptions, constraints, keyboard, responsive debugging |
 | [atomic-design.md](references/atomic-design.md) | Shared widgets in `core/widgets/` |
+| [widget-previews.md](references/widget-previews.md) | Flutter Widget Previewer, preview fakes, preview matrix |
 | [testing.md](references/testing.md) | Unit/widget tests, event/subscription contract tests, sync reaction tests |
 | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) | Dart MCP runtime E2E, multi-actor sync proof, source-of-truth checks, logs, cleanup |
 | [common-patterns.md](references/common-patterns.md) | Lists, search, forms, GoRouter, sync |
+| [deep-linking.md](references/deep-linking.md) | Web URL strategy, App Links, Universal Links, deep-link E2E |
+| [networking.md](references/networking.md) | HTTP service boundary, datasource parsing, source-of-truth refresh |
+| [localization.md](references/localization.md) | gen-l10n, ARB, placeholders, plurals/selects |
 | [extensions-utilities.md](references/extensions-utilities.md) | Utilities, extensions |
 | [mixins.md](references/mixins.md) | Mixin vs interface vs extension, `retryWithBackoff` + `SaveAllRowsException` for bulk I/O |
 | [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
@@ -229,14 +239,19 @@ Read before generating code for that topic.
 - [ ] `State` async methods using context after await use `final context = this.context;` before await; no `if (!mounted) return`
 - [ ] No `_buildXxx()` helpers — extracted to widget classes
 - [ ] No private widget classes (`class _Foo extends StatelessWidget/StatefulWidget/ConsumerWidget/...`) — public + `@visibleForTesting` if file-internal, public in own file if reused. State subclasses (`_FooState extends State<Foo>`) stay private.
-- [ ] No hardcoded strings — `*Strings` constants classes
+- [ ] No hardcoded user-facing strings — gen-l10n for UI copy; `*Strings` only for non-user-facing IDs
 - [ ] No `dynamic` — `Object?` or proper types
 - [ ] No value! — `if (value case final v?)`
 - [ ] `ref.watch()` in `build()`, `ref.read()` only in callbacks
 - [ ] Sync `Notifier.build()` never reads `state` before first `state=` — loading flags seeded via returned constructor; async init dispatched with `Future.microtask`; no `fireImmediately: true` listener that reads state without prior direct `state =` assignment
 - [ ] Every notifier mutation method lazily inits repositories/deps (`_ensureRepository`/`_ensureDependencies`) before writes
 - [ ] Route-param lookups in widget `build()` are nullable (no throw-on-missing-id)
+- [ ] Deep-link/platform-link changes have resolver matrix tests plus Android/iOS/web validation when applicable
 - [ ] Wizard/deep-link mutation sequence: persist → targeted sync → navigate
+- [ ] HTTP/network calls are behind datasource/service interfaces; widgets/notifiers do not call HTTP clients directly
+- [ ] User-facing copy added to ARB/localization files with placeholders/plurals/selects where needed
+- [ ] Widget previews use preview shell + provider fakes; no native plugin/Hive/Firebase/real HTTP in previews
+- [ ] Layout changes checked across compact/medium/expanded, keyboard-open, and large text-scale states
 - [ ] Every provider is generated with `@riverpod` / `@Riverpod(...)`; no manual `Provider`, `FutureProvider`, `StreamProvider`, `StateProvider`, `NotifierProvider`, `AsyncNotifierProvider`, `StateNotifierProvider`, or `ChangeNotifierProvider`
 - [ ] Widgets/screens do not call `SnackBarUtils.show*` or `ScaffoldMessenger`; notifier/service owns snackbar side effects
 - [ ] If streams/realtime/push/sync/shared state changed: exact event families/channels/topics/listeners mapped; datasource/service contract tests prove subscriptions; notifier/widget tests prove state reaction

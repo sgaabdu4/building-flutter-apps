@@ -4,14 +4,15 @@ Flutter clean arch, four layers. Deps flow inward: Presentation → Repository �
 
 ## Scope
 
-In: state, nav, persistence, models/JSON, DI, errors, forms (via
-[Validators](extensions-utilities.md#validators) + [common-patterns.md](common-patterns.md)),
-atomic widgets, codegen, tests.
+In: state, nav, deep links, persistence, HTTP boundaries, models/JSON, DI,
+errors, forms (via [Validators](extensions-utilities.md#validators) +
+[common-patterns.md](common-patterns.md)), localization, atomic widgets,
+previews, codegen, tests.
 
-Out: HTTP client (dio/retrofit/interceptors/retry/auth — `http_service.dart`
-placeholder, BYO), i18n, theming, a11y beyond `Semantics` notes in
-[atomic-design.md](atomic-design.md#accessibility). HTTP = black box in
-diagram below.
+Out: backend-vendor SDK specifics, full design-system authoring, and a11y
+beyond `Semantics` notes in [atomic-design.md](atomic-design.md#accessibility).
+HTTP service internals are covered at boundary level in
+[networking.md](networking.md).
 
 ```mermaid
 sequenceDiagram

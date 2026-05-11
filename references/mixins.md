@@ -148,7 +148,7 @@ Future<T> retryWithBackoff<T>(
   bool Function(Object)? shouldRetry,
 }) async {
   final retryable = shouldRetry ?? _defaultShouldRetry;
-  var attempt = 0;
+  int attempt = 0;
   while (true) {
     try {
       return await fn();

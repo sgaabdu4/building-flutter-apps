@@ -30,6 +30,7 @@ Thanks for interest. This doc = guidelines for contributing.
 - Keep SKILL.md under 500 lines; detailed content goes in `references/`
 - Run analyzer with `references/analysis_options.yaml`
 - For package/version reviews, verify the documented install path exactly. Analyzer plugins in top-level `plugins:` are not the same as `pubspec.yaml` dependencies.
+- Run `ruby tool/check_upstream_flutter_skills.rb` before broad Flutter docs updates. If it flags upstream skill changes, review the changed upstream skill(s) before editing this repo. After adopting or intentionally ignoring those changes, refresh the lock with `ruby tool/check_upstream_flutter_skills.rb --update`.
 
 ### Code Examples
 
