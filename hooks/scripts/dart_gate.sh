@@ -133,6 +133,61 @@ add_match "use-applocalizations" \
   "Use AppLocalizations.of(context).key. Hardcoded UI strings are not localizable." \
   "$MATCHES"
 
+# ---------- Rule 6b: Feature presentation notifiers should be keepAlive ----------
+case "$FILE_PATH" in
+  */lib/features/*/presentation/notifiers/*_notifier.dart)
+    MATCHES=$(awk '
+      {
+        line[NR] = $0
+        if ($0 ~ /ref[[:space:]]*\.[[:space:]]*onDispose[[:space:]]*\(/) has_dispose = 1
+      }
+      END {
+        for (i = 1; i <= NR; i++) {
+          if (line[i] !~ /@(riverpod|Riverpod)/) continue
+
+          class_line = 0
+          for (j = i + 1; j <= i + 8 && j <= NR; j++) {
+            if (line[j] ~ /^[[:space:]]*class[[:space:]]+[A-Za-z_][A-Za-z0-9_]*Notifier([[:space:]]|$)/) {
+              class_line = j
+              break
+            }
+          }
+          if (class_line == 0) continue
+
+          keep_alive = 0
+          for (j = i; j < class_line; j++) {
+            if (line[j] ~ /keepAlive:[[:space:]]*true/) keep_alive = 1
+          }
+          if (keep_alive) continue
+          if (has_dispose) continue
+
+          family = 0
+          for (j = class_line; j <= class_line + 80 && j <= NR; j++) {
+            if (line[j] ~ /^[[:space:]]*[A-Za-z0-9_<>,?[:space:]]+[[:space:]]+build[[:space:]]*\([^)]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/) {
+              family = 1
+              break
+            }
+          }
+          if (family) continue
+
+          rationale = 0
+          for (j = i - 6; j < i; j++) {
+            if (j > 0 && line[j] ~ /(auto[- ]?dispose|ephemeral|transient|route[- ]?local|screen[- ]?local|reset when|dispose when unused)/) {
+              rationale = 1
+            }
+          }
+          if (rationale) continue
+
+          print i ":" line[i]
+        }
+      }
+    ' "$FILE_PATH" 2>/dev/null)
+    add_match "riverpod-feature-notifier-keepalive" \
+      "Feature presentation notifiers should use @Riverpod(keepAlive: true), or document why the state is ephemeral. Family notifiers and lifecycle-cleanup notifiers are exempt." \
+      "$MATCHES"
+    ;;
+esac
+
 # ---------- Rule 7: Inline string ValueKey ----------
 MATCHES=$(grep -nE "ValueKey[[:space:]]*\([[:space:]]*['\"]" "$FILE_PATH" 2>/dev/null)
 add_match "use-app-widget-keys" \

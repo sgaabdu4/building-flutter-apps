@@ -94,6 +94,68 @@ if [[ -d "$FLUTTER_ROOT/lib" ]]; then
   done < <(recursive_grep 'ValueKey[[:space:]]*\([[:space:]]*['\''"]' | head -n 5)
   [[ $COUNT -gt 0 ]] && add_violation "$COUNT inline string ValueKey(...) found. Use AppWidgetKeys central registry."
 
+  feature_notifier_keepalive_scan() {
+    local tmp_hits="" result
+    [[ -d "$FLUTTER_ROOT/lib/features" ]] || return 0
+    while IFS= read -r f; do
+      result=$(awk '
+        {
+          line[NR] = $0
+          if ($0 ~ /ref[[:space:]]*\.[[:space:]]*onDispose[[:space:]]*\(/) has_dispose = 1
+        }
+        END {
+          for (i = 1; i <= NR; i++) {
+            if (line[i] !~ /@(riverpod|Riverpod)/) continue
+
+            class_line = 0
+            for (j = i + 1; j <= i + 8 && j <= NR; j++) {
+              if (line[j] ~ /^[[:space:]]*class[[:space:]]+[A-Za-z_][A-Za-z0-9_]*Notifier([[:space:]]|$)/) {
+                class_line = j
+                break
+              }
+            }
+            if (class_line == 0) continue
+
+            keep_alive = 0
+            for (j = i; j < class_line; j++) {
+              if (line[j] ~ /keepAlive:[[:space:]]*true/) keep_alive = 1
+            }
+            if (keep_alive) continue
+            if (has_dispose) continue
+
+            family = 0
+            for (j = class_line; j <= class_line + 80 && j <= NR; j++) {
+              if (line[j] ~ /^[[:space:]]*[A-Za-z0-9_<>,?[:space:]]+[[:space:]]+build[[:space:]]*\([^)]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/) {
+                family = 1
+                break
+              }
+            }
+            if (family) continue
+
+            rationale = 0
+            for (j = i - 6; j < i; j++) {
+              if (j > 0 && line[j] ~ /(auto[- ]?dispose|ephemeral|transient|route[- ]?local|screen[- ]?local|reset when|dispose when unused)/) {
+                rationale = 1
+              }
+            }
+            if (rationale) continue
+
+            print FILENAME ":" i ": feature notifier without keepAlive"
+          }
+        }
+      ' "$f" 2>/dev/null || true)
+      [[ -n "$result" ]] && tmp_hits="$tmp_hits"$'\n'"$result"
+    done < <(find "$FLUTTER_ROOT/lib/features" -type f -path '*/presentation/notifiers/*_notifier.dart' 2>/dev/null)
+    printf '%s\n' "${tmp_hits#$'\n'}"
+  }
+
+  COUNT=0
+  while IFS= read -r match; do
+    [[ -z "$match" ]] && continue
+    COUNT=$((COUNT + 1))
+  done < <(feature_notifier_keepalive_scan | head -n 5)
+  [[ $COUNT -gt 0 ]] && add_violation "$COUNT feature presentation notifier(s) auto-dispose without keepAlive or rationale. Use @Riverpod(keepAlive: true) unless it is family, lifecycle-cleanup, or documented ephemeral state."
+
   COUNT=0
   while IFS= read -r match; do
     [[ -z "$match" ]] && continue
