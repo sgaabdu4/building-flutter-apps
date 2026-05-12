@@ -80,7 +80,7 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | Widget test, `ProviderContainer.test()`, `UncontrolledProviderScope`, fakes, mocks, `AppWidgetKeys`, event-contract tests | [testing.md](references/testing.md) |
 | `flutter_driver`, Dart MCP, E2E, `integration_test`, semantic selectors, log capture | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 | Hive, `TypeAdapter`, TypeId, box, persistence migration, retired field accounting | [hive-persistence.md](references/hive-persistence.md) |
-| Crashlytics, error reporting, `Crash` facade, recoverable error classifier, symbol upload | [crashlytics.md](references/crashlytics.md) |
+| Crashlytics, error reporting, `Crash` facade, recoverable error classifier, symbol upload, three-hook wiring (`FlutterError.onError` + `PlatformDispatcher.instance.onError` + `Isolate.current.addErrorListener`), `runZonedGuarded` legacy (Flutter 3.3+) | [crashlytics.md](references/crashlytics.md) |
 | Mixin, capability vs interface, retry helper, RNG, bulk operation | [mixins.md](references/mixins.md) |
 | Service, singleton, fire-and-forget, `abstract final class`, `unawaited()`, `Future<void>` signature | [services-and-singletons.md](references/services-and-singletons.md) |
 | `@Preview`, `widget_previews.dart`, preview fakes, deterministic preview data | [widget-previews.md](references/widget-previews.md) |
@@ -164,8 +164,11 @@ dart run build_runner clean && dart run build_runner build --delete-conflicting-
 | Tool | Auto-install command | Hook source |
 |---|---|---|
 | Claude Code | `/plugin marketplace add sgaabdu4/building-flutter-apps` then `/plugin install building-flutter-apps@building-flutter-apps` | `hooks/hooks.json` |
-| Codex CLI | `codex` → `/plugins` (add `sgaabdu4/building-flutter-apps`, install) | `hooks/hooks.json` (same as Claude) |
+| Codex CLI | `codex` → `/plugins` (add `sgaabdu4/building-flutter-apps`, install) | default `hooks/hooks.json` |
 | Copilot CLI | `copilot plugin marketplace add sgaabdu4/building-flutter-apps` then `copilot plugin install building-flutter-apps` | `hooks/hooks.copilot.json` |
+
+Raw skill installs are guidance-only. They load this file but cannot register
+runtime hooks or run scanners. Use plugin installs when enforcement matters.
 
 ## Pre-Flight
 

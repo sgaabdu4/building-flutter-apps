@@ -12,7 +12,9 @@
 
 ## Installation
 
-Three one-line installs. Hooks auto-wire on plugin install. No file copying.
+Install this as a plugin, not as a raw skill, when you want enforcement. Raw
+Agent Skills installs only provide prompt guidance; they cannot register hooks
+or run scanners.
 
 ### Claude Code
 
@@ -21,7 +23,8 @@ Three one-line installs. Hooks auto-wire on plugin install. No file copying.
 /plugin install building-flutter-apps@building-flutter-apps
 ```
 
-Reads `.claude-plugin/marketplace.json` + `.claude-plugin/plugin.json`. Auto-loads `hooks/hooks.json`:
+Reads `.claude-plugin/marketplace.json` + `.claude-plugin/plugin.json`.
+Auto-loads `hooks/hooks.json`:
 
 - **PostToolUse** (`dart_gate.sh`) — grep + awk checks after every `Write|Edit|MultiEdit`; blocks turn with violation reason.
 - **Stop** (`preflight_audit.sh`) — full repo audit + `dart analyze --fatal-infos` before turn ends.
@@ -36,7 +39,20 @@ codex
 # install building-flutter-apps
 ```
 
-Reads `.codex-plugin/plugin.json` (also recognizes `.claude-plugin/marketplace.json`). Auto-loads default `hooks/hooks.json` — same `PostToolUse`/`Stop`/`UserPromptSubmit` events, same scripts as Claude.
+Reads `.codex-plugin/plugin.json` (also recognizes `.claude-plugin/marketplace.json`).
+Auto-loads the default `hooks/hooks.json` — same `PostToolUse`/`Stop`/`UserPromptSubmit`
+events, same scripts as Claude.
+
+Codex hooks must be enabled in the CLI. Current Codex builds expose hooks as a
+stable feature; older builds may require:
+
+```toml
+[features]
+codex_hooks = true
+```
+
+Some builds also gate plugin-bundled hooks behind `plugin_hooks`; verify with
+`codex features list` when testing the package locally.
 
 ### Copilot CLI
 
@@ -52,6 +68,21 @@ Reads `.github/plugin/marketplace.json` + root `plugin.json`. Auto-loads `hooks/
 - **userPromptSubmitted** → `skill_reminder.sh`
 
 All scripts no-op outside Flutter projects (gated on upward `pubspec.yaml` discovery).
+
+### Enforcement model
+
+Install-time script execution is not a safe assumption across agent runtimes.
+The enforceable contract is:
+
+1. **Plugin install wires hooks** for Claude Code, Codex CLI, and Copilot CLI.
+2. **First Flutter prompt/edit/stop proves hooks are active** because the
+   `UserPromptSubmit`, `PostToolUse`, and `Stop`/`agentStop` hooks fire from the
+   installed plugin.
+3. **Project CI remains the hard gate** through `dart analyze` with
+   `flutter_skill_lints` and `riverpod_lint` in `analysis_options.yaml`.
+
+If a user installs only `SKILL.md` or copies `~/.agents/skills/building-flutter-apps`,
+none of the scanners run. Treat that as guidance-only mode.
 
 ### Project bootstrap (one-time per Flutter project)
 
@@ -73,7 +104,11 @@ The skill enforces ~218 rules across SKILL.md + 23 references via a 3-tier mecha
 | **Write-time grep** | `hooks/scripts/dart_gate.sh` (PostToolUse hook) + `hooks/scripts/preflight_audit.sh` (Stop hook) | hardcoded UI strings, inline `ValueKey('...')`, raw `context.go('/string')`, snackbar dispatch from widget, `AppLocalizations.of(context)!`, app-root text scale clamp |
 | **Prompt** | SKILL.md `<gate>` + `<critical-always>` + `<trigger-map>` + tiered `<pre-flight>` + `<recap>`; each reference file has its own `<trigger>` + `<recap>` | semantic / architectural rules — `_ensureRepository` in mutations, sync notifier init order, source-of-truth refresh, observer+writer E2E, navigation sequencing, etc. |
 
-Cross-tool: Claude Code, Codex CLI, and Copilot CLI all auto-install hooks via the install commands above. All three fire the same three scripts in `hooks/scripts/`. The AST tier (`dart analyze` + `flutter_skill_lints`) applies wherever `dart analyze` runs. The prompt tier (SKILL.md + references) applies on every Agent Skills tool.
+Cross-tool: Claude Code, Codex CLI, and Copilot CLI all install hook manifests
+via the plugin install commands above. All three fire the same three scripts in
+`hooks/scripts/`. The AST tier (`dart analyze` + `flutter_skill_lints`) applies
+wherever `dart analyze` runs. The prompt tier (SKILL.md + references) applies
+on every Agent Skills tool, but it does not execute scanners by itself.
 
 ## What's Included
 

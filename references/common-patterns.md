@@ -23,7 +23,7 @@ Before generating code in this area, output verbatim: `Reading: common-patterns.
 
 ## Rules — NEVER Violate
 
-1. **MUST** use typed GoRouter routes (`const MyRoute().go(context)`) — NEVER string-based `context.go('/path')`.
+1. **MUST** use typed GoRouter routes (`const MyRoute().go(context)` / `const MyRoute().push<T>(context)`) — NEVER string-based `context.go('/path')` (lint: `router_string_nav`), `GoRouter.of(context).push|go|...` (lint: `router_gorouter_of`), or `Navigator.of(context).push(MaterialPageRoute(...))` (lint: `router_untyped_navigator_push`).
 2. **NEVER** use `ref.watch()` inside GoRouter `redirect` — recreates router every state change.
 3. **MUST** guard `if (!ref.mounted) return;` after EVERY `await` in notifiers (pagination, search, forms, sync).
 4. **MUST** use `ref.listen()` + `refreshListenable` for GoRouter redirect triggers — NEVER `ref.watch()`.
@@ -33,6 +33,7 @@ Before generating code in this area, output verbatim: `Reading: common-patterns.
 8. **Route-id lookups in widget `build()` MUST be nullable.** Use by-id provider + fallback UI. Never throw in `build()`.
 9. **Wizard/deep-link mutation order MUST be:** persist write → targeted parent sync → navigate.
 10. **Repo mounted rule:** keep `context.mounted` in widget async flows. Never swap to `mounted` to silence lint; refactor flow instead.
+11. **NEVER** wrap `runApp` in `runZonedGuarded` — legacy (Flutter 3.3+), misses platform-channel async errors. Use the three-hook pattern: `FlutterError.onError` + `PlatformDispatcher.instance.onError` + `Isolate.current.addErrorListener` (lint: `avoid_run_zoned_guarded`). See [crashlytics.md](crashlytics.md).
 
 ```mermaid
 graph TD
@@ -576,9 +577,15 @@ if (context.canPop()) {
 }
 const ProductListRoute().go(context);
 
-// WRONG — NEVER use string-based navigation (no type safety)
-// context.go('/products/${product.id}');
 ```
+
+**Forbidden (lint enforced)** — every form below has a typed-route replacement above:
+
+| Anti-pattern | Lint |
+|---|---|
+| `context.go('/products/${id}')` / any string path | `router_string_nav` |
+| `GoRouter.of(context).push(...)` / `.go` / `.pushNamed` / `.replace` | `router_gorouter_of` |
+| `Navigator.of(context).push(MaterialPageRoute(...))` / `CupertinoPageRoute` / `PageRouteBuilder` | `router_untyped_navigator_push` |
 
 ### StatefulShellRoute Tabs
 
@@ -773,7 +780,7 @@ Future<void> _onCreateCallback() async {
 
 ## Recap
 
-1. MUST use typed GoRouter routes (`const MyRoute().go(context)`) — NEVER string-based `context.go('/path')` when a typed route exists.
+1. MUST use typed GoRouter routes (`const MyRoute().go(context)` / `const MyRoute().push<T>(context)`) — NEVER string-based `context.go('/path')`, `GoRouter.of(context).push|go|...`, or `Navigator.of(context).push(MaterialPageRoute(...))`. Lints: `router_string_nav`, `router_gorouter_of`, `router_untyped_navigator_push`.
 2. MUST guard `if (!ref.mounted) return;` after EVERY `await` in notifiers (pagination, search, forms, sync).
 3. Route-id lookups in widget `build()` MUST be nullable — use a by-id provider + fallback UI. NEVER throw in `build()` for a missing route parameter.
 

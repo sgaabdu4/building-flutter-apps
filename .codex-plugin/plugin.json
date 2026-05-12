@@ -1,6 +1,6 @@
 {
   "name": "building-flutter-apps",
-  "version": "4.4.1",
+  "version": "4.4.2",
   "description": "Flutter app architecture skill: Riverpod 3 codegen, Freezed 3 sealed, GoRouter typed routes, Hive CE persistence, Crashlytics, ShowcaseView, gen-l10n. Pairs with the external flutter_skill_lints analyzer plugin (wired via analysis_options.yaml) for AST-level enforcement. Bundles PostToolUse, Stop, and UserPromptSubmit hooks that auto-fire only inside Flutter projects.",
   "author": {
     "name": "sgaabdu4"
@@ -21,6 +21,5 @@
     "clean-architecture",
     "gen-l10n"
   ],
-  "skills": ["./skills/"],
-  "hooks": "./hooks/hooks.json"
+  "skills": ["./skills/"]
 }

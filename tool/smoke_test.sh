@@ -68,6 +68,39 @@ for f in \
   fi
 done
 
+if python3 - "$PLUGIN_ROOT" <<'PY'
+import json
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+claude = json.loads((root / ".claude-plugin/plugin.json").read_text())
+codex = json.loads((root / ".codex-plugin/plugin.json").read_text())
+copilot = json.loads((root / "plugin.json").read_text())
+
+assert not (root / "hooks/hooks.codex.json").exists()
+assert claude.get("hooks") == "./hooks/hooks.json"
+assert claude.get("skills") == ["./skills/"]
+assert "hooks" not in codex
+assert copilot.get("hooks") == "hooks/hooks.copilot.json"
+
+shared_hooks = json.loads((root / "hooks/hooks.json").read_text())
+commands = [
+    hook["command"]
+    for groups in shared_hooks["hooks"].values()
+    for group in groups
+    for hook in group["hooks"]
+]
+assert commands
+assert all("CODEX_PLUGIN_ROOT" in command for command in commands)
+assert all("CLAUDE_PLUGIN_ROOT" in command for command in commands)
+PY
+then
+  report pass "runtime manifests wire hooks"
+else
+  report fail "runtime manifests wire hooks"
+fi
+
 # --------- 3. Shell syntax ---------
 echo ""
 echo "── 3. Shell syntax ──"

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/dart_gate.sh"
+            "command": "bash -lc 'p=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$p\" ] && p=\"${CODEX_PLUGIN_ROOT:-}\"; if [ -z \"$p\" ]; then for d in \"$HOME\"/.codex/plugins/cache/*/building-flutter-apps/*; do [ -x \"$d/hooks/scripts/dart_gate.sh\" ] && p=\"$d\" && break; done; fi; exec \"${p:?building-flutter-apps plugin root not found}/hooks/scripts/dart_gate.sh\"'"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/preflight_audit.sh"
+            "command": "bash -lc 'p=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$p\" ] && p=\"${CODEX_PLUGIN_ROOT:-}\"; if [ -z \"$p\" ]; then for d in \"$HOME\"/.codex/plugins/cache/*/building-flutter-apps/*; do [ -x \"$d/hooks/scripts/preflight_audit.sh\" ] && p=\"$d\" && break; done; fi; exec \"${p:?building-flutter-apps plugin root not found}/hooks/scripts/preflight_audit.sh\"'"
           }
         ]
       }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/skill_reminder.sh"
+            "command": "bash -lc 'p=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$p\" ] && p=\"${CODEX_PLUGIN_ROOT:-}\"; if [ -z \"$p\" ]; then for d in \"$HOME\"/.codex/plugins/cache/*/building-flutter-apps/*; do [ -x \"$d/hooks/scripts/skill_reminder.sh\" ] && p=\"$d\" && break; done; fi; exec \"${p:?building-flutter-apps plugin root not found}/hooks/scripts/skill_reminder.sh\"'"
           }
         ]
       }
