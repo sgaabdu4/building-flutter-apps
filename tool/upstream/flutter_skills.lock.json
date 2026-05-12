@@ -2,8 +2,8 @@
   "version": 1,
   "source": "https://github.com/flutter/skills.git",
   "branch": "main",
-  "commit": "a43f55998b56b8b61e82b2ce012a4e4066ba8118",
-  "checked_at": "2026-05-11T06:27:19Z",
+  "commit": "e4497873950727ee781fa411c1a2f624b1ec50c6",
+  "checked_at": "2026-05-12T21:39:20Z",
   "skill_count": 10,
   "skills": {
     "flutter-add-integration-test": {
@@ -62,7 +62,7 @@
     },
     "flutter-use-http-package": {
       "path": "skills/flutter-use-http-package/SKILL.md",
-      "sha256": "6d53f8bac039151166fececdc31cbaf2762abe96a323f697ecbebc347adb10e3",
+      "sha256": "439fec047f07e9ec7cd387bf506801bb11b2b9037e5d2c5c03602360532980c4",
       "last_modified": "Tue, 21 Apr 2026 21:36:42 GMT",
       "model": "models/gemini-3.1-pro-preview"
     }

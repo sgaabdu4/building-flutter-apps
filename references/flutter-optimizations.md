@@ -455,7 +455,7 @@ void initState() {
 
 ## Recap
 
-1. NEVER use `shrinkWrap: true` on `ListView`/`GridView`. It defeats lazy rendering and causes O(N) layout on every rebuild. Replace with `Slivers` (`SliverList`, `SliverGrid`) inside a `CustomScrollView`.
+1. NEVER enable shrinkWrap on `ListView`/`GridView`. It defeats lazy rendering and causes O(N) layout on every rebuild. Replace with `Slivers` (`SliverList`, `SliverGrid`) inside a `CustomScrollView`.
 2. Use `FadeTransition` instead of the `Opacity` widget for fade animations. `Opacity` triggers `saveLayer()` which allocates an offscreen framebuffer on every frame; `FadeTransition` avoids this overhead.
 3. MUST dispose every `AnimationController` in `dispose()` or `ref.onDispose()`. Undisposed controllers keep `Ticker` alive, preventing garbage collection and causing memory leaks.
 

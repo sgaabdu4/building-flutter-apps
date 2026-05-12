@@ -46,7 +46,7 @@ In `/plugins`, choose the `building-flutter-apps` marketplace tab, open the
 Reads `.codex-plugin/plugin.json` from the installed plugin. Codex marketplaces
 can be added from GitHub shorthand (`owner/repo`), Git URLs, SSH URLs, or local
 marketplace roots; Codex also recognizes repo-local
-`.claude-plugin/marketplace.json` entries. Auto-loads the default
+`.claude-plugin/marketplace.json` entries. Auto-loads the manifest-declared
 `hooks/hooks.json` — same `PostToolUse`/`Stop`/`UserPromptSubmit` events, same
 scripts as Claude.
 
@@ -60,14 +60,15 @@ hooks = true
 plugin_hooks = true
 ```
 
-`codex_hooks` is still accepted as a legacy alias for `hooks`, but new installs
-should use `hooks`.
+Public Codex docs may still show `codex_hooks` for the lifecycle hook gate.
+Use the CLI commands above on current Codex builds; `codex features list`
+shows the feature key your installed CLI accepts.
 
 ### Copilot CLI
 
 ```bash
 copilot plugin marketplace add sgaabdu4/building-flutter-apps
-copilot plugin install building-flutter-apps
+copilot plugin install building-flutter-apps@building-flutter-apps
 ```
 
 Reads `.github/plugin/marketplace.json` + root `plugin.json`. Auto-loads `hooks/hooks.copilot.json` (camelCase event names, `bash`/`powershell` fields per Copilot schema):
@@ -105,7 +106,8 @@ dart analyze   # confirms wiring
 
 ## How drift is prevented
 
-The skill enforces ~218 rules across SKILL.md + 23 references via a 3-tier mechanism:
+The skill enforces rules across SKILL.md, the reference docs, and the bundled
+analyzer config via a 3-tier mechanism:
 
 | Tier | Mechanism | Covers |
 |---|---|---|
@@ -125,7 +127,8 @@ Flutter dev guidance, modern best practices:
 
 ### Core Stack
 
-This is the canonical version table (SSOT). Every reference and `CONTRIBUTING.md` mirrors it.
+This is the canonical version table (SSOT). Update related setup snippets when
+changing it.
 
 | Package | Constraint | Purpose |
 |---------|-----------|---------|
@@ -139,7 +142,7 @@ This is the canonical version table (SSOT). Every reference and `CONTRIBUTING.md
 | go_router | `^17.2.3` | Declarative routing |
 | go_router_builder | `^4.3.0` | Typed route codegen (dev_dependency) |
 | hive_ce | `^2.19.3` | Binary local persist |
-| hive_ce_flutter | `^2.4.0` | Flutter glue for `hive_ce` |
+| hive_ce_flutter | `^2.3.4` | Flutter glue for `hive_ce` |
 | hive_ce_generator | `1.11.0` | Hive type adapters (**exact pin** — see note) |
 | build_runner | `^2.15.0` | Codegen runner (dev_dependency) |
 | showcaseview | `^5.0.2` | First-run guided tours |
@@ -206,7 +209,7 @@ lib/
 |---|---|---|
 | [Claude Code](https://code.claude.com/) | PostToolUse + Stop + UserPromptSubmit | `/plugin marketplace add sgaabdu4/building-flutter-apps` |
 | [Codex CLI](https://developers.openai.com/codex/cli) | PostToolUse + Stop + UserPromptSubmit | `codex features enable hooks`, `codex features enable plugin_hooks`, `codex plugin marketplace add sgaabdu4/building-flutter-apps`, then `codex` → `/plugins` |
-| [Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/copilot-cli) | postToolUse + agentStop + userPromptSubmitted | `copilot plugin marketplace add sgaabdu4/building-flutter-apps` |
+| [Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/copilot-cli) | postToolUse + agentStop + userPromptSubmitted | `copilot plugin marketplace add sgaabdu4/building-flutter-apps`, then `copilot plugin install building-flutter-apps@building-flutter-apps` |
 | Any other Agent Skills tool | Skill text only (no hooks) | Read SKILL.md directly |
 
 ## Usage

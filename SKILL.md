@@ -19,7 +19,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.0.0"
+  version: "5.0.1"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -106,7 +106,7 @@ Version SSOT: [README.md → Core Stack](README.md).
 | go_router + go_router_builder | `^17.2.3` / `^4.3.0` | Declarative, type-safe routing |
 | json_serializable + build_runner | `6.13.0` / `^2.15.0` | JSON serialization + code generation |
 | showcaseview | `^5.0.2` | First-run guided tours |
-| hive_ce + hive_ce_flutter + hive_ce_generator | `^2.19.3` / `^2.4.0` / `1.11.0` | Local persistence |
+| hive_ce + hive_ce_flutter + hive_ce_generator | `^2.19.3` / `^2.3.4` / `1.11.0` | Local persistence |
 
 ## Architecture
 
@@ -166,9 +166,9 @@ dart run build_runner clean && dart run build_runner build --delete-conflicting-
 
 | Tool | Auto-install command | Hook source |
 |---|---|---|
-| Claude Code | `/plugin marketplace add sgaabdu4/building-flutter-apps` then `/plugin install building-flutter-apps@building-flutter-apps` | `hooks/hooks.json` |
-| Codex CLI | `codex` → `/plugins` (add `sgaabdu4/building-flutter-apps`, install) | default `hooks/hooks.json` |
-| Copilot CLI | `copilot plugin marketplace add sgaabdu4/building-flutter-apps` then `copilot plugin install building-flutter-apps` | `hooks/hooks.copilot.json` |
+| Claude Code | `/plugin marketplace add sgaabdu4/building-flutter-apps` then `/plugin install building-flutter-apps@building-flutter-apps`; run `/reload-plugins` in the active session | `hooks/hooks.json` |
+| Codex CLI | `codex features enable hooks`, `codex features enable plugin_hooks`, `codex plugin marketplace add sgaabdu4/building-flutter-apps`, then `codex` → `/plugins` → install | `hooks/hooks.json` |
+| Copilot CLI | `copilot plugin marketplace add sgaabdu4/building-flutter-apps` then `copilot plugin install building-flutter-apps@building-flutter-apps` | `hooks/hooks.copilot.json` |
 
 Raw skill installs are guidance-only. They load this file but cannot register
 runtime hooks or run scanners. Use plugin installs when enforcement matters.

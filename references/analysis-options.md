@@ -27,8 +27,8 @@ Plugin block:
 ```yaml
 plugins:
   flutter_skill_lints:
-  # Pre-release pin: lift when riverpod_lint 3.2.0 stable lands.
-  # Verify pub.dev before ship. Promote to latest stable when possible.
+  # Pre-release pin: latest stable is 3.1.3; use 3.1.4-dev.3 for Riverpod 3.3-era lint coverage.
+  # Verify pub.dev before ship. Promote to a stable release when compatible.
   # Pre-release silently adopts dev behavior — review.
   riverpod_lint: 3.1.4-dev.3
 ```
@@ -69,13 +69,14 @@ CI/scripts: `dart analyze`. Never `flutter analyze lib`.
 
 Symptom: `server.pluginError`, `analysis server crashed`, `plugin failed to load`, `IsolateSpawnException`, hang, IDE Dart pane dies.
 
-Cause: plugin packages (`riverpod_lint`, `custom_lint`, `flutter_skill_lints`, ...) listed in `pubspec.yaml` `dependencies:`/`dev_dependencies:` AND top-level `plugins:` block. Two paths conflict → crash.
+Cause: analyzer plugin packages (`riverpod_lint`, `custom_lint`, `flutter_skill_lints`, ...) listed in `pubspec.yaml` `dependencies:`/`dev_dependencies:` AND top-level `plugins:` block. Two paths conflict → crash.
 
 Fix:
 1. Open `pubspec.yaml`.
-2. Remove from `dependencies:`/`dev_dependencies:`: `riverpod_lint`, `custom_lint`, `custom_lint_builder`, `flutter_skill_lints`, `flutter_lints` (when top-level plugins used), any other analyzer plugin.
-3. Keep ONLY in `analysis_options.yaml` `plugins:`.
-4. `flutter pub get` → restart analysis server (IDE: "Restart Analysis Server"; CLI: re-run `dart analyze`).
+2. Remove analyzer plugin packages from `dependencies:`/`dev_dependencies:`: `riverpod_lint`, `custom_lint`, `custom_lint_builder`, `flutter_skill_lints`, any other package listed under top-level `plugins:`.
+3. Keep analyzer plugins ONLY in `analysis_options.yaml` `plugins:`.
+4. Keep lint packages referenced by `include:` as normal dev dependencies; this config includes `package:flutter_lints/flutter.yaml`.
+5. `flutter pub get` → restart analysis server (IDE: "Restart Analysis Server"; CLI: re-run `dart analyze`).
 
 Rule: plugins live in `analysis_options.yaml plugins:`. Never both places.
 
@@ -112,6 +113,5 @@ After fresh cache: remaining diagnostics are real plugin lints, not crashes.
 ## Recap
 
 1. Run `dart analyze` from package root with no path argument. `flutter analyze lib` exits before plugin diagnostics report — plugin lints are silently dropped.
-2. Plugins live in `analysis_options.yaml` top-level `plugins:` block ONLY. NEVER list `riverpod_lint`, `custom_lint`, or `flutter_skill_lints` in `pubspec.yaml` `dependencies:`/`dev_dependencies:` — two paths conflict and crash the analysis server.
+2. Analyzer plugins live in `analysis_options.yaml` top-level `plugins:` block ONLY. NEVER list `riverpod_lint`, `custom_lint`, or `flutter_skill_lints` in `pubspec.yaml` `dependencies:`/`dev_dependencies:` — two paths conflict and crash the analysis server. Keep `flutter_lints` as a dev dependency when `include: package:flutter_lints/flutter.yaml` is present.
 3. Exclude generated files (`*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`) and enable `strict-casts`, `strict-inference`, `strict-raw-types: true`.
-
