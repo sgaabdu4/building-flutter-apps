@@ -2,6 +2,8 @@
 
 Wrap domain primitives in sealed Freezed classes. Kills primitive obsession. Sidesteps `arch_domain_import`.
 
+Raw redirects private (`._name`). Validated public factory only. No named primitive factories on entities. No hand-rolled `copyWith` in `/domain/`. Convert primitives at data/notifier/import boundaries — never inside `/domain/`.
+
 ## Trigger
 
 Signals: `Distance`, `Money`, `Email`, `Username`, `Slug`, `PhoneNumber`, `HeartRate`, `Weight`, `Pace`, unit conversion in domain, currency math in domain, bare `double distanceMeters` / `int amountCents` / `String email` at entity boundary, `arch_domain_import` fighting `core/extensions/` import.
@@ -34,16 +36,18 @@ Both match `/domain/` → both allowed.
 import 'package:freezed_annotation/freezed_annotation.dart';
 part 'distance.freezed.dart';
 
-@freezed
+@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
 sealed class Distance with _$Distance {
   const Distance._();
-  const factory Distance.meters(double value) = _Meters;
-  const factory Distance.kilometers(double value) = _Kilometers;
-  const factory Distance.miles(double value) = _Miles;
+  const factory Distance._meters(double value) = _Meters;
+  const factory Distance._kilometers(double value) = _Kilometers;
+  const factory Distance._miles(double value) = _Miles;
 
   factory Distance.fromMeters(double m) {
-    assert(m >= 0, 'Distance cannot be negative');
-    return Distance.meters(m);
+    if (m.isNaN || !m.isFinite || m < 0) {
+      throw ArgumentError.value(m, 'm', 'Distance must be finite and non-negative');
+    }
+    return Distance._meters(m);
   }
 
   double get inMeters => switch (this) {
@@ -72,8 +76,8 @@ class WorkoutSet with _$WorkoutSet {
 ```dart
 enum Currency { usd, eur, gbp, sar }
 
-@freezed
-class Money with _$Money {
+@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+sealed class Money with _$Money {
   const Money._();
   const factory Money({required int cents, required Currency currency}) = _Money;
   factory Money.usd(double dollars) => Money(cents: (dollars * 100).round(), currency: Currency.usd);
@@ -96,8 +100,8 @@ Text(order.total.asDouble.asCurrency(symbol: '\$'))
 ## Email (identity)
 
 ```dart
-@freezed
-class Email with _$Email {
+@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+sealed class Email with _$Email {
   const Email._();
   const factory Email._raw(String value) = _Email;
 
@@ -144,7 +148,135 @@ class Order {
   final Email customerEmail;
   final Weight weight;
 }
+
+// ❌ public raw VO constructor — caller skips invariants (vo_public_raw_constructor)
+@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+sealed class Distance with _$Distance {
+  const Distance._();
+  const factory Distance.meters(double value) = _Meters;
+}
+
+// ❌ passthrough factory — looks compliant, still skips validation (vo_public_raw_constructor)
+@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+sealed class Distance with _$Distance {
+  const Distance._();
+  const factory Distance._meters(double value) = _Meters;
+  factory Distance.meters(double value) => Distance._meters(value);  // zero-touch forward
+}
+
+// ✅ private raw redirect + public factory with EXPLICIT guards in body
+@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+sealed class Distance with _$Distance {
+  const Distance._();
+  const factory Distance._meters(double value) = _Meters;
+  factory Distance.fromMeters(double m) {
+    if (m.isNaN) throw ArgumentError.value(m, 'm', 'Distance cannot be NaN');
+    if (!m.isFinite) throw ArgumentError.value(m, 'm', 'Distance must be finite');
+    if (m < 0) throw ArgumentError.value(m, 'm', 'Distance cannot be negative');
+    return Distance._meters(m);
+  }
+}
+
+// ✅ extracted guard helper — still validates, lint passes (body is function call, not bare arg)
+@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+sealed class Distance with _$Distance {
+  const Distance._();
+  const factory Distance._meters(double value) = _Meters;
+  factory Distance.meters(double v) => Distance._meters(_guard(v, 'meters'));
+  static double _guard(double v, String unit) {
+    if (v.isNaN || !v.isFinite || v < 0) {
+      throw ArgumentError.value(v, 'v', 'Distance.$unit must be finite and non-negative');
+    }
+    return v;
+  }
+}
+
+// ❌ named primitive factory on domain entity — boundary in wrong layer (domain_entity_primitive_factory)
+// (entity, not VO — bare `@freezed` is fine here; opt-out only required in /domain/value_objects/)
+@freezed
+sealed class User with _$User {
+  const factory User({required Email email}) = _User;
+  factory User.fromPrimitives(String emailString) => User(email: Email(emailString));
+}
+
+// ✅ convert primitives at data/notifier/import boundary; entity accepts VOs only
+@freezed
+sealed class User with _$User {
+  const factory User({required Email email}) = _User;
+}
+// inside UserModel.toEntity() or UserImportService — outside /domain/:
+//   User(email: Email(json['email'] as String))
+
+// ❌ hand-rolled copyWith in /domain/ (domain_custom_copy_with)
+@freezed
+sealed class User with _$User {
+  const User._();
+  const factory User({required String id, required Email email}) = _User;
+  User copyWith({String? id, Email? email}) => User(id: id ?? this.id, email: email ?? this.email);
+}
+
+// ✅ let Freezed generate copyWith from the redirect — change the constructor if the API is wrong
+@freezed
+sealed class User with _$User {
+  const User._();
+  const factory User({required String id, required Email email}) = _User;
+}
 ```
+
+### Hive collision
+
+Disk sacred. `hive_ce_generator` writes `HiveField(N)` indices to `hive_adapters.g.yaml` (committed) from Freezed ctor param order on first run. Wrapping a primitive in a VO on a `@GenerateAdapters`-registered class regenerates that yaml against the new shape — different binary layout from the one on user disks. `dart analyze` blind. Per the [hive_ce docs](https://github.com/IO-Design-Team/hive_ce_docs/blob/master/custom-objects/generate_adapters.md): *"Changing the type of a field is not supported. You should create a new one instead."*
+
+**Option A — entity stays primitive, VO via getter.** Use when entity shipped w/ user data.
+
+```dart
+@freezed
+sealed class WorkoutSet with _$WorkoutSet {
+  const WorkoutSet._();
+  const factory WorkoutSet({
+    required String id,
+    /// HiveField(1)
+    required double distanceMeters,  // locked
+    /// HiveField(2)
+    required int durationSeconds,    // locked
+  }) = _WorkoutSet;
+  Distance get distance => Distance.fromMeters(distanceMeters);
+  Duration get duration => Duration(seconds: durationSeconds);
+}
+```
+
+**Option B — separate Model (Hive) + Entity (VOs) + mapper.** Use for new entities.
+
+```dart
+// /data/models/workout_set_model.dart
+@freezed
+sealed class WorkoutSetModel with _$WorkoutSetModel {
+  const factory WorkoutSetModel({
+    /// HiveField(0)
+    required String id,
+    /// HiveField(1)
+    required double distanceMeters,
+    /// HiveField(2)
+    required int durationSeconds,
+  }) = _WorkoutSetModel;
+}
+@GenerateAdapters([AdapterSpec<WorkoutSetModel>()], firstTypeId: 1) void _h() {}
+
+// /domain/entities/workout_set.dart
+@freezed
+sealed class WorkoutSet with _$WorkoutSet {
+  const factory WorkoutSet({required String id, required Distance distance, required Duration duration}) = _WorkoutSet;
+}
+
+// /data/mappers/workout_set_mapper.dart
+extension WorkoutSetMapper on WorkoutSetModel {
+  WorkoutSet toEntity() => WorkoutSet(id: id, distance: Distance.fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
+}
+```
+
+Forbidden either option: reorder ctor params on `@GenerateAdapters` class, renumber/reuse `HiveField(N)`, reuse retired `typeId`. See [hive-persistence.md](hive-persistence.md).
+
+Lints: `hive_field_no_vo_type` (no VO types on Model ctor params).
 
 ## Test
 

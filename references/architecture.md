@@ -199,6 +199,11 @@ lib/
 
 **MUST be pure Dart.** Allowed imports: `freezed_annotation` + `/domain/` paths only. NEVER `core/extensions/`, `package:flutter`, `dart:ui`. Enforced by `arch_domain_import` (ERROR). Models own behavior derived from own fields (see [freezed-sealed.md](freezed-sealed.md#rich-models)).
 
+Boundary integrity (all ERROR — see [value-objects.md](value-objects.md)):
+- `vo_public_raw_constructor` — VO raw redirects must be private (`._meters`/`._raw`); only validated factories public.
+- `domain_entity_primitive_factory` — `@freezed` entities outside `/domain/value_objects/` must not own named factories. Convert primitives in data/notifier/import boundaries only.
+- `domain_custom_copy_with` — no hand-written `copyWith` in `/domain/`; let Freezed generate it.
+
 Domain derivations:
 - 1 entity, 1 derivation → entity getter
 - Same primitive in 2+ entities → Value Object in `/domain/value_objects/` (see [value-objects.md](value-objects.md))
