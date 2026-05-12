@@ -33,7 +33,7 @@ Before generating code in this area, output verbatim: `Reading: common-patterns.
 8. **Route-id lookups in widget `build()` MUST be nullable.** Use by-id provider + fallback UI. Never throw in `build()`.
 9. **Wizard/deep-link mutation order MUST be:** persist write → targeted parent sync → navigate.
 10. **Repo mounted rule:** keep `context.mounted` in widget async flows. Never swap to `mounted` to silence lint; refactor flow instead.
-11. **NEVER** wrap `runApp` in `runZonedGuarded` — legacy (Flutter 3.3+), misses platform-channel async errors. Use the three-hook pattern: `FlutterError.onError` + `PlatformDispatcher.instance.onError` + `Isolate.current.addErrorListener` (lint: `avoid_run_zoned_guarded`). See [crashlytics.md](crashlytics.md).
+11. **NEVER** wrap `runApp` in `runZonedGuarded` — legacy (Flutter 3.3+), misses platform-channel async errors. Use the three-hook pattern: `FlutterError.onError` + `PlatformDispatcher.instance.onError` + `Isolate.current.addErrorListener`. Any function calling `runApp(...)` (incl. wrappers like `runMainApp`, `bootstrap`) MUST wire all three. Lints: `avoid_run_zoned_guarded` (bans the call) + `require_main_error_hooks` (enforces presence). Escape hatch: `// flutter_skill_lints:configure_error_hooks_elsewhere` inside the body when hooks live in an extracted helper. See [crashlytics.md](crashlytics.md).
 
 ```mermaid
 graph TD
