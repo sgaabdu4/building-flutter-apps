@@ -1,0 +1,18 @@
+{
+  "name": "building-flutter-apps",
+  "owner": {
+    "name": "sgaabdu4"
+  },
+  "metadata": {
+    "description": "Flutter clean-architecture skill with auto-enforcement hooks (Riverpod 3 codegen, Freezed 3 sealed, GoRouter, Hive CE, ShowcaseView).",
+    "version": "4.4.0"
+  },
+  "plugins": [
+    {
+      "name": "building-flutter-apps",
+      "description": "Flutter app architecture skill: Riverpod 3 codegen, Freezed 3 sealed, GoRouter typed routes, Hive CE persistence, Crashlytics, ShowcaseView, gen-l10n. Runs dart analyze --fatal-infos after every file edit; full grep + AST audit at turn-end.",
+      "version": "4.4.0",
+      "source": "."
+    }
+  ]
+}

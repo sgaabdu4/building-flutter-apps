@@ -1,6 +1,30 @@
 # Hive CE Persistence
 
-Binary persistence Flutter. Hive CE + TypeAdapter codegen.
+## Trigger
+
+Signals: hive_ce, TypeAdapter, @GenerateAdapters, IsolatedHive, HiveField
+Before generating code in this area, output verbatim: `Reading: hive-persistence.md`
+
+
+## Contents
+
+- [Core Stack](#core-stack)
+- [Setup](#setup)
+- [TypeAdapter Storage vs JSON](#typeadapter-storage-vs-json)
+- [@GenerateAdapters Pattern](#generateadapters-pattern)
+- [TypeId Management](#typeid-management)
+- [Mixing @HiveType and @GenerateAdapters](#mixing-hivetype-and-generateadapters)
+- [IsolatedHive (background-isolate)](#isolatedhive-background-isolate)
+- [Repository Pattern](#repository-pattern)
+- [Testing with TypeAdapters](#testing-with-typeadapters)
+- [Storage Location](#storage-location)
+- [Critical Rules](#critical-rules)
+- [Retiring entities](#retiring-entities)
+- [Failure signatures](#failure-signatures)
+- [Evolution cheat sheet](#evolution-cheat-sheet)
+- [File Structure](#file-structure)
+- [Adding New Entities](#adding-new-entities)
+- [References](#references)
 
 ## Core Stack
 
@@ -20,8 +44,6 @@ dev_dependencies:
 ```
 
 ## TypeAdapter Storage vs JSON
-
-TypeAdapters big perf win.
 
 | Mode | Reads | Writes | Size |
 |------|-------|--------|------|
@@ -300,6 +322,7 @@ Hive.init(path);
 7. **Idempotent registration** — Check `isAdapterRegistered` in tests
 8. **Store entities, not JSON** — TypeAdapters for direct object storage
 9. **Close boxes** — Call `Hive.close()` in tearDown
+10. **Hive lives in `Local<X>Datasource` ONLY** — Notifiers and widgets NEVER import `package:hive_ce` / `package:hive_ce_flutter` and NEVER call `Hive.openBox` / `Hive.box` / `box.get` / `box.put` / `box.delete`. Datasource implements interface; repository exposes domain entities; notifier depends on repository provider. The hook blocks Hive imports outside `data/datasources/` and `*_datasource.dart` files.
 
 ## Retiring entities
 
@@ -366,3 +389,10 @@ test/shared/
 
 - [Hive CE Documentation](https://docs.hivedb.dev/)
 - [hive_ce on pub.dev](https://pub.dev/packages/hive_ce)
+
+## Recap
+
+1. TypeIds are permanent — NEVER change, rename, or reuse a TypeId after release. Changing a TypeId corrupts all existing boxes that stored the old adapter.
+2. HiveField indices are permanent — NEVER reorder or reuse field indices. Append new fields at the next available index. Reordering causes silent data corruption on existing devices.
+3. Domain entities MUST be Hive-free — only the persistence-only model carries `@HiveField` annotations. Importing Hive into domain or repository layer breaks the clean architecture boundary.
+

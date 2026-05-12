@@ -2,11 +2,31 @@
 
 Flutter tricks: render, scroll, animate, layout, concurrency, size, a11y, adaptive.
 
-**Contents:** [Keys](#keys) | [Slivers](#slivers) | [Avoid shrinkWrap](#avoid-shrinkwrap-true) | [Animations](#animations) | [Rendering Costs](#rendering-costs) | [Isolates](#isolates) | [App Size](#app-size) | [Accessibility](#accessibility) | [Adaptive & Responsive](#adaptive--responsive) | [Build Modes](#build-modes) | [Impeller](#impeller) | [Frame Budget](#frame-budget) | [RepaintBoundary](#repaintboundary) | [Preserving Tab State](#preserving-tab-state) | [Post-Frame Callbacks](#post-frame-callbacks)
+## Trigger
+
+Signals: shrinkWrap, FadeTransition, Sliver, RepaintBoundary, Impeller, Isolate.run, AnimationController
+Before generating code in this area, output verbatim: `Reading: flutter-optimizations.md`
+
+
+## Contents
+
+- [Keys](#keys)
+- [Slivers](#slivers)
+- [Avoid `shrinkWrap: true`](#avoid-shrinkwrap-true)
+- [Animations](#animations)
+- [Rendering Costs](#rendering-costs)
+- [Isolates](#isolates)
+- [App Size](#app-size)
+- [Accessibility](#accessibility)
+- [Adaptive & Responsive](#adaptive--responsive)
+- [Build Modes](#build-modes)
+- [Impeller](#impeller)
+- [Frame Budget](#frame-budget)
+- [RepaintBoundary](#repaintboundary)
+- [Preserving Tab State](#preserving-tab-state)
+- [Post-Frame Callbacks](#post-frame-callbacks)
 
 ## Keys
-
-Keys preserve widget state across tree change.
 
 | Situation | Key Type | Example |
 |-----------|----------|---------|
@@ -33,7 +53,7 @@ Rules:
 
 ## Slivers
 
-Slivers build scroll layouts where sections scroll together. Use `CustomScrollView`, not `ListView` in `SingleChildScrollView`.
+Use `CustomScrollView`, not `ListView` in `SingleChildScrollView`.
 
 ```dart
 CustomScrollView(
@@ -432,4 +452,11 @@ void initState() {
     ref.read(welcomeProvider.notifier).maybeShowWelcomeMessage();
   });
 }
+
+## Recap
+
+1. NEVER use `shrinkWrap: true` on `ListView`/`GridView`. It defeats lazy rendering and causes O(N) layout on every rebuild. Replace with `Slivers` (`SliverList`, `SliverGrid`) inside a `CustomScrollView`.
+2. Use `FadeTransition` instead of the `Opacity` widget for fade animations. `Opacity` triggers `saveLayer()` which allocates an offscreen framebuffer on every frame; `FadeTransition` avoids this overhead.
+3. MUST dispose every `AnimationController` in `dispose()` or `ref.onDispose()`. Undisposed controllers keep `Ticker` alive, preventing garbage collection and causing memory leaks.
+
 ```

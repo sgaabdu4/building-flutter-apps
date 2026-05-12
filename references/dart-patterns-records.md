@@ -1,5 +1,11 @@
 # Dart Patterns & Records
 
+## Trigger
+
+Signals: Records, pattern matching, extension types, destructuring, sealed class switch
+Before generating code in this area, output verbatim: `Reading: dart-patterns-records.md`
+
+
 Rules:
 1. MUST use Records for multiple return values — NEVER `Map<String, dynamic>` or parallel lists.
 2. MUST use Extension Types for entity IDs — NEVER raw `String` when multiple ID types coexist.
@@ -8,7 +14,7 @@ Rules:
 
 ## Records (Dart 3.0)
 
-Immutable, structurally equal. Use for multiple return values.
+Use for multiple return values.
 
 ```dart
 // Positional
@@ -49,7 +55,7 @@ deleteProduct(UserId('u1'));    // compile-time ERROR — wrong type
 deleteProduct(ProductId('p1')); // OK
 ```
 
-Use for: entity IDs, units (Meters, Grams), currencies (USD, EUR). Stops mixing `userId` w/ `productId` at zero cost.
+Use for: entity IDs, units (Meters, Grams), currencies (USD, EUR).
 
 NEVER raw `String`/`int` IDs when multiple distinct ID types in same feature.
 
@@ -143,4 +149,11 @@ final children = [
   ...?conditionalItems,   // spread skipped if null
   const FooterWidget(),
 ];
+
+## Recap
+
+1. MUST use Records for multiple return values — NEVER `Map<String, dynamic>` or parallel lists. Records are typed, destructurable, and require no class definition.
+2. MUST use Extension Types for entity IDs — NEVER raw `String` when multiple ID types coexist. Extension types give compile-time safety at zero runtime cost.
+3. MUST use `if (value case final v?)` for null-binding — NEVER `value!`. Force-unwrap bypasses the type system and throws at runtime instead of failing at compile time.
+
 ```

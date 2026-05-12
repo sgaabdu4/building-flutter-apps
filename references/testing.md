@@ -1,6 +1,29 @@
 # Testing
 
-Test utils Riverpod 3.x + `ProviderContainer.test()`.
+## Trigger
+
+Signals: ProviderContainer.test, UncontrolledProviderScope, mocktail, widget tests, event contract
+Before generating code in this area, output verbatim: `Reading: testing.md`
+
+
+## Contents
+
+- [Rules — NEVER Violate](#rules--never-violate)
+- [Setup](#setup)
+- [Mock Declaration](#mock-declaration)
+- [ProviderContainer.test](#providercontainertest)
+- [Test Helper SSOT](#test-helper-ssot)
+- [Cross-Runtime Contract Drift Tests](#cross-runtime-contract-drift-tests)
+- [overrideWithBuild](#overridewithbuild)
+- [overrideWithValue for Async Providers](#overridewithvalue-for-async-providers)
+- [Widget Tests](#widget-tests)
+- [Widget Key Registry](#widget-key-registry)
+- [WidgetTester.container](#widgettestercontainer)
+- [Testing Notifier Methods](#testing-notifier-methods)
+- [Event Contract and Sync Tests](#event-contract-and-sync-tests)
+- [Testing Repository Layer](#testing-repository-layer)
+- [Testing Union States](#testing-union-states)
+- [Common Pitfalls](#common-pitfalls)
 
 ## Rules — NEVER Violate
 
@@ -71,7 +94,7 @@ verify(() => mock.fetchAll()).called(1);
 
 ## ProviderContainer.test
 
-Replace manual `createContainer`. Auto-dispose each test:
+Auto-dispose each test:
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -444,3 +467,10 @@ test('auth state transitions', () async {
 | Delete/remove leaves stale detail UI | Emit delete/remove event and assert selected state clears or route fallback appears |
 | Generated code/token stale after mutation | Fake source generates new value; notifier must refetch and expose source-of-truth value |
 | Event test passes but real app does not sync | Add writer/observer Dart MCP E2E from [dart-mcp-e2e-testing.md](dart-mcp-e2e-testing.md) |
+
+## Recap
+
+1. MUST mock interfaces (`IProductRepository`), NEVER concrete implementations.
+2. MUST use `ProviderContainer.test()` — NEVER manual `createContainer`. Manual containers leak between tests and corrupt subsequent test state.
+3. MUST use `UncontrolledProviderScope` in widget tests — NEVER raw `ProviderScope` with overrides. Raw `ProviderScope` creates its own container and ignores the test container's overrides.
+

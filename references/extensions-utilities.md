@@ -2,7 +2,50 @@
 
 Context/type extensions + utilities. Kill boilerplate. Snackbars use `SnackBarUtils`, not `ScaffoldMessenger.of(context)`.
 
-**Contents:** [Context Extensions](#context-extensions) | [String Extensions](#string-extensions) | [DateTime Extensions](#datetime-extensions) | [Iterable Extensions](#iterable-extensions) | [Widget List Extensions](#widget-list-extensions) | [SnackBar Utility](#snackbar-utility) | [Debouncer](#debouncer) | [Validators](#validators) | [Result Type](#result-type) | [Extension Types](#extension-types) | [Barrel Export](#barrel-export)
+## Trigger
+
+Signals: SnackBarUtils, context extensions, Debouncer, Validators, extension types, Result type, **any** `DateTime` / `String` / `int` / `double` / `num` / `Duration` formatting / parsing / arithmetic / capitalize / titleCase / truncate / initials / timeAgo / diff / startOfDay / endOfDay / isToday / clamped / pluralized / asCurrency / percent / toFixed / inWords / `NumberFormat` / `DateFormat` / locale-format.
+Before generating code in this area, output verbatim: `Reading: extensions-utilities.md`
+
+## SSOT rule
+
+Primitive manipulation lives in `core/extensions/`. NEVER inline at call site. Authoritative in [SKILL.md → Critical Rule 11](../SKILL.md#critical-rules).
+
+### Forbidden inline → use extension
+
+| Forbidden inline                                        | Use                          |
+|---------------------------------------------------------|------------------------------|
+| `'${s[0].toUpperCase()}${s.substring(1)}'`              | `s.capitalized`              |
+| `s.split(' ').map(...).join(' ')` for title case        | `s.titleCase`                |
+| `s.length > n ? '${s.substring(0,n)}...' : s`           | `s.truncate(n)`              |
+| `DateTime.now().difference(date)` for relative time     | `date.timeAgo`               |
+| `DateTime(d.year, d.month, d.day)` for day boundary     | `d.startOfDay` / `d.endOfDay`|
+| Manual `year == now.year && month == ...` for today     | `d.isToday` / `d.isYesterday`|
+| `NumberFormat.currency(...).format(amount)` ad-hoc      | `amount.asCurrency()`        |
+| `(value * 100).toStringAsFixed(n) + '%'`                | `value.asPercent(n)`         |
+| `value.clamp(lo, hi)` repeated at call site             | `value.clamped(lo, hi)`      |
+| `count == 1 ? 'item' : 'items'`                         | `count.pluralized('item')`   |
+| `Theme.of(context).colorScheme` / `MediaQuery.sizeOf(context)` | `context.colors` / `context.screenSize` |
+
+Missing case? Add to extension file in `core/extensions/`, export in barrel, then call. Don't inline "just this once".
+
+
+## Contents
+
+- [Context Extensions](#context-extensions)
+- [String Extensions](#string-extensions)
+- [DateTime Extensions](#datetime-extensions)
+- [Int Extensions](#int-extensions)
+- [Double / Num Extensions](#double--num-extensions)
+- [Duration Extensions](#duration-extensions)
+- [Iterable Extensions](#iterable-extensions)
+- [Widget List Extensions](#widget-list-extensions)
+- [SnackBar Utility](#snackbar-utility)
+- [Debouncer](#debouncer)
+- [Validators](#validators)
+- [Result Type](#result-type)
+- [Extension Types](#extension-types)
+- [Barrel Export](#barrel-export)
 
 ## Context Extensions
 
@@ -108,6 +151,112 @@ extension DateTimeExtensions on DateTime {
     if (diff.inDays < 365) return '${diff.inDays ~/ 30}mo ago';
     return '${diff.inDays ~/ 365}y ago';
   }
+
+  /// Locale format via `intl`. Default `yMMMd` (e.g. `Jan 5, 2026`).
+  String formatted({String pattern = 'yMMMd', String? locale}) =>
+      DateFormat(pattern, locale).format(this);
+
+  String get asDate => formatted(pattern: 'yMMMd');
+  String get asTime => formatted(pattern: 'jm');
+  String get asDateTime => formatted(pattern: 'yMMMd jm');
+}
+```
+
+Pattern reference: `intl` `DateFormat`. Skill convention — date display ALWAYS via `.formatted(...)` / `.asDate` / `.asTime`, never inline `DateFormat(...)` at widget/notifier site.
+
+## Int Extensions
+
+```dart
+// core/extensions/int_extensions.dart
+extension IntExtensions on int {
+  /// Pluralize: `1.pluralized('item') == '1 item'`, `3.pluralized('item') == '3 items'`.
+  /// Pass explicit plural for irregular nouns: `2.pluralized('child', plural: 'children')`.
+  String pluralized(String singular, {String? plural}) =>
+      this == 1 ? '$this $singular' : '$this ${plural ?? '${singular}s'}';
+
+  int clamped(int lo, int hi) => clamp(lo, hi) as int;
+
+  Duration get days => Duration(days: this);
+  Duration get hours => Duration(hours: this);
+  Duration get minutes => Duration(minutes: this);
+  Duration get seconds => Duration(seconds: this);
+  Duration get milliseconds => Duration(milliseconds: this);
+
+  /// `1234567.compact == '1.2M'`. Wrap `NumberFormat.compact()`.
+  String get compact => NumberFormat.compact().format(this);
+}
+```
+
+Usage:
+
+```dart
+Text(items.length.pluralized('result'))                 // "3 results"
+Future.delayed(300.milliseconds, ...)
+final retries = attempts.clamped(0, 5);
+```
+
+## Double / Num Extensions
+
+```dart
+// core/extensions/double_extensions.dart
+extension DoubleExtensions on double {
+  /// Locale currency. Default project locale via `Intl.defaultLocale`.
+  String asCurrency({String? locale, String? symbol, int decimals = 2}) =>
+      NumberFormat.currency(locale: locale, symbol: symbol, decimalDigits: decimals)
+          .format(this);
+
+  /// `0.875.asPercent() == '88%'`, `0.875.asPercent(1) == '87.5%'`.
+  String asPercent([int decimals = 0]) =>
+      '${(this * 100).toStringAsFixed(decimals)}%';
+
+  double clamped(double lo, double hi) => clamp(lo, hi) as double;
+
+  /// Fixed-decimal string without trailing zeros: `3.10.toFixed(2) == '3.10'`.
+  String toFixed(int decimals) => toStringAsFixed(decimals);
+}
+
+extension NumExtensions on num {
+  /// Locale decimal: `1234567.89.formatted() == '1,234,567.89'`.
+  String formatted({String? locale, int? decimals}) {
+    final fmt = NumberFormat.decimalPattern(locale);
+    if (decimals != null) {
+      fmt
+        ..minimumFractionDigits = decimals
+        ..maximumFractionDigits = decimals;
+    }
+    return fmt.format(this);
+  }
+}
+```
+
+Usage:
+
+```dart
+Text(total.asCurrency(symbol: '\$'))     // "$1,299.00"
+Text(progress.asPercent(1))              // "87.5%"
+Text(score.clamped(0.0, 100.0).toFixed(1))
+```
+
+## Duration Extensions
+
+```dart
+// core/extensions/duration_extensions.dart
+extension DurationExtensions on Duration {
+  /// Human-readable: `2h 15m`, `45s`. Drops zero leading units.
+  String get inWords {
+    if (inDays > 0) return '${inDays}d ${inHours.remainder(24)}h';
+    if (inHours > 0) return '${inHours}h ${inMinutes.remainder(60)}m';
+    if (inMinutes > 0) return '${inMinutes}m ${inSeconds.remainder(60)}s';
+    return '${inSeconds}s';
+  }
+
+  /// Stopwatch-style `mm:ss` or `hh:mm:ss`.
+  String get clock {
+    final h = inHours;
+    final m = inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = inSeconds.remainder(60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
 }
 ```
 
@@ -170,7 +319,7 @@ Boundary rule (notifier/service owns snackbar; widgets dispatch only) =
 authoritative in [SKILL.md → Snackbar boundary](../SKILL.md). This section
 ships the impl; rule repeated only in passing.
 
-Central context-free snackbar. Notifiers/services dispatch snackbar side effects. Widgets/screens call notifier methods and render state; they do not call `SnackBarUtils.show*` or `ScaffoldMessenger.of(context)` directly.
+Central context-free snackbar.
 
 ### Class
 
@@ -407,6 +556,17 @@ Use for entity IDs, units, currencies. NEVER raw `String`/`int` when multiple ID
 export 'context_extensions.dart';
 export 'string_extensions.dart';
 export 'date_time_extensions.dart';
+export 'int_extensions.dart';
+export 'double_extensions.dart';
+export 'duration_extensions.dart';
 export 'iterable_extensions.dart';
 export 'widget_extensions.dart';
 ```
+
+## Recap
+
+1. Notifiers and services own snackbar side effects — widgets MUST NOT call `SnackBarUtils.show*` or `ScaffoldMessenger.of(context)` directly. Widget callbacks dispatch to notifier methods only.
+2. MUST use context extensions (`context.theme`, `context.colors`, `context.textTheme`, `context.screenWidth`) — NEVER call `Theme.of(context)` or `MediaQuery.sizeOf(context)` inline in widget build methods.
+3. MUST use `Debouncer` for search inputs with a minimum 500 ms duration. NEVER trigger API calls on every keystroke without debouncing.
+4. MUST use extensions for `DateTime` / `String` / `int` / `double` / `num` / `Duration` manipulation — capitalize / titleCase / truncate / timeAgo / startOfDay / asCurrency / asPercent / clamped / pluralized / inWords / formatted. NEVER inline at call site. Missing case? Add to `core/extensions/<type>_extensions.dart`, export in barrel, then call.
+

@@ -12,15 +12,68 @@
 
 ## Installation
 
-```bash
-npx skills add sgaabdu4/building-flutter-apps
-```
+Three one-line installs. Hooks auto-wire on plugin install. No file copying.
 
-Or clone to `~/.claude/skills/`:
+### Claude Code
 
 ```bash
-git clone https://github.com/sgaabdu4/building-flutter-apps ~/.claude/skills/building-flutter-apps
+/plugin marketplace add sgaabdu4/building-flutter-apps
+/plugin install building-flutter-apps@building-flutter-apps
 ```
+
+Reads `.claude-plugin/marketplace.json` + `.claude-plugin/plugin.json`. Auto-loads `hooks/hooks.json`:
+
+- **PostToolUse** (`dart_gate.sh`) — grep + awk checks after every `Write|Edit|MultiEdit`; blocks turn with violation reason.
+- **Stop** (`preflight_audit.sh`) — full repo audit + `dart analyze --fatal-infos` before turn ends.
+- **UserPromptSubmit** (`skill_reminder.sh`) — top-5 rules reminder per turn in Flutter projects.
+
+### Codex CLI
+
+```bash
+codex
+/plugins
+# add marketplace https://github.com/sgaabdu4/building-flutter-apps
+# install building-flutter-apps
+```
+
+Reads `.codex-plugin/plugin.json` (also recognizes `.claude-plugin/marketplace.json`). Auto-loads default `hooks/hooks.json` — same `PostToolUse`/`Stop`/`UserPromptSubmit` events, same scripts as Claude.
+
+### Copilot CLI
+
+```bash
+copilot plugin marketplace add sgaabdu4/building-flutter-apps
+copilot plugin install building-flutter-apps
+```
+
+Reads `.github/plugin/marketplace.json` + root `plugin.json`. Auto-loads `hooks/hooks.copilot.json` (camelCase event names, `bash`/`powershell` fields per Copilot schema):
+
+- **postToolUse** → `dart_gate.sh`
+- **agentStop** → `preflight_audit.sh`
+- **userPromptSubmitted** → `skill_reminder.sh`
+
+All scripts no-op outside Flutter projects (gated on upward `pubspec.yaml` discovery).
+
+### Project bootstrap (one-time per Flutter project)
+
+```bash
+cp <plugin-cache>/references/analysis_options.yaml ./analysis_options.yaml
+dart pub get
+dart analyze   # confirms wiring
+```
+
+`flutter_skill_lints` is an external analyzer plugin. List it ONLY under `plugins:` in `analysis_options.yaml` (NEVER in `pubspec.yaml`). The bundled `analysis_options.yaml` already wires it.
+
+## How drift is prevented
+
+The skill enforces ~218 rules across SKILL.md + 23 references via a 3-tier mechanism:
+
+| Tier | Mechanism | Covers |
+|---|---|---|
+| **AST** | `flutter_skill_lints` analyzer plugin running via `dart analyze` | private widget classes, `_buildXxx()`, `dynamic` (except `Map<String, dynamic>`), null-bang, `shrinkWrap: true`, legacy provider types, route-param throw, showcase key filtering, sync notifier state-read, context.pop guard, `ref.mounted` / `context.mounted` after await, sealed Freezed, unawaited fire-and-forget |
+| **Write-time grep** | `hooks/scripts/dart_gate.sh` (PostToolUse hook) + `hooks/scripts/preflight_audit.sh` (Stop hook) | hardcoded UI strings, inline `ValueKey('...')`, raw `context.go('/string')`, snackbar dispatch from widget, `AppLocalizations.of(context)!`, app-root text scale clamp |
+| **Prompt** | SKILL.md `<gate>` + `<critical-always>` + `<trigger-map>` + tiered `<pre-flight>` + `<recap>`; each reference file has its own `<trigger>` + `<recap>` | semantic / architectural rules — `_ensureRepository` in mutations, sync notifier init order, source-of-truth refresh, observer+writer E2E, navigation sequencing, etc. |
+
+Cross-tool: Claude Code, Codex CLI, and Copilot CLI all auto-install hooks via the install commands above. All three fire the same three scripts in `hooks/scripts/`. The AST tier (`dart analyze` + `flutter_skill_lints`) applies wherever `dart analyze` runs. The prompt tier (SKILL.md + references) applies on every Agent Skills tool.
 
 ## What's Included
 
@@ -105,10 +158,12 @@ lib/
 
 ## Compatible Agents
 
-- [Claude Code](https://code.claude.com/)
-- [Cursor](https://cursor.sh/)
-- [Windsurf](https://windsurf.ai/)
-- Any agent w/ [Agent Skills](https://agentskills.io/) standard
+| Tool | Hooks | Install command |
+|---|---|---|
+| [Claude Code](https://code.claude.com/) | PostToolUse + Stop + UserPromptSubmit | `/plugin marketplace add sgaabdu4/building-flutter-apps` |
+| [Codex CLI](https://developers.openai.com/codex/cli) | PostToolUse + Stop + UserPromptSubmit | `codex` → `/plugins` |
+| [Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/copilot-cli) | postToolUse + agentStop + userPromptSubmitted | `copilot plugin marketplace add sgaabdu4/building-flutter-apps` |
+| Any other Agent Skills tool | Skill text only (no hooks) | Read SKILL.md directly |
 
 ## Usage
 

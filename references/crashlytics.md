@@ -2,7 +2,27 @@
 
 Prod wiring. Pattern: backend interface + static facade. Handle platform gating, handler chaining, test seams, non-fatal classify.
 
+## Trigger
+
+Signals: Crashlytics, ICrashBackend, Crash.error, FlutterError.onError, crash reporting
+Before generating code in this area, output verbatim: `Reading: crashlytics.md`
+
+
 > **Swap providers (Sentry, Bugsnag, Datadog, self-hosted).** `ICrashBackend` = seam. New impl (`SentryCrashBackend implements ICrashBackend`), assign in `Crash.init()` instead of `FirebaseCrashBackend`. Facade API (`Crash.error`/`info`/`setUser`/`setKey`), handler chaining, `_isRecoverable`, test seams, every call site stay same. Multi-backend fan-out = `CompositeCrashBackend` forward each method to delegate list. **Never call provider SDK direct from feature code** — only from backend impl.
+
+## Contents
+
+- [Call-site policy](#call-site-policy)
+- [Rules](#rules)
+- [Backend interface](#backend-interface)
+- [Facade — `abstract final class Crash`](#facade--abstract-final-class-crash)
+- [Backends](#backends)
+- [`main.dart`](#maindart)
+- [Call patterns](#call-patterns)
+- [Testing](#testing)
+- [Obfuscated builds](#obfuscated-builds)
+- [Extending the non-fatal classifier](#extending-the-non-fatal-classifier)
+- [Checklist](#checklist)
 
 ## Call-site policy
 
@@ -318,3 +338,9 @@ Repeat non-crash appear fatal in dashboard → add marker string or type to `_is
 - [ ] `debugPrint` alongside Firebase sends
 - [ ] Symbols uploaded in release CI
 - [ ] No PII anywhere
+
+## Recap
+
+1. MUST split into three pieces: `abstract interface class ICrashBackend` + concrete backends (`FirebaseCrashBackend`, `ConsoleCrashBackend`) + static facade `abstract final class Crash`. Feature code calls `Crash.error`/`Crash.info` only — NEVER the SDK directly.
+2. MUST wire three error hooks: `FlutterError.onError` (Flutter widget errors), `PlatformDispatcher.instance.onError` (platform/async errors), and `Isolate.current.addErrorListener` (background isolate errors). Missing any hook leaves a category of crashes unreported.
+3. MUST classify recoverable exceptions as non-fatal (`Crash.error`). NEVER call `Crash.fatal` for RenderFlex overflows, TLS handshakes, past-date scheduling, or plugin-not-found — flooding the fatal dashboard masks real crashes.

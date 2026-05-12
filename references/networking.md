@@ -1,9 +1,10 @@
 # Networking
 
-Networking is a data-layer concern. Widgets and notifiers request use cases or
-repositories; datasources perform HTTP through an app-owned service interface.
-Keep retry, auth headers, base URLs, logging, and response decoding behind that
-service so feature datasources stay small and testable.
+## Trigger
+
+Signals: IHttpService, datasource, HTTP, auth token, background parsing, Isolate.run
+Before generating code in this area, output verbatim: `Reading: networking.md`
+
 
 ## Rules
 
@@ -66,9 +67,6 @@ IHttpService httpService(Ref ref) {
 ```
 
 ## Datasource Pattern
-
-Datasources decode transport payloads into models. They do not catch unless they
-can add useful transport context and rethrow a typed exception.
 
 ```dart
 abstract interface class IProductRemoteDatasource {
@@ -168,3 +166,10 @@ List<ProductModel> parseProducts(String responseBody) {
 - [ ] Mutations refresh source-of-truth when backend values can differ.
 - [ ] Large payload parsing uses isolate/compute path when needed.
 - [ ] Datasource, repository, notifier, and E2E coverage match the risk.
+
+## Recap
+
+1. MUST keep all HTTP calls in datasources — widgets and notifiers NEVER call HTTP clients directly.
+2. MUST inject an interface (`IHttpService`) into datasources — constructors take interfaces, NEVER concrete clients.
+3. MUST throw typed exceptions from infrastructure boundaries — NEVER return `null` for failed network operations.
+

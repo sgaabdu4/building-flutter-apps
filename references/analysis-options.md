@@ -1,5 +1,11 @@
 # analysis_options.yaml
 
+## Trigger
+
+Signals: analysis_options, dart analyze, flutter_skill_lints, riverpod_lint
+Before generating code in this area, output verbatim: `Reading: analysis-options.md`
+
+
 Copy `references/analysis_options.yaml` to every Flutter project root.
 
 ## Required
@@ -102,3 +108,10 @@ dart analyze
 Caveat: never use relative `--cache=` (e.g. `--cache=.dart_tool/cache`). Dart 3.11 resolves it relative to the SDK analysis-server snapshot dir → `invalid plugin.aot`. Absolute paths only.
 
 After fresh cache: remaining diagnostics are real plugin lints, not crashes.
+
+## Recap
+
+1. Run `dart analyze` from package root with no path argument. `flutter analyze lib` exits before plugin diagnostics report — plugin lints are silently dropped.
+2. Plugins live in `analysis_options.yaml` top-level `plugins:` block ONLY. NEVER list `riverpod_lint`, `custom_lint`, or `flutter_skill_lints` in `pubspec.yaml` `dependencies:`/`dev_dependencies:` — two paths conflict and crash the analysis server.
+3. Exclude generated files (`*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`) and enable `strict-casts`, `strict-inference`, `strict-raw-types: true`.
+

@@ -2,6 +2,12 @@
 
 Dart MCP first. Shell fallback only for project commands that MCP cannot run.
 
+## Trigger
+
+Signals: E2E testing, Dart MCP, flutter_driver, integration_test, source-of-truth verification
+Before generating code in this area, output verbatim: `Reading: dart-mcp-e2e-testing.md`
+
+
 https://docs.flutter.dev/ai/mcp-server
 
 Runtime E2E means real app behavior on a real simulator/device. Static review, screenshots without interactions, widget tests, or one-device happy paths do not prove sync/collaboration/cloud behavior.
@@ -196,3 +202,10 @@ Verify:
 6. Relevant tests pass after final runtime fix pass.
 7. Test data cleaned.
 8. All app processes stopped.
+
+## Recap
+
+1. MUST use Dart MCP tools (hot restart, screenshot, tap, input, log inspection) before falling back to shell commands — shell fallback is only for project commands MCP cannot run.
+2. MUST wait for semantic UI state or backend/source-of-truth state — NEVER use blind `sleep` or fixed-duration waits. Waits must be conditional on observable state.
+3. MUST verify source-of-truth state with an admin/API/CLI/read model when remote data is involved. UI-only verification is insufficient for sync/collaboration/cloud behavior.
+

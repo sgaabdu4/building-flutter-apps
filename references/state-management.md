@@ -1,8 +1,35 @@
 # State Management
 
-Notifier pattern manage mutable state w/ Riverpod 3.x codegen.
+## Trigger
+
+Signals: ref.mounted, Notifier, AsyncNotifier, state.copyWith, ref.onDispose, sync notifier trap
+Before generating code in this area, output verbatim: `Reading: state-management.md`
+
+
+## Contents
+
+- [Notifier Structure](#notifier-structure)
+- [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap)
+- [ref.mounted Guard](#refmounted-guard)
+- [Dependency Readiness For Mutations](#dependency-readiness-for-mutations)
+- [Optimistic Updates](#optimistic-updates)
+- [Preventing Duplicate Fetches](#preventing-duplicate-fetches)
+- [Async Initialization](#async-initialization)
+- [AsyncNotifier Pattern](#asyncnotifier-pattern)
+- [AsyncValue.requireValue](#asyncvaluerequirevalue)
+- [Loading Progress](#loading-progress)
+- [Cleanup](#cleanup)
+- [Error Handling Strategy](#error-handling-strategy)
+- [Domain Error Types](#domain-error-types)
+- [Cross-Provider Communication](#cross-provider-communication)
 
 ## Rules — NEVER Violate
+
+0. **NEVER prop-drill state.** Child widgets watch the provider directly via `ref.watch` / `ref.read` / `ref.listen`. Do **not** pass entity / state / notifier instances through constructor parameters. Allowed constructor params: `Key`, callbacks (`VoidCallback`, `ValueChanged`, etc.), primitive props on atoms, and immutable IDs for lookup. `class OrderCard extends StatelessWidget { final OrderEntity order; ... }` — forbidden. `class OrderCard extends ConsumerWidget { final String orderId; ... build → ref.watch(orderProvider(orderId)) }` — correct.
+
+0b. **NEVER call storage SDK from a notifier or widget.** `Hive.openBox`, `Hive.box`, `box.get`/`put`/`delete`, `SharedPreferences.getInstance`, `FlutterSecureStorage()`, `getApplicationDocumentsDirectory()`, `dart:io` file ops — all live behind a `Local<X>Datasource` interface, called by `<X>Repository`. Notifier depends on the repository provider, not on storage. Imports of `package:hive_ce`, `package:hive_ce_flutter`, `package:shared_preferences`, `package:flutter_secure_storage`, `package:path_provider`, or `dart:io` in `*_notifier.dart` or any `presentation/` file are violations.
+
+0c. **MUST extract shared behavior to a mixin.** When the same logic appears in 2+ notifiers, widgets, or services, write `mixin XxxMixin on Y` and apply via `with`. Suffix the name with `Mixin`. Copy-paste sharing across notifiers / widgets / services is forbidden. See [mixins.md](mixins.md).
 
 1. **MUST** check `if (!ref.mounted) return;` after EVERY `await` in notifier.
 2. **MUST** check `if (!context.mounted) return;` after EVERY `await` in widget.
@@ -47,7 +74,7 @@ class ProductPageState extends ConsumerState<ProductPage> {
 }
 ```
 
-Do not pass `BuildContext` into async helpers just for navigation/snackbars. Prefer notifier-owned business logic, then a small sync UI step after `context.mounted`.
+Do not pass `BuildContext` into async helpers just for navigation/snackbars.
 
 ## Notifier Structure
 
@@ -94,11 +121,6 @@ class ProductNotifier extends _$ProductNotifier {
   }
 }
 ```
-
-Key:
-- Initial loading flag set via returned constant — never `state.copyWith` before `build()` returns.
-- `_load()` dispatched via `Future.microtask`, so body runs after `build()` complete + state init.
-- `refresh()` safe w/ `state.copyWith` — runs after mount.
 
 ## Sync Notifier Initialization Trap
 
@@ -581,4 +603,9 @@ class OrderNotifier extends _$OrderNotifier {
 }
 ```
 
-Use `ref.read` one-time access. `ref.watch` rebuild on dep change. `ref.listen` side effect. NEVER `ref.watch()` inside notifier method.
+## Recap
+
+1. MUST `if (!ref.mounted) return;` after EVERY `await` in a notifier — the provider may be disposed while the async operation is in flight, and writing to disposed state throws.
+2. NEVER call `ref.watch()` inside a notifier method — use `ref.read()` for one-time access or `ref.listen()` for reactive side effects. `ref.watch()` in a method body causes rebuild loops.
+3. NEVER read `state` (including `state.copyWith`) before the first assignment in a sync `Notifier.build()` — defer via `Future.microtask` to avoid the "uninitialized provider" exception that fires before `build()` returns.
+

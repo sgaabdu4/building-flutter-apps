@@ -1,6 +1,10 @@
 # Services, Singletons, Fire-and-Forget
 
-Three patterns, one topic: code outside widget tree, no `ref.watch`. Structure + test.
+## Trigger
+
+Signals: abstract final class, singleton, unawaited, fire-and-forget, static facade
+Before generating code in this area, output verbatim: `Reading: services-and-singletons.md`
+
 
 ## When & Why
 
@@ -174,3 +178,9 @@ No assert vs real Firebase backend in unit/widget tests.
 | Async side effect not blocking UI | `unawaited(service.method())` with internal catch |
 
 Default: **provider**. Static-only or singleton only when provider don't fit.
+
+## Recap
+
+1. Pure stateless helpers → `abstract final class` with only `static` members; stateful services with I/O → `@Riverpod(keepAlive: true)` provider. NEVER reach for a singleton when a provider fits.
+2. NEVER write new singletons — wrap any SDK-forced singleton (FirebaseAuth, SharedPreferences, Hive) in a Riverpod provider so it is mockable and scoped correctly.
+3. Fire-and-forget MUST use `unawaited(foo())`, NEVER `void async` lambda. The call MUST catch internally — uncaught throws escape to `PlatformDispatcher.onError` and appear as false fatals in crash reporting.

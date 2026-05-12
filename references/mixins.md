@@ -1,10 +1,16 @@
 # Mixin vs Interface vs Extension
 
-Pick right abstraction. Wrong pick → coupling, bloated hierarchies, dup code.
+## Trigger
+
+Signals: mixin, ConnectivityMixin, ShowcaseScreenMixin, on ConsumerState, abstract interface class
+Before generating code in this area, output verbatim: `Reading: mixins.md`
+
 
 **Contents:** [Rules](#rules--never-violate) | [Decision Tree](#decision-tree) | [Quick Reference](#quick-reference) | [Common Flutter Mixins](#common-flutter-mixins) | [Custom Mixin Example](#custom-mixin-example) | [Restricted Mixin](#mixin-with-on-clause-restricted)
 
 ## Rules — NEVER Violate
+
+0. **MUST extract shared behavior to a mixin the moment it appears in 2+ classes.** When the same code shows up in two notifiers, two widgets, or two services, stop copy-pasting and write a mixin. `mixin XxxMixin on Y` with the right `on` constraint. Suffix `Mixin`. Copy-paste sharing across notifiers / widgets / services is forbidden.
 
 1. **MUST** use `mixin` for reusable behavior across unrelated classes. NEVER inherit to share behavior without "is-a".
 2. **MUST** use `abstract interface class` for contracts (what class must do). MUST use `mixin` for capabilities (what class can do).
@@ -169,3 +175,10 @@ Rules:
 - **Partial-failure**: bulk op collects `SaveRowResult` per item. `throwOnPartialFailure` → `SaveAllRowsException` w/ failure list. No silent drop.
 - **Concurrency cap**: bulk default 4 (avoid 429 bucket swamp). Each item in `retryWithBackoff`.
 - **Not in widgets**: retry = infra. Notifier → datasource → mixin.
+
+## Recap
+
+1. MUST use `mixin` for reusable behavior across unrelated classes — NEVER inherit to share behavior without an "is-a" relationship.
+2. MUST NEVER put mutable state fields in mixins.
+3. MUST suffix mixin names with `Mixin` and keep them single-responsibility.
+

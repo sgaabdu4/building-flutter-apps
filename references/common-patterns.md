@@ -1,6 +1,25 @@
 # Common Patterns
 
-Reusable patterns: pagination, search, forms, debouncing, batch processing.
+## Trigger
+
+Signals: pagination, search debounce, form validation, GoRouter redirect, typed routes
+Before generating code in this area, output verbatim: `Reading: common-patterns.md`
+
+
+## Contents
+
+- [Rules — NEVER Violate](#rules--never-violate)
+- [Route-Param Safety + Wizard Sequencing](#route-param-safety--wizard-sequencing)
+- [Pagination](#pagination)
+- [Search with Debounce](#search-with-debounce)
+- [Local Filter (No API Call)](#local-filter-no-api-call)
+- [Form Validation](#form-validation)
+- [Batch Processing](#batch-processing)
+- [Pull-to-Refresh](#pull-to-refresh)
+- [Navigation with Typed GoRouter](#navigation-with-typed-gorouter)
+- [Long-Running Sync/Auth Cancellation](#long-running-syncauth-cancellation)
+- [Delta Sync (Incremental Remote Pull)](#delta-sync-incremental-remote-pull)
+- [Dismiss Modal → Push Route (Bottom Sheet Navigation)](#dismiss-modal--push-route-bottom-sheet-navigation)
 
 ## Rules — NEVER Violate
 
@@ -353,7 +372,7 @@ class ProductListScreen extends ConsumerWidget {
 
 ## Navigation with Typed GoRouter
 
-Use `go_router_builder` for type-safe routes. Every route = class extending `GoRouteData` with generated mixin. Compiler catches route param errors at build time.
+Use `go_router_builder` for type-safe routes.
 
 ### Setup
 
@@ -505,7 +524,7 @@ class AppLoginPage extends ConsumerWidget {
 
 ## Long-Running Sync/Auth Cancellation
 
-Sign-in sync, import/export, account deletion, and background upload flows can outlive the user/session that started them. Guard with a generation token or cancellation signal before every state write or remote connection change.
+Guard with a generation token or cancellation signal before every state write or remote connection change.
 
 ```dart
 class SyncCoordinator {
@@ -625,7 +644,7 @@ class MyApp extends ConsumerWidget {
 
 ## Delta Sync (Incremental Remote Pull)
 
-Fetch only rows changed since last sync, not all data. Needs per-table timestamps stored locally + `mergeAll`/`deleteByIds` on repositories.
+Fetch only rows changed since last sync, not all data.
 
 ### Repository Interface Additions
 
@@ -752,4 +771,9 @@ Future<void> _onCreateCallback() async {
 }
 ```
 
-**Why `maybePop()`?** Returns `Future<bool>` that completes only after the modal route is fully removed from the stack. `.then()` fires post-dismiss.
+## Recap
+
+1. MUST use typed GoRouter routes (`const MyRoute().go(context)`) — NEVER string-based `context.go('/path')` when a typed route exists.
+2. MUST guard `if (!ref.mounted) return;` after EVERY `await` in notifiers (pagination, search, forms, sync).
+3. Route-id lookups in widget `build()` MUST be nullable — use a by-id provider + fallback UI. NEVER throw in `build()` for a missing route parameter.
+

@@ -2,6 +2,27 @@
 
 Flutter clean arch, four layers. Deps flow inward: Presentation → Repository → Domain → Data.
 
+## Trigger
+
+Signals: clean architecture, four layers, dependency inversion, domain entity, repository interface
+Before generating code in this area, output verbatim: `Reading: architecture.md`
+
+
+## Contents
+
+- [Scope](#scope)
+- [Tradeoffs](#tradeoffs)
+- [Rules — NEVER Violate](#rules--never-violate)
+- [Full Directory Structure](#full-directory-structure)
+- [Layer Responsibilities](#layer-responsibilities)
+  - [Domain Layer](#domain-layer)
+  - [Data Layer](#data-layer)
+  - [Repository Layer](#repository-layer)
+  - [Presentation Layer](#presentation-layer)
+- [Complexity Tiers](#complexity-tiers)
+- [Design Tokens](#design-tokens)
+- [Atomic Design for Widgets](#atomic-design-for-widgets)
+
 ## Scope
 
 In: state, nav, deep links, persistence, HTTP boundaries, models/JSON, DI,
@@ -53,6 +74,8 @@ sequenceDiagram
 7. **MUST** put feature widgets in `features/x/presentation/widgets/` — shared in `core/widgets/`.
 8. **MUST** keep persistence in data/repository layers by default (e.g. local datasource + repository).
 9. **MUST NEVER** run repository persistence and notifier persistence as dual SSOT for same state.
+10. **MUST NEVER** call a storage SDK (Hive, SharedPreferences, secure_storage, `dart:io`, `path_provider`) from a notifier, widget, or service. Storage lives in `Local<X>Datasource` only, exposed via `<X>Repository`. Imports of `package:hive_ce`, `package:hive_ce_flutter`, `package:shared_preferences`, `package:flutter_secure_storage`, `package:path_provider`, or `dart:io` are forbidden in `presentation/`, `*_notifier.dart`, `*_service.dart`, and `*_repository.dart` files. See [hive-persistence.md](hive-persistence.md).
+11. **MUST NEVER** prop-drill state. Child widgets read providers directly with `ref.watch` / `ref.read` / `ref.listen`. Widget constructors take only `Key`, callbacks, primitive props, and immutable IDs — never entities / models / states / notifiers / repositories / datasources. See [state-management.md](state-management.md).
 
 ```mermaid
 graph LR
@@ -281,7 +304,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
 
 ### Repository Layer
 
-Bridges Data and Domain. Orchestrates datasources, maps models to entities. MUST define `abstract interface class`. Constructor MUST take datasource interfaces, NEVER concrete types. Provider MUST return interface type.
+MUST define `abstract interface class`. Constructor MUST take datasource interfaces, NEVER concrete types. Provider MUST return interface type.
 
 ```dart
 // features/products/repositories/product_repository.dart
@@ -330,7 +353,7 @@ NEVER try-catch in datasources or domain. Catch once in repository or notifier.
 
 ### Presentation Layer
 
-Notifiers manage state. Screens compose widgets. Widgets MUST watch providers directly — NEVER prop drill.
+Widgets MUST watch providers directly — NEVER prop drill.
 
 Full notifier patterns: [state-management.md](state-management.md).
 
@@ -418,3 +441,10 @@ Container(color: Theme.of(context).colorScheme.primary)
 Shared widgets in `core/widgets/` follow atomic design: tokens → atoms → molecules → organisms → templates → pages. See [atomic-design.md](atomic-design.md) for rules, examples, placement.
 
 Feature widgets go in `features/x/presentation/widgets/`, not `core/widgets/`.
+
+## Recap
+
+1. MUST separate data models from domain entities — NEVER reuse one class for both.
+2. MUST define `abstract interface class` for every repository and datasource. Constructors MUST take interfaces, NEVER concrete types.
+3. MUST NEVER put `fromJson`/`toJson` on domain entities — serialization is a Data-layer concern.
+

@@ -2,6 +2,27 @@
 
 Build UI from composable pieces: tokens → atoms → molecules → organisms → templates → pages.
 
+## Trigger
+
+Signals: atomic design, atoms, molecules, organisms, design tokens, widget hierarchy
+Before generating code in this area, output verbatim: `Reading: atomic-design.md`
+
+
+## Contents
+
+- [Rules — NEVER Violate](#rules--never-violate)
+- [Hierarchy](#hierarchy)
+- [Tokens](#tokens)
+- [Atoms](#atoms)
+- [Molecules](#molecules)
+- [Organisms](#organisms)
+- [Templates](#templates)
+- [Pages](#pages)
+- [Placement Rules](#placement-rules)
+- [Promotion Rules](#promotion-rules)
+- [Accessibility](#accessibility)
+- [Theming](#theming)
+
 ## Rules — NEVER Violate
 
 1. **MUST** use design tokens for ALL measurements — NEVER hardcode spacing, colors, radii, font sizes, icon sizes.
@@ -130,8 +151,6 @@ abstract final class SemanticColors {
 
 ## Atoms
 
-Single-element, stateless widgets. No business logic, no provider access.
-
 ### Rules
 
 - MUST be one visual element per atom
@@ -176,8 +195,6 @@ class AppBadge extends StatelessWidget {
 Common atoms: `AppBadge`, `AppIconButton`, `AppTextField`, `LoadingIndicator`, `AppDivider`, `AppAvatar`.
 
 ## Molecules
-
-Combine 2–4 atoms into unit. No provider access.
 
 ### Rules
 
@@ -269,8 +286,6 @@ class StatCard extends StatelessWidget {
 
 ## Organisms
 
-Groups of molecules + atoms forming distinct UI section.
-
 ### Rules
 
 - May use `ref.watch` + `ref.read` (not required — data-only organisms valid)
@@ -332,8 +347,6 @@ class ProductGrid extends ConsumerWidget {
 ```
 
 ## Templates
-
-Define page structure w/ slots. No business logic, no provider access.
 
 ### Rules
 
@@ -502,3 +515,9 @@ Container(color: context.colors.primary)
 ```
 
 Exceptions: `SemanticColors` + `Spacing` tokens — static constants independent of theme mode.
+
+## Recap
+
+1. MUST use design tokens for ALL measurements — NEVER hardcode spacing, colors, radii, font sizes, or icon sizes. Use `Spacing.s16`, `context.colors.primary`, `Radii.rounded12`.
+2. NEVER use `ref.watch` or `ref.read` in atoms, molecules, or templates — provider access ONLY in organisms and pages.
+3. MUST use `const` constructors on all atoms and molecules.

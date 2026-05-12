@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "hooks": {
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "P=$(ls -d ~/.copilot/installed-plugins/*/building-flutter-apps 2>/dev/null | head -1); [ -x \"$P/hooks/scripts/dart_gate.sh\" ] && exec \"$P/hooks/scripts/dart_gate.sh\" || exit 0",
+        "powershell": "$p = Get-ChildItem -Path \"$HOME/.copilot/installed-plugins/*/building-flutter-apps\" -ErrorAction SilentlyContinue | Select-Object -First 1; if ($p -and (Test-Path \"$($p.FullName)/hooks/scripts/dart_gate.sh\")) { & bash \"$($p.FullName)/hooks/scripts/dart_gate.sh\" }",
+        "timeoutSec": 30
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "P=$(ls -d ~/.copilot/installed-plugins/*/building-flutter-apps 2>/dev/null | head -1); [ -x \"$P/hooks/scripts/preflight_audit.sh\" ] && exec \"$P/hooks/scripts/preflight_audit.sh\" || exit 0",
+        "powershell": "$p = Get-ChildItem -Path \"$HOME/.copilot/installed-plugins/*/building-flutter-apps\" -ErrorAction SilentlyContinue | Select-Object -First 1; if ($p -and (Test-Path \"$($p.FullName)/hooks/scripts/preflight_audit.sh\")) { & bash \"$($p.FullName)/hooks/scripts/preflight_audit.sh\" }",
+        "timeoutSec": 120
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "P=$(ls -d ~/.copilot/installed-plugins/*/building-flutter-apps 2>/dev/null | head -1); [ -x \"$P/hooks/scripts/skill_reminder.sh\" ] && exec \"$P/hooks/scripts/skill_reminder.sh\" || exit 0",
+        "powershell": "$p = Get-ChildItem -Path \"$HOME/.copilot/installed-plugins/*/building-flutter-apps\" -ErrorAction SilentlyContinue | Select-Object -First 1; if ($p -and (Test-Path \"$($p.FullName)/hooks/scripts/skill_reminder.sh\")) { & bash \"$($p.FullName)/hooks/scripts/skill_reminder.sh\" }",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

@@ -1,8 +1,10 @@
 # Deep Linking
 
-Deep links are a contract across router code, native platform files, hosted
-association files, auth/setup redirects, and analytics. Treat them as runtime
-behavior, not just route strings.
+## Trigger
+
+Signals: deep linking, Universal Links, App Links, GoRouter redirect, assetlinks.json, apple-app-site-association
+Before generating code in this area, output verbatim: `Reading: deep-linking.md`
+
 
 ## Rules
 
@@ -50,7 +52,7 @@ class ProductRoute extends GoRouteData {
 
 ## Redirect Resolver
 
-Keep the closure thin. Inputs in, string location or null out.
+Keep the closure thin.
 
 ```dart
 @visibleForTesting
@@ -179,3 +181,10 @@ xcrun simctl openurl booted https://example.com/products/123
 - [ ] Hosted association files match app IDs, bundle IDs, package names, and SHA fingerprints.
 - [ ] Cold/warm, signed-in/signed-out, setup, stale, and permission-denied paths are E2E tested.
 - [ ] Missing route params or missing resources do not throw from widget `build()`.
+
+## Recap
+
+1. MUST keep redirect decisions in a pure resolver function and matrix-test it. The resolver receives auth/setup state and current location; it returns a redirect string or null — no widget dependencies allowed inside the resolver.
+2. MUST validate route parameters at the route boundary before using them. Missing or invalid IDs MUST render fallback UI or redirect to a typed fallback — NEVER throw from widget `build()`.
+3. MUST NOT call `context.go('/raw-string')` from widgets when a typed route exists. Use `const MyRoute(id: id).go(context)` for type-safe navigation that survives route renames.
+

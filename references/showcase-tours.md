@@ -1,8 +1,25 @@
 # Showcase Guided Tours
 
-First-run tours use `showcaseview` v5. Each screen manage own tour via shared mixin, styled wrapper widget, persistence service.
+## Trigger
 
-**Contents:** [Package](#package) | [Architecture](#architecture) | [ShowcaseScreenMixin](#showcasescreenmixin) | [AppShowcaseTarget](#appshowasetarget) | [ShowcaseService](#showcaseservice) | [ShowcaseKeys](#showcasekeys) | [Adding a Tour to a New Screen](#adding-a-tour-to-a-new-screen) | [Testing](#testing) | [Resetting Tours](#resetting-tours-shell-route-caveat) | [Sync Integration](#sync-integration) | [Constraints](#constraints)
+Signals: showcaseview, ShowcaseScreenMixin, ShowcaseKeys, GlobalKey, tour
+Before generating code in this area, output verbatim: `Reading: showcase-tours.md`
+
+
+## Contents
+
+- [Package](#package)
+- [Architecture](#architecture)
+- [ShowcaseScreenMixin](#showcasescreenmixin)
+- [AppShowcaseTarget](#appshowasetarget)
+- [ShowcaseService](#showcaseservice)
+- [ShowcaseKeys](#showcasekeys)
+- [Adding a Tour to a New Screen](#adding-a-tour-to-a-new-screen)
+- [Testing](#testing)
+- [Resetting Tours (Shell Route Caveat)](#resetting-tours-shell-route-caveat)
+- [Test-Env Safe Service Read](#test-env-safe-service-read)
+- [Sync Integration](#sync-integration)
+- [Constraints](#constraints)
 
 ## Package
 
@@ -303,8 +320,6 @@ abstract final class ShowcaseKeys {
 }
 ```
 
-List order = step order in tour.
-
 ## Adding a Tour to a New Screen
 
 1. **Add scope** in `ShowcaseConstants`:
@@ -497,7 +512,7 @@ Tour completion live in per-scope local service. Remote settings live in separat
 
 ### Push: Include Tour State in Remote Settings
 
-Remote settings object must include `tourCompleted` field (or equivalent boolean). Query showcase service when building push payload. Callback pattern avoid tight coupling:
+Remote settings object must include `tourCompleted` field (or equivalent boolean). Callback pattern avoids tight coupling:
 
 ```dart
 // Repository interface
@@ -561,3 +576,10 @@ Sync tour state (or any cross-service field):
 - **Every `AppShowcaseTarget` must get same named scope** screen registered in `ShowcaseScreenMixin`. Default and named scopes not interchangeable.
 - **Do not build `Showcase` before named scope exist.** Render plain child until registration done.
 - **Do not use `disposeOnTap` without `onTargetClick`** — cause assertion failures in tests.
+
+## Recap
+
+1. MUST use `ShowcaseScreenMixin on ConsumerState` — call `initShowcase()` in `initState()` and `disposeShowcase()` in `dispose()`. Skipping either leaks the named scope registration and breaks subsequent tour starts.
+2. MUST use `AppShowcaseTarget` styled wrapper for all showcase targets — NEVER use the bare `Showcase` widget. The wrapper enforces consistent styling and the named-scope requirement.
+3. MUST NOT start tours during loading state transitions — `ref.listen` on loading state and guard `scheduleShowcase()` so it only fires after the loading gate resolves. Starting during load drops tour keys before they are registered.
+

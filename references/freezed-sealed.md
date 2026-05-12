@@ -1,6 +1,31 @@
 # Freezed 3.x Sealed Classes
 
-All Freezed classes MUST use `sealed class` — NEVER `abstract class`. Dart `sealed` enable exhaustive pattern matching with `switch` expressions.
+All Freezed classes MUST use `sealed class` — NEVER `abstract class`.
+
+## Trigger
+
+Signals: Freezed, sealed class, @freezed, build.yaml, explicit_to_json, copyWith, union types
+Before generating code in this area, output verbatim: `Reading: freezed-sealed.md`
+
+
+## Contents
+
+- [Rules — NEVER Violate](#rules--never-violate)
+- [Setup](#setup)
+- [Simple Data Classes](#simple-data-classes)
+- [Adding Methods and Getters](#adding-methods-and-getters)
+- [Union Types](#union-types)
+- [AsyncValue Pattern Matching](#asyncvalue-pattern-matching)
+- [Feature State](#feature-state)
+- [Deep Copy](#deep-copy)
+- [JSON Serialization](#json-serialization)
+- [Non-Constant Default Values](#non-constant-default-values)
+- [Inheritance](#inheritance)
+- [Mutable Classes](#mutable-classes)
+- [Configuration](#configuration)
+- [Linting](#linting)
+- [Rich Models](#rich-models)
+- [Deep Serialization](#deep-serialization)
 
 ## Rules — NEVER Violate
 
@@ -375,13 +400,7 @@ Freezed not deep-serialize nested objects by default. Without explicit config, n
 
 ### Why build.yaml Is Required
 
-Freezed auto-generates `toJson()` when `fromJson` factory exists (using `=>`). That part work without config. But generated `toJson()` does NOT call `.toJson()` on nested objects unless `explicit_to_json` enabled.
-
-Two separate concerns:
-- **Whether** `toJson()` exists → Freezed handles automatically when `fromJson` present
-- **How** `toJson()` serializes nested objects → requires `explicit_to_json: true`
-
-`@Freezed(toJson: true)` only controls first concern. Redundant when `fromJson` exists. Does NOT enable deep serialization.
+Generated `toJson()` does NOT call `.toJson()` on nested objects unless `explicit_to_json` enabled. `@Freezed(toJson: true)` does NOT enable deep serialization — redundant when `fromJson` exists.
 
 ### Global Fix: build.yaml
 
@@ -405,3 +424,10 @@ targets:
 | `build.yaml explicit_to_json` | Calls `.toJson()` on nested objects | Always — set once, forget |
 | `@Freezed(toJson: true)` | Forces `toJson` generation | Only if class has NO `fromJson` factory (rare) |
 | `@JsonSerializable(explicitToJson: true)` | Per-class deep serialization (legacy) | NEVER — build.yaml replaces it |
+
+## Recap
+
+1. MUST use `sealed class` with `@freezed` — NEVER `abstract class`. Required by Freezed 3.x.
+2. MUST configure `build.yaml` with `explicit_to_json: true` — NEVER use per-class `@JsonSerializable(explicitToJson: true)`.
+3. MUST use Dart native `switch` expressions for union matching — NEVER Freezed legacy `.when()`/`.map()` (removed in Freezed 3.0). Native switch is exhaustive and does not require default cases on sealed types.
+

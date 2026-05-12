@@ -1,41 +1,100 @@
 ---
 name: building-flutter-apps
-description: Flutter app architecture skill for Riverpod 3 codegen, Freezed 3, GoRouter, Hive CE, Crashlytics, ShowcaseView, localization, networking, previews, testing, and E2E. Use for Flutter/Dart app work touching `lib/`, `test/`, `pubspec.yaml`, routing, state, UI, models, repositories, datasources, providers, persistence, or app bugs.
+description: >-
+  CRITICAL — invoke this skill BEFORE answering any Flutter or Dart question.
+  Do NOT answer Flutter/Dart questions from training knowledge alone. The
+  skill encodes project-specific architecture rules and anti-patterns that
+  supersede public Flutter best practices; answering without it WILL produce
+  code that fails review. Invoke for any prompt mentioning Flutter, Dart,
+  Riverpod, Freezed, GoRouter, Hive, ShowcaseView, Notifier, AsyncNotifier,
+  AsyncValue, ref.watch, ref.read, ref.mounted, context.mounted, BuildContext,
+  Widget, ConsumerWidget, repository, datasource, sealed class, copyWith,
+  json_serializable, build_runner, AppLocalizations, gen-l10n,
+  firebase_messaging, Crashlytics, pubspec.yaml, build.yaml,
+  analysis_options.yaml, .dart files. SKIP entirely (do NOT invoke) for:
+  React, React Native, Next.js, SwiftUI, native Android/iOS, flutter_bloc,
+  BLoC, Cubit, GetX, Provider package, ChangeNotifierProvider, MobX, Redux,
+  pure-Dart CLI, shelf, Dart server. Invoke first; base your answer on the
+  skill.
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "4.3.4"
-  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, fire-and-forget, singletons, e2e testing
+  version: "4.4.0"
+  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
-## MANDATORY — Read Before Writing Any Code
+## Gate
 
-**Read this section + linked refs before code.**
+On skill activation, emit verbatim once:
 
-1. **MUST copy [analysis_options.yaml](references/analysis_options.yaml) verbatim into every Flutter project root. Guide: [analysis_options.md](references/analysis-options.md).**
-2. **MUST run `dart analyze` from package root (NOT `flutter analyze`, NOT path-scoped like `flutter analyze lib`) with the copied config. `flutter_skill_lints` + `riverpod_lint` are the primary machine gate. Analyzer ERROR = stop. `flutter analyze lib` silently drops plugin diagnostics ([flutter#184190](https://github.com/flutter/flutter/issues/184190)) — see [analysis-options.md](references/analysis-options.md#rule--use-dart-analyze-not-flutter-analyze). Server crash / `server.pluginError` → see [analysis-options.md](references/analysis-options.md) Troubleshooting (purge analyzer plugins from `pubspec.yaml`).**
-3. **MUST read [architecture.md](references/architecture.md) BEFORE creating any feature module, entity, model, datasource, or repository.**
-4. **MUST read [freezed-sealed.md](references/freezed-sealed.md) BEFORE creating any Freezed class.**
-5. **MUST read [state-management.md](references/state-management.md) BEFORE creating any notifier.**
-6. **MUST read [performance.md](references/performance.md) BEFORE writing any widget tree or provider.**
-7. **When touching HTTP/network calls, MUST read [networking.md](references/networking.md). Widgets/notifiers never call HTTP directly.**
-8. **When adding user-facing copy, MUST read [localization.md](references/localization.md). Use gen-l10n, not ad hoc hardcoded UI strings.**
-9. **When adding widget previews, MUST read [widget-previews.md](references/widget-previews.md). Preview dependencies are faked via provider overrides.**
-10. **When touching deep links, platform links, or URL strategy, MUST read [deep-linking.md](references/deep-linking.md).**
-11. **When fixing layout errors or responsive branches, MUST read [layout-diagnostics.md](references/layout-diagnostics.md).**
-12. **NEVER** use `dynamic`, `_buildXxx()` helpers, hardcoded user-facing strings, `shrinkWrap: true`, value!, or `abstract class` with Freezed.
-13. **ALWAYS** check `if (!ref.mounted) return;` after every `await` in notifiers.
-14. **NEVER** read `state` (incl. `state.copyWith`) in sync `Notifier` before `build()` returns. Seed via returned constructor, defer async init via `Future.microtask`. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap).
-15. **ALWAYS** init repositories inside mutation methods (`create*`, `update*`, `delete*`, `set*`, `reorder*`) via `_ensureRepository()`/`_ensureDependencies()` helper. NEVER rely only on `build()`/`_init()` timing for write paths.
-16. **When touching guided tours, MUST read [showcase-tours.md](references/showcase-tours.md) first. NEVER filter `startShowCase()` keys with `key.currentContext` checks.**
-17. **When touching streams, realtime, push events, subscriptions, sync, shared state, collaboration, remote callbacks, or any source-of-truth refresh path, MUST read [testing.md](references/testing.md#event-contract-and-sync-tests) + [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md). Map event families before code.**
-18. **Remote/shared-state E2E MUST prove writer + observer behavior on real app instances, including create, update, delete/remove, relaunch, source-of-truth verification, and cleanup.**
-19. **When adding E2E-testable UI, MUST use a central widget key registry file, default `lib/core/testing/app_widget_keys.dart` or existing project equivalent. No inline string `ValueKey`s.**
-20. **Widgets/screens MUST NOT dispatch snackbars. Notifiers/services own success/error messaging. See [extensions-utilities.md](references/extensions-utilities.md#snackbar-utility).**
+> building-flutter-apps active. Pre-flight required.
+
+Before writing any `.dart` code, emit verbatim:
+
+> Reading building-flutter-apps gate.
+
+After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` / `analysis_options.yaml`):
+
+1. Run `dart analyze` from the package root. Block on any ERROR or WARNING.
+2. Emit the filled-in Pre-Flight checklist. T0 always. T1 / T2 only if their domain was touched.
+3. If `dart analyze` is not wired with `flutter_skill_lints`, run Setup before continuing.
+
+## Critical Rules
+
+1. **Use `dart analyze` from package root**, never `flutter analyze` and never path-scoped. Copy [references/analysis_options.yaml](references/analysis_options.yaml) to project root and wire `flutter_skill_lints` + `riverpod_lint` under `plugins:`. `flutter analyze lib` silently drops plugin diagnostics ([flutter#184190](https://github.com/flutter/flutter/issues/184190)).
+
+2. **Use `@riverpod` / `@Riverpod` codegen for every provider** — state, computed, repository, datasource, service, family, stream. Never manual `Provider`, `FutureProvider`, `StreamProvider`, `StateProvider`, `StateNotifierProvider`, `NotifierProvider`, `AsyncNotifierProvider`, `ChangeNotifierProvider`. Run `dart run build_runner watch --delete-conflicting-outputs`.
+
+3. **Guard every `await`** in notifiers and repositories with `if (!ref.mounted) return;`. Guard every `await` in widgets and `State` with `if (!context.mounted) return;`. Inside `State`, never `if (mounted)` — always `if (!context.mounted) return;`.
+
+4. **Extract widgets to public classes.** No `_buildXxx()` helpers. No `class _Foo extends StatelessWidget | StatefulWidget | ConsumerWidget | ConsumerStatefulWidget | HookWidget | HookConsumerWidget`. Mark file-internal widgets `@visibleForTesting`. `_FooState extends State<Foo>` stays private (Flutter convention — exempt).
+
+5. **Use `Object?` or a specific type** for unknown values. `dynamic` only for `Map<String, dynamic>` JSON. Never `value!` — use `if (value case final v?)`.
+
+6. **Use `AppLocalizations` (gen-l10n)** for every user-facing string. Never hardcode UI copy in widgets, notifiers, repositories, or datasources. `*Strings` constants only for non-user-facing IDs.
+
+7. **Use `sealed class` for Freezed unions and states.** Never `abstract class` with `@freezed`. Match with Dart native `switch` — never Freezed `.when()` / `.map()`.
+
+8. **Never prop-drill state.** Child widgets read providers directly with `ref.watch` / `ref.read` / `ref.listen`. Do not pass entity / state / notifier instances through constructors. Constructor params allowed: immutable IDs (for routing/lookup), callbacks, `Key`, and primitive props on leaf atoms.
+
+9. **Use a mixin when the same behavior appears in 2+ classes.** Extract to a `mixin` with an `on` clause (e.g. `mixin RetryMixin on AsyncNotifier<X>`). Suffix the name with `Mixin`. Copy-paste sharing across notifiers, widgets, or services is forbidden — replace with a mixin.
+
+10. **Storage SDK calls live in Local Datasource, never in Notifier.** Hive (`Hive.openBox`, `box.get/put/delete`, `Hive.box`), `SharedPreferences`, `flutter_secure_storage`, `dart:io` file ops, `path_provider` directory access — all live behind a `Local<X>Datasource` interface, called by `<X>Repository`. Notifiers and widgets never import `hive_ce` / `shared_preferences` / `flutter_secure_storage` / `dart:io` / `path_provider`.
+
+11. **Primitive manipulation lives in `core/extensions/` — never inline.** All `DateTime` / `String` / `int` / `double` / `num` / `Duration` / `Iterable` / `BuildContext` derivation (formatting, parsing, arithmetic, capitalize, truncate, diff/timeAgo, currency, percent, clamp, range, locale format) goes through extensions in `core/extensions/{date_time,string,int,double,num,duration,iterable,context}_extensions.dart`, re-exported via `core/extensions/extensions.dart`. Widgets / notifiers / repositories MUST call `date.timeAgo` / `name.capitalized` / `amount.asCurrency` / `score.clamped(0, 100)` / `count.pluralized('item')` — NEVER re-roll `DateTime.now().difference(...)`, `'${s[0].toUpperCase()}${s.substring(1)}'`, `NumberFormat.currency(...).format(...)`, or inline `value.clamp(...)` at call sites. **Why:** SSOT — one fix / locale tweak / null-safety guard updates every call site; duplication drifts. **Apply:** if same primitive op appears in 2+ files OR an extension already covers it, use the extension. Missing? Add to `core/extensions/`, export in barrel, then use. See [extensions-utilities.md](references/extensions-utilities.md).
+
+## Trigger Map
+
+Before writing code in any row below, output `Reading: <ref-name>` and read the listed reference(s).
+
+| Touching | Read |
+|---|---|
+| Notifier, AsyncNotifier, mutation method, `ref.read` / `ref.watch` / `ref.listen`, `_ensureRepository`, async cancellation, sync `Notifier` init | [state-management.md](references/state-management.md) |
+| Freezed entity, sealed union, `fromJson` / `toJson`, `copyWith`, model vs entity, `build.yaml` for `explicit_to_json` | [freezed-sealed.md](references/freezed-sealed.md) |
+| Provider declaration, `@riverpod`, family, `keepAlive`, codegen, `Mutation<T>` (experimental) | [riverpod-codegen.md](references/riverpod-codegen.md) |
+| Repository, datasource, domain entity, layered architecture, `IHttpService`, mapping models to entities | [architecture.md](references/architecture.md) |
+| GoRouter, typed route, redirect, `context.go`, deep link, cold-start, navigation gate | [architecture.md](references/architecture.md) + [deep-linking.md](references/deep-linking.md) |
+| HTTP, network, REST, source-of-truth fetch after mutation, transport id vs domain id | [networking.md](references/networking.md) |
+| Atom, molecule, organism, design tokens, atomic widgets, `core/widgets/` promotion | [atomic-design.md](references/atomic-design.md) |
+| Showcase, `AppShowcaseTarget`, `startShowCase`, replay, `ShowcaseKeys`, `ProviderSubscription` lifecycle | [showcase-tours.md](references/showcase-tours.md) |
+| Widget test, `ProviderContainer.test()`, `UncontrolledProviderScope`, fakes, mocks, `AppWidgetKeys`, event-contract tests | [testing.md](references/testing.md) |
+| `flutter_driver`, Dart MCP, E2E, `integration_test`, semantic selectors, log capture | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
+| Hive, `TypeAdapter`, TypeId, box, persistence migration, retired field accounting | [hive-persistence.md](references/hive-persistence.md) |
+| Crashlytics, error reporting, `Crash` facade, recoverable error classifier, symbol upload | [crashlytics.md](references/crashlytics.md) |
+| Mixin, capability vs interface, retry helper, RNG, bulk operation | [mixins.md](references/mixins.md) |
+| Service, singleton, fire-and-forget, `abstract final class`, `unawaited()`, `Future<void>` signature | [services-and-singletons.md](references/services-and-singletons.md) |
+| `@Preview`, `widget_previews.dart`, preview fakes, deterministic preview data | [widget-previews.md](references/widget-previews.md) |
+| `AppLocalizations`, ARB file, gen-l10n, locale fallback, placeholders, plural / select | [localization.md](references/localization.md) |
+| Performance, build cost, `.select()`, `const` constructors, `ListView.builder`, large list compute | [performance.md](references/performance.md) + [flutter-optimizations.md](references/flutter-optimizations.md) |
+| `LayoutBuilder`, `RenderFlex` overflow, `Expanded` / `Flexible` outside `Row` / `Column`, `Positioned` outside `Stack`, text-scale clamp | [layout-diagnostics.md](references/layout-diagnostics.md) |
+| Extension, `SnackBarUtils`, snackbar dispatch from notifier, `@visibleForTesting` helpers, `DateTime` format/diff/timeAgo/startOfDay, `String` capitalize/truncate/titleCase/initials/format, `int` / `double` / `num` clamp/pluralized/asCurrency/percent/toFixed, `Duration` format, parse/format, `NumberFormat`, `DateFormat`, `intl`, `core/extensions/` | [extensions-utilities.md](references/extensions-utilities.md) |
+| Records `(x, y)`, extension type IDs, pattern matching, guard clause `case _ when ...` | [dart-patterns-records.md](references/dart-patterns-records.md) |
+| `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` pre-release pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
+| Common navigation / form / list / debounce / route-param-fallback patterns | [common-patterns.md](references/common-patterns.md) |
 
 ## Core Stack
 
-Version SSOT: [README.md → What's Included](README.md#whats-included). Setup snippets in references mirror that table.
+Version SSOT: [README.md → What's Included](README.md#whats-included).
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -58,124 +117,17 @@ graph LR
 
 ```
 lib/
-├── core/           # Shared: theme, utils, widgets, navigation, services
+├── core/
 ├── features/
 │   └── feature_x/
-│       ├── data/           # Models, datasources (API/local)
-│       ├── domain/         # Entities (pure Dart, no dependencies)
+│       ├── data/           # Models, datasources (API / local)
+│       ├── domain/         # Entities (pure Dart, no Flutter imports)
 │       ├── repositories/   # Map models → entities
 │       └── presentation/   # Notifiers, screens, widgets
 └── main.dart
 ```
 
-## Critical Rules
-
-1. **Codegen only** — `@riverpod` / `@Riverpod(keepAlive: true)` for every provider: state, computed, repository, datasource, service, family, and stream. NEVER write manual `Provider`, `FutureProvider`, `StreamProvider`, `StateProvider`, `StateNotifierProvider`, `NotifierProvider`, `AsyncNotifierProvider`, or `ChangeNotifierProvider`.
-2. **Sealed classes** — `sealed class` with Freezed. NEVER `abstract class`.
-3. **No prop drilling** — child widgets watch providers direct.
-4. **Guard async** — `if (!ref.mounted) return;` after EVERY `await` in notifiers. `if (!context.mounted) return;` in widgets. In `State` methods without a local context, capture `final context = this.context;` before `await`, then guard `context.mounted`.
-5. **Single Ref** — Riverpod 3.0 unified Ref types. NEVER `AutoDisposeRef`, `FutureProviderRef`.
-6. **Select in leaves** — `ref.watch(provider.select((s) => s.field))` in leaf widgets.
-7. **One primary class per file** — exception: Freezed state + notifier may share file.
-8. **Interface contracts** — `abstract interface class` for every repo + datasource. Constructors take interfaces, NEVER concrete types.
-9. **No `dynamic`** — use `Object?` or proper type. Exception: `Map<String, dynamic>` in JSON.
-10. **Widget classes only** — NEVER `_buildXxx()` helpers. Extract to named widget classes. NEVER private widget classes (`class _Foo extends StatelessWidget/StatefulWidget/ConsumerWidget/...`). File-internal widget → make public + `@visibleForTesting`. Reused widget → public class in own file. State subclasses (`class _FooState extends State<Foo>`) stay private — Flutter convention.
-11. **No hardcoded strings** — `*Strings` constants classes with `static const`.
-12. **ref.watch in build, ref.read in callbacks.**
-13. **Provider naming** — codegen strips "Notifier": `FooNotifier` → `fooProvider`.
-14. **No `shrinkWrap: true`** — use `Sliver` variants or constrained containers.
-15. **Mixins for capabilities, interfaces for contracts** — see [mixins.md](references/mixins.md).
-16. **No null-bang** — NEVER value!. Use `if (value case final v?)`.
-17. **`abstract final class` for static-only namespaces** — NEVER `Class._()`. Exception: `const Entity._()` in Freezed.
-18. **`ref.invalidate` not `ref.refresh`** when no return value needed.
-19. **Persistence SSOT** — Default to repository/data persistence. Notifier persistence opt-in. One persistence owner per feature state.
-20. **Pop safely with GoRouter** — For dismiss/back on pushable or deep-linkable screens, guard `context.pop()` with `context.canPop()`. If true, pop + return. Else navigate to typed fallback (`const MyRoute().go(context)`).
-21. **No silent mutation no-op** — Mutation methods must not return early just because cached repo field null; lazily init deps first, then proceed or fail explicit.
-22. **Route-param safety in widgets** — NEVER throw from widget `build()` for missing route IDs. Use nullable by-id providers + fallback UI. See [common-patterns.md](references/common-patterns.md#route-param-safety--wizard-sequencing).
-23. **Navigation-critical mutation sequencing** — In wizard/deep-link flows: persist write → targeted state sync → navigate. See [common-patterns.md](references/common-patterns.md#route-param-safety--wizard-sequencing) and [state-management.md](references/state-management.md).
-24. **Showcase replay safety** — Pass full ordered key list to `startShowCase()`. Do not gate by `key.currentContext != null` / mounted checks; readiness is handled by scope registration + scheduling.
-25. **Event contract proof** — For streams/realtime/sync/push/shared remote state, map source-of-truth event families to exact subscriptions/listeners before code. Do not assume parent-resource events cover child resources. Add datasource/service contract tests plus notifier/UI reaction tests.
-26. **Source-of-truth after mutation** — If a backend/service can return stale, partial, generated, or derived values, mutation flow must refresh from the source of truth before claiming UI is synced.
-27. **Remote observer proof** — Shared/collaboration/team/chat/invite flows need at least two actors or two app instances: writer performs the mutation, observer sees the change without manual refresh, then destructive/removal paths are verified.
-28. **E2E is behavior proof** — Runtime E2E is not static analysis, screenshot-only review, or a single happy path. It must drive the real app, inspect logs, verify source-of-truth state when remote data is involved, and rerun failed/downstream flow segments after fixes.
-29. **E2E key registry** — E2E selectors live in one app-owned key registry file. Widgets use `ValueKey(AppWidgetKeys.someAction)`. Tests use the same constants. Do not scatter string keys through widgets/tests.
-30. **Snackbar boundary** — Widgets/screens dispatch notifier actions only. No `SnackBarUtils.show*` or `ScaffoldMessenger.of(...)` in UI files.
-31. **E2E entrypoint** — Runtime E2E needs a deterministic app entrypoint (`lib/main_dev.dart` or project equivalent) with Flutter Driver enabled and provider/env overrides for known app states.
-32. **Pure router policy** — Keep GoRouter redirect decisions in a pure resolver function and matrix-test it. Router closures wire inputs only.
-33. **No global text-scale clamp** — Never clamp text scaling at app root. Fix local overflow/layout instead.
-34. **Shared test harness SSOT** — Keep provider containers, fakes, mocks, wait helpers, and platform stubs in shared test helpers.
-35. **Cross-runtime contract tests** — If Flutter shares schema/IDs/constants with backend/functions/native code, add drift tests so copies cannot silently diverge.
-36. **Async sync cancellation** — Long auth/sync/import/export flows need generation/cancellation guards so stale async work cannot write state after sign-out/account switch.
-
-## Provider Decision Tree
-
-```mermaid
-graph TD
-  Q1{Repository, datasource, or service?} -->|Yes| A1["@Riverpod(keepAlive: true)"]
-  Q1 -->|No| Q2{Feature notifier with mutable state?}
-  Q2 -->|Yes| A2["@Riverpod(keepAlive: true) class XNotifier"]
-  Q2 -->|No| Q3{Computed value or one-time fetch?}
-  Q3 -->|Yes| Q5{All deps keepAlive?}
-  Q5 -->|Yes| A5["@Riverpod(keepAlive: true)"]
-  Q5 -->|No| A3["@riverpod — auto-disposes"]
-  Q3 -->|No| Q4{Needs parameters?}
-  Q4 -->|Yes| A4["Add params to function — family via codegen"]
-```
-
-**Family + keepAlive caveat.** Family + `@Riverpod(keepAlive: true)` keeps every key forever. Cache can grow unbounded. Prefer `@riverpod`.
-
-**Nested computed hop warning.** Avoid computed -> computed chain in pause-sensitive paths (`aProvider` watches `bProvider(param)`). Riverpod 3.2.x offstage nav can throw TickerMode pause/resume assertion.
-
-If chain required, flatten in parent provider:
-- watch base state directly
-- derive via pure helpers
-- avoid provider -> provider indirection on hot navigation paths
-
-**Exception:** Riverpod 3.2.x has TickerMode assertion bug ([rrousselGit/riverpod#4709](https://github.com/rrousselGit/riverpod/issues/4709)). If hit, `keepAlive: true` workaround allowed. Add inline note: `// keepAlive: Riverpod 3.2.x #4709 workaround`. Remove after upstream fix.
-
-## Anti-Patterns
-
-| Wrong | Right |
-|-------|-------|
-| `StateProvider` | `@riverpod` codegen |
-| Manual `Provider(...)`, `FutureProvider(...)`, `StreamProvider(...)`, `NotifierProvider(...)`, `AsyncNotifierProvider(...)` | Annotated provider/function/class with generated `.g.dart` |
-| `abstract class` with Freezed | `sealed class` |
-| Pass state through constructors | Child watches provider directly |
-| Missing `ref.mounted` after `await` | `if (!ref.mounted) return;` |
-| Auto-dispose with all-keepAlive deps | `@Riverpod(keepAlive: true)` |
-| Try-catch at every layer | Catch once in notifier |
-| `context.go('/path')` string | `const MyRoute().go(context)` typed |
-| Entity in datasource | `Model` with `toEntity()` in repo |
-| Assume domain `id` equals backend row/document id in datasource update/delete | Keep ids separate. Resolve transport id first, then update/delete |
-| `@JsonSerializable(explicitToJson: true)` per class | `explicit_to_json: true` in `build.yaml` |
-| `@Freezed(toJson: true)` when `fromJson` exists | Plain `@freezed` |
-| Concrete type in constructor | `abstract interface class` |
-| value! null-bang | `if (value case final v?)` |
-| `class Foo { Foo._(); }` | `abstract final class Foo` |
-| `ref.refresh(provider)` discarding return | `ref.invalidate(provider)` |
-| `@Riverpod(keepAlive: true)` on family provider | `@riverpod` (auto-dispose) |
-| Side-effect loading/error in notifier state | `Mutation<T>()` (experimental — API may break before Riverpod 4.0) — see [riverpod-codegen.md](references/riverpod-codegen.md) |
-| `ref.read` in `initState` | `addPostFrameCallback` then read |
-| `state.copyWith(...)` before first `state=` in sync `Notifier.build()` (incl. `_load()` called sync from build, or `ref.listen(..., fireImmediately: true)` callback that reads state) | Seed via returned constructor + `Future.microtask(_load)`, OR `state = const FooState()` before `fireImmediately` listener. See [state-management.md](references/state-management.md#sync-notifier-initialization-trap) |
-| Mutation method (`create*`, `update*`, `delete*`, `set*`) does `if (_repository == null) return ...` | Use `_ensureRepository()`/`_ensureDependencies()` with `await`, then guard with `if (!ref.mounted) return ...` |
-| `context.pop()` without guard on dismiss/back callbacks | `if (context.canPop()) { context.pop(); return; } const MyRoute().go(context);` |
-| `context.pop()` then immediately push route (modal still animating) | `Navigator.of(context).maybePop().then((_) { if (ctx.mounted) nav(); })` — see [common-patterns.md](references/common-patterns.md#dismiss-modal--push-route-bottom-sheet-navigation) |
-| `firstWhere(... orElse: () => throw StateError(...))` in widget `build()` for route IDs | Nullable by-id provider + fallback UI (no throw). See [common-patterns.md](references/common-patterns.md#route-param-safety--wizard-sequencing) |
-| `ref.invalidate(parentProvider)` right after child create/delete in active wizard/deep-link flow | Persist write → targeted parent sync → navigate. See [state-management.md](references/state-management.md) |
-| `using context` after `await` | `if (!context.mounted) return;` |
-| `if (!mounted) return;` in `State` async code | `final context = this.context;` before `await`, then `if (!context.mounted) return;` |
-| Mixin vs interface vs extension choices | See [mixins.md](references/mixins.md) |
-| Subscribe to "some realtime events" and hope sync works | Map exact event families/channels/topics, test each event family, then run writer/observer E2E |
-| Mutation writes remote data then trusts cached/local response | Fetch source-of-truth after mutation when values can be generated/stale/derived |
-| Inline `ValueKey('save-button')` | `ValueKey(AppWidgetKeys.saveButton)` from central key registry |
-| Widget calls `SnackBarUtils.showError(...)` | Widget calls notifier method; notifier emits snackbar |
-| `class _Foo extends StatelessWidget` (or Stateful/Consumer/HookConsumer/etc.) private widget in same file | Public `class Foo` + `@visibleForTesting` if file-internal, OR public widget in own file. State subclasses (`_FooState extends State<Foo>`) stay private — Flutter convention |
-| GoRouter redirect logic only inside closure | Pure `resolveAppRedirect(...)` function + matrix tests |
-| App root clamps text scaling | Responsive local layout fixes; no global clamp |
-| One-off test fakes in each test file | Shared `test/helpers/test_fakes.dart` style harness |
-| Shared backend/app constants copied without test | Contract drift test covering both runtimes |
-
-Full patterns: [common-patterns.md](references/common-patterns.md) | [extensions-utilities.md](references/extensions-utilities.md)
+Repository returns Domain entities (never Models). Domain has no Flutter import. Datasource throws typed exceptions, never returns null on failure. `try`/`catch` lives in the Notifier — never in Domain or Datasource.
 
 ## Class Modifiers
 
@@ -190,78 +142,76 @@ Full patterns: [common-patterns.md](references/common-patterns.md) | [extensions
 | `final class` | ✗ | ✗ | ✓ | ✗ |
 | `mixin class` | ✓ | ✓ | ✓ | ✓ |
 
+`abstract interface class` for repository / datasource / service contracts. `sealed class` for Freezed unions. `abstract final class` for pure stateless helper namespaces (`Crash`, `Storage`).
+
 ## Code Generation
 
 ```bash
-dart run build_runner watch --d   # Watch mode (recommended)
-dart run build_runner build --d  # One-time build
-dart run build_runner clean && dart run build_runner build --d  # Clean build
+dart run build_runner watch --delete-conflicting-outputs
+dart run build_runner build --delete-conflicting-outputs
+dart run build_runner clean && dart run build_runner build --delete-conflicting-outputs
 ```
 
-`-d` is shorthand for `--delete-conflicting-outputs` — overwrites stale generated files when annotations move or rename.
+## Setup
 
-## References
+1. Copy [references/analysis_options.yaml](references/analysis_options.yaml) to project root. It already wires `flutter_skill_lints` + `riverpod_lint` under `plugins:`.
+2. `flutter_skill_lints` is an analyzer plugin — it lives **only** in `analysis_options.yaml plugins:`. Never add it to `pubspec.yaml`.
+3. Run `dart pub get`. Confirm `dart analyze` exits 0.
+4. Sanity check: write `Widget _buildHeader() => const SizedBox();` — `dart analyze` must flag it.
 
-Read before generating code for that topic.
+### Per-Tool Hooks
 
-| File | When |
-|------|------|
-| [performance.md](references/performance.md) | **Always** — any widget or provider |
-| [architecture.md](references/architecture.md) | Feature modules, layers, interfaces |
-| [riverpod-codegen.md](references/riverpod-codegen.md) | Providers, mutations, lifecycle |
-| [freezed-sealed.md](references/freezed-sealed.md) | Entities, models, unions, serialization |
-| [state-management.md](references/state-management.md) | Notifiers, error handling, cross-provider |
-| [analysis_options.yaml](references/analysis_options.yaml) + [analysis-options.md](references/analysis-options.md) | **Every Flutter project** — linter config |
-| [flutter-optimizations.md](references/flutter-optimizations.md) | Scrolling, animation, concurrency |
-| [layout-diagnostics.md](references/layout-diagnostics.md) | Layout exceptions, constraints, keyboard, responsive debugging |
-| [atomic-design.md](references/atomic-design.md) | Shared widgets in `core/widgets/` |
-| [widget-previews.md](references/widget-previews.md) | Flutter Widget Previewer, preview fakes, preview matrix |
-| [testing.md](references/testing.md) | Unit/widget tests, event/subscription contract tests, sync reaction tests |
-| [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) | Dart MCP runtime E2E, multi-actor sync proof, source-of-truth checks, logs, cleanup |
-| [common-patterns.md](references/common-patterns.md) | Lists, search, forms, GoRouter, sync |
-| [deep-linking.md](references/deep-linking.md) | Web URL strategy, App Links, Universal Links, deep-link E2E |
-| [networking.md](references/networking.md) | HTTP service boundary, datasource parsing, source-of-truth refresh |
-| [localization.md](references/localization.md) | gen-l10n, ARB, placeholders, plurals/selects |
-| [extensions-utilities.md](references/extensions-utilities.md) | Utilities, extensions |
-| [mixins.md](references/mixins.md) | Mixin vs interface vs extension, `retryWithBackoff` + `SaveAllRowsException` for bulk I/O |
-| [hive-persistence.md](references/hive-persistence.md) | Local storage, Hive adapters |
-| [services-and-singletons.md](references/services-and-singletons.md) | Static-only class vs singleton vs provider, fire-and-forget pattern, testing each |
-| [crashlytics.md](references/crashlytics.md) | Firebase Crashlytics setup (3 hooks), `Crash` wrapper, non-fatal vs fatal, breadcrumbs, custom keys, symbols |
-| [showcase-tours.md](references/showcase-tours.md) | Guided tours, tour state sync, `ProviderSubscription` handle, test-env safe service read |
-| [dart-patterns-records.md](references/dart-patterns-records.md) | Records, patterns, extension types |
+| Tool | Auto-install command | Hook source |
+|---|---|---|
+| Claude Code | `/plugin marketplace add sgaabdu4/building-flutter-apps` then `/plugin install building-flutter-apps@building-flutter-apps` | `hooks/hooks.json` |
+| Codex CLI | `codex` → `/plugins` (add `sgaabdu4/building-flutter-apps`, install) | `hooks/hooks.json` (same as Claude) |
+| Copilot CLI | `copilot plugin marketplace add sgaabdu4/building-flutter-apps` then `copilot plugin install building-flutter-apps` | `hooks/hooks.copilot.json` |
 
-## Pre-Flight — Before Returning Any Code
+## Pre-Flight
 
-- [ ] `analysis_options.yaml` copied from [analysis_options.yaml](references/analysis_options.yaml) in Flutter project root
-- [ ] `dart analyze` (NOT `flutter analyze`, NOT path-scoped) ran from package root with `flutter_skill_lints` + `riverpod_lint`; no analyzer errors
-- [ ] `if (!ref.mounted) return;` after EVERY `await` in notifiers
-- [ ] `if (!context.mounted) return;` after EVERY `await` in widgets
-- [ ] `State` async methods using context after await use `final context = this.context;` before await; no `if (!mounted) return`
-- [ ] No `_buildXxx()` helpers — extracted to widget classes
-- [ ] No private widget classes (`class _Foo extends StatelessWidget/StatefulWidget/ConsumerWidget/...`) — public + `@visibleForTesting` if file-internal, public in own file if reused. State subclasses (`_FooState extends State<Foo>`) stay private.
-- [ ] No hardcoded user-facing strings — gen-l10n for UI copy; `*Strings` only for non-user-facing IDs
-- [ ] No `dynamic` — `Object?` or proper types
-- [ ] No value! — `if (value case final v?)`
-- [ ] `ref.watch()` in `build()`, `ref.read()` only in callbacks
-- [ ] Sync `Notifier.build()` never reads `state` before first `state=` — loading flags seeded via returned constructor; async init dispatched with `Future.microtask`; no `fireImmediately: true` listener that reads state without prior direct `state =` assignment
-- [ ] Every notifier mutation method lazily inits repositories/deps (`_ensureRepository`/`_ensureDependencies`) before writes
-- [ ] Route-param lookups in widget `build()` are nullable (no throw-on-missing-id)
-- [ ] Deep-link/platform-link changes have resolver matrix tests plus Android/iOS/web validation when applicable
-- [ ] Wizard/deep-link mutation sequence: persist → targeted sync → navigate
-- [ ] HTTP/network calls are behind datasource/service interfaces; widgets/notifiers do not call HTTP clients directly
-- [ ] User-facing copy added to ARB/localization files with placeholders/plurals/selects where needed
-- [ ] Widget previews use preview shell + provider fakes; no native plugin/Hive/Firebase/real HTTP in previews
-- [ ] Layout changes checked across compact/medium/expanded, keyboard-open, and large text-scale states
-- [ ] Every provider is generated with `@riverpod` / `@Riverpod(...)`; no manual `Provider`, `FutureProvider`, `StreamProvider`, `StateProvider`, `NotifierProvider`, `AsyncNotifierProvider`, `StateNotifierProvider`, or `ChangeNotifierProvider`
-- [ ] Widgets/screens do not call `SnackBarUtils.show*` or `ScaffoldMessenger`; notifier/service owns snackbar side effects
-- [ ] If streams/realtime/push/sync/shared state changed: exact event families/channels/topics/listeners mapped; datasource/service contract tests prove subscriptions; notifier/widget tests prove state reaction
-- [ ] If remote mutation returns generated/stale/partial/derived values: UI refreshes from source of truth before navigation or success state
-- [ ] If shared/collaboration/team/chat/invite/sync changed: real E2E covered writer + observer create/update/delete/remove/relaunch path, source-of-truth state was checked, and test data was cleaned
-- [ ] E2E/widget selectors use a central key registry (`lib/core/testing/app_widget_keys.dart` or existing equivalent); no inline string `ValueKey`s in widgets/tests
-- [ ] E2E target entrypoint exists and is deterministic (`lib/main_dev.dart` or equivalent), with Flutter Driver enabled when MCP/driver E2E needs it
-- [ ] Router redirect rules are pure-function tested when navigation/auth/onboarding/update/sync gates changed
-- [ ] App root does not clamp text scaling
-- [ ] Shared test helper SSOT used for containers/fakes/mocks/wait helpers
-- [ ] Cross-runtime constants/schema/function contracts have drift tests when copied across app/backend/native boundaries
-- [ ] Long-running sync/auth/import/export flows guard stale async writes after cancellation/sign-out/account switch
-- [ ] If showcase code changed: `startShowCase()` uses full `ShowcaseKeys.*Tour` list (no `key.currentContext` filtering), and replay/reset path follows [showcase-tours.md](references/showcase-tours.md)
+Fill T0 always after any `.dart` write. Fill T1 if state / notifier / mutation touched. Fill T2 if network / E2E / stream / showcase / route touched. Emit before yielding the turn.
+
+### T0
+
+- [ ] `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint` wired
+- [ ] `if (!ref.mounted) return;` after every `await` in notifiers and repositories
+- [ ] `if (!context.mounted) return;` after every `await` in widgets and `State` (no bare `if (mounted)`)
+- [ ] No `_buildXxx()` and no private widget classes extending Stateless / Stateful / Consumer / Hook widgets (`State` subclasses exempt)
+- [ ] No `dynamic` except `Map<String, dynamic>` for JSON; no `value!`
+- [ ] All providers `@riverpod` codegen; no manual `Provider(...)` family
+- [ ] No prop-drilling: children watch providers directly. No entity / state / notifier in constructors
+- [ ] Shared behavior across 2+ classes lives in a `mixin` (suffixed `Mixin`), not copy-pasted
+- [ ] No `hive_ce` / `shared_preferences` / `flutter_secure_storage` / `dart:io` / `path_provider` imports in notifier or widget files — storage goes through `Local<X>Datasource` → `<X>Repository`
+- [ ] No inline `DateTime` / `String` / `int` / `double` / `num` / `Duration` manipulation outside `core/extensions/` — call existing extension or add one. Forbidden inline: capitalize via `'${s[0].toUpperCase()}${s.substring(1)}'`, `DateTime.now().difference(...)` for timeAgo, `NumberFormat.currency(...).format(...)`, `value.clamp(...)` at call site, locale-format reimplementation. Use `.capitalized` / `.timeAgo` / `.asCurrency` / `.clamped(...)` / `.pluralized(...)`
+
+### T1 — State / Notifier / Mutation
+
+- [ ] Mutation methods (`create*`, `update*`, `delete*`, `set*`, `reorder*`) init deps via `_ensureRepository()` / `_ensureDependencies()` lazily
+- [ ] Sync `Notifier.build()` does not read `state` before first return; seed via constructor; defer async with `Future.microtask`
+- [ ] `ref.onDispose()` cancels every subscription / controller / timer
+- [ ] Notifier owns snackbar dispatch — widgets do not call `SnackBarUtils.show*` or `ScaffoldMessenger.of(context)`
+- [ ] Long-running sync / auth / import flows guard stale async writes
+- [ ] No `ref.watch` inside notifier method body — `ref.watch` in `build()` only; `ref.read` in callbacks
+
+### T2 — Network / E2E / Stream / Showcase / Route
+
+- [ ] Source-of-truth fetch after mutation when backend generates / normalizes / reorders / derives values
+- [ ] Observer + writer E2E proof present for shared / realtime / collaborative state
+- [ ] All `ValueKey` from central `AppWidgetKeys` registry — no inline string `ValueKey('...')`
+- [ ] E2E entrypoint deterministic (`lib/main_dev.dart` or equivalent); test overrides isolated from `main.dart`
+- [ ] GoRouter redirect logic in pure `resolveAppRedirect(...)`, matrix-tested; nullable by-id provider for route params with fallback UI
+- [ ] `startShowCase()` receives full ordered `ShowcaseKeys.*Tour` list; `ProviderSubscription` stored and closed in `disposeShowcase()`
+- [ ] Cross-runtime constants / schema / function contracts have drift tests
+- [ ] No `MediaQuery.withClampedTextScaling` in `MaterialApp` builder
+
+## Recap
+
+1. `dart analyze` from package root, never `flutter analyze`. Plugin wired in `analysis_options.yaml plugins:`, never `pubspec.yaml`.
+2. No `_buildXxx()`. No private widget classes extending Stateless / Stateful / Consumer / Hook. Public + `@visibleForTesting` if file-internal. `_FooState extends State<Foo>` stays private.
+3. `if (!ref.mounted) return;` after EVERY `await` in notifiers and repositories. `if (!context.mounted) return;` after EVERY `await` in widgets and `State`. Never bare `if (mounted)`.
+4. Every mutation method inits deps via `_ensureRepository()` / `_ensureDependencies()`. Never rely on `build()` / `_init()` timing.
+5. `sealed class` with Freezed, never `abstract class`. Dart native `switch`, never `.when()` / `.map()`.
+6. No prop-drilling. Child widgets watch providers directly. No entity / state / notifier as constructor params.
+7. Shared behavior across 2+ classes → `mixin XxxMixin on Y`. No copy-paste sharing.
+8. Storage SDK (Hive, SharedPreferences, secure_storage, `dart:io`, `path_provider`) lives in `Local<X>Datasource`. Notifiers and widgets never import storage SDKs directly.
+9. Primitive manipulation (`DateTime`, `String`, `int`, `double`, `num`, `Duration`, `Iterable`) lives in `core/extensions/` — SSOT. Inline reimpl of capitalize / timeAgo / currency / percent / clamp / locale-format is forbidden. Missing extension? Add it, export in barrel, then call.

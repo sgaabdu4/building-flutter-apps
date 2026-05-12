@@ -1,6 +1,12 @@
 # Performance
 
-Widget rebuild, provider watch, memory mgmt. Flutter rendering/animations/slivers/isolates/app-size → see [flutter-optimizations.md](flutter-optimizations.md).
+## Trigger
+
+Signals: ref.watch, leaf widget, .select(), ListView.builder, computed provider, ref.onDispose
+Before generating code in this area, output verbatim: `Reading: performance.md`
+
+
+Flutter rendering/animations/slivers/isolates/app-size → see [flutter-optimizations.md](flutter-optimizations.md).
 
 ## Rules — NEVER Violate
 
@@ -268,3 +274,10 @@ List<Product> sortedProducts(Ref ref) {
 - Dispose timers/controllers/subscriptions in `ref.onDispose()`
 - No raw API responses in state
 - Auto-dispose for temporary state
+
+## Recap
+
+1. MUST watch providers in leaf widgets — NEVER in parent widgets that pass data down as props. Watching high in the tree causes every descendant to rebuild on each state change.
+2. MUST use `.select()` for specific fields so rebuilds fire only when the watched field changes — watching the whole provider object rebuilds on any field change, even unrelated ones.
+3. MUST use `ListView.builder` — NEVER `ListView(children: [...])` for dynamic lists. The `children` form eagerly constructs all items; `builder` lazy-constructs only visible items.
+

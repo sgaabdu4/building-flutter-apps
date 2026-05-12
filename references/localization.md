@@ -1,8 +1,10 @@
 # Localization
 
-User-facing copy belongs in Flutter localization files, not in ad hoc string
-constants. Keep `*Strings` classes for non-user-facing identifiers such as
-route names, storage keys, analytics event names, log tags, and test-only labels.
+## Trigger
+
+Signals: gen-l10n, ARB, AppLocalizations, plural, select, l10n.yaml
+Before generating code in this area, output verbatim: `Reading: localization.md`
+
 
 ## Rules
 
@@ -41,12 +43,7 @@ nullable-getter: false
 use-escaping: true
 ```
 
-Prefer `synthetic-package: false` so generated imports live under the app
-package and are easier for agents to discover.
-
 ## App Wiring
-
-Configure localization at the app root.
 
 ```dart
 import 'package:flutter/material.dart';
@@ -202,3 +199,10 @@ class InviteStatusLabel extends StatelessWidget {
 - [ ] Placeholders/plurals/selects are used instead of string concatenation.
 - [ ] Notifiers expose semantic state, not translated copy.
 - [ ] Widget tests/previews include localization delegates or app preview shell.
+
+## Recap
+
+1. MUST use Flutter gen-l10n for all user-visible copy in production UI — NEVER ad hoc string constants for user-facing text.
+2. MUST NOT call `AppLocalizations.of(context)!` directly — configure `nullable-getter: false` in `l10n.yaml` or use a context extension to avoid null-assertion boilerplate.
+3. MUST NOT store localized copy in domain entities, repositories, datasources, or notifiers — expose semantic state and let the UI layer render translated copy.
+

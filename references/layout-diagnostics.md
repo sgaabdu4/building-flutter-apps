@@ -1,15 +1,15 @@
 # Layout Diagnostics
 
-Use this when fixing Flutter layout exceptions, responsive breakpoints, keyboard
-overlap, foldables, or large-screen behavior. Read
-[performance.md](performance.md) and [flutter-optimizations.md](flutter-optimizations.md)
-for the broader performance rules.
+## Trigger
+
+Signals: layout exception, unbounded height, viewport, LayoutBuilder, Expanded, Flexible
+Before generating code in this area, output verbatim: `Reading: layout-diagnostics.md`
+
 
 ## Core Rule
 
 Flutter layout is constraints-first: constraints go down, sizes go up, parent
-sets position. Most layout failures are a child asking for space the parent did
-not constrain.
+sets position.
 
 ## Error Map
 
@@ -177,3 +177,10 @@ Material 3 width classes:
 - [ ] ParentDataWidgets are direct children of the required parent.
 - [ ] Layout decisions use `LayoutBuilder` or `MediaQuery.sizeOf`, not device type.
 - [ ] Compact, medium, expanded, keyboard-open, and large text-scale states were checked.
+
+## Recap
+
+1. Fix the FIRST layout exception in the log — cascading errors below it are symptoms, not causes. Fixing a downstream error while the root persists wastes time.
+2. NEVER use `shrinkWrap: true` to silence unbounded-height errors — add real constraints or switch to Slivers. `shrinkWrap` forces a full layout pass and is prohibited project-wide.
+3. Base adaptive layout decisions on `LayoutBuilder` or `MediaQuery.sizeOf` — NEVER on device type or orientation. Screen size is the correct input; platform/orientation assumptions break on foldables and tablets.
+
