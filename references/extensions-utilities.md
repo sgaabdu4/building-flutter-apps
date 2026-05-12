@@ -11,6 +11,8 @@ Before generating code in this area, output verbatim: `Reading: extensions-utili
 
 Primitive manipulation lives in `core/extensions/`. NEVER inline at call site. Authoritative in [SKILL.md → Critical Rule 11](../SKILL.md#critical-rules).
 
+> **Domain NEVER imports `core/extensions/`.** Outer dep — `arch_domain_import` ERROR. Domain math: entity getter (one-off) OR VO (cross-entity). See [value-objects.md](value-objects.md) + [SKILL.md → Rule 12](../SKILL.md#critical-rules).
+
 ### Forbidden inline → use extension
 
 | Forbidden inline                                        | Use                          |

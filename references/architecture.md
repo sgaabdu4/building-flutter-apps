@@ -197,7 +197,12 @@ lib/
 
 ### Domain Layer
 
-**MUST be pure Dart.** No Flutter, no package imports. Defines data shape. Models MUST own behavior derived from own fields (see [freezed-sealed.md](freezed-sealed.md#rich-models)).
+**MUST be pure Dart.** Allowed imports: `freezed_annotation` + `/domain/` paths only. NEVER `core/extensions/`, `package:flutter`, `dart:ui`. Enforced by `arch_domain_import` (ERROR). Models own behavior derived from own fields (see [freezed-sealed.md](freezed-sealed.md#rich-models)).
+
+Domain derivations:
+- 1 entity, 1 derivation → entity getter
+- Same primitive in 2+ entities → Value Object in `/domain/value_objects/` (see [value-objects.md](value-objects.md))
+- Never `core/extensions/` from domain — outer dep, Dependency Rule
 
 ```dart
 // features/products/domain/entities/product.dart

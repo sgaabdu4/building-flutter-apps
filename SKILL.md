@@ -19,7 +19,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "4.4.1"
+  version: "4.5.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -61,7 +61,9 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 
 10. **Storage SDK calls live in Local Datasource, never in Notifier.** Hive (`Hive.openBox`, `box.get/put/delete`, `Hive.box`), `SharedPreferences`, `flutter_secure_storage`, `dart:io` file ops, `path_provider` directory access — all live behind a `Local<X>Datasource` interface, called by `<X>Repository`. Notifiers and widgets never import `hive_ce` / `shared_preferences` / `flutter_secure_storage` / `dart:io` / `path_provider`.
 
-11. **Primitive manipulation lives in `core/extensions/` — never inline.** All `DateTime` / `String` / `int` / `double` / `num` / `Duration` / `Iterable` / `BuildContext` derivation (formatting, parsing, arithmetic, capitalize, truncate, diff/timeAgo, currency, percent, clamp, range, locale format) goes through extensions in `core/extensions/{date_time,string,int,double,num,duration,iterable,context}_extensions.dart`, re-exported via `core/extensions/extensions.dart`. Widgets / notifiers / repositories MUST call `date.timeAgo` / `name.capitalized` / `amount.asCurrency` / `score.clamped(0, 100)` / `count.pluralized('item')` — NEVER re-roll `DateTime.now().difference(...)`, `'${s[0].toUpperCase()}${s.substring(1)}'`, `NumberFormat.currency(...).format(...)`, or inline `value.clamp(...)` at call sites. **Why:** SSOT — one fix / locale tweak / null-safety guard updates every call site; duplication drifts. **Apply:** if same primitive op appears in 2+ files OR an extension already covers it, use the extension. Missing? Add to `core/extensions/`, export in barrel, then use. See [extensions-utilities.md](references/extensions-utilities.md).
+11. **Primitives → `core/extensions/`. Never inline.** `DateTime` / `String` / `int` / `double` / `num` / `Duration` / `Iterable` / `BuildContext` ops (capitalize, timeAgo, currency, percent, clamp, format) in `core/extensions/{type}_extensions.dart`, barrel `extensions.dart`. Call `.timeAgo` / `.capitalized` / `.asCurrency` / `.clamped(...)` / `.pluralized(...)`. Forbidden: `'${s[0].toUpperCase()}${s.substring(1)}'`, `DateTime.now().difference(...)`, `NumberFormat.currency(...).format(...)`, inline `.clamp(...)`. **Why:** SSOT — one fix updates every call site. **Apply:** 2+ uses → extension. **Domain entities NEVER import `core/extensions/`** (outer dep, `arch_domain_import` ERROR). Domain derive via entity getter (one-off) OR Value Object (cross-entity — Rule 12). See [extensions-utilities.md](references/extensions-utilities.md).
+
+12. **Wrap domain primitives in Value Objects.** `double` / `int` / `String` carrying domain meaning — unit (`meters`/`kg`/`bpm`), currency (`cents`), measure (`pace`), identity (`Email`/`Slug`), format (`PhoneNumber`) → sealed Freezed VO in `/domain/value_objects/` (feature or `core/domain/`). Named factory per unit (`.meters`/`.kilometers`), conversion getters (`inMeters`/`inKilometers`), invariants in factory (`assert(value >= 0)`). Solves primitive obsession + sidesteps `arch_domain_import` (VO in `/domain/` imports freely). **Apply:** same primitive in 2+ entities → VO. Bare `double distanceMeters` at boundary = smell. See [value-objects.md](references/value-objects.md).
 
 ## Trigger Map
 
@@ -73,6 +75,7 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | Freezed entity, sealed union, `fromJson` / `toJson`, `copyWith`, model vs entity, `build.yaml` for `explicit_to_json` | [freezed-sealed.md](references/freezed-sealed.md) |
 | Provider declaration, `@riverpod`, family, `keepAlive`, codegen, `Mutation<T>` (experimental) | [riverpod-codegen.md](references/riverpod-codegen.md) |
 | Repository, datasource, domain entity, layered architecture, `IHttpService`, mapping models to entities | [architecture.md](references/architecture.md) |
+| Value Object, primitive obsession, `Distance`/`Money`/`Email`/`Slug`, unit conversion in domain, cross-entity primitive, `double distanceMeters`/`int amountCents`/`String email` smell, `arch_domain_import` error | [value-objects.md](references/value-objects.md) |
 | GoRouter, typed route, redirect, `context.go`, deep link, cold-start, navigation gate | [architecture.md](references/architecture.md) + [deep-linking.md](references/deep-linking.md) |
 | HTTP, network, REST, source-of-truth fetch after mutation, transport id vs domain id | [networking.md](references/networking.md) |
 | Atom, molecule, organism, design tokens, atomic widgets, `core/widgets/` promotion | [atomic-design.md](references/atomic-design.md) |
@@ -186,7 +189,9 @@ Fill T0 always after any `.dart` write. Fill T1 if state / notifier / mutation t
 - [ ] No prop-drilling: children watch providers directly. No entity / state / notifier in constructors
 - [ ] Shared behavior across 2+ classes lives in a `mixin` (suffixed `Mixin`), not copy-pasted
 - [ ] No `hive_ce` / `shared_preferences` / `flutter_secure_storage` / `dart:io` / `path_provider` imports in notifier or widget files — storage goes through `Local<X>Datasource` → `<X>Repository`
-- [ ] No inline `DateTime` / `String` / `int` / `double` / `num` / `Duration` manipulation outside `core/extensions/` — call existing extension or add one. Forbidden inline: capitalize via `'${s[0].toUpperCase()}${s.substring(1)}'`, `DateTime.now().difference(...)` for timeAgo, `NumberFormat.currency(...).format(...)`, `value.clamp(...)` at call site, locale-format reimplementation. Use `.capitalized` / `.timeAgo` / `.asCurrency` / `.clamped(...)` / `.pluralized(...)`
+- [ ] No inline primitive ops outside `core/extensions/` — use `.capitalized` / `.timeAgo` / `.asCurrency` / `.clamped(...)` / `.pluralized(...)`. Forbidden: `'${s[0].toUpperCase()}...'`, `DateTime.now().difference(...)`, `NumberFormat.currency(...).format(...)`, inline `.clamp(...)`
+- [ ] Domain entity imports = `freezed_annotation` + `/domain/` paths only. Zero `core/`, `data/`, `presentation/`, `package:flutter`, `dart:ui`
+- [ ] Domain primitives with unit / currency / measure / identity wrapped in VO (`Distance`/`Money`/`Email`) — no bare `double distanceMeters` / `int amountCents` / `String email` at entity boundary
 
 ### T1 — State / Notifier / Mutation
 
@@ -218,4 +223,5 @@ Fill T0 always after any `.dart` write. Fill T1 if state / notifier / mutation t
 6. No prop-drilling. Child widgets watch providers directly. No entity / state / notifier as constructor params.
 7. Shared behavior across 2+ classes → `mixin XxxMixin on Y`. No copy-paste sharing.
 8. Storage SDK (Hive, SharedPreferences, secure_storage, `dart:io`, `path_provider`) lives in `Local<X>Datasource`. Notifiers and widgets never import storage SDKs directly.
-9. Primitive manipulation (`DateTime`, `String`, `int`, `double`, `num`, `Duration`, `Iterable`) lives in `core/extensions/` — SSOT. Inline reimpl of capitalize / timeAgo / currency / percent / clamp / locale-format is forbidden. Missing extension? Add it, export in barrel, then call.
+9. Primitives → `core/extensions/`. SSOT. Inline forbidden. Missing? Add to barrel, then call. **Domain never imports `core/extensions/`** — entity getter (one-off) or VO (cross-entity).
+10. Domain primitives with unit / currency / measure / identity → sealed Freezed VO in `/domain/`. See [value-objects.md](references/value-objects.md).
