@@ -45,7 +45,7 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 
 2. **Use `@riverpod` / `@Riverpod` codegen for every provider** — state, computed, repository, datasource, service, family, stream. Never manual `Provider`, `FutureProvider`, `StreamProvider`, `StateProvider`, `StateNotifierProvider`, `NotifierProvider`, `AsyncNotifierProvider`, `ChangeNotifierProvider`. Run `dart run build_runner watch --delete-conflicting-outputs`.
 
-3. **Guard every `await`** in notifiers and repositories with `if (!ref.mounted) return;`. Guard every `await` in widgets and `State` with `if (!context.mounted) return;`. Inside `State`, never `if (mounted)` — always `if (!context.mounted) return;`.
+3. **Guard every `await`** in notifiers and repositories with `if (!ref.mounted) return;`. Guard every `await` in widgets and `State` with `if (!context.mounted) return;`. Inside `State`, never `if (mounted)` — always `if (!context.mounted) return;`. **Inside `finally`, use the guard form `if (ref.mounted) { ... }`** — never `if (!ref.mounted) return;`.
 
 4. **Extract widgets to public classes.** No `_buildXxx()` helpers. No `class _Foo extends StatelessWidget | StatefulWidget | ConsumerWidget | ConsumerStatefulWidget | HookWidget | HookConsumerWidget`. Mark file-internal widgets `@visibleForTesting`. `_FooState extends State<Foo>` stays private (Flutter convention — exempt).
 
@@ -176,6 +176,7 @@ Fill T0 always after any `.dart` write. Fill T1 if state / notifier / mutation t
 - [ ] `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint` wired
 - [ ] `if (!ref.mounted) return;` after every `await` in notifiers and repositories
 - [ ] `if (!context.mounted) return;` after every `await` in widgets and `State` (no bare `if (mounted)`)
+- [ ] Inside `finally`, use guard form `if (ref.mounted) { ... }` — never early-return
 - [ ] No `_buildXxx()` and no private widget classes extending Stateless / Stateful / Consumer / Hook widgets (`State` subclasses exempt)
 - [ ] No `dynamic` except `Map<String, dynamic>` for JSON; no `value!`
 - [ ] All providers `@riverpod` codegen; no manual `Provider(...)` family
@@ -208,7 +209,7 @@ Fill T0 always after any `.dart` write. Fill T1 if state / notifier / mutation t
 
 1. `dart analyze` from package root, never `flutter analyze`. Plugin wired in `analysis_options.yaml plugins:`, never `pubspec.yaml`.
 2. No `_buildXxx()`. No private widget classes extending Stateless / Stateful / Consumer / Hook. Public + `@visibleForTesting` if file-internal. `_FooState extends State<Foo>` stays private.
-3. `if (!ref.mounted) return;` after EVERY `await` in notifiers and repositories. `if (!context.mounted) return;` after EVERY `await` in widgets and `State`. Never bare `if (mounted)`.
+3. `if (!ref.mounted) return;` after EVERY `await` in notifiers and repositories. `if (!context.mounted) return;` after EVERY `await` in widgets and `State`. Never bare `if (mounted)`. **Inside `finally` blocks**, use `if (ref.mounted) { ... }` guard form, never `if (!ref.mounted) return;`.
 4. Every mutation method inits deps via `_ensureRepository()` / `_ensureDependencies()`. Never rely on `build()` / `_init()` timing.
 5. `sealed class` with Freezed, never `abstract class`. Dart native `switch`, never `.when()` / `.map()`.
 6. No prop-drilling. Child widgets watch providers directly. No entity / state / notifier as constructor params.

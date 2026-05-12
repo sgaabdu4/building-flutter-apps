@@ -231,6 +231,31 @@ Future<void> save(Product product) async {
 
 MUST guard after EVERY `await`, not just first.
 
+### Inside `finally` — Guard, Never Early-Return
+
+Use the guard form, not the early-return form. `return;` in `finally` swallows in-flight exceptions (Dart `control_flow_in_finally` + custom `avoid_mounted_check_in_finally` with auto-fix).
+
+```dart
+// ❌ Wrong — `return;` in finally eats exceptions
+try {
+  await doWork();
+} finally {
+  if (!ref.mounted) return;
+  state = state.copyWith(isResetting: false);
+}
+
+// ✅ Correct — guard the assignment, no control flow in finally
+try {
+  await doWork();
+} finally {
+  if (ref.mounted) {
+    state = state.copyWith(isResetting: false);
+  }
+}
+```
+
+Same rule for `context.mounted` in `State` cleanup, and bare `mounted` inside `State`.
+
 ## Dependency Readiness For Mutations
 
 Notifier init repo async in `build()`/`_init()` → mutation method can run before dep ready + silently no-op.
