@@ -33,26 +33,35 @@ Auto-loads `hooks/hooks.json`:
 ### Codex CLI
 
 ```bash
+codex features enable hooks
+codex features enable plugin_hooks
+codex plugin marketplace add sgaabdu4/building-flutter-apps
 codex
 /plugins
-# add marketplace https://github.com/sgaabdu4/building-flutter-apps
-# install building-flutter-apps
 ```
 
-Reads `.codex-plugin/plugin.json` (also recognizes `.claude-plugin/marketplace.json`).
-Auto-loads the default `hooks/hooks.json` — same `PostToolUse`/`Stop`/`UserPromptSubmit`
-events, same scripts as Claude.
+In `/plugins`, choose the `building-flutter-apps` marketplace tab, open the
+`building-flutter-apps` plugin, and select `Install plugin`.
 
-Codex hooks must be enabled in the CLI. Current Codex builds expose hooks as a
-stable feature; older builds may require:
+Reads `.codex-plugin/plugin.json` from the installed plugin. Codex marketplaces
+can be added from GitHub shorthand (`owner/repo`), Git URLs, SSH URLs, or local
+marketplace roots; Codex also recognizes repo-local
+`.claude-plugin/marketplace.json` entries. Auto-loads the default
+`hooks/hooks.json` — same `PostToolUse`/`Stop`/`UserPromptSubmit` events, same
+scripts as Claude.
+
+The `hooks` feature enables Codex lifecycle hooks. Current Codex builds also
+require `plugin_hooks` for plugin-bundled lifecycle configs. If you edit
+`~/.codex/config.toml` directly, use:
 
 ```toml
 [features]
-codex_hooks = true
+hooks = true
+plugin_hooks = true
 ```
 
-Some builds also gate plugin-bundled hooks behind `plugin_hooks`; verify with
-`codex features list` when testing the package locally.
+`codex_hooks` is still accepted as a legacy alias for `hooks`, but new installs
+should use `hooks`.
 
 ### Copilot CLI
 
@@ -196,7 +205,7 @@ lib/
 | Tool | Hooks | Install command |
 |---|---|---|
 | [Claude Code](https://code.claude.com/) | PostToolUse + Stop + UserPromptSubmit | `/plugin marketplace add sgaabdu4/building-flutter-apps` |
-| [Codex CLI](https://developers.openai.com/codex/cli) | PostToolUse + Stop + UserPromptSubmit | `codex` → `/plugins` |
+| [Codex CLI](https://developers.openai.com/codex/cli) | PostToolUse + Stop + UserPromptSubmit | `codex features enable hooks`, `codex features enable plugin_hooks`, `codex plugin marketplace add sgaabdu4/building-flutter-apps`, then `codex` → `/plugins` |
 | [Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/copilot-cli) | postToolUse + agentStop + userPromptSubmitted | `copilot plugin marketplace add sgaabdu4/building-flutter-apps` |
 | Any other Agent Skills tool | Skill text only (no hooks) | Read SKILL.md directly |
 
