@@ -7,13 +7,13 @@
   },
   "metadata": {
     "description": "Flutter clean-architecture skill with auto-enforcement hooks (Riverpod 3 codegen, Freezed 3 sealed, GoRouter, Hive CE, ShowcaseView).",
-    "version": "4.5.1"
+    "version": "5.0.0"
   },
   "plugins": [
     {
       "name": "building-flutter-apps",
       "description": "Flutter app architecture skill: Riverpod 3 codegen, Freezed 3 sealed, GoRouter typed routes, Hive CE persistence, Crashlytics, ShowcaseView, gen-l10n. Pairs with the external flutter_skill_lints analyzer plugin for AST-level enforcement. Bundles PostToolUse, Stop, and UserPromptSubmit hooks that auto-fire only inside Flutter projects.",
-      "version": "4.5.1",
+      "version": "5.0.0",
       "category": "language",
       "keywords": [
         "flutter",

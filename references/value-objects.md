@@ -17,22 +17,22 @@ Domain inner, `core/extensions/` outer. Dependency Rule: inner never depend on o
 | Scope | Use |
 |---|---|
 | 1 entity, 1 derivation | Entity getter |
-| 2+ entities share primitive concept | **Value Object** in `/domain/value_objects/` |
+| 2+ entities share primitive concept | **Value Object** in `/domain/values/` |
 | Only widgets/notifiers/repos use it | `core/extensions/` |
 
 VO wins: lives in `/domain/` (lint pass), encodes invariants, type-safe API, unit conversions as getters.
 
 ## Where
 
-- Feature: `lib/features/<x>/domain/value_objects/<name>.dart`
-- Shared: `lib/core/domain/value_objects/<name>.dart`
+- Feature: `lib/features/<x>/domain/values/<name>.dart`
+- Shared: `lib/core/domain/values/<name>.dart`
 
 Both match `/domain/` → both allowed.
 
 ## Distance
 
 ```dart
-// lib/core/domain/value_objects/distance.dart
+// lib/core/domain/values/distance.dart
 import 'package:freezed_annotation/freezed_annotation.dart';
 part 'distance.freezed.dart';
 
@@ -192,7 +192,7 @@ sealed class Distance with _$Distance {
 }
 
 // ❌ named primitive factory on domain entity — boundary in wrong layer (domain_entity_primitive_factory)
-// (entity, not VO — bare `@freezed` is fine here; opt-out only required in /domain/value_objects/)
+// (entity, not VO — bare `@freezed` is fine here; opt-out only required in /domain/values/)
 @freezed
 sealed class User with _$User {
   const factory User({required Email email}) = _User;

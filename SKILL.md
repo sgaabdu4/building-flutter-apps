@@ -19,7 +19,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "4.5.1"
+  version: "5.0.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -53,7 +53,7 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 
 6. **Use `AppLocalizations` (gen-l10n)** for every user-facing string. Never hardcode UI copy in widgets, notifiers, repositories, or datasources. `*Strings` constants only for non-user-facing IDs.
 
-7. **Use `sealed class` for Freezed unions and states.** Never `abstract class` with `@freezed`. Match with Dart native `switch` — never Freezed `.when()` / `.map()`. For VOs in `/domain/value_objects/`, annotate `@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)` to disable codegen of those methods entirely. Lint: `freezed_disable_map_when_required`.
+7. **Use `sealed class` for Freezed unions and states.** Never `abstract class` with `@freezed`. Match with Dart native `switch` — never Freezed `.when()` / `.map()`. For VOs in `/domain/values/`, annotate `@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)` to disable codegen of those methods entirely. Lint: `freezed_disable_map_when_required`.
 
 8. **Never prop-drill state.** Child widgets read providers directly with `ref.watch` / `ref.read` / `ref.listen`. Do not pass entity / state / notifier instances through constructors. Constructor params allowed: immutable IDs (for routing/lookup), callbacks, `Key`, and primitive props on leaf atoms.
 
@@ -63,7 +63,7 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 
 11. **Primitives → `core/extensions/`. Never inline.** `DateTime` / `String` / `int` / `double` / `num` / `Duration` / `Iterable` / `BuildContext` ops (capitalize, timeAgo, currency, percent, clamp, format) in `core/extensions/{type}_extensions.dart`, barrel `extensions.dart`. Call `.timeAgo` / `.capitalized` / `.asCurrency` / `.clamped(...)` / `.pluralized(...)`. Forbidden: `'${s[0].toUpperCase()}${s.substring(1)}'`, `DateTime.now().difference(...)`, `NumberFormat.currency(...).format(...)`, inline `.clamp(...)`. **Why:** SSOT — one fix updates every call site. **Apply:** 2+ uses → extension. **Domain entities NEVER import `core/extensions/`** (outer dep, `arch_domain_import` ERROR). Domain derive via entity getter (one-off) OR Value Object (cross-entity — Rule 12). See [extensions-utilities.md](references/extensions-utilities.md).
 
-12. **Wrap domain primitives in Value Objects.** Domain-meaning `double`/`int`/`String` (unit, currency, measure, identity, format) → sealed Freezed VO in `/domain/value_objects/`. Raw redirects PRIVATE (`._meters`/`._raw`); public factories MUST contain explicit guards in body (`if (v.isNaN) throw ArgumentError.value(...)`, `if (!v.isFinite) throw ...`, domain assertions), NEVER passthrough (`factory X.unit(T v) => X._unit(v);` is rejected — same risk as a public raw redirect). No named primitive factories on domain entities — convert at data/notifier/import boundaries. No hand-written `copyWith` in `/domain/`. **Hive collision:** Hive Models in `/data/models/` hold primitives only; VOs live on domain Entity, mapper bridges. Never change ctor param types or order on a `@GenerateAdapters`-registered class with shipped user data — silent box corruption, `dart analyze` blind to disk. **Apply:** primitive in 2+ entities → VO. Bare `double distanceMeters` at entity boundary = smell. See [value-objects.md](references/value-objects.md), [hive-persistence.md](references/hive-persistence.md). Lints: `vo_public_raw_constructor` (catches public redirect AND passthrough), `domain_entity_primitive_factory`, `domain_custom_copy_with`, `hive_field_no_vo_type`.
+12. **Wrap domain primitives in Value Objects.** Domain-meaning `double`/`int`/`String` (unit, currency, measure, identity, format) → sealed Freezed VO in `/domain/values/`. Raw redirects PRIVATE (`._meters`/`._raw`); public factories MUST contain explicit guards in body (`if (v.isNaN) throw ArgumentError.value(...)`, `if (!v.isFinite) throw ...`, domain assertions), NEVER passthrough (`factory X.unit(T v) => X._unit(v);` is rejected — same risk as a public raw redirect). No named primitive factories on domain entities — convert at data/notifier/import boundaries. No hand-written `copyWith` in `/domain/`. **Hive collision:** Hive Models in `/data/models/` hold primitives only; VOs live on domain Entity, mapper bridges. Never change ctor param types or order on a `@GenerateAdapters`-registered class with shipped user data — silent box corruption, `dart analyze` blind to disk. **Apply:** primitive in 2+ entities → VO. Bare `double distanceMeters` at entity boundary = smell. See [value-objects.md](references/value-objects.md), [hive-persistence.md](references/hive-persistence.md). Lints: `vo_public_raw_constructor` (catches public redirect AND passthrough), `domain_entity_primitive_factory`, `domain_custom_copy_with`, `hive_field_no_vo_type`.
 
 ## Trigger Map
 

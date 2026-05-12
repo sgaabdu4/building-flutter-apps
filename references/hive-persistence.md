@@ -374,7 +374,7 @@ extension WorkoutSetToModel on WorkoutSet {
 `dart analyze` blind to disk. Constructor signature = append-only schema.
 
 **Lint (ERROR):**
-- `hive_field_no_vo_type` — `/data/models/` `@freezed` ctor: no VO types. Hard-coded set: `Distance`/`Money`/`Email`/`Slug`/`PhoneNumber`/`HeartRate`/`Weight`/`Pace`/`Username`. Auto-extends w/ types imported from `*/domain/value_objects/<name>.dart` (PascalCase filename heuristic) + `show` clause names.
+- `hive_field_no_vo_type` — `/data/models/` `@freezed` ctor: no VO types. Hard-coded set: `Distance`/`Money`/`Email`/`Slug`/`PhoneNumber`/`HeartRate`/`Weight`/`Pace`/`Username`. Auto-extends w/ types imported from `*/domain/values/<name>.dart` (PascalCase filename heuristic) + `show` clause names.
 
 ## Retiring entities
 
