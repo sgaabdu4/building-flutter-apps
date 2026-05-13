@@ -111,8 +111,8 @@ analyzer config via a 3-tier mechanism:
 
 | Tier | Mechanism | Covers |
 |---|---|---|
-| **AST** | `flutter_skill_lints` analyzer plugin running via `dart analyze` | private widget classes, `_buildXxx()`, `dynamic` (except `Map<String, dynamic>`), null-bang, `shrinkWrap: true`, legacy provider types, route-param throw, showcase key filtering, sync notifier state-read, context.pop guard, `ref.mounted` / `context.mounted` after await, sealed Freezed, unawaited fire-and-forget |
-| **Write-time grep** | `hooks/scripts/dart_gate.sh` (PostToolUse hook) + `hooks/scripts/preflight_audit.sh` (Stop hook) | hardcoded UI strings, inline `ValueKey('...')`, raw `context.go('/string')`, snackbar dispatch from widget, `AppLocalizations.of(context)!`, gen-l10n path config, app-root text scale clamp |
+| **AST** | `flutter_skill_lints` analyzer plugin running via `dart analyze` | private widget classes, `_buildXxx()`, `dynamic` (except `Map<String, dynamic>`), null-bang, `shrinkWrap: true`, legacy provider types, route-param throw, showcase key filtering, sync notifier state-read, typed-route navigation boundaries, raw route definitions, context.pop guard, `ref.mounted` / `context.mounted` after await, sealed Freezed, unawaited fire-and-forget |
+| **Write-time grep** | `hooks/scripts/dart_gate.sh` (PostToolUse hook) + `hooks/scripts/preflight_audit.sh` (Stop hook) | hardcoded UI strings, inline `ValueKey('...')`, raw or named context/router page navigation, direct Navigator page pushes, snackbar dispatch from widget, `AppLocalizations.of(context)!`, gen-l10n path config, app-root text scale clamp |
 | **Prompt** | SKILL.md `<gate>` + `<critical-always>` + `<trigger-map>` + tiered `<pre-flight>` + `<recap>`; each reference file has its own `<trigger>` + `<recap>` | semantic / architectural rules — `_ensureRepository` in mutations, sync notifier init order, source-of-truth refresh, observer+writer E2E, navigation sequencing, etc. |
 
 Cross-tool: Claude Code, Codex CLI, and Copilot CLI all install hook manifests
@@ -176,6 +176,7 @@ lib/
 - **Widget classes only** — no `_buildXxx` helpers
 - **No `dynamic`** — use `Object?` or proper type
 - **Data-layer networking** — widgets/notifiers never call HTTP directly
+- **Navigation SSOT** — widgets/notifiers call generated typed GoRouter route helpers directly
 - **Localized UI copy** — gen-l10n/ARB for user-facing strings
 - **Preview-safe components** — Flutter Widget Previewer with provider fakes
 - **Primary static analysis** — `flutter_skill_lints` + `riverpod_lint`

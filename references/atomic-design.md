@@ -462,7 +462,7 @@ class ProductDashboardScreen extends ConsumerWidget {
         actions: [
           AppIconButton(
             icon: Icons.add,
-            onPressed: () => const ProductCreateRoute().go(context),
+            onPressed: () => const ProductCreateRoute().push<void>(context),
             tooltip: 'Add product',
           ),
         ],

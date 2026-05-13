@@ -19,7 +19,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.0.2"
+  version: "5.0.3"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -64,6 +64,8 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 11. **Primitives → `core/extensions/`. Never inline.** `DateTime` / `String` / `int` / `double` / `num` / `Duration` / `Iterable` / `BuildContext` ops (capitalize, timeAgo, currency, percent, clamp, format) in `core/extensions/{type}_extensions.dart`, barrel `extensions.dart`. Call `.timeAgo` / `.capitalized` / `.asCurrency` / `.clamped(...)` / `.pluralized(...)`. Forbidden: `'${s[0].toUpperCase()}${s.substring(1)}'`, `DateTime.now().difference(...)`, `NumberFormat.currency(...).format(...)`, inline `.clamp(...)`. **Why:** SSOT — one fix updates every call site. **Apply:** 2+ uses → extension. **Domain entities NEVER import `core/extensions/`** (outer dep, `arch_domain_import` ERROR). Domain derive via entity getter (one-off) OR Value Object (cross-entity — Rule 12). See [extensions-utilities.md](references/extensions-utilities.md).
 
 12. **Wrap domain primitives in Value Objects.** Domain-meaning `double`/`int`/`String` (unit, currency, measure, identity, format) → sealed Freezed VO in `/domain/values/`. Raw redirects PRIVATE (`._meters`/`._raw`); public factories MUST contain explicit guards in body (`if (v.isNaN) throw ArgumentError.value(...)`, `if (!v.isFinite) throw ...`, domain assertions), NEVER passthrough (`factory X.unit(T v) => X._unit(v);` is rejected — same risk as a public raw redirect). No named primitive factories on domain entities — convert at data/notifier/import boundaries. No hand-written `copyWith` in `/domain/`. **Hive collision:** Hive Models in `/data/models/` hold primitives only; VOs live on domain Entity, mapper bridges. Never change ctor param types or order on a `@GenerateAdapters`-registered class with shipped user data — silent box corruption, `dart analyze` blind to disk. **Apply:** primitive in 2+ entities → VO. Bare `double distanceMeters` at entity boundary = smell. See [value-objects.md](references/value-objects.md), [hive-persistence.md](references/hive-persistence.md). Lints: `vo_public_raw_constructor` (catches public redirect AND passthrough), `domain_entity_primitive_factory`, `domain_custom_copy_with`, `hive_field_no_vo_type`.
+
+13. **Keep typed GoRouter routes as the navigation SSOT.** Define routes once with `go_router_builder`, then navigate with generated route helpers such as `SomeRoute(...).go(context)` and `SomeRoute(...).push<T>(context)`. Keep route paths inside route definitions and generated helpers. Local sheets/dialogs use semantic helpers and `Navigator.pop` for dismissal. Navigation lints enforce typed routes, local modal helpers, and typed fallback behavior.
 
 ## Trigger Map
 
@@ -211,7 +213,7 @@ Fill T0 always after any `.dart` write. Fill T1 if state / notifier / mutation t
 - [ ] Observer + writer E2E proof present for shared / realtime / collaborative state
 - [ ] All `ValueKey` from central `AppWidgetKeys` registry — no inline string `ValueKey('...')`
 - [ ] E2E entrypoint deterministic (`lib/main_dev.dart` or equivalent); test overrides isolated from `main.dart`
-- [ ] GoRouter redirect logic in pure `resolveAppRedirect(...)`, matrix-tested; nullable by-id provider for route params with fallback UI
+- [ ] GoRouter redirect logic in pure `resolveAppRedirect(...)`, matrix-tested; nullable by-id provider for route params with fallback UI; call sites use generated typed route helpers
 - [ ] `startShowCase()` receives full ordered `ShowcaseKeys.*Tour` list; `ProviderSubscription` stored and closed in `disposeShowcase()`
 - [ ] Cross-runtime constants / schema / function contracts have drift tests
 - [ ] No `MediaQuery.withClampedTextScaling` in `MaterialApp` builder
@@ -228,3 +230,4 @@ Fill T0 always after any `.dart` write. Fill T1 if state / notifier / mutation t
 8. Storage SDK (Hive, SharedPreferences, secure_storage, `dart:io`, `path_provider`) lives in `Local<X>Datasource`. Notifiers and widgets never import storage SDKs directly.
 9. Primitives → `core/extensions/`. SSOT. Inline forbidden. Missing? Add to barrel, then call. **Domain never imports `core/extensions/`** — entity getter (one-off) or VO (cross-entity).
 10. Domain primitives with unit / currency / measure / identity → sealed Freezed VO in `/domain/`. See [value-objects.md](references/value-objects.md).
+11. Typed GoRouter route classes are the navigation SSOT. Call generated route helpers directly; local modal helpers own sheet/dialog presentation and dismissal.

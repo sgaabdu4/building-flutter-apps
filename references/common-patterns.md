@@ -16,20 +16,20 @@ Before generating code in this area, output verbatim: `Reading: common-patterns.
 - [Form Validation](#form-validation)
 - [Batch Processing](#batch-processing)
 - [Pull-to-Refresh](#pull-to-refresh)
-- [Navigation with Typed GoRouter](#navigation-with-typed-gorouter)
+- [Typed GoRouter Route SSOT](#typed-gorouter-route-ssot)
 - [Long-Running Sync/Auth Cancellation](#long-running-syncauth-cancellation)
 - [Delta Sync (Incremental Remote Pull)](#delta-sync-incremental-remote-pull)
 - [Dismiss Modal → Push Route (Bottom Sheet Navigation)](#dismiss-modal--push-route-bottom-sheet-navigation)
 
 ## Rules — NEVER Violate
 
-1. **MUST** use typed GoRouter routes (`const MyRoute().go(context)` / `const MyRoute().push<T>(context)`) — NEVER string-based `context.go('/path')` (lint: `router_string_nav`), `GoRouter.of(context).push|go|...` (lint: `router_gorouter_of`), or `Navigator.of(context).push(MaterialPageRoute(...))` (lint: `router_untyped_navigator_push`).
+1. **MUST** use generated typed GoRouter route helpers as the navigation SSOT. Call `SomeRoute(...).go(context)` / `.push<T>(context)` directly. Route definitions own paths and params. Local sheet/dialog helpers own modal presentation and dismissal.
 2. **NEVER** use `ref.watch()` inside GoRouter `redirect` — recreates router every state change.
 3. **MUST** guard `if (!ref.mounted) return;` after EVERY `await` in notifiers (pagination, search, forms, sync).
 4. **MUST** use `ref.listen()` + `refreshListenable` for GoRouter redirect triggers — NEVER `ref.watch()`.
 5. **MUST** debounce search inputs (500ms min) — NEVER call API on every keystroke.
 6. **During loading, stay put.** Return `null` from redirect — NEVER bounce to splash on web refresh.
-7. **MUST** guard dismiss/back `context.pop()` with `context.canPop()` + typed fallback route for deep-link/resume safety.
+7. **MUST** guard page back with a typed fallback route for deep-link/resume safety.
 8. **Route-id lookups in widget `build()` MUST be nullable.** Use by-id provider + fallback UI. Never throw in `build()`.
 9. **Wizard/deep-link mutation order MUST be:** persist write → targeted parent sync → navigate.
 10. **Repo mounted rule:** keep `context.mounted` in widget async flows. Never swap to `mounted` to silence lint; refactor flow instead.
@@ -371,9 +371,11 @@ class ProductListScreen extends ConsumerWidget {
 }
 ```
 
-## Navigation with Typed GoRouter
+## Typed GoRouter Route SSOT
 
-Use `go_router_builder` for type-safe routes.
+Use `go_router_builder` for type-safe route definitions. The generated route
+classes are the app navigation API. Widgets, notifiers, and services call the
+generated helpers directly.
 
 ### Setup
 
@@ -390,8 +392,8 @@ dev_dependencies:
 ### Route Definitions
 
 ```dart
-// core/navigation/routes.dart
-part 'routes.g.dart';
+// core/router/app_routes.dart
+part 'app_routes.g.dart';
 
 @TypedGoRoute<HomeRoute>(
   path: '/',
@@ -506,6 +508,27 @@ String? resolveAppRedirect({
 
 Test the matrix: loading, signed out, signed in, setup incomplete, setup complete, stale deep links, update-required gates, and auth pages.
 
+### Page Navigation
+
+The route class owns the path, params, query params, and generated helper.
+Call it at the event boundary:
+
+```dart
+// features/products/presentation/widgets/product_card.dart
+class ProductCard extends StatelessWidget {
+  const ProductCard({required this.id, super.key});
+
+  final String id;
+
+  @override
+  Widget build(BuildContext context) {
+    return ProductTile(
+      onTap: () => ProductDetailRoute(id: id).go(context),
+    );
+  }
+}
+```
+
 ```dart
 // Belt-and-suspenders: auth pages navigate directly on authentication.
 class AppLoginPage extends ConsumerWidget {
@@ -515,13 +538,40 @@ class AppLoginPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(authProvider, (prev, next) {
       if (next.isAuthenticated && !(prev?.isAuthenticated ?? false)) {
-        const SplashRoute().go(context);
+        const HomeRoute().go(context);
       }
     });
     return const LoginPageContent();
   }
 }
 ```
+
+For pushed screens that may also be opened by deep link, pop when possible and
+otherwise go to a typed fallback route:
+
+```dart
+void closeEditor(BuildContext context) {
+  if (context.canPop()) {
+    context.pop();
+    return;
+  }
+  const ProductListRoute().go(context);
+}
+```
+
+Keep this helper generic if it appears in multiple places; it must take a
+`GoRouteData` fallback, never a raw string. Generic `BuildContext` fallback
+helpers such as `context.popIfCan()` and `context.popOrGo(fallbackRoute)` are
+allowed because they do not create route-specific APIs. Do not put
+route-specific helpers on `BuildContext`; call the generated typed route helper
+directly at the event boundary.
+
+### Dialogs and Sheets
+
+Dialogs and sheets are local presentation, not page routes. Use semantic helper
+methods such as `context.showScrollableBottomSheet<T>(...)` or
+`showConfirmDialog(...)`. Dismiss from inside the modal widget with
+`Navigator.pop(context, result)` / `Navigator.of(context).maybePop()`.
 
 ## Long-Running Sync/Auth Cancellation
 
@@ -558,38 +608,37 @@ class SyncCoordinator {
 ### Type-Safe Navigation
 
 ```dart
-// Navigate with compile-time checked parameters
+// Navigate with compile-time checked route parameters.
 const HomeRoute().go(context);
 const ProductListRoute().go(context);
 ProductDetailRoute(id: product.id).go(context);
-const ProductCreateRoute().go(context);
 
-// Push (adds to stack)
-ProductDetailRoute(id: product.id).push(context);
+// Push with return value.
+final result = await ProductCreateRoute(parentId: product.id).push<bool>(context);
 
-// Push with return value
-final result = await ProductDetailRoute(id: product.id).push<bool>(context);
-
-// Safe pop with typed fallback (recommended for dismiss/back actions)
+// Safe pop with typed fallback.
 if (context.canPop()) {
   context.pop(result);
-  return;
+} else {
+  const ProductListRoute().go(context);
 }
-const ProductListRoute().go(context);
-
 ```
 
 **Forbidden (lint enforced)** — every form below has a typed-route replacement above:
 
 | Anti-pattern | Lint |
 |---|---|
-| `context.go('/products/${id}')` / any string path | `router_string_nav` |
-| `GoRouter.of(context).push(...)` / `.go` / `.pushNamed` / `.replace` | `router_gorouter_of` |
-| `Navigator.of(context).push(MaterialPageRoute(...))` / `CupertinoPageRoute` / `PageRouteBuilder` | `router_untyped_navigator_push` |
+| String route path from feature code | `router_string_nav` |
+| Direct `GoRouter.of(context)` usage | `router_gorouter_of` |
+| Injected router or `context.go(route.location)` usage | `router_direct_route_call` |
+| Raw `GoRouter` / `GoRoute` definitions outside the router boundary or shared test router helper | `router_raw_route_definition` |
+| Direct `Navigator` page route usage | `router_untyped_navigator_push` |
+| Extra navigation wrapper around typed routes | navigation SSOT lints |
 
 ### StatefulShellRoute Tabs
 
-Use `StatefulNavigationShell.goBranch()` for main tabs. Don't `push` a tab route.
+Use `StatefulNavigationShell.goBranch()` for tab changes. Do not push tab root
+routes to switch tabs.
 
 ```dart
 class AppShellScaffold extends StatelessWidget {
@@ -608,19 +657,20 @@ class AppShellScaffold extends StatelessWidget {
 }
 ```
 
-- Inside shell, use `StatefulNavigationShell.of(context).goBranch(index)`.
 - In reusable sheets/overlays, pass callback from shell-owned caller, don't route in child.
 
 **GoRouter 17.x — `ShellRoute` propagates to root observers.** Since 17.0.0
 `ShellRoute`/`StatefulShellRoute` notify root `NavigatorObserver`s by default.
 Most want this (analytics on shell push). Root `RouteObserver` should fire
 **only** for top-level nav? Pass `notifyRootObserver: false` on `ShellRoute`.
-- Use route-level `.go(context)` only to enter shell from outside, or to intentionally reset branch to known root.
+- Use typed route `.go(context)` to enter shell from outside, or `goBranch()`
+  when the shell is already available.
 
 ```dart
 BentoWorkoutSelectorSheet(
-  onCreateWorkout: () {
-    Navigator.of(sheetContext).pop();
+  onCreateWorkout: () async {
+    await Navigator.of(sheetContext).maybePop();
+    if (!sheetContext.mounted) return;
     navigationShell.goBranch(1);
   },
 )
@@ -757,30 +807,29 @@ Future<void> setTableSyncDate(String key, DateTime date) async {
 
 **NEVER:**
 ```dart
-context.pop();
-await CreateExerciseRoute().push(context); // race — modal still animating
+Navigator.of(context).pop();
+await const CreateExerciseRoute().push<String>(context);
 ```
 
 **DO — await pop future, then navigate:**
 ```dart
 // Sheet widget:
-void _onCreateTapped() {
-  // maybePop() Future resolves AFTER dismiss animation completes.
-  Navigator.of(context).maybePop().then((_) {
-    if (context.mounted) widget.onCreateCallback();
-  });
+Future<void> _onCreateTapped(BuildContext context) async {
+  Navigator.of(context).pop(CreateChoice.exercise);
 }
 
-// Parent widget (outside sheet) — guaranteed post-dismiss:
-Future<void> _onCreateCallback() async {
-  final id = await CreateExerciseRoute().push<String>(context);
-  if (id != null && context.mounted) _useId(id);
+// Caller that opened the sheet:
+Future<void> openCreateSheet(BuildContext context) async {
+  final choice = await context.showScrollableBottomSheet<CreateChoice>(
+    builder: (_) => const CreateSheet(),
+  );
+  if (!context.mounted || choice != CreateChoice.exercise) return;
+  await const CreateExerciseRoute().push<String>(context);
 }
 ```
 
 ## Recap
 
-1. MUST use typed GoRouter routes (`const MyRoute().go(context)` / `const MyRoute().push<T>(context)`) — NEVER string-based `context.go('/path')`, `GoRouter.of(context).push|go|...`, or `Navigator.of(context).push(MaterialPageRoute(...))`. Lints: `router_string_nav`, `router_gorouter_of`, `router_untyped_navigator_push`.
+1. MUST use generated typed GoRouter route helpers as the navigation SSOT. Route definitions own paths and params; local modal helpers own sheet/dialog presentation and dismissal.
 2. MUST guard `if (!ref.mounted) return;` after EVERY `await` in notifiers (pagination, search, forms, sync).
 3. Route-id lookups in widget `build()` MUST be nullable — use a by-id provider + fallback UI. NEVER throw in `build()` for a missing route parameter.
-

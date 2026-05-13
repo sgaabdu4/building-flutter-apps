@@ -156,12 +156,39 @@ if [[ -d "$FLUTTER_ROOT/lib" ]]; then
   done < <(feature_notifier_keepalive_scan | head -n 5)
   [[ $COUNT -gt 0 ]] && add_violation "$COUNT feature presentation notifier(s) auto-dispose without keepAlive or rationale. Use @Riverpod(keepAlive: true) unless it is family, lifecycle-cleanup, or documented ephemeral state."
 
+  raw_or_named_nav_grep() {
+    {
+      recursive_grep '(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement)[[:space:]]*(<[^>]+>)?[[:space:]]*\([[:space:]]*r?['\''"]'
+      recursive_grep '(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+      recursive_grep '(^|[^A-Za-z0-9_])GoRouter[[:space:]]*\.[[:space:]]*of[[:space:]]*\([^)]*\)[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement)[[:space:]]*(<[^>]+>)?[[:space:]]*\([[:space:]]*r?['\''"]'
+      recursive_grep '(^|[^A-Za-z0-9_])GoRouter[[:space:]]*\.[[:space:]]*of[[:space:]]*\([^)]*\)[[:space:]]*\.[[:space:]]*(goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+      recursive_grep '(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement)[[:space:]]*(<[^>]+>)?[[:space:]]*\([[:space:]]*r?['\''"]'
+      recursive_grep '(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+      recursive_grep '(^|[^A-Za-z0-9_])initialLocation[[:space:]]*:[[:space:]]*r?['\''"]'
+    }
+  }
+
   COUNT=0
   while IFS= read -r match; do
     [[ -z "$match" ]] && continue
     COUNT=$((COUNT + 1))
-  done < <(recursive_grep 'context\.go[[:space:]]*\([[:space:]]*['\''"]/' | head -n 5)
-  [[ $COUNT -gt 0 ]] && add_violation "$COUNT raw context.go('/path') found. Use typed go_router_builder routes."
+  done < <(raw_or_named_nav_grep | head -n 5)
+  [[ $COUNT -gt 0 ]] && add_violation "$COUNT raw or named route navigation call(s) found. Use generated typed route helpers; route definitions own paths."
+
+  direct_page_nav_grep() {
+    {
+      recursive_grep '(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+      recursive_grep '(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+      recursive_grep '(^|[^A-Za-z0-9_])Navigator[[:space:]]*(\.[[:space:]]*of[[:space:]]*\([^)]*\)[[:space:]]*)?\.[[:space:]]*(push|pushReplacement|pushAndRemoveUntil|pushNamed|pushReplacementNamed|restorablePush|restorablePushNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+    }
+  }
+
+  COUNT=0
+  while IFS= read -r match; do
+    [[ -z "$match" ]] && continue
+    COUNT=$((COUNT + 1))
+  done < <(direct_page_nav_grep | head -n 5)
+  [[ $COUNT -gt 0 ]] && add_violation "$COUNT raw context/router/Navigator page navigation call(s) found. Call generated typed route helpers for page navigation."
 
   # Extension SSOT — scope checks to OUTSIDE core/extensions/ and *_extensions.dart files
   ext_grep() {

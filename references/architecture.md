@@ -19,6 +19,7 @@ Before generating code in this area, output verbatim: `Reading: architecture.md`
   - [Data Layer](#data-layer)
   - [Repository Layer](#repository-layer)
   - [Presentation Layer](#presentation-layer)
+- [Navigation Coordination](#navigation-coordination)
 - [Complexity Tiers](#complexity-tiers)
 - [Design Tokens](#design-tokens)
 - [Atomic Design for Widgets](#atomic-design-for-widgets)
@@ -76,6 +77,7 @@ sequenceDiagram
 9. **MUST NEVER** run repository persistence and notifier persistence as dual SSOT for same state.
 10. **MUST NEVER** call a storage SDK (Hive, SharedPreferences, secure_storage, `dart:io`, `path_provider`) from a notifier, widget, or service. Storage lives in `Local<X>Datasource` only, exposed via `<X>Repository`. Imports of `package:hive_ce`, `package:hive_ce_flutter`, `package:shared_preferences`, `package:flutter_secure_storage`, `package:path_provider`, or `dart:io` are forbidden in `presentation/`, `*_notifier.dart`, `*_service.dart`, and `*_repository.dart` files. See [hive-persistence.md](hive-persistence.md).
 11. **MUST NEVER** prop-drill state. Child widgets read providers directly with `ref.watch` / `ref.read` / `ref.listen`. Widget constructors take only `Key`, callbacks, primitive props, and immutable IDs — never entities / models / states / notifiers / repositories / datasources. See [state-management.md](state-management.md).
+12. **MUST** keep typed GoRouter routes as the navigation SSOT. Route definitions live in the router package boundary, and app code navigates with generated route helpers such as `SomeRoute(...).go(context)` / `.push<T>(context)`. Local sheets/dialogs use local semantic helpers and `Navigator.pop` for dismissal.
 
 ```mermaid
 graph LR
@@ -118,10 +120,10 @@ lib/
 │   │   └── widget_extensions.dart        # separatedBy
 │   ├── mixins/
 │   │   └── connectivity_mixin.dart      # Cross-cutting behavior mixins
-│   ├── navigation/
-│   │   ├── routes.dart                  # Typed GoRouter route classes
-│   │   ├── routes.g.dart
-│   │   └── router_provider.dart         # GoRouter provider with auth redirect
+│   ├── router/
+│   │   ├── app_routes.dart              # Typed GoRouter route classes
+│   │   ├── app_routes.g.dart            # Generated route helpers
+│   │   └── app_router.dart              # GoRouter provider with auth redirect
 │   ├── services/
 │   │   ├── http_service.dart            # HTTP client wrapper
 │   │   ├── storage_service.dart         # Local persistence
@@ -425,6 +427,25 @@ class ProductListView extends ConsumerWidget {
 }
 ```
 
+## Navigation SSOT
+
+GoRouter is infrastructure; generated typed route classes are the call-site API.
+Define typed routes in `core/router/app_routes.dart`, create `GoRouter` in the
+router provider, and navigate from app code with generated helpers:
+
+```dart
+ProductDetailRoute(id: productId).go(context);
+final created = await const ProductCreateRoute().push<bool>(context);
+```
+
+Allowed raw router boundary:
+- generated `*.g.dart` route helpers
+- shared test router helpers
+
+Every other widget/notifier/service/feature file uses generated typed routes.
+Dialogs and sheets stay local semantic helpers; dismiss them with
+`Navigator.pop` inside the modal widget.
+
 ## Complexity Tiers
 
 | Tier | Data | Auth | Example | Implementation |
@@ -457,4 +478,3 @@ Feature widgets go in `features/x/presentation/widgets/`, not `core/widgets/`.
 1. MUST separate data models from domain entities — NEVER reuse one class for both.
 2. MUST define `abstract interface class` for every repository and datasource. Constructors MUST take interfaces, NEVER concrete types.
 3. MUST NEVER put `fromJson`/`toJson` on domain entities — serialization is a Data-layer concern.
-

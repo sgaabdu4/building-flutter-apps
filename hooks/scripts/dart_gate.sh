@@ -224,13 +224,44 @@ add_match "use-app-widget-keys" \
   "Use AppWidgetKeys.<name>. Inline string ValueKey defeats the central key registry." \
   "$MATCHES"
 
-# ---------- Rule 8: context.go('/raw') ----------
-MATCHES=$(grep -nE "context\.go[[:space:]]*\([[:space:]]*['\"]/" "$FILE_PATH" 2>/dev/null)
+# ---------- Rule 8: raw or named route navigation ----------
+CONTEXT_STRING_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement)[[:space:]]*(<[^>]+>)?[[:space:]]*\([[:space:]]*r?['\"]" "$FILE_PATH" 2>/dev/null)
+CONTEXT_NAMED_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+GOROUTER_STRING_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])GoRouter[[:space:]]*\.[[:space:]]*of[[:space:]]*\([^)]*\)[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement)[[:space:]]*(<[^>]+>)?[[:space:]]*\([[:space:]]*r?['\"]" "$FILE_PATH" 2>/dev/null)
+GOROUTER_NAMED_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])GoRouter[[:space:]]*\.[[:space:]]*of[[:space:]]*\([^)]*\)[[:space:]]*\.[[:space:]]*(goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+ROUTER_STRING_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement)[[:space:]]*(<[^>]+>)?[[:space:]]*\([[:space:]]*r?['\"]" "$FILE_PATH" 2>/dev/null)
+ROUTER_NAMED_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+INITIAL_LOCATION_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])initialLocation[[:space:]]*:[[:space:]]*r?['\"]" "$FILE_PATH" 2>/dev/null)
+MATCHES="$CONTEXT_STRING_MATCHES"
+for EXTRA_MATCHES in "$CONTEXT_NAMED_MATCHES" "$GOROUTER_STRING_MATCHES" "$GOROUTER_NAMED_MATCHES" "$ROUTER_STRING_MATCHES" "$ROUTER_NAMED_MATCHES" "$INITIAL_LOCATION_MATCHES"; do
+  if [[ -n "$EXTRA_MATCHES" ]]; then
+    MATCHES="${MATCHES:+$MATCHES$'\n'}$EXTRA_MATCHES"
+  fi
+done
 add_match "use-typed-routes" \
-  "Use const FooRoute().go(context) with go_router_builder. Raw string routes lose type safety." \
+  "Use generated typed route helpers. Route definitions own paths; raw string and named route navigation are forbidden." \
   "$MATCHES"
 
-# ---------- Rule 9: abstract class + @freezed (multi-line context) ----------
+# ---------- Rule 9: raw page navigation should use generated helpers ----------
+case "$FILE_PATH" in
+  *.g.dart) ;;
+  *)
+    CONTEXT_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+    ROUTER_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+    NAVIGATOR_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])Navigator[[:space:]]*(\.[[:space:]]*of[[:space:]]*\([^)]*\)[[:space:]]*)?\.[[:space:]]*(push|pushReplacement|pushAndRemoveUntil|pushNamed|pushReplacementNamed|restorablePush|restorablePushNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+    MATCHES=""
+    for EXTRA_MATCHES in "$CONTEXT_MATCHES" "$ROUTER_MATCHES" "$NAVIGATOR_MATCHES"; do
+      if [[ -n "$EXTRA_MATCHES" ]]; then
+        MATCHES="${MATCHES:+$MATCHES$'\n'}$EXTRA_MATCHES"
+      fi
+    done
+    add_match "use-typed-route-helpers" \
+      "Call generated typed route helpers for page navigation. Local dialog/sheet dismissal may use Navigator.pop/maybePop." \
+      "$MATCHES"
+    ;;
+esac
+
+# ---------- Rule 10: abstract class + @freezed (multi-line context) ----------
 MATCHES=$(awk '
   /@freezed/ { freezed = 1; next }
   freezed && /^[[:space:]]*abstract[[:space:]]+class[[:space:]]+/ {
@@ -243,7 +274,7 @@ add_match "use-sealed-freezed" \
   "Use sealed class with @freezed, never abstract class." \
   "$MATCHES"
 
-# ---------- Rule 10: ScaffoldMessenger.of or SnackBarUtils.show in widget files ----------
+# ---------- Rule 11: ScaffoldMessenger.of or SnackBarUtils.show in widget files ----------
 case "$FILE_PATH" in
   */presentation/*|*/screens/*|*/widgets/*|*/views/*|*/pages/*)
     case "$FILE_PATH" in

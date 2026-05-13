@@ -13,7 +13,7 @@ Before generating code in this area, output verbatim: `Reading: deep-linking.md`
 3. **MUST** validate route parameters before using them. Missing or invalid IDs render fallback UI or redirect to a typed fallback.
 4. **MUST** configure Android App Links and iOS Universal Links when URLs should open the installed app.
 5. **MUST** test cold-start, warm-start, signed-out, signed-in, setup-incomplete, and stale-link paths.
-6. **MUST NOT** call `context.go('/raw-string')` from widgets when a typed route exists.
+6. **MUST** navigate with generated route helpers such as `SomeRoute(...).go(context)` / `.push<T>(context)`.
 7. **MUST NOT** assume deep links bypass auth/setup/update gates. The resolver owns that policy.
 
 ## Web URL Strategy
@@ -80,6 +80,16 @@ String? resolveAppRedirect({
 ```
 
 Test the resolver matrix before shipping any auth/setup/deep-link route change.
+
+## Route Boundary
+
+Deep links enter through GoRouter, and app code navigates through the generated
+typed route helpers. Keep route definitions, redirect resolver wiring, and
+generated-route `.location` usage in the router boundary.
+
+```dart
+ProductDetailRoute(id: productId).go(context);
+```
 
 ## Android App Links
 
@@ -175,7 +185,7 @@ xcrun simctl openurl booted https://example.com/products/123
 
 ## Checklist
 
-- [ ] Typed routes exist for link targets.
+- [ ] Typed routes exist for link targets and call sites use generated route helpers.
 - [ ] Redirect resolver is pure and matrix-tested.
 - [ ] Android App Links or iOS Universal Links are configured when required.
 - [ ] Hosted association files match app IDs, bundle IDs, package names, and SHA fingerprints.
@@ -186,5 +196,4 @@ xcrun simctl openurl booted https://example.com/products/123
 
 1. MUST keep redirect decisions in a pure resolver function and matrix-test it. The resolver receives auth/setup state and current location; it returns a redirect string or null — no widget dependencies allowed inside the resolver.
 2. MUST validate route parameters at the route boundary before using them. Missing or invalid IDs MUST render fallback UI or redirect to a typed fallback — NEVER throw from widget `build()`.
-3. MUST NOT call `context.go('/raw-string')` from widgets when a typed route exists. Use `const MyRoute(id: id).go(context)` for type-safe navigation that survives route renames.
-
+3. MUST use generated typed route helpers at call sites. Route definitions own URL paths and params; local modal helpers own sheet/dialog presentation and dismissal.

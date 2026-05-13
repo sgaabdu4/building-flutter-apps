@@ -202,6 +202,82 @@ class CleanWidget extends StatelessWidget {
 }
 EOF
 
+# Generated typed route helper call
+cat > "$TEST_DIR/lib/direct_route_call.dart" <<'EOF'
+void open(context, String id) {
+  ProductDetailRoute(id: id).go(context);
+}
+EOF
+
+# Raw context navigation with typed location
+cat > "$TEST_DIR/lib/context_route_call.dart" <<'EOF'
+void open(context, String id) {
+  context.go(ProductDetailRoute(id: id).location);
+}
+EOF
+
+# Raw router string navigation
+cat > "$TEST_DIR/lib/raw_router_string.dart" <<'EOF'
+class GoRouter {
+  void go(String location) {}
+  Future<T?> pushNamed<T>(String name) async => null;
+}
+
+void open(GoRouter router) {
+  router.go('/home');
+}
+EOF
+
+# Camel-case router variable navigation
+cat > "$TEST_DIR/lib/raw_app_router_string.dart" <<'EOF'
+class GoRouter {
+  void go(String location) {}
+}
+
+void open(GoRouter appRouter) {
+  appRouter.go('/home');
+}
+EOF
+
+# Named router navigation
+cat > "$TEST_DIR/lib/raw_router_named.dart" <<'EOF'
+class GoRouter {
+  Future<T?> pushNamed<T>(String name) async => null;
+}
+
+Future<T?> open<T>(GoRouter router) {
+  return router.pushNamed<T>('home');
+}
+EOF
+
+# Route fallback helper
+cat > "$TEST_DIR/lib/fallback_route_call.dart" <<'EOF'
+void popOrGo(fallbackRoute) {
+  fallbackRoute.go(this);
+}
+EOF
+
+# Navigator dismissal for local modals
+cat > "$TEST_DIR/lib/direct_navigator_call.dart" <<'EOF'
+void close(context) {
+  Navigator.of(context).maybePop();
+}
+EOF
+
+# Shell branch navigation
+cat > "$TEST_DIR/lib/direct_shell_call.dart" <<'EOF'
+void selectTab(navigationShell) {
+  navigationShell.goBranch(1);
+}
+EOF
+
+# Local modal helper
+cat > "$TEST_DIR/lib/direct_modal_call.dart" <<'EOF'
+void confirm(context) {
+  showDialog<bool>(context: context, builder: (_) => null);
+}
+EOF
+
 # l10n.yaml — gen-l10n path config
 cat > "$TEST_DIR/l10n.yaml" <<'EOF'
 arb-dir: lib/l10n
@@ -233,6 +309,15 @@ assert_silent "datasource (storage allowed)"            "$TEST_DIR/lib/features/
 assert_silent "main.dart Hive.initFlutter (allowed)"    "$TEST_DIR/lib/main.dart"
 assert_silent "test/ file Hive (allowed)"               "$TEST_DIR/test/foo_test.dart"
 assert_silent "widget — only allowlist types"           "$TEST_DIR/lib/widget_clean.dart"
+assert_silent "generated typed route helper"            "$TEST_DIR/lib/direct_route_call.dart"
+assert_block  "context route helper bypass"             "$TEST_DIR/lib/context_route_call.dart"
+assert_block  "raw router string navigation"            "$TEST_DIR/lib/raw_router_string.dart"
+assert_block  "raw appRouter string navigation"         "$TEST_DIR/lib/raw_app_router_string.dart"
+assert_block  "named router navigation"                 "$TEST_DIR/lib/raw_router_named.dart"
+assert_silent "fallback route helper"                   "$TEST_DIR/lib/fallback_route_call.dart"
+assert_silent "navigator local dismissal"               "$TEST_DIR/lib/direct_navigator_call.dart"
+assert_silent "shell branch navigation"                 "$TEST_DIR/lib/direct_shell_call.dart"
+assert_silent "local modal helper"                      "$TEST_DIR/lib/direct_modal_call.dart"
 assert_block  "l10n path config guard"                  "$TEST_DIR/l10n.yaml"
 cat > "$TEST_DIR/l10n.yaml" <<'EOF'
 arb-dir: lib/l10n

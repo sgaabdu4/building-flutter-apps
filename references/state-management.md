@@ -75,6 +75,8 @@ class ProductPageState extends ConsumerState<ProductPage> {
 ```
 
 Do not pass `BuildContext` into async helpers just for navigation/snackbars.
+Navigation uses generated typed route helpers; see
+[common-patterns.md](common-patterns.md#typed-gorouter-route-ssot).
 
 ## Notifier Structure
 
@@ -633,4 +635,3 @@ class OrderNotifier extends _$OrderNotifier {
 1. MUST `if (!ref.mounted) return;` after EVERY `await` in a notifier — the provider may be disposed while the async operation is in flight, and writing to disposed state throws.
 2. NEVER call `ref.watch()` inside a notifier method — use `ref.read()` for one-time access or `ref.listen()` for reactive side effects. `ref.watch()` in a method body causes rebuild loops.
 3. NEVER read `state` (including `state.copyWith`) before the first assignment in a sync `Notifier.build()` — defer via `Future.microtask` to avoid the "uninitialized provider" exception that fires before `build()` returns.
-

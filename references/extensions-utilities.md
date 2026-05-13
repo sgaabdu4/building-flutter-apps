@@ -72,33 +72,19 @@ extension ContextExtensions on BuildContext {
 
 ### Dialogs
 
+Dialogs and sheets are local presentation helpers. Use named helpers for
+semantic presentation, and return results through `Navigator.pop` from inside
+the modal widget.
+
 ```dart
-extension ContextDialogs on BuildContext {
-  Future<bool> showConfirmDialog({
-    required String title,
-    required String message,
-    String confirmLabel = 'Confirm',
-    String cancelLabel = 'Cancel',
-  }) async {
-    final result = await showDialog<bool>(
-      context: this,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(cancelLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
+final confirmed = await showConfirmDialog(
+  context: context,
+  title: context.l10n.deleteTitle,
+  message: context.l10n.deleteMessage,
+);
+
+if (confirmed) {
+  await ref.read(itemsNotifierProvider.notifier).delete(id);
 }
 ```
 
@@ -571,4 +557,3 @@ export 'widget_extensions.dart';
 2. MUST use context extensions (`context.theme`, `context.colors`, `context.textTheme`, `context.screenWidth`) — NEVER call `Theme.of(context)` or `MediaQuery.sizeOf(context)` inline in widget build methods.
 3. MUST use `Debouncer` for search inputs with a minimum 500 ms duration. NEVER trigger API calls on every keystroke without debouncing.
 4. MUST use extensions for `DateTime` / `String` / `int` / `double` / `num` / `Duration` manipulation — capitalize / titleCase / truncate / timeAgo / startOfDay / asCurrency / asPercent / clamped / pluralized / inWords / formatted. NEVER inline at call site. Missing case? Add to `core/extensions/<type>_extensions.dart`, export in barrel, then call.
-
