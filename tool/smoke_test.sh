@@ -81,7 +81,8 @@ copilot = json.loads((root / "plugin.json").read_text())
 assert not (root / "hooks/hooks.codex.json").exists()
 assert claude.get("hooks") == "./hooks/hooks.json"
 assert claude.get("skills") == ["./skills/"]
-assert "hooks" not in codex
+assert codex.get("hooks") == "./hooks/hooks.json"
+assert codex.get("skills") == ["./skills/"]
 assert copilot.get("hooks") == "hooks/hooks.copilot.json"
 
 shared_hooks = json.loads((root / "hooks/hooks.json").read_text())
@@ -201,6 +202,12 @@ class CleanWidget extends StatelessWidget {
 }
 EOF
 
+# l10n.yaml — gen-l10n path config
+cat > "$TEST_DIR/l10n.yaml" <<'EOF'
+arb-dir: lib/l10n
+synthetic-package: false
+EOF
+
 assert_block() {
   local name="$1" file="$2"
   echo "{\"tool_input\":{\"file_path\":\"$file\"}}" | "$HOOK" > /tmp/smoke_out.json 2>/dev/null
@@ -226,6 +233,12 @@ assert_silent "datasource (storage allowed)"            "$TEST_DIR/lib/features/
 assert_silent "main.dart Hive.initFlutter (allowed)"    "$TEST_DIR/lib/main.dart"
 assert_silent "test/ file Hive (allowed)"               "$TEST_DIR/test/foo_test.dart"
 assert_silent "widget — only allowlist types"           "$TEST_DIR/lib/widget_clean.dart"
+assert_block  "l10n path config guard"                  "$TEST_DIR/l10n.yaml"
+cat > "$TEST_DIR/l10n.yaml" <<'EOF'
+arb-dir: lib/l10n
+output-localization-file: app_localizations.dart
+EOF
+assert_silent "l10n path config"                        "$TEST_DIR/l10n.yaml"
 
 # --------- 5. Stop hook ---------
 echo ""

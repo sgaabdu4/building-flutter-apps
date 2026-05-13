@@ -19,7 +19,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.0.1"
+  version: "5.0.2"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, showcaseview, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -51,7 +51,7 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 
 5. **Use `Object?` or a specific type** for unknown values. `dynamic` only for `Map<String, dynamic>` JSON. Never `value!` — use `if (value case final v?)`.
 
-6. **Use `AppLocalizations` (gen-l10n)** for every user-facing string. Never hardcode UI copy in widgets, notifiers, repositories, or datasources. `*Strings` constants only for non-user-facing IDs.
+6. **Use `AppLocalizations` (gen-l10n)** for every user-facing string. Never hardcode UI copy in widgets, notifiers, repositories, or datasources. `*Strings` constants only for non-user-facing IDs. For l10n config, put ARB files in `arb-dir` (`lib/l10n` by default). Generated Dart is written to `${arb-dir}/${output-localization-file}` unless `output-dir` is set; import `app_localizations.dart` from that directory.
 
 7. **Use `sealed class` for Freezed unions and states.** Never `abstract class` with `@freezed`. Match with Dart native `switch` — never Freezed `.when()` / `.map()`. For VOs in `/domain/values/`, annotate `@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)` to disable codegen of those methods entirely. Lint: `freezed_disable_map_when_required`.
 

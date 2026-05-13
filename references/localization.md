@@ -15,6 +15,7 @@ Before generating code in this area, output verbatim: `Reading: localization.md`
 5. **MUST** use plural/select syntax for counts, gender, roles, or status choices.
 6. **MUST NOT** use `AppLocalizations.of(context)!`. Prefer `nullable-getter: false`; if an existing project uses nullable getters, handle null once in a context extension.
 7. **MUST NOT** store localized copy in domain entities, repositories, datasources, or notifiers. Store semantic state there; render copy in UI.
+8. **Configure gen-l10n paths explicitly.** Put ARB files in `arb-dir` (`lib/l10n` by default). Generated Dart is written to `${arb-dir}/${output-localization-file}` unless `output-dir` is set, then it is written to `${output-dir}/${output-localization-file}`.
 
 ## Setup
 
@@ -38,9 +39,14 @@ Create `l10n.yaml`:
 arb-dir: lib/l10n
 template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
-synthetic-package: false
 nullable-getter: false
 use-escaping: true
+```
+
+With the config above, generated output is `lib/l10n/app_localizations.dart`; import:
+
+```dart
+import 'package:my_app/l10n/app_localizations.dart';
 ```
 
 ## App Wiring
@@ -194,6 +200,7 @@ class InviteStatusLabel extends StatelessWidget {
 ## Checklist
 
 - [ ] `l10n.yaml` exists and gen-l10n is enabled.
+- [ ] Generated l10n files are in `arb-dir` or `output-dir`, and imports use that path.
 - [ ] `AppLocalizations` is wired at `MaterialApp`/`CupertinoApp`.
 - [ ] User-facing strings are in ARB files.
 - [ ] Placeholders/plurals/selects are used instead of string concatenation.
@@ -205,4 +212,4 @@ class InviteStatusLabel extends StatelessWidget {
 1. MUST use Flutter gen-l10n for all user-visible copy in production UI — NEVER ad hoc string constants for user-facing text.
 2. MUST NOT call `AppLocalizations.of(context)!` directly — configure `nullable-getter: false` in `l10n.yaml` or use a context extension to avoid null-assertion boilerplate.
 3. MUST NOT store localized copy in domain entities, repositories, datasources, or notifiers — expose semantic state and let the UI layer render translated copy.
-
+4. Configure gen-l10n paths explicitly — ARB in `arb-dir`; generated Dart in `${arb-dir}` or `${output-dir}`; import `app_localizations.dart` from that directory.

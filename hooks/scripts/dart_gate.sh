@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PostToolUse hook for Write|Edit|MultiEdit.
-# Fires only on .dart files inside a Flutter project (pubspec.yaml present in ancestor).
+# Fires on .dart files and l10n.yaml inside a Flutter project (pubspec.yaml present in ancestor).
 # Runs ERE grep + awk context checks to catch grep-able rule violations.
 # Always exits 0. Violations emitted as JSON {"decision":"block","reason":"..."} on stdout,
 # which Claude Code interprets as a block + feedback message.
@@ -18,17 +18,7 @@ if [[ -z "$FILE_PATH" ]] && command -v jq >/dev/null 2>&1 && [[ -n "$INPUT_JSON"
   FILE_PATH=$(printf '%s' "$INPUT_JSON" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
 fi
 
-# Bail fast when not a Dart source file
 [[ -z "$FILE_PATH" ]] && exit 0
-case "$FILE_PATH" in
-  *.dart) ;;
-  *) exit 0 ;;
-esac
-
-# Skip generated files
-case "$FILE_PATH" in
-  *.g.dart|*.freezed.dart|*.gr.dart|*.config.dart|*.mocks.dart) exit 0 ;;
-esac
 
 # Walk up to find pubspec.yaml. No pubspec = not a Flutter project = exit silently.
 find_flutter_root() {
@@ -49,6 +39,46 @@ PROJECT_ROOT=$(find_flutter_root "$FILE_PATH") || exit 0
 
 # File must exist for checks to run
 [[ -f "$FILE_PATH" ]] || exit 0
+
+emit_block() {
+  local reason="$1"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c "import json,sys; print(json.dumps({'decision':'block','reason':sys.stdin.read()}))" <<<"$reason"
+  else
+    local escaped="$reason"
+    escaped=${escaped//\\/\\\\}
+    escaped=${escaped//\"/\\\"}
+    escaped=${escaped//$'\n'/\\n}
+    printf '{"decision":"block","reason":"%s"}\n' "$escaped"
+  fi
+}
+
+case "$FILE_PATH" in
+  */l10n.yaml|l10n.yaml)
+    MATCHES=$(awk '/^[[:space:]]*synthetic-package[[:space:]]*:/ { print NR ":" $0 }' "$FILE_PATH" 2>/dev/null)
+    if [[ -n "$MATCHES" ]]; then
+      REASON="building-flutter-apps gate blocked the write. Fix these before retrying:"
+      while IFS=: read -r lineno content; do
+        [[ -z "$lineno" ]] && continue
+        content="${content#"${content%%[![:space:]]*}"}"
+        REASON+=$'\n'"  $FILE_PATH:$lineno [gen-l10n-paths]: configure gen-l10n paths explicitly: ARB in arb-dir; generated Dart in arb-dir or output-dir; import app_localizations.dart from that directory."
+      done <<< "$MATCHES"
+      emit_block "$REASON"
+    fi
+    exit 0
+    ;;
+esac
+
+# Bail fast when not a Dart source file.
+case "$FILE_PATH" in
+  *.dart) ;;
+  *) exit 0 ;;
+esac
+
+# Skip generated files
+case "$FILE_PATH" in
+  *.g.dart|*.freezed.dart|*.gr.dart|*.config.dart|*.mocks.dart) exit 0 ;;
+esac
 
 VIOLATIONS=()
 
@@ -370,13 +400,6 @@ for v in "${VIOLATIONS[@]}"; do
   REASON+=$'\n'"$v"
 done
 
-if command -v python3 >/dev/null 2>&1; then
-  python3 -c "import json,sys; print(json.dumps({'decision':'block','reason':sys.stdin.read()}))" <<<"$REASON"
-else
-  ESCAPED=${REASON//\\/\\\\}
-  ESCAPED=${ESCAPED//\"/\\\"}
-  ESCAPED=${ESCAPED//$'\n'/\\n}
-  printf '{"decision":"block","reason":"%s"}\n' "$ESCAPED"
-fi
+emit_block "$REASON"
 
 exit 0
