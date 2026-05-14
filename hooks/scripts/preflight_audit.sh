@@ -94,6 +94,70 @@ if [[ -d "$FLUTTER_ROOT/lib" ]]; then
   done < <(recursive_grep 'ValueKey[[:space:]]*\([[:space:]]*['\''"]' | head -n 5)
   [[ $COUNT -gt 0 ]] && add_violation "$COUNT inline string ValueKey(...) found. Use AppWidgetKeys central registry."
 
+  consumer_state_cache_scan() {
+    local result
+    while IFS= read -r f; do
+      [[ -f "$f" ]] || continue
+      if ! grep -qE "extends[[:space:]]+ConsumerState[[:space:]]*<" "$f" 2>/dev/null; then
+        continue
+      fi
+      if ! grep -qE "ref[[:space:]]*\.[[:space:]]*watch[[:space:]]*\(" "$f" 2>/dev/null; then
+        continue
+      fi
+      result=$(awk '
+        {
+          line = $0
+
+          if (!in_consumer) {
+            if (!pending_class && line ~ /^[[:space:]]*class[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/) {
+              pending_class = 1
+              signature = line
+            } else if (pending_class) {
+              signature = signature " " line
+            }
+
+            if (pending_class && line ~ /\{/) {
+              if (signature ~ /extends[[:space:]]+ConsumerState[[:space:]]*</) {
+                in_consumer = 1
+                depth = 0
+                saw_open = 0
+              }
+              pending_class = 0
+              signature = ""
+            }
+          }
+
+          if (in_consumer && saw_open && depth == 1 &&
+              line ~ /^[[:space:]]*(late[[:space:]]+)?(final[[:space:]]+)?[A-Za-z_][A-Za-z0-9_<>,?[:space:]]+[[:space:]]+_[A-Za-z_][A-Za-z0-9_]*(Cache|Source|DayStart|TodayStart)([^A-Za-z0-9_]|$)/) {
+            print NR ":" $0
+          }
+
+          for (i = 1; i <= length(line); i++) {
+            char = substr(line, i, 1)
+            if (char == "{") {
+              depth++
+              saw_open = 1
+            } else if (char == "}") {
+              depth--
+              if (in_consumer && depth <= 0) {
+                in_consumer = 0
+                saw_open = 0
+              }
+            }
+          }
+        }
+      ' "$f" 2>/dev/null || true)
+      [[ -n "$result" ]] && printf '%s\n' "$result"
+    done < <(find "$FLUTTER_ROOT/lib" -type f -name '*.dart' 2>/dev/null)
+  }
+
+  COUNT=0
+  while IFS= read -r match; do
+    [[ -z "$match" ]] && continue
+    COUNT=$((COUNT + 1))
+  done < <(consumer_state_cache_scan | head -n 5)
+  [[ $COUNT -gt 0 ]] && add_violation "$COUNT ConsumerState provider-derived cache field(s) found. Move derived data to @riverpod codegen or compute it locally without mutable cache fields."
+
   feature_notifier_keepalive_scan() {
     local tmp_hits="" result
     [[ -d "$FLUTTER_ROOT/lib/features" ]] || return 0
@@ -177,9 +241,11 @@ if [[ -d "$FLUTTER_ROOT/lib" ]]; then
 
   direct_page_nav_grep() {
     {
-      recursive_grep '(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
-      recursive_grep '(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+      recursive_grep '(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(go[A-Z][A-Za-z0-9_]*|push[A-Z][A-Za-z0-9_]*|replace[A-Z][A-Za-z0-9_]*|pushReplacement[A-Z][A-Za-z0-9_]*|go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+      recursive_grep '(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(go[A-Z][A-Za-z0-9_]*|push[A-Z][A-Za-z0-9_]*|replace[A-Z][A-Za-z0-9_]*|pushReplacement[A-Z][A-Za-z0-9_]*|go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
       recursive_grep '(^|[^A-Za-z0-9_])Navigator[[:space:]]*(\.[[:space:]]*of[[:space:]]*\([^)]*\)[[:space:]]*)?\.[[:space:]]*(push|pushReplacement|pushAndRemoveUntil|pushNamed|pushReplacementNamed|restorablePush|restorablePushNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+      recursive_grep '(^|[^A-Za-z0-9_])(navigateTo|goTo|pushTo|replaceWith)[A-Z][A-Za-z0-9_]*(Route|Screen|Page)[A-Za-z0-9_]*[[:space:]]*(<[^>]+>)?[[:space:]]*\('
+      recursive_grep '(^|[^A-Za-z0-9_])(([A-Za-z_][A-Za-z0-9_]*[[:space:]]*\.[[:space:]]*)?routerDelegate[[:space:]]*\.[[:space:]]*navigatorKey[[:space:]]*\.[[:space:]]*currentContext|navigatorKey[[:space:]]*\.[[:space:]]*currentContext)'
     }
   }
 

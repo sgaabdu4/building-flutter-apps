@@ -774,7 +774,7 @@ if (lastTableSync == null) {
   if (deleted.isNotEmpty) await repo.deleteByIds(deleted);
 }
 
-await settingsRepo.setTableSyncDate(tableKey, DateTime.now().toUtc());
+await settingsRepo.setTableSyncDate(tableKey, DateTimeX.nowUtc());
 ```
 
 ### Per-Table Sync Date Storage

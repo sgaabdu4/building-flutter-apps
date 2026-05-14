@@ -8,7 +8,11 @@
 
 > **Disclaimer:** Unofficial. No affiliation w/ Google, Flutter team, Riverpod maintainers. "Flutter" trademark Google LLC. "Riverpod" by Remi Rousselet.
 
-> **Opinionated by design:** Strict patterns over flexible style.
+> **Highly opinionated by design:** This skill intentionally favors a strict
+> Riverpod/codegen/clean-architecture workflow over broad Flutter flexibility.
+> Treat it as a project policy package, not a neutral best-practices checklist.
+> Until v1.0.0, assume every release may include breaking changes as the policy
+> surface is refined.
 
 ## Installation
 

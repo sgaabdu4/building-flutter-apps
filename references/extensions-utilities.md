@@ -21,6 +21,9 @@ Primitive manipulation lives in `core/extensions/`. NEVER inline at call site. A
 | `s.split(' ').map(...).join(' ')` for title case        | `s.titleCase`                |
 | `s.length > n ? '${s.substring(0,n)}...' : s`           | `s.truncate(n)`              |
 | `DateTime.now().difference(date)` for relative time     | `date.timeAgo`               |
+| `DateTime.now().toUtc()` / `DateTime.timestamp()`       | `DateTimeX.nowUtc()`         |
+| `DateTimeX.nowLocal().startOfDay`                       | `DateTimeX.nowLocalStartOfDay()` |
+| `DateTimeX.nowLocal().calendarDaysBefore(60)`           | semantic `DateTimeX` helper  |
 | `DateTime(d.year, d.month, d.day)` for day boundary     | `d.startOfDay` / `d.endOfDay`|
 | Manual `year == now.year && month == ...` for today     | `d.isToday` / `d.isYesterday`|
 | `NumberFormat.currency(...).format(amount)` ad-hoc      | `amount.asCurrency()`        |
@@ -28,6 +31,7 @@ Primitive manipulation lives in `core/extensions/`. NEVER inline at call site. A
 | `value.clamp(lo, hi)` repeated at call site             | `value.clamped(lo, hi)`      |
 | `count == 1 ? 'item' : 'items'`                         | `count.pluralized('item')`   |
 | `Theme.of(context).colorScheme` / `MediaQuery.sizeOf(context)` | `context.colors` / `context.screenSize` |
+| Raw key/id/limit/threshold literals                     | named constants, VOs, or semantic helpers |
 
 Missing case? Add to extension file in `core/extensions/`, export in barrel, then call. Don't inline "just this once".
 
@@ -77,10 +81,11 @@ semantic presentation, and return results through `Navigator.pop` from inside
 the modal widget.
 
 ```dart
+final l10n = context.l10n;
 final confirmed = await showConfirmDialog(
   context: context,
-  title: context.l10n.deleteTitle,
-  message: context.l10n.deleteMessage,
+  title: l10n.deleteTitle,
+  message: l10n.deleteMessage,
 );
 
 if (confirmed) {
@@ -113,24 +118,70 @@ extension StringExtensions on String {
 
 ## DateTime Extensions
 
+Current-time access belongs here too. Use `DateTimeX.nowUtc()` for
+persisted/server timestamps and `DateTimeX.nowLocal()` for local UI calendar
+logic. Current-day boundaries and repeated windows should be named helpers here
+rather than inline `DateTimeX.nowLocal().startOfDay` or
+`DateTimeX.nowLocal().calendarDaysBefore(60)` call sites.
+
 ```dart
 // core/extensions/date_time_extensions.dart
+abstract final class DateTimeX {
+  static DateTime nowUtc() => DateTime.timestamp();
+  static DateTime nowLocal() => nowUtc().toLocal();
+  static DateTime nowLocalStartOfDay() => nowLocal().startOfDay;
+
+  // Name repeated windows for the app/domain instead of inlining the number.
+  static DateTime localHistoryWindowStart() =>
+      nowLocalStartOfDay().calendarDaysBefore(60);
+}
+
 extension DateTimeExtensions on DateTime {
   bool get isToday {
-    final now = DateTime.now();
+    final now = DateTimeX.nowLocal();
     return year == now.year && month == now.month && day == now.day;
   }
 
   bool get isYesterday {
-    final y = DateTime.now().subtract(const Duration(days: 1));
+    final y = DateTimeX.nowLocal().calendarDaysBefore(1);
     return year == y.year && month == y.month && day == y.day;
   }
 
   DateTime get startOfDay => DateTime(year, month, day);
   DateTime get endOfDay => DateTime(year, month, day, 23, 59, 59);
 
+  // Calendar days preserve local wall-clock time across DST transitions.
+  // Use add/subtract(Duration) only for elapsed-time arithmetic.
+  DateTime calendarDaysBefore(int days) => _copyWithCalendarDay(day - days);
+  DateTime calendarDaysAfter(int days) => _copyWithCalendarDay(day + days);
+
+  DateTime _copyWithCalendarDay(int calendarDay) {
+    if (isUtc) {
+      return DateTime.utc(
+        year,
+        month,
+        calendarDay,
+        hour,
+        minute,
+        second,
+        millisecond,
+        microsecond,
+      );
+    }
+    return DateTime(
+      year,
+      month,
+      calendarDay,
+      hour,
+      minute,
+      second,
+      millisecond,
+      microsecond,
+    );
+  }
+
   String get timeAgo {
-    final diff = DateTime.now().difference(this);
+    final diff = DateTimeX.nowLocal().difference(toLocal());
     if (diff.inSeconds < 60) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';

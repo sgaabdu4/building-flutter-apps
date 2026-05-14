@@ -77,7 +77,7 @@ esac
 
 # Skip generated files
 case "$FILE_PATH" in
-  *.g.dart|*.freezed.dart|*.gr.dart|*.config.dart|*.mocks.dart) exit 0 ;;
+  *.g.dart|*.freezed.dart|*.gr.dart|*.config.dart|*.mocks.dart|*/l10n/app_localizations*.dart) exit 0 ;;
 esac
 
 VIOLATIONS=()
@@ -157,11 +157,69 @@ add_match "use-riverpod-codegen" \
   "Use @riverpod or @Riverpod(keepAlive: true) codegen. Run dart run build_runner watch --delete-conflicting-outputs." \
   "$MATCHES"
 
-# ---------- Rule 6: Hardcoded UI string in Text('...') ----------
-MATCHES=$(grep -nE "Text[[:space:]]*\([[:space:]]*['\"][A-Z][A-Za-z][A-Za-z ]{2,}['\"]" "$FILE_PATH" 2>/dev/null)
-add_match "use-applocalizations" \
-  "Use AppLocalizations.of(context).key. Hardcoded UI strings are not localizable." \
+# ---------- Rule 5b: ConsumerState provider-derived cache ----------
+MATCHES=""
+if grep -qE "extends[[:space:]]+ConsumerState[[:space:]]*<" "$FILE_PATH" 2>/dev/null &&
+   grep -qE "ref[[:space:]]*\.[[:space:]]*watch[[:space:]]*\(" "$FILE_PATH" 2>/dev/null; then
+  MATCHES=$(awk '
+    {
+      line = $0
+
+      if (!in_consumer) {
+        if (!pending_class && line ~ /^[[:space:]]*class[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/) {
+          pending_class = 1
+          signature = line
+        } else if (pending_class) {
+          signature = signature " " line
+        }
+
+        if (pending_class && line ~ /\{/) {
+          if (signature ~ /extends[[:space:]]+ConsumerState[[:space:]]*</) {
+            in_consumer = 1
+            depth = 0
+            saw_open = 0
+          }
+          pending_class = 0
+          signature = ""
+        }
+      }
+
+      if (in_consumer && saw_open && depth == 1 &&
+          line ~ /^[[:space:]]*(late[[:space:]]+)?(final[[:space:]]+)?[A-Za-z_][A-Za-z0-9_<>,?[:space:]]+[[:space:]]+_[A-Za-z_][A-Za-z0-9_]*(Cache|Source|DayStart|TodayStart)([^A-Za-z0-9_]|$)/) {
+        print NR ":" $0
+      }
+
+      for (i = 1; i <= length(line); i++) {
+        char = substr(line, i, 1)
+        if (char == "{") {
+          depth++
+          saw_open = 1
+        } else if (char == "}") {
+          depth--
+          if (in_consumer && depth <= 0) {
+            in_consumer = 0
+            saw_open = 0
+          }
+        }
+      }
+    }
+  ' "$FILE_PATH" 2>/dev/null)
+fi
+add_match "riverpod-consumer-state-derived-cache" \
+  "Do not cache provider-derived data in ConsumerState. Move derived data to @riverpod codegen or compute it locally without mutable cache fields." \
   "$MATCHES"
+
+# ---------- Rule 6: Hardcoded UI string in Text('...') ----------
+case "$FILE_PATH" in
+  *_test.dart|*/test/*|*_strings.dart|*/l10n/*)
+    ;;
+  *)
+    MATCHES=$(grep -nE "Text[[:space:]]*\([[:space:]]*['\"][A-Z][A-Za-z][A-Za-z ]{2,}['\"]" "$FILE_PATH" 2>/dev/null)
+    add_match "use-applocalizations" \
+      "Use AppLocalizations.of(context).key. Hardcoded UI strings are not localizable." \
+      "$MATCHES"
+    ;;
+esac
 
 # ---------- Rule 6b: Feature presentation notifiers should be keepAlive ----------
 case "$FILE_PATH" in
@@ -246,11 +304,13 @@ add_match "use-typed-routes" \
 case "$FILE_PATH" in
   *.g.dart) ;;
   *)
-    CONTEXT_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
-    ROUTER_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+    CONTEXT_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])context[[:space:]]*\.[[:space:]]*(go[A-Z][A-Za-z0-9_]*|push[A-Z][A-Za-z0-9_]*|replace[A-Z][A-Za-z0-9_]*|pushReplacement[A-Z][A-Za-z0-9_]*|go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+    ROUTER_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])(_?router|[A-Za-z_][A-Za-z0-9_]*Router[A-Za-z0-9_]*)[[:space:]]*\.[[:space:]]*(go[A-Z][A-Za-z0-9_]*|push[A-Z][A-Za-z0-9_]*|replace[A-Z][A-Za-z0-9_]*|pushReplacement[A-Z][A-Za-z0-9_]*|go|push|replace|pushReplacement|goNamed|pushNamed|replaceNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
     NAVIGATOR_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])Navigator[[:space:]]*(\.[[:space:]]*of[[:space:]]*\([^)]*\)[[:space:]]*)?\.[[:space:]]*(push|pushReplacement|pushAndRemoveUntil|pushNamed|pushReplacementNamed|restorablePush|restorablePushNamed)[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+    WRAPPER_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])(navigateTo|goTo|pushTo|replaceWith)[A-Z][A-Za-z0-9_]*(Route|Screen|Page)[A-Za-z0-9_]*[[:space:]]*(<[^>]+>)?[[:space:]]*\(" "$FILE_PATH" 2>/dev/null)
+    NAVIGATOR_CONTEXT_MATCHES=$(grep -nE "(^|[^A-Za-z0-9_])(([A-Za-z_][A-Za-z0-9_]*[[:space:]]*\.[[:space:]]*)?routerDelegate[[:space:]]*\.[[:space:]]*navigatorKey[[:space:]]*\.[[:space:]]*currentContext|navigatorKey[[:space:]]*\.[[:space:]]*currentContext)" "$FILE_PATH" 2>/dev/null)
     MATCHES=""
-    for EXTRA_MATCHES in "$CONTEXT_MATCHES" "$ROUTER_MATCHES" "$NAVIGATOR_MATCHES"; do
+    for EXTRA_MATCHES in "$CONTEXT_MATCHES" "$ROUTER_MATCHES" "$NAVIGATOR_MATCHES" "$WRAPPER_MATCHES" "$NAVIGATOR_CONTEXT_MATCHES"; do
       if [[ -n "$EXTRA_MATCHES" ]]; then
         MATCHES="${MATCHES:+$MATCHES$'\n'}$EXTRA_MATCHES"
       fi
@@ -358,7 +418,7 @@ case "$FILE_PATH" in
         allow = allow "FontWeight,FontStyle,FontFeature,Brightness,Clip,Axis,VerticalDirection,MainAxisAlignment,MainAxisSize,CrossAxisAlignment,"
         allow = allow "BuildContext,Locale,ThemeMode,ImageProvider,"
         allow = allow "Widget,WidgetBuilder,IndexedWidgetBuilder,SliverChildDelegate,PreferredSizeWidget,InlineSpan,GestureDetector,InheritedWidget,RenderBox,RenderObject,"
-        allow = allow "VoidCallback,Function,AsyncCallback,ValueGetter,ValueSetter,Completer,"
+        allow = allow "VoidCallback,Function,AsyncCallback,ValueGetter,ValueSetter,ReorderCallback,Completer,"
         allow = allow "Future,Stream,Iterable,List,Map,Set,Iterator,FutureOr,Record,"
         allow = allow "ValueChanged,ValueNotifier,ChangeNotifier,Listenable,Animation,CurvedAnimation,Tween,Curve,"
         allow = allow "ScrollController,TextEditingController,FocusNode,PageController,TabController,AnimationController,OverlayPortalController,SearchController,"

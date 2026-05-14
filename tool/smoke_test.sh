@@ -117,6 +117,7 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 mkdir -p "$TEST_DIR/lib/features/orders/presentation"
 mkdir -p "$TEST_DIR/lib/features/orders/data/datasources"
+mkdir -p "$TEST_DIR/lib/l10n"
 mkdir -p "$TEST_DIR/test"
 echo "name: smoke_test
 description: building-flutter-apps smoke fixture
@@ -193,12 +194,33 @@ EOF
 cat > "$TEST_DIR/lib/widget_clean.dart" <<'EOF'
 import 'package:flutter/material.dart';
 class CleanWidget extends StatelessWidget {
-  const CleanWidget({super.key, required this.id, required this.onTap, this.color});
+  const CleanWidget({super.key, required this.id, required this.onTap, required this.onReorder, this.color});
   final String id;
   final VoidCallback onTap;
+  final ReorderCallback onReorder;
   final Color? color;
   @override
   Widget build(BuildContext context) => const SizedBox();
+}
+EOF
+
+# Generated l10n output — hook must stay silent
+cat > "$TEST_DIR/lib/l10n/app_localizations.dart" <<'EOF'
+class LocalizationsDelegate<T> {}
+abstract class AppLocalizations {
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[];
+}
+EOF
+
+# Test fixtures may contain hardcoded UI strings
+cat > "$TEST_DIR/test/hardcoded_text_test.dart" <<'EOF'
+class Text {
+  const Text(String value);
+}
+
+void main() {
+  const Text('Login destination');
 }
 EOF
 
@@ -236,6 +258,44 @@ class GoRouter {
 
 void open(GoRouter appRouter) {
   appRouter.go('/home');
+}
+EOF
+
+# Router route-specific helper bypass
+cat > "$TEST_DIR/lib/router_go_home.dart" <<'EOF'
+void open(router) {
+  router.goHome();
+}
+EOF
+
+# Route wrapper function bypass
+cat > "$TEST_DIR/lib/route_wrapper_function.dart" <<'EOF'
+void open(router) {
+  navigateToHomeRoute(router);
+}
+EOF
+
+# Router navigatorKey context escape
+cat > "$TEST_DIR/lib/router_navigator_context.dart" <<'EOF'
+void open(router) {
+  final navigatorContext = router.routerDelegate.navigatorKey.currentContext;
+  if (navigatorContext == null) return;
+  const HomeRoute().go(navigatorContext);
+}
+EOF
+
+# ConsumerState provider-derived cache/source fields
+cat > "$TEST_DIR/lib/consumer_state_cache.dart" <<'EOF'
+class AddExerciseSheet extends ConsumerStatefulWidget {}
+
+class _AddExerciseSheetState extends ConsumerState<AddExerciseSheet> {
+  List<Object>? _availableExercisesSource;
+  List<Object> _availableExercisesCache = const [];
+
+  Object build(context) {
+    final items = ref.watch(itemsProvider.select((state) => state.items));
+    return items;
+  }
 }
 EOF
 
@@ -309,10 +369,16 @@ assert_silent "datasource (storage allowed)"            "$TEST_DIR/lib/features/
 assert_silent "main.dart Hive.initFlutter (allowed)"    "$TEST_DIR/lib/main.dart"
 assert_silent "test/ file Hive (allowed)"               "$TEST_DIR/test/foo_test.dart"
 assert_silent "widget — only allowlist types"           "$TEST_DIR/lib/widget_clean.dart"
+assert_silent "generated app localizations"             "$TEST_DIR/lib/l10n/app_localizations.dart"
+assert_silent "test hardcoded UI text"                  "$TEST_DIR/test/hardcoded_text_test.dart"
 assert_silent "generated typed route helper"            "$TEST_DIR/lib/direct_route_call.dart"
 assert_block  "context route helper bypass"             "$TEST_DIR/lib/context_route_call.dart"
 assert_block  "raw router string navigation"            "$TEST_DIR/lib/raw_router_string.dart"
 assert_block  "raw appRouter string navigation"         "$TEST_DIR/lib/raw_app_router_string.dart"
+assert_block  "router convenience navigation"           "$TEST_DIR/lib/router_go_home.dart"
+assert_block  "route wrapper function navigation"       "$TEST_DIR/lib/route_wrapper_function.dart"
+assert_block  "router navigator context navigation"     "$TEST_DIR/lib/router_navigator_context.dart"
+assert_block  "ConsumerState provider-derived cache"    "$TEST_DIR/lib/consumer_state_cache.dart"
 assert_block  "named router navigation"                 "$TEST_DIR/lib/raw_router_named.dart"
 assert_silent "fallback route helper"                   "$TEST_DIR/lib/fallback_route_call.dart"
 assert_silent "navigator local dismissal"               "$TEST_DIR/lib/direct_navigator_call.dart"

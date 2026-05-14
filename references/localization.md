@@ -86,7 +86,7 @@ extension LocalizationContext on BuildContext {
 }
 ```
 
-Use it in widgets:
+Use it in widgets by binding localizations once at the top of `build`:
 
 ```dart
 class ProductEmptyState extends StatelessWidget {
@@ -94,7 +94,9 @@ class ProductEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(context.l10n.productsEmptyTitle);
+    final l10n = context.l10n;
+
+    return Text(l10n.productsEmptyTitle);
   }
 }
 ```
@@ -181,10 +183,12 @@ class InviteStatusLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return switch (status) {
-      InviteStatus.pending => Text(context.l10n.invitePending),
-      InviteStatus.accepted => Text(context.l10n.inviteAccepted),
-      InviteStatus.declined => Text(context.l10n.inviteDeclined),
+      InviteStatus.pending => Text(l10n.invitePending),
+      InviteStatus.accepted => Text(l10n.inviteAccepted),
+      InviteStatus.declined => Text(l10n.inviteDeclined),
     };
   }
 }
@@ -202,6 +206,7 @@ class InviteStatusLabel extends StatelessWidget {
 - [ ] `l10n.yaml` exists and gen-l10n is enabled.
 - [ ] Generated l10n files are in `arb-dir` or `output-dir`, and imports use that path.
 - [ ] `AppLocalizations` is wired at `MaterialApp`/`CupertinoApp`.
+- [ ] Widgets bind `final l10n = context.l10n;` before localized key reads.
 - [ ] User-facing strings are in ARB files.
 - [ ] Placeholders/plurals/selects are used instead of string concatenation.
 - [ ] Notifiers expose semantic state, not translated copy.
@@ -211,5 +216,6 @@ class InviteStatusLabel extends StatelessWidget {
 
 1. MUST use Flutter gen-l10n for all user-visible copy in production UI — NEVER ad hoc string constants for user-facing text.
 2. MUST NOT call `AppLocalizations.of(context)!` directly — configure `nullable-getter: false` in `l10n.yaml` or use a context extension to avoid null-assertion boilerplate.
-3. MUST NOT store localized copy in domain entities, repositories, datasources, or notifiers — expose semantic state and let the UI layer render translated copy.
-4. Configure gen-l10n paths explicitly — ARB in `arb-dir`; generated Dart in `${arb-dir}` or `${output-dir}`; import `app_localizations.dart` from that directory.
+3. MUST bind `final l10n = context.l10n;` before localized key reads in widgets — do not chain `context.l10n.someKey`.
+4. MUST NOT store localized copy in domain entities, repositories, datasources, or notifiers — expose semantic state and let the UI layer render translated copy.
+5. Configure gen-l10n paths explicitly — ARB in `arb-dir`; generated Dart in `${arb-dir}` or `${output-dir}`; import `app_localizations.dart` from that directory.
