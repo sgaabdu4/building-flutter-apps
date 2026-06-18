@@ -1,29 +1,20 @@
 # Riverpod 3.x Codegen
 
+## Read first
+
+1. Every provider shape uses `@riverpod`/`@Riverpod(keepAlive: true)` codegen. No manual providers.
+2. Never import `package:riverpod/legacy.dart` or use banned providers.
+3. Generated provider names are SSOT; rename annotated fn/class, then regenerate.
+4. No provider-derived caches in `ConsumerState`; use computed providers or build-local values.
+5. Keep `keepAlive` for app-wide services/repos/nav-surviving state, not transient UI.
+
 ## Trigger
 
 Signals: @riverpod, @Riverpod(keepAlive), Notifier, AsyncNotifier, riverpod_annotation, riverpod_generator
-Before generating code in this area, output verbatim: `Reading: riverpod-codegen.md`
+Before code: output `Reading: riverpod-codegen.md`
 
 
-## Contents
-
-- [Setup](#setup)
-- [Generated Provider Names](#generated-provider-names)
-- [Provider Types](#provider-types)
-- [Provider-Derived UI Data](#provider-derived-ui-data)
-- [Unified Ref](#unified-ref)
-- [Automatic Retry](#automatic-retry)
-- [ProviderException](#providerexception)
-- [Mutations (experimental)](#mutations-experimental)
-- [Offline Persistence (experimental)](#offline-persistence-experimental)
-- [Pause/Resume](#pauseresume)
-- [Weak Listeners](#weak-listeners)
-- [Lifecycle Listeners Return Unsubscribe Functions](#lifecycle-listeners-return-unsubscribe-functions)
-- [Scoping (codegen only)](#scoping-codegen-only)
-- [Backend Client Providers](#backend-client-providers)
-
-Generate all providers with annotations. Never write providers manually. Never import from `package:riverpod/legacy.dart`.
+Generate all providers with annotations. Never write providers manually. Never import `package:riverpod/legacy.dart`.
 
 Hard rule: this applies to every provider shape: state, computed value, repository, datasource, service/client, family, future, stream, and notifier. Manual `Provider(...)`, `FutureProvider(...)`, `StreamProvider(...)`, `StateProvider(...)`, `NotifierProvider(...)`, `AsyncNotifierProvider(...)`, `StateNotifierProvider(...)`, and `ChangeNotifierProvider(...)` are banned.
 
@@ -44,7 +35,7 @@ dev_dependencies:
 > 3.x as short-lived. Prefer codegen + `Notifier` shapes over deprecated
 > APIs — minimise 4.0 migration.
 
-Canonical [analysis_options.yaml](analysis_options.yaml): `flutter_skill_lints` + `riverpod_lint`. Apply [analysis-options.md](analysis-options.md#install) before `dart analyze` (use `dart analyze`, not `flutter analyze` — see [analysis-options.md](analysis-options.md#rule--use-dart-analyze-not-flutter-analyze)).
+Canonical [analysis_options.yaml](analysis_options.yaml): `flutter_skill_lints` + `riverpod_lint`. Apply [analysis-options.md](analysis-options.md#install) before `dart analyze` (use `dart analyze`, not `flutter analyze` — see [analysis-options.md](analysis-options.md#use-dart-analyze-not-flutter-analyze)).
 
 Every file with providers need these:
 
@@ -200,14 +191,13 @@ class HistoryCard extends ConsumerWidget {
 
 ## Unified Ref
 
-Use single `Ref` type. `AutoDisposeRef`, `FutureProviderRef`, generated `ExampleRef` removed:
+Use `Ref` for providers. Do not use `AutoDisposeRef`, `FutureProviderRef`, or generated `ExampleRef`.
 
 ```dart
-// Riverpod 3.0 — always use Ref
 @riverpod
 String greeting(Ref ref) => 'Hello';
 
-// NOT: String greeting(GreetingRef ref) — removed in 3.0
+// NOT: String greeting(GreetingRef ref)
 ```
 
 `Ref` and `WidgetRef` stay separate. `WidgetRef` for widgets only.
@@ -352,7 +342,7 @@ Execution order:
 1. **One owner per feature state**: use repository/data persistence or notifier persistence, never both.
 2. **Cache policy**: default retention 2 days; set `StorageOptions(cacheTime: ...)` when needed; use `unsafe_forever` only with cleanup.
 3. **Persist keys**: keys must be unique, stable across restarts, include family params.
-4. **Schema migration**: use `StorageOptions(destroyKey: ...)` for simple versioned resets.
+4. **Versioned reset**: use `StorageOptions(destroyKey: ...)` when cached provider state must be hard-reset after a shape change.
 5. **Startup mode**: use `persist(...)` for network-first init, or `await persist(...).future` to hydrate state first.
 6. **UI signal**: use `AsyncValue.isFromCache` for cached/offline indicators.
 7. **Tests**: override storage with `Storage.inMemory()` in unit/widget tests.
@@ -433,20 +423,10 @@ External SDK clients (HTTP, database, auth, storage) follow **config → client 
 ### Rules — NEVER Violate
 
 1. **MUST** expose SDK types directly as providers. NEVER wrap in factory class or service locator.
-2. **MUST** use `@Riverpod(keepAlive: true)` for all SDK client and service providers — they singletons.
-3. **MUST** chain providers with `ref.watch()` so services react to config changes.
+2. **MUST** use `@Riverpod(keepAlive: true)` for SDK client/service providers that need `Ref`, config reactivity, disposal, overrides, returned data, or UI-observed state. Plain fire-and-forget SDK facades stay direct and boring; see [services-and-singletons.md](services-and-singletons.md).
+3. **MUST** use `ref.read()` for stable service/repository/datasource/client/plugin wiring. Use `ref.watch()` only for the provider that intentionally owns reactivity, such as rebuilding a client from a live config provider.
 4. **MUST** use destructuring for clean config access.
 5. **NEVER** create `ServiceFactory`, `ServiceLocator`, or `BackendProvider` class — Riverpod providers replace these patterns entirely.
-
-### Provider Chain
-
-```mermaid
-graph LR
-  C[Config Provider] --> CL[Client Provider]
-  CL --> S1[Service A Provider]
-  CL --> S2[Service B Provider]
-  CL --> S3[Service C Provider]
-```
 
 ### Pattern
 
@@ -471,49 +451,27 @@ HttpClient backendClient(Ref ref) {
 /// 3. Services — each depends on client, one provider per SDK service
 @Riverpod(keepAlive: true)
 AuthService authService(Ref ref) {
-  return AuthService(ref.watch(backendClientProvider));
+  return AuthService(ref.read(backendClientProvider));
 }
 
 @Riverpod(keepAlive: true)
 DatabaseService databaseService(Ref ref) {
-  return DatabaseService(ref.watch(backendClientProvider));
+  return DatabaseService(ref.read(backendClientProvider));
 }
 
 @Riverpod(keepAlive: true)
 StorageService storageService(Ref ref) {
-  return StorageService(ref.watch(backendClientProvider));
+  return StorageService(ref.read(backendClientProvider));
 }
 ```
 
 ## Provider Decision Tree
 
-```mermaid
-graph TD
-  Q1{Repository, datasource, or service?} -->|Yes| A1["@Riverpod(keepAlive: true)"]
-  Q1 -->|No| Q2{Feature notifier with mutable state?}
-  Q2 -->|Yes| A2["@Riverpod(keepAlive: true) class XNotifier"]
-  Q2 -->|No| Q3{Computed value or one-time fetch?}
-  Q3 -->|Yes| Q5{All deps keepAlive?}
-  Q5 -->|Yes| A5["@Riverpod(keepAlive: true)"]
-  Q5 -->|No| A3["@riverpod — auto-disposes"]
-  Q3 -->|No| Q4{Needs parameters?}
-  Q4 -->|Yes| A4["Add params to function — family via codegen"]
-```
+Family providers default to `@riverpod`; avoid `@Riverpod(keepAlive: true)` with unbounded args.
 
-**Family + keepAlive caveat.** Family + `@Riverpod(keepAlive: true)` keeps every arg variant forever. Cache can grow unbounded. Prefer `@riverpod` for family providers.
-
-**Nested computed hop warning.** Avoid computed → computed chains in pause-sensitive paths (`aProvider` watches `bProvider(param)`). Riverpod 3.2.x offstage navigation can throw a `TickerMode` pause/resume assertion.
-
-If a chain is required, flatten in the parent provider:
+Avoid computed → computed chains on nav/offstage paths. Flatten in parent provider:
 - watch base state directly
 - derive via pure helpers
-- avoid provider → provider indirection on hot navigation paths
+- avoid provider → provider indirection
 
-**Exception:** Riverpod 3.2.x has a TickerMode assertion bug ([rrousselGit/riverpod#4709](https://github.com/rrousselGit/riverpod/issues/4709)). If you hit it, a `keepAlive: true` workaround is allowed. Add an inline note: `// keepAlive: Riverpod 3.2.x #4709 workaround`. Remove the workaround after the upstream fix.
-
-## Recap
-
-1. NEVER write providers manually — ALL provider shapes (state, computed, repo, datasource, notifier, family, future, stream) MUST use `@riverpod` or `@Riverpod(keepAlive: true)` annotations and be generated by `riverpod_generator`.
-2. NEVER import from `package:riverpod/legacy.dart` — legacy providers (`StateProvider`, `StateNotifierProvider`, `ChangeNotifierProvider`) are banned even when imported indirectly.
-3. NEVER create an alias or manual provider to simplify a generated name — rename the annotated class or function and regenerate. The generated name is the source of truth.
-4. NEVER cache provider-derived data in `ConsumerState`; use generated computed providers or build-local derivation.
+If needed, use `keepAlive: true` with note: `// keepAlive: Riverpod #4709 workaround`.

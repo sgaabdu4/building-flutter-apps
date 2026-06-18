@@ -1,9 +1,17 @@
 # Widget Previews
 
+## Read first
+
+1. Import `package:flutter/widget_previews.dart` only in preview files/preview blocks.
+2. Wrap preview targets in app shell/theme/localization (`AppPreviewShell` or project equivalent).
+3. Override repos/datasources/auth/config/clock with fakes. No real backends.
+4. No native plugins, platform channels, `dart:io`, Firebase, Hive boxes, or real HTTP.
+5. Use deterministic small data and central `AppWidgetKeys`; preview surfaces, not full runtime screens.
+
 ## Trigger
 
 Signals: @Preview, AppPreviewShell, widget_previews, provider overrides, preview fakes
-Before generating code in this area, output verbatim: `Reading: widget-previews.md`
+Before code: output `Reading: widget-previews.md`
 
 
 ## Rules
@@ -138,10 +146,4 @@ For reusable widgets, add enough previews to catch real UI states:
 - [ ] No native plugin, Hive, Firebase, platform channel, or real HTTP call runs in preview.
 - [ ] Long text, empty, error, and compact/expanded states are covered when applicable.
 - [ ] No inline string `ValueKey`s were added.
-
-## Recap
-
-1. MUST wrap every preview target in `AppPreviewShell` — every preview gets theme, localization, and provider overrides. Unwrapped previews render without theming and silently miss provider dependencies.
-2. MUST override all Riverpod providers with fakes for repositories, datasources, auth, config, and clock — NEVER use real backends in previews. The previewer environment has no platform channels or network.
-3. MUST NOT call native plugins, `dart:io`, Firebase, Hive boxes, or real HTTP from previews — these cannot run in the previewer sandbox and will crash the preview tool silently.
 

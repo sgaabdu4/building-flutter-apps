@@ -1,9 +1,18 @@
 # Networking
 
+## Read first
+
+1. HTTP calls live only in datasources/infra services. Widgets/notifiers never call clients.
+2. Datasources depend on `IHttpService`/token interfaces, not concrete clients.
+3. Data layer parses JSON → models; repos map models → domain.
+4. Failures throw typed errors. Never return `null`/empty fallback for failed network ops.
+5. Mutations refresh source of truth when backend can generate/normalize/reorder/derive.
+6. Long remote work async-starts, then reconciles with bounded polling/realtime/fetch.
+
 ## Trigger
 
 Signals: IHttpService, datasource, HTTP, auth token, background parsing, Isolate.run
-Before generating code in this area, output verbatim: `Reading: networking.md`
+Before code: output `Reading: networking.md`
 
 
 ## Rules
@@ -15,6 +24,7 @@ Before generating code in this area, output verbatim: `Reading: networking.md`
 5. **MUST** refresh from source of truth after mutations when the backend can generate, normalize, reorder, or derive fields.
 6. **MUST** move large JSON parsing off the UI isolate when it can exceed a frame budget.
 7. **MUST NOT** put auth tokens, base URLs, or secrets in widget code.
+8. **MUST** async-start long-running remote work (delete/sync/import/export/migrate/generate), then reconcile source-of-truth state with bounded polling, realtime, or a canonical fetch. Do not block the client request waiting for backend completion.
 
 ## Platform Setup
 
@@ -127,6 +137,25 @@ class ProductRepository implements IProductRepository {
 }
 ```
 
+## Long-Running Remote Work
+
+A destructive or batch operation can complete after the client request times out. Treat the initial call as a start acknowledgement, then reconcile the source of truth.
+
+```dart
+// WRONG — client waits for backend completion.
+final result = await remote.deleteAccount(userId, waitForCompletion: true);
+
+// RIGHT — async-start + bounded reconcile.
+final started = await remote.startDeleteAccount(userId);
+if (!started.ok) return started;
+final deleted = await remote.waitForAccountDeleted(userId, maxAttempts: 60);
+return deleted ? DeleteResult.ok() : DeleteResult.timedOut();
+```
+
+Log/report destructive failures only after reconcile proves the entity still exists or the source of truth still disagrees.
+
+Lints: `appwrite_blocking_function_execution_in_client`, `destructive_failure_logged_before_reconcile`.
+
 ## Background Parsing
 
 Use `Isolate.run` or `compute` for large payloads. Keep parsing functions
@@ -164,12 +193,8 @@ List<ProductModel> parseProducts(String responseBody) {
 - [ ] JSON is parsed into data models only.
 - [ ] Failures throw typed errors; no silent `null` or empty fallback.
 - [ ] Mutations refresh source-of-truth when backend values can differ.
+- [ ] Long-running remote functions async-start, then reconcile with bounded polling/realtime/fetch.
+- [ ] Destructive catch blocks reconcile before Crash/Sentry/Firebase reporting.
 - [ ] Large payload parsing uses isolate/compute path when needed.
 - [ ] Datasource, repository, notifier, and E2E coverage match the risk.
-
-## Recap
-
-1. MUST keep all HTTP calls in datasources — widgets and notifiers NEVER call HTTP clients directly.
-2. MUST inject an interface (`IHttpService`) into datasources — constructors take interfaces, NEVER concrete clients.
-3. MUST throw typed exceptions from infrastructure boundaries — NEVER return `null` for failed network operations.
 

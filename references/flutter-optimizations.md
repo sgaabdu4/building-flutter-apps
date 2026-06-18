@@ -1,30 +1,18 @@
 # Flutter Optimizations
 
-Flutter tricks: render, scroll, animate, layout, concurrency, size, a11y, adaptive.
+## Read first
+
+1. Never use `shrinkWrap` to fix layout; constrain or use slivers.
+2. Prefer `FadeTransition` over `Opacity` for animations; avoid `saveLayer()` churn.
+3. Dispose every controller/ticker/subscription via `dispose()` or `ref.onDispose()`.
+4. Stable keys for dynamic/reordered lists; avoid `UniqueKey` except forced recreation.
+5. Move CPU-heavy parse/work off UI isolate when it can miss frame budget.
 
 ## Trigger
 
 Signals: shrinkWrap, FadeTransition, Sliver, RepaintBoundary, Impeller, Isolate.run, AnimationController
-Before generating code in this area, output verbatim: `Reading: flutter-optimizations.md`
+Before code: output `Reading: flutter-optimizations.md`
 
-
-## Contents
-
-- [Keys](#keys)
-- [Slivers](#slivers)
-- [Avoid `shrinkWrap: true`](#avoid-shrinkwrap-true)
-- [Animations](#animations)
-- [Rendering Costs](#rendering-costs)
-- [Isolates](#isolates)
-- [App Size](#app-size)
-- [Accessibility](#accessibility)
-- [Adaptive & Responsive](#adaptive--responsive)
-- [Build Modes](#build-modes)
-- [Impeller](#impeller)
-- [Frame Budget](#frame-budget)
-- [RepaintBoundary](#repaintboundary)
-- [Preserving Tab State](#preserving-tab-state)
-- [Post-Frame Callbacks](#post-frame-callbacks)
 
 ## Keys
 
@@ -224,7 +212,7 @@ Use `borderRadius` on `Container`, not `ClipRRect` wrap. Avoid `Clip.antiAliasWi
 
 ### Intrinsic Layout Passes
 
-`IntrinsicWidth`/`IntrinsicHeight` cause double layout pass. Prefer fixed height or `ConstrainedBox`:
+Avoid `IntrinsicWidth`/`IntrinsicHeight`; use fixed height or `ConstrainedBox`:
 
 ```dart
 // EXPENSIVE — double layout pass
@@ -238,7 +226,7 @@ SizedBox(height: 72, child: Row(children: [/* children */]))
 
 Move heavy compute off main thread. UI thread render frame <16ms (60fps) or <8ms (120fps).
 
-`Isolate.run` (Dart 3.x) for one-shot heavy work. `compute()` legacy alt:
+Use `Isolate.run` for one-shot heavy work:
 
 ```dart
 final products = await Isolate.run(() {
@@ -395,10 +383,10 @@ Follow Material 3 window size classes:
 | Mode | Use | Optimizations |
 |------|-----|---------------|
 | Debug | Development | Hot reload, asserts, no tree shaking |
-| Profile | Performance testing | Optimized, with profiling overhead |
+| Profile | Performance testing | Optimized + profiling |
 | Release | Production | Full AOT, tree shaking, no asserts |
 
-Always profile in **profile mode**. Debug 10x overhead.
+Profile in **profile mode**, not debug.
 
 ## Impeller
 
@@ -415,7 +403,7 @@ Frame exceed budget: profile DevTools, check rebuild count, look for intrinsic p
 
 ## RepaintBoundary
 
-Wrap subtree in own compositing layer. Use for custom paint, chart, map, widget animate independently. Don't wrap simple widget — each boundary add compositing overhead.
+Wrap only custom paint/chart/map/independent animation subtrees. Do not wrap simple widgets.
 
 ```dart
 RepaintBoundary(child: ComplexChart(data: chartData))
@@ -452,11 +440,5 @@ void initState() {
     ref.read(welcomeProvider.notifier).maybeShowWelcomeMessage();
   });
 }
-
-## Recap
-
-1. NEVER enable shrinkWrap on `ListView`/`GridView`. It defeats lazy rendering and causes O(N) layout on every rebuild. Replace with `Slivers` (`SliverList`, `SliverGrid`) inside a `CustomScrollView`.
-2. Use `FadeTransition` instead of the `Opacity` widget for fade animations. `Opacity` triggers `saveLayer()` which allocates an offscreen framebuffer on every frame; `FadeTransition` avoids this overhead.
-3. MUST dispose every `AnimationController` in `dispose()` or `ref.onDispose()`. Undisposed controllers keep `Ticker` alive, preventing garbage collection and causing memory leaks.
 
 ```

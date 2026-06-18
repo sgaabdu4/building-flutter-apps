@@ -1,12 +1,18 @@
 # Mixin vs Interface vs Extension
 
+## Read first
+
+1. Same behavior in 2+ classes → `mixin XxxMixin on Y`; no copy-paste sharing.
+2. Interfaces define contracts; mixins add capabilities; extensions add methods to external types.
+3. Keep mixins small, single-purpose, suffixed `Mixin`.
+4. Use `on` when mixin needs `super`/host API.
+5. No mutable state fields in mixins.
+
 ## Trigger
 
-Signals: mixin, ConnectivityMixin, ShowcaseScreenMixin, on ConsumerState, abstract interface class
-Before generating code in this area, output verbatim: `Reading: mixins.md`
+Signals: mixin, ConnectivityMixin, RetryMixin, on ConsumerState, abstract interface class
+Before code: output `Reading: mixins.md`
 
-
-**Contents:** [Rules](#rules--never-violate) | [Decision Tree](#decision-tree) | [Quick Reference](#quick-reference) | [Common Flutter Mixins](#common-flutter-mixins) | [Custom Mixin Example](#custom-mixin-example) | [Restricted Mixin](#mixin-with-on-clause-restricted)
 
 ## Rules — NEVER Violate
 
@@ -16,27 +22,10 @@ Before generating code in this area, output verbatim: `Reading: mixins.md`
 2. **MUST** use `abstract interface class` for contracts (what class must do). MUST use `mixin` for capabilities (what class can do).
 3. **MUST** keep mixins small, focused — one capability per mixin (SRP).
 4. **MUST** suffix mixin names with `Mixin` (e.g., `LoggingMixin`, `ConnectivityMixin`).
-5. **MUST** use `on` clause when mixin needs `super` access or must restrict users (e.g., `mixin ShowcaseScreenMixin on ConsumerState`).
+5. **MUST** use `on` clause when mixin needs `super` access or must restrict users (e.g., `mixin RouteAwareMixin on State`).
 6. **MUST NEVER** put mutable state fields in mixins — hidden side effects across unrelated classes. Pass state via ctor or method args.
 7. **MUST NEVER** use `mixin class` unless type needs both direct instantiation AND mixing in. Prefer pure `mixin`.
 8. **MUST** use `extension` for adding methods to types you don't own (e.g., `String`, `BuildContext`). NEVER mixin for this.
-
-## Decision Tree
-
-```mermaid
-graph TD
-  Q1{Need to share<br/>behavior across<br/>unrelated classes?}
-  Q1 -->|Yes| Q2{Does it need<br/>'super' access or<br/>depend on a type?}
-  Q2 -->|Yes| M1["mixin X on SuperType"]
-  Q2 -->|No| M2["mixin X"]
-  Q1 -->|No| Q3{Defining a contract<br/>for dependency injection<br/>or testability?}
-  Q3 -->|Yes| I1["abstract interface class"]
-  Q3 -->|No| Q4{Adding methods<br/>to a type you<br/>don't own?}
-  Q4 -->|Yes| E1["extension on Type"]
-  Q4 -->|No| Q5{Base implementation<br/>for an 'is-a'<br/>hierarchy?}
-  Q5 -->|Yes| A1["abstract class"]
-  Q5 -->|No| C1["Concrete class"]
-```
 
 ## Quick Reference
 
@@ -95,18 +84,15 @@ class ProductNotifier extends _$ProductNotifier with ConnectivityMixin {
 ## Mixin with `on` Clause (Restricted)
 
 ```dart
-// core/mixins/showcase_screen_mixin.dart
+// core/mixins/route_aware_mixin.dart
 
-/// Restricts this mixin to ConsumerState subclasses only.
-mixin ShowcaseScreenMixin on ConsumerState {
-  String get showcaseScope;
-  List<GlobalKey> get showcaseKeys;
-
-  void initShowcase() {
-    // Can access 'ref' and 'widget' because of 'on ConsumerState'
+/// Restricts this mixin to State subclasses only.
+mixin RouteAwareMixin on State {
+  void didPushRoute() {
+    // `on State` exposes context/widget/lifecycle.
   }
 
-  void disposeShowcase() { /* cleanup */ }
+  void disposeRouteAware() { /* cleanup */ }
 }
 ```
 
@@ -175,10 +161,4 @@ Rules:
 - **Partial-failure**: bulk op collects `SaveRowResult` per item. `throwOnPartialFailure` → `SaveAllRowsException` w/ failure list. No silent drop.
 - **Concurrency cap**: bulk default 4 (avoid 429 bucket swamp). Each item in `retryWithBackoff`.
 - **Not in widgets**: retry = infra. Notifier → datasource → mixin.
-
-## Recap
-
-1. MUST use `mixin` for reusable behavior across unrelated classes — NEVER inherit to share behavior without an "is-a" relationship.
-2. MUST NEVER put mutable state fields in mixins.
-3. MUST suffix mixin names with `Mixin` and keep them single-responsibility.
 

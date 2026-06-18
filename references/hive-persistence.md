@@ -1,31 +1,18 @@
 # Hive CE Persistence
 
+## Read first
+
+1. TypeIds + HiveField indexes are permanent after release. Never reuse/reorder; append/retire only.
+2. `hive_adapters.g.yaml` is disk-format SSOT. Commit it; edit manually on rename.
+3. Changing field type is unsupported. Retire old field, add new field.
+4. Domain is Hive-free. Hive models stay in data layer with primitives; mapper bridges VOs/entities.
+5. Never change ctor param order/types for shipped `@GenerateAdapters` models.
+
 ## Trigger
 
 Signals: hive_ce, TypeAdapter, @GenerateAdapters, IsolatedHive, HiveField
-Before generating code in this area, output verbatim: `Reading: hive-persistence.md`
+Before code: output `Reading: hive-persistence.md`
 
-
-## Contents
-
-- [Core Stack](#core-stack)
-- [Setup](#setup)
-- [TypeAdapter Storage vs JSON](#typeadapter-storage-vs-json)
-- [@GenerateAdapters Pattern](#generateadapters-pattern)
-- [TypeId Management](#typeid-management)
-- [Mixing @HiveType and @GenerateAdapters](#mixing-hivetype-and-generateadapters)
-- [IsolatedHive (background-isolate)](#isolatedhive-background-isolate)
-- [Repository Pattern](#repository-pattern)
-- [Testing with TypeAdapters](#testing-with-typeadapters)
-- [Storage Location](#storage-location)
-- [Critical Rules](#critical-rules)
-- [VO Interop](#vo-interop)
-- [Retiring entities](#retiring-entities)
-- [Failure signatures](#failure-signatures)
-- [Evolution cheat sheet](#evolution-cheat-sheet)
-- [File Structure](#file-structure)
-- [Adding New Entities](#adding-new-entities)
-- [References](#references)
 
 ## Core Stack
 
@@ -317,7 +304,7 @@ Hive.init(path);
 ## Critical Rules
 
 1. **TypeIds permanent** — Never change, rename, reuse TypeId post-release
-2. **HiveField indices permanent** — Never reuse removed field index. Append new at `nextIndex`
+2. **HiveField indices permanent** — Never reuse retired index. Append at `nextIndex`
 3. **Field types permanent** — Never flip type (`String`↔`List`, enum↔int) at same index
 4. **Box names permanent** — Rename loses data
 5. **Reserve TypeId 0** — Use `reservedTypeIds: {0}` if @HiveType classes exist
@@ -329,7 +316,7 @@ Hive.init(path);
 
 ## VO Interop
 
-`hive_ce_generator` writes the schema to `hive_adapters.g.yaml` from Freezed ctor param order on first run. That yaml is the disk-format SSOT — **commit it**, never delete after first deploy. Reordering / type-changing ctor params on a `@GenerateAdapters`-registered class regenerates the yaml against the new order, producing a different binary layout from the one users have on disk. `dart analyze` is blind to this — the type system sees the same Dart class; only deserialization of an existing box throws or returns garbage. Per the [official docs](https://github.com/IO-Design-Team/hive_ce_docs/blob/master/custom-objects/generate_adapters.md): *"Changing the type of a field is not supported. You should create a new one instead."* Field rename requires manual edit of `hive_adapters.g.yaml`. New non-nullable fields need a default value.
+`hive_adapters.g.yaml` = disk-format SSOT. **Commit it**. After release, never delete it. Ctor param order/type is append-only. Field rename requires manual `hive_adapters.g.yaml` edit. New non-nullable fields need defaults. Field type change is unsupported; add a new field.
 
 **Rule:** `/data/models/` = primitives. `/domain/entities/` = VOs. Mapper bridges.
 
@@ -363,7 +350,7 @@ extension WorkoutSetToModel on WorkoutSet {
 }
 ```
 
-**Legacy escape hatch:** shipped class in `/domain/` w/ user data → keep primitive ctor slots, expose VOs via entity getter (`Distance get distance => Distance.fromMeters(distanceMeters);`). Disk unchanged.
+**Shipped domain class:** keep primitive ctor slots; expose VOs via getters. Do not change disk shape.
 
 **Forbidden:**
 - Reorder ctor params on `@GenerateAdapters` class (silent slot shift).
@@ -371,7 +358,7 @@ extension WorkoutSetToModel on WorkoutSet {
 - Renumber/reuse `HiveField(N)`.
 - Reuse retired `typeId`.
 
-`dart analyze` blind to disk. Constructor signature = append-only schema.
+Constructor signature = append-only schema.
 
 **Lint (ERROR):**
 - `hive_field_no_vo_type` — `/data/models/` `@freezed` ctor: no VO types. Hard-coded set: `Distance`/`Money`/`Email`/`Slug`/`PhoneNumber`/`HeartRate`/`Weight`/`Pace`/`Username`. Auto-extends w/ types imported from `*/domain/values/<name>.dart` (PascalCase filename heuristic) + `show` clause names.
@@ -396,15 +383,13 @@ Field retirement same rule: remove field from class + keep index in `nextIndex` 
 
 ## Failure signatures
 
-Typeid / field reuse symptoms:
+| Error | Fix |
+|-------|-----|
+| `type 'String' is not a subtype of type 'List<dynamic>'` | Check field index/typeId reuse |
+| `HiveError: Cannot read, unknown typeId: N` | Register/retire adapter id correctly |
+| `RangeError: value not in range` on enum | Do not reorder/remove encoded enum cases |
 
-| Error | Cause |
-|-------|-------|
-| `type 'String' is not a subtype of type 'List<dynamic>'` in `BinaryReaderImpl.readFrame` | Field index or typeId reused; new adapter reads old bytes |
-| `HiveError: Cannot read, unknown typeId: N` | Adapter for retired typeId not registered |
-| `RangeError: value not in range` on enum | Enum reordered or cases removed |
-
-Fresh install works, upgrade breaks = binary incompat. Grep commit history for typeId / HiveField index reassignment.
+Upgrade-only failure = binary incompat. Check typeId / HiveField changes.
 
 ## Evolution cheat sheet
 
@@ -412,10 +397,10 @@ Fresh install works, upgrade breaks = binary incompat. Grep commit history for t
 |--------|-------|-----|
 | Add new field | ✅ | New ctor param at end; nullable OR default value (required for non-nullable) |
 | Remove field | ✅ | Delete ctor param; retired index recorded in `hive_adapters.g.yaml` |
-| Rename class | ⚠️ | Manually edit `hive_adapters.g.yaml` — without it generator sees added+removed |
+| Rename class | ⚠️ | Manually edit `hive_adapters.g.yaml` |
 | Rename field | ⚠️ | Manually edit field key in `hive_adapters.g.yaml` (per official docs) |
 | Change field type | ❌ | Per official docs: not supported. Retire old field, add new with new type |
-| Reorder ctor params | ❌ | Regenerates yaml against new order = different binary layout. Append only. |
+| Reorder ctor params | ❌ | Append only |
 | Delete class | ✅ | Retire typeId into `reservedTypeIds` |
 | Replace class (rename + restructure) | ❌ (if typeId reused) | New typeId, retire old |
 | Reorder enum cases | ❌ | Enum encoded by index — retire adapter, new one |
@@ -442,12 +427,4 @@ test/shared/
 
 - [Hive CE Documentation](https://docs.hivedb.dev/)
 - [hive_ce on pub.dev](https://pub.dev/packages/hive_ce)
-
-## Recap
-
-1. TypeIds are permanent — NEVER change, rename, or reuse a TypeId after release. Changing a TypeId corrupts all existing boxes that stored the old adapter.
-2. HiveField indices are permanent — NEVER reorder ctor params or reuse retired indices. Append new fields as new ctor params at the end. Reordering rewrites `hive_adapters.g.yaml` against the new shape and silently corrupts existing user data.
-3. `hive_adapters.g.yaml` is the disk-format SSOT — commit it to git, never delete after first deploy. Rename of class or field requires a manual edit of this yaml (per [official docs](https://github.com/IO-Design-Team/hive_ce_docs/blob/master/custom-objects/generate_adapters.md)). Pre-first-deploy churn: delete the yaml and regenerate to reclaim unused indices.
-4. Changing field types is NOT supported (per official docs) — retire the old field, add a new one with the new type.
-5. Domain entities MUST be Hive-free — only the persistence-only model carries `@HiveField` annotations. Importing Hive into domain or repository layer breaks the clean architecture boundary.
 

@@ -84,6 +84,33 @@ if [[ -d "$FLUTTER_ROOT/lib" ]]; then
   while IFS= read -r match; do
     [[ -z "$match" ]] && continue
     COUNT=$((COUNT + 1))
+  done < <(
+    find "${SCAN_ROOTS[@]}" -type f -name '*.dart' \
+      ! -name '*.g.dart' ! -name '*.freezed.dart' ! -name '*.gr.dart' \
+      ! -name '*.config.dart' ! -name '*.mocks.dart' 2>/dev/null |
+      while IFS= read -r f; do
+        awk '
+          {
+            line = $0
+            stripped = line
+            sub(/^[[:space:]]*/, "", stripped)
+            if (stripped ~ /^\/\//) next
+            gsub(/"([^"\\]|\\.)*"/, "\"\"", line)
+            gsub(/\047([^\\047\\]|\\.)*\047/, "\047\047", line)
+            if (line ~ /(^|[^A-Za-z0-9_.])(this\.)?mounted([^A-Za-z0-9_]|$)/ &&
+                line !~ /(context|ref)\.mounted/) {
+              print FILENAME ":" NR ":" $0
+            }
+          }
+        ' "$f" 2>/dev/null
+      done | head -n 5
+  )
+  [[ $COUNT -gt 0 ]] && add_violation "$COUNT bare mounted check(s) found. Use context.mounted; inside State capture final context = this.context when needed."
+
+  COUNT=0
+  while IFS= read -r match; do
+    [[ -z "$match" ]] && continue
+    COUNT=$((COUNT + 1))
   done < <(recursive_grep 'shrinkWrap:[[:space:]]*true' | head -n 5)
   [[ $COUNT -gt 0 ]] && add_violation "$COUNT shrinkWrap: true found. Use slivers or fix viewport constraint."
 
@@ -302,11 +329,19 @@ if [[ -d "$FLUTTER_ROOT/lib" ]]; then
     COUNT=$((COUNT + 1))
   done < <(ext_grep 'DateFormat\(.*\)\.format\(' | head -n 5)
   [[ $COUNT -gt 0 ]] && add_violation "$COUNT inline DateFormat(...).format(...) found outside core/extensions/. Use .formatted() / .asDate / .asTime extension (Critical Rule 11)."
+
+  # Inline DateTime pattern literal outside extensions
+  COUNT=0
+  while IFS= read -r match; do
+    [[ -z "$match" ]] && continue
+    COUNT=$((COUNT + 1))
+  done < <(ext_grep '\.formatted\([^\n]*pattern:[[:space:]]*['\''"]|DateFormat[[:space:]]*\([[:space:]]*['\''"]' | head -n 5)
+  [[ $COUNT -gt 0 ]] && add_violation "$COUNT inline date format pattern literal(s) found outside core/extensions/. Add a semantic DateTime extension getter or use a named pattern constant (Critical Rule 11)."
 fi
 
 # 4. dart analyze must exit 0
 if command -v dart >/dev/null 2>&1; then
-  ANALYZE_OUT=$(dart analyze --fatal-infos 2>&1 || true)
+  ANALYZE_OUT=$(dart analyze 2>&1)
   ANALYZE_EXIT=$?
   if [[ $ANALYZE_EXIT -ne 0 ]] || printf '%s' "$ANALYZE_OUT" | grep -qE '\b(error|warning) '; then
     # Truncate analyze output to first 30 lines for the reason

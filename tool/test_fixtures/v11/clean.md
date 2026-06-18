@@ -1,12 +1,9 @@
-# V11 Clean Fixture — runZonedGuarded with legacy context nearby
-
-<!-- NOTE: runZonedGuarded is a legacy pattern. Prefer PlatformDispatcher.instance.onError. -->
+# V11 Clean Fixture
 
 ```dart
-runZonedGuarded(() async {
+Future<void> main() async {
   await Firebase.initializeApp();
+  await Crash.init();
   runApp(const MyApp());
-}, (error, stack) {
-  FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-});
+}
 ```

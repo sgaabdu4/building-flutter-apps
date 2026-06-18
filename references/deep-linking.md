@@ -1,9 +1,17 @@
 # Deep Linking
 
+## Read first
+
+1. Typed routes + generated helpers for every in-app nav call.
+2. Redirect policy lives in a pure resolver; matrix-test auth/setup/location states.
+3. Validate params at route boundary; missing/stale resources render fallback/typed redirect, never throw in `build()`.
+4. App Links/Universal Links require hosted association files + cold/warm signed-state E2E.
+5. Deep links still pass auth/setup/update gates.
+
 ## Trigger
 
 Signals: deep linking, Universal Links, App Links, GoRouter redirect, assetlinks.json, apple-app-site-association
-Before generating code in this area, output verbatim: `Reading: deep-linking.md`
+Before code: output `Reading: deep-linking.md`
 
 
 ## Rules
@@ -180,7 +188,7 @@ xcrun simctl openurl booted https://example.com/products/123
 | Cold start signed in | Link opens target screen after loading gates settle |
 | Setup incomplete | Resolver sends user to setup without losing intended target when required |
 | Missing resource | Fallback/empty screen, no build throw |
-| Removed permission | Blocked or fallback state; no stale detail data |
+| Revoked permission | Blocked or fallback state; no stale detail data |
 | Web refresh | Current path survives loading state |
 
 ## Checklist
@@ -191,9 +199,3 @@ xcrun simctl openurl booted https://example.com/products/123
 - [ ] Hosted association files match app IDs, bundle IDs, package names, and SHA fingerprints.
 - [ ] Cold/warm, signed-in/signed-out, setup, stale, and permission-denied paths are E2E tested.
 - [ ] Missing route params or missing resources do not throw from widget `build()`.
-
-## Recap
-
-1. MUST keep redirect decisions in a pure resolver function and matrix-test it. The resolver receives auth/setup state and current location; it returns a redirect string or null — no widget dependencies allowed inside the resolver.
-2. MUST validate route parameters at the route boundary before using them. Missing or invalid IDs MUST render fallback UI or redirect to a typed fallback — NEVER throw from widget `build()`.
-3. MUST use generated typed route helpers at call sites. Route definitions own URL paths and params; local modal helpers own sheet/dialog presentation and dismissal.

@@ -43,7 +43,9 @@ When using this skill:
 2. **Review generated code** - Always review code suggestions before running
 3. **Keep dependencies updated** - Run `flutter pub upgrade` regularly
 4. **Validate user input** - Always validate form inputs as shown in patterns
-5. **Use secure storage** - Use `flutter_secure_storage` for sensitive data
+5. **Use storage deliberately** - Do not add secret-storage SDKs unless the
+   product has a real secret to protect and the app-specific security review
+   approves that storage boundary
 
 ## Scope
 

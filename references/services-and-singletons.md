@@ -1,121 +1,155 @@
 # Services, Singletons, Fire-and-Forget
 
+## Read first
+
+1. Singletons and static service facades are allowed only for fire-and-forget infrastructure.
+2. Plain singleton = private constructor + one `static final instance` (or private static final + trivial getter) + public methods that return only `void` / `Future<void>`.
+3. Plain static facade = `abstract final class` with a tiny `void` / `Future<void>` API over an SDK singleton (`Crash`, analytics/logging wrappers).
+4. Do not add backend interfaces, fake implementations, debug injection, service locators, or Riverpod wrappers only to test singleton wiring.
+5. If the service returns data, exposes state, owns mutable resources, or needs replacement in tests, it is not a singleton. Use a repository/datasource or Riverpod provider.
+6. Fire-and-forget uses `unawaited(foo())`; never `void async` callbacks. The callee catches internally.
+7. Riverpod service/repository/datasource/client factories wire stable deps with `ref.read`. Use `ref.watch` only for the provider that intentionally owns reactivity.
+8. For Android exact alarms with `flutter_local_notifications`, use `AndroidFlutterLocalNotificationsPlugin.canScheduleExactNotifications()` / `requestExactAlarmsPermission()`. Do not launch `android.settings.REQUEST_SCHEDULE_EXACT_ALARM` manually; the plugin owns the app-specific settings intent and permission re-check.
+9. For platform-specific plugin APIs, assign `resolvePlatformSpecificImplementation<T>()` to a local variable or narrow helper getter before use. Explicitly handle `null`; do not chain directly into `?.method()`, `?.property`, or `!.method()`.
+
 ## Trigger
 
 Signals: abstract final class, singleton, unawaited, fire-and-forget, static facade
-Before generating code in this area, output verbatim: `Reading: services-and-singletons.md`
+Before code: output `Reading: services-and-singletons.md`
 
+## Decision
 
-## When & Why
+| Need | Use |
+|---|---|
+| Pure stateless helper | `abstract final class` static namespace |
+| Tiny fire-and-forget SDK/service facade | `abstract final class` with direct SDK calls and `void` / `Future<void>` API |
+| Fire-and-forget app singleton | `final class` + private constructor + `static final instance` + no returned data/state |
+| Non-fire-and-forget service needing `Ref`, config reactivity, dispose, state, returned data, or test override | `@Riverpod(keepAlive: true)` provider |
+| Async side effect | `unawaited(foo())` + internal catch |
 
-Default = Riverpod provider. Other two = fallback.
+Default: boring code. Do not build indirection before the product needs it.
 
-### Static-only class (`abstract final class Foo { static ... }`)
+## 1. Static-only class (namespace or tiny facade)
 
-**When.** Pure fn. No state. No I/O. Grouped by topic. Ex: `DateUtils.format`, `StringCasing.camel`, `Bytes.humanize`.
-
-**Why.** Namespace. No instance = no lifecycle = no test setup. Dart block `new Foo()` via `abstract final` — intent enforced.
-
-**Not when.** Touch Firebase/disk/network/time/random. Need seam. Static = unseamable = unmockable = flaky test.
-
-**Exception.** Static facade **over** swappable backend (see [crashlytics.md](crashlytics.md)). Facade static; backend injectable via `debugUseBackend`. Namespace ergonomics + test swap.
-
-### Singleton (`static final instance = Foo._()`)
-
-**When.** Never write new. Use only when SDK force (`FirebaseAuth.instance`, `SharedPreferences.getInstance()`).
-
-**Why avoid.** Global mutable state. Leak between tests. Hidden dep — caller signature lie. No override path.
-
-**If forced.** Wrap SDK singleton in provider. Feature code watch provider, not SDK.
+`abstract final class` with only `static` members.
 
 ```dart
-@Riverpod(keepAlive: true)
-FirebaseAuth auth(Ref ref) => FirebaseAuth.instance;
-```
-
-Now testable: `overrides: [authProvider.overrideWithValue(FakeAuth())]`.
-
-### Riverpod provider (`@Riverpod(keepAlive: true)`)
-
-**When.** Stateful service. I/O. Mockable. Default pick.
-
-**Why.** One instance per container. Lifecycle tied to container. Override in tests. Dispose hooks. No global mutation.
-
-**Not when.** Zero-dep pure helper → static class lighter.
-
-## Decision — one-liner
-
-> Pure + stateless → **static-only class**. SDK-forced one-instance → **singleton wrapped in provider**. Else → **provider**.
-
-## 1. Static-only class (namespace)
-
-`abstract final class` with only `static` members. **Not singleton** — no instance. Pure fn grouped by topic.
-
-```dart
-// Pure helper — no I/O, no SDK ref. Safe static-only.
+// Pure helper — no I/O, no SDK ref.
 abstract final class StringCasing {
   static String camel(String input) => /* ... */;
   static String snake(String input) => /* ... */;
 }
 ```
 
-Infrastructure facades (`Crash`, `SnackBarUtils`) = thin shim **over swappable
-backend** — see [crashlytics.md](crashlytics.md). Static never references
-`FirebaseCrashlytics.instance` direct. Backend injected via `Crash.init(backend)`
-— tests swap `FakeCrashBackend`.
-
-Lint: `prefer-abstract-final-static-class` (DCM) flag static-only class missing `abstract final`.
-
-### Testing
-
-Hard seam direct. Two options:
-
-- **Inject at boundary.** No `Crash.error` from tests. Keep wrapper thin so tests skip (e.g. no Firebase init in tests → no-op/throw — wrap in provider below).
-- **Wrap in Riverpod provider** (preferred) — static class = impl detail:
+Tiny infrastructure facades may call SDK singletons directly. Keep the public API
+small, purpose-specific, and fire-and-forget (`void` / `Future<void>` only).
 
 ```dart
-@Riverpod(keepAlive: true)
-CrashReporter crashReporter(Ref ref) => const FirebaseCrashReporter();
+abstract final class AnalyticsLog {
+  static FirebaseAnalytics get _analytics => FirebaseAnalytics.instance;
 
-// In tests:
-ProviderScope(overrides: [crashReporterProvider.overrideWithValue(FakeCrashReporter())]);
-```
-
-Rule: static-only class **only** for dep-free helper (pure math, formatters). Touch Firebase/network/disk → provider.
-
-## 2. Singleton
-
-One instance, global reach. Use **only** when library force (SDK hold own singleton).
-
-```dart
-final class AudioPlayer {
-  AudioPlayer._();
-  static final AudioPlayer instance = AudioPlayer._();
-  final _queue = <Clip>[];
+  static Future<void> event(String name, {Map<String, Object> params = const {}}) async {
+    try {
+      await _analytics.logEvent(
+        name: name,
+        parameters: params.isEmpty ? null : params,
+      );
+    } on Exception catch (e, s) {
+      Crash.error(e, s, reason: 'AnalyticsLog.event');
+    }
+  }
 }
 ```
 
+`Crash` exposes only `init`, `error`, and `log`; see
+[crashlytics.md](crashlytics.md).
+
+### Do not add
+
+- `IAnalyticsBackend`, `FirebaseAnalyticsBackend`, `FakeAnalyticsBackend`
+- `debugUseBackend`, `debugReset`, `setClient`, `setInstance`
+- `ProviderScope`/Riverpod wrapper only to override the facade in tests
+- service locator / factory layer
+- broad public API (`init`, `log`, `error`, `setUser`, `setKey`, `classify`, ...)
+- manual `AndroidIntent(action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM')` flows when `flutter_local_notifications` provides `requestExactAlarmsPermission()`
+- direct chains from `resolvePlatformSpecificImplementation<T>()` into nullable member calls/properties
+
+Lint: `use_local_notifications_exact_alarm_permission_api` flags manual exact-alarm settings intents. `resolve_platform_specific_implementation_before_use` flags direct platform-specific implementation member chains. `prefer-abstract-final-static-class` flags static-only classes missing
+`abstract final`. `service_static_side_effect` flags static facades that become
+wide or overbuilt.
+
 ### Testing
 
-Singleton test-hostile. State leak between tests. Fixes:
+Smoke test only: unsupported platform does not throw, methods return/catch. Do
+not fake the singleton/facade itself. Feature tests should fake the repository,
+datasource, or caller-owned boundary instead.
 
-- **Wrap in provider** so tests override:
+## 2. Singleton
 
-```dart
-@Riverpod(keepAlive: true)
-AudioPlayer audio(Ref ref) => AudioPlayer.instance;
-
-ProviderScope(overrides: [audioProvider.overrideWithValue(FakeAudioPlayer())]);
-```
-
-- **Reset hook** for tests must touch real singleton:
+One process-wide instance. Use only for fire-and-forget infrastructure where the
+caller never reads state/data back. Keep the shape boring:
 
 ```dart
-@visibleForTesting
-void debugReset() { _queue.clear(); }
+final class PushTokenRefresh {
+  PushTokenRefresh._();
+
+  static final PushTokenRefresh instance = PushTokenRefresh._();
+
+  Future<void> refresh() async {
+    try {
+      await FirebaseMessaging.instance.getToken();
+    } on Exception catch (e, s) {
+      Crash.error(e, s, reason: 'PushTokenRefresh.refresh');
+    }
+  }
+}
+
+// Call site:
+unawaited(PushTokenRefresh.instance.refresh());
 ```
 
-Rule: **no new singletons.** Write `final class Foo { ... }` + `keepAlive: true` provider. Riverpod give one instance per container, override for tests, dispose on container dispose.
+Allowed alternate shape when a getter reads better:
+
+```dart
+final class PushTokenRefresh {
+  PushTokenRefresh._();
+
+  static final PushTokenRefresh _instance = PushTokenRefresh._();
+  static PushTokenRefresh get instance => _instance;
+
+  Future<void> refresh() async { /* fire-and-forget work */ }
+}
+```
+
+### Do not add
+
+- public constructor plus `instance`
+- mutable/lazy `_instance` setter
+- `debugConfigure`, `debugUse`, `setInstance`, `setBackend`, `setClient`
+- `Fake*Service` solely for singleton tests
+- provider/service-locator wrapper solely for singleton tests
+- public getters / state / streams / controllers / caches / queues
+- public methods that return data (`Future<User>`, `String`, `bool`, etc.)
+
+### Testing
+
+Prefer testing callers through a repository/datasource/provider boundary. Tests
+may `await` the fire-and-forget method directly to verify it does not throw.
+
+```dart
+void main() {
+  test('refresh does not throw', () async {
+    await PushTokenRefresh.instance.refresh();
+  });
+}
+```
+
+If a service needs replacement in tests, config changes, lifecycle disposal,
+user scope, mutable state, or returned data, it is not a plain singleton. Use a
+Riverpod provider or a repository/datasource boundary instead.
+
+Lint: `service_singleton` allows boring fire-and-forget singleton shapes and
+flags stateful/data-returning/debug/fake/backend singleton seams.
 
 ## 3. Fire-and-Forget
 
@@ -123,64 +157,54 @@ Future intentionally no `await`. Five rules:
 
 1. Mark `unawaited(foo())` — explicit intent, satisfy `unawaited_futures` + `discarded_futures` lints.
 2. `Future<void>` signature, never `void async` (`avoid_void_async`).
-3. Catch internally. Uncaught throw leak to `PlatformDispatcher.onError` → logged **fatal** (wrong).
+3. Catch internally. Uncaught async errors become unhandled runtime/test failures.
 4. No ordering dep on other fire-and-forget calls.
-5. Never fire-and-forget in tests — leaked future pollute next test.
+5. Never fire-and-forget in tests — leaked future pollutes the next test.
 
 ### Canonical shape
 
 ```dart
 Future<void> trackEvent(String name) async {
   try {
-    await _analytics.logEvent(name: name);
+    await AnalyticsLog.event(name);
   } on Exception catch (e, s) {
     Crash.error(e, s, reason: 'Analytics.$name');
   }
 }
 
 // Call site:
-unawaited(ref.read(analyticsProvider).trackEvent('sign_in'));
+unawaited(trackEvent('sign_in'));
 ```
 
 ### When to fire-and-forget
 
-Analytics, non-fatal `Crash.error`, breadcrumb `Crash.log`, local-first remote mirror sync, perf trace `stop()`, push-token refresh, cache eviction, session heartbeat.
+Analytics, non-fatal `Crash.error`, breadcrumb `Crash.log`, local-first remote
+mirror sync, perf trace `stop()`, push-token refresh, cache eviction, session
+heartbeat.
 
 ### When NOT to
 
-UI await, toast surface, caller read return value.
+UI await, toast surface, caller reads return value.
 
 ### Testing
 
-- Tests `await` future direct — prod `unawaited(...)` wrapper not on returned Future itself.
-- Fake service (via provider override) capture calls sync:
+Tests `await` the future directly. Do not assert against a real Firebase backend
+in unit/widget tests.
 
 ```dart
-final fake = FakeAnalyticsClient();
-await tester.pumpWidget(ProviderScope(
-  overrides: [analyticsProvider.overrideWithValue(fake)],
-  child: const App(),
-));
-await tester.tap(find.byKey(signInKey));
-await tester.pumpAndSettle();
-expect(fake.events, contains('sign_in'));
+await trackEvent('sign_in');
 ```
 
-No assert vs real Firebase backend in unit/widget tests.
+## Checklist
 
-## Decision
-
-| Need | Use |
-|---|---|
-| Stateless helpers (format, parse) | `abstract final class` |
-| Stateful service, mockable | Riverpod provider wrapping `final class` |
-| Library-forced singleton (Firebase, SharedPreferences) | Riverpod provider returning SDK instance |
-| Async side effect not blocking UI | `unawaited(service.method())` with internal catch |
-
-Default: **provider**. Static-only or singleton only when provider don't fit.
-
-## Recap
-
-1. Pure stateless helpers → `abstract final class` with only `static` members; stateful services with I/O → `@Riverpod(keepAlive: true)` provider. NEVER reach for a singleton when a provider fits.
-2. NEVER write new singletons — wrap any SDK-forced singleton (FirebaseAuth, SharedPreferences, Hive) in a Riverpod provider so it is mockable and scoped correctly.
-3. Fire-and-forget MUST use `unawaited(foo())`, NEVER `void async` lambda. The call MUST catch internally — uncaught throws escape to `PlatformDispatcher.onError` and appear as false fatals in crash reporting.
+- [ ] Singleton has private constructor + one `static final instance` or trivial getter
+- [ ] Singleton/facade public API returns only `void` / `Future<void>`
+- [ ] Singleton/facade is fire-and-forget only: no public getters, returned data, or mutable state
+- [ ] Static facade public API is tiny and purpose-specific
+- [ ] No backend/fake/debug injection seam added just for tests
+- [ ] Fire-and-forget singleton/facade is not wrapped in a provider just for testing
+- [ ] Provider used only for non-fire-and-forget `Ref`, config reactivity, dispose, override, returned data, or UI state
+- [ ] Fire-and-forget caller uses `unawaited(...)`
+- [ ] Fire-and-forget callee catches and reports internally
+- [ ] Android exact-alarm permission uses `flutter_local_notifications` `canScheduleExactNotifications()` / `requestExactAlarmsPermission()`, not a manual `AndroidIntent` settings launch (`use_local_notifications_exact_alarm_permission_api`)
+- [ ] Platform-specific plugin APIs resolve `resolvePlatformSpecificImplementation<T>()` before use and handle `null` explicitly; no direct `?.method()`, `?.property`, or `!.method()` chain (`resolve_platform_specific_implementation_before_use`)

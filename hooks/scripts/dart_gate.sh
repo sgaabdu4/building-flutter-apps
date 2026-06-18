@@ -121,6 +121,19 @@ add_match "no-private-widget-class" \
   "Use a public widget class. Mark file-internal widgets @visibleForTesting. State<T> subclasses are exempt and stay private." \
   "$MATCHES"
 
+# ---------- Rule 2b: Bare State.mounted ----------
+MATCHES=$(awk '
+  /(^|[^A-Za-z0-9_.])(this\.)?mounted([^A-Za-z0-9_]|$)/ {
+    line = $0
+    if (line ~ /^[[:space:]]*\/\//) next
+    if (line ~ /(context|ref)\.mounted/) next
+    print NR ":" $0
+  }
+' "$FILE_PATH" 2>/dev/null)
+add_match "bare-state-mounted-forbidden" \
+  "Use context.mounted. In State methods, capture final context = this.context when needed." \
+  "$MATCHES"
+
 # ---------- Rule 3: dynamic (excluding Map<String, dynamic> JSON shape) ----------
 MATCHES=$(awk '
   /(^|[^A-Za-z0-9_])dynamic([^A-Za-z0-9_]|$)/ {
@@ -393,7 +406,7 @@ case "$FILE_PATH" in
       "$MATCHES"
 
     # Storage helper calls.
-    MATCHES=$(grep -nE "(Hive\.openBox|Hive\.box[[:space:]]*\(|SharedPreferences\.getInstance|FlutterSecureStorage\(|getApplicationDocumentsDirectory|getApplicationSupportDirectory|getTemporaryDirectory|getExternalStorageDirectory)" "$FILE_PATH" 2>/dev/null)
+    MATCHES=$(grep -nE "(Hive\.openBox|Hive\.box[[:space:]]*\(|SharedPreferences\.getInstance|FlutterSecureStorage[[:space:]]*\(|getApplicationDocumentsDirectory|getApplicationSupportDirectory|getTemporaryDirectory|getExternalStorageDirectory)" "$FILE_PATH" 2>/dev/null)
     add_match "no-storage-call-outside-datasource" \
       "Direct storage call outside Local<X>Datasource. Move to data/datasources/; expose via repository." \
       "$MATCHES"

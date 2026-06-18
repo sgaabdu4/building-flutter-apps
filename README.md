@@ -31,7 +31,7 @@ Reads `.claude-plugin/marketplace.json` + `.claude-plugin/plugin.json`.
 Auto-loads `hooks/hooks.json`:
 
 - **PostToolUse** (`dart_gate.sh`) — grep + awk checks after every `Write|Edit|MultiEdit`; blocks turn with violation reason.
-- **Stop** (`preflight_audit.sh`) — full repo audit + `dart analyze --fatal-infos` before turn ends.
+- **Stop** (`preflight_audit.sh`) — full repo audit + package-root `dart analyze` before turn ends.
 - **UserPromptSubmit** (`skill_reminder.sh`) — top-5 rules reminder per turn in Flutter projects.
 
 ### Codex CLI
@@ -102,28 +102,38 @@ none of the scanners run. Treat that as guidance-only mode.
 
 ```bash
 cp <plugin-cache>/references/analysis_options.yaml ./analysis_options.yaml
+mkdir -p lib/core/extensions
+cp <plugin-cache>/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
 dart pub get
 dart analyze   # confirms wiring
 ```
 
 `flutter_skill_lints` is an external analyzer plugin. List it ONLY under `plugins:` in `analysis_options.yaml` (NEVER in `pubspec.yaml`). The bundled `analysis_options.yaml` already wires it.
+If a project already has `lib/core/extensions/`, merge the template files instead of overwriting them.
 
 ## How drift is prevented
 
-The skill enforces rules across SKILL.md, the reference docs, and the bundled
-analyzer config via a 3-tier mechanism:
+SSOTs:
 
-| Tier | Mechanism | Covers |
-|---|---|---|
-| **AST** | `flutter_skill_lints` analyzer plugin running via `dart analyze` | private widget classes, `_buildXxx()`, `dynamic` (except `Map<String, dynamic>`), null-bang, `shrinkWrap: true`, legacy provider types, route-param throw, showcase key filtering, sync notifier state-read, typed-route navigation boundaries, raw route definitions, context.pop guard, `ref.mounted` / `context.mounted` after await, sealed Freezed, unawaited fire-and-forget |
-| **Write-time grep** | `hooks/scripts/dart_gate.sh` (PostToolUse hook) + `hooks/scripts/preflight_audit.sh` (Stop hook) | hardcoded UI strings, inline `ValueKey('...')`, raw or named context/router page navigation, direct Navigator page pushes, snackbar dispatch from widget, `AppLocalizations.of(context)!`, gen-l10n path config, app-root text scale clamp |
-| **Prompt** | SKILL.md `<gate>` + `<critical-always>` + `<trigger-map>` + tiered `<pre-flight>` + `<recap>`; each reference file has its own `<trigger>` + `<recap>` | semantic / architectural rules — `_ensureRepository` in mutations, sync notifier init order, source-of-truth refresh, observer+writer E2E, navigation sequencing, etc. |
+| Surface | Source |
+|---|---|
+| Skill rules + trigger map | `SKILL.md` |
+| Deep guidance | `references/*.md` first `## Read first`, then task section |
+| Analyzer config | `references/analysis_options.yaml` |
+| New-project extension template | `templates/flutter/lib/core/extensions/` |
+| Runtime hooks | `hooks/hooks.json`, `hooks/hooks.copilot.json`, `hooks/scripts/*.sh` |
+| Analyzer diagnostics | `flutter_skill_lints` repo → `doc/building-flutter-apps-lint-coverage.md` |
 
-Cross-tool: Claude Code, Codex CLI, and Copilot CLI all install hook manifests
-via the plugin install commands above. All three fire the same three scripts in
-`hooks/scripts/`. The AST tier (`dart analyze` + `flutter_skill_lints`) applies
-wherever `dart analyze` runs. The prompt tier (SKILL.md + references) applies
-on every Agent Skills tool, but it does not execute scanners by itself.
+Tiers:
+
+| Tier | Mechanism |
+|---|---|
+| Prompt | `SKILL.md` Gate + Critical Rules + Trigger Map + Pre-Flight |
+| Hooks | `dart_gate.sh`, `preflight_audit.sh`, `skill_reminder.sh` |
+| AST | `dart analyze` with `flutter_skill_lints` + `riverpod_lint` |
+
+Do not duplicate exhaustive diagnostic lists outside the lint coverage doc.
+Cross-tool installs wire the same hook scripts for Claude Code, Codex CLI, and Copilot CLI.
 
 ## What's Included
 
@@ -149,7 +159,6 @@ changing it.
 | hive_ce_flutter | `^2.3.4` | Flutter glue for `hive_ce` |
 | hive_ce_generator | `1.11.0` | Hive type adapters (**exact pin** — see note) |
 | build_runner | `^2.15.0` | Codegen runner (dev_dependency) |
-| showcaseview | `^5.0.2` | First-run guided tours |
 
 **Pin note.** `json_serializable` and `hive_ce_generator` stay at exact pins
 because they bind the analyzer version and the Riverpod generator stack
@@ -196,6 +205,7 @@ lib/
 | Riverpod 3.x codegen | [riverpod-codegen.md](references/riverpod-codegen.md) |
 | Freezed 3.x sealed classes | [freezed-sealed.md](references/freezed-sealed.md) |
 | State management patterns | [state-management.md](references/state-management.md) |
+| State teardown and errors | [state-management-lifecycle.md](references/state-management-lifecycle.md) |
 | Testing with ProviderContainer.test | [testing.md](references/testing.md) |
 | HTTP/networking boundaries | [networking.md](references/networking.md) |
 | Localization/gen-l10n | [localization.md](references/localization.md) |
@@ -206,7 +216,6 @@ lib/
 | Flutter optimizations | [flutter-optimizations.md](references/flutter-optimizations.md) |
 | Extensions & utilities | [extensions-utilities.md](references/extensions-utilities.md) |
 | Hive CE persistence, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) |
-| Showcase guided tours | [showcase-tours.md](references/showcase-tours.md) |
 
 ## Compatible Agents
 

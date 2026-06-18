@@ -1,28 +1,18 @@
 # Architecture
 
-Flutter clean arch, four layers. Deps flow inward: Presentation → Repository → Domain → Data.
+## Read first
+
+1. Data models != domain entities. Domain has no JSON, Flutter, storage, or SDK imports.
+2. Repos/datasources use `abstract interface class`; constructors take interfaces, not concretes.
+3. Storage SDK calls live in Local Datasource → Repository only. Not notifier/widget/service/repo.
+4. Child widgets watch providers directly. No entity/state/notifier prop-drilling.
+5. Typed GoRouter route helpers are nav SSOT; route defs own paths/params.
 
 ## Trigger
 
 Signals: clean architecture, four layers, dependency inversion, domain entity, repository interface
-Before generating code in this area, output verbatim: `Reading: architecture.md`
+Before code: output `Reading: architecture.md`
 
-
-## Contents
-
-- [Scope](#scope)
-- [Tradeoffs](#tradeoffs)
-- [Rules — NEVER Violate](#rules--never-violate)
-- [Full Directory Structure](#full-directory-structure)
-- [Layer Responsibilities](#layer-responsibilities)
-  - [Domain Layer](#domain-layer)
-  - [Data Layer](#data-layer)
-  - [Repository Layer](#repository-layer)
-  - [Presentation Layer](#presentation-layer)
-- [Navigation Coordination](#navigation-coordination)
-- [Complexity Tiers](#complexity-tiers)
-- [Design Tokens](#design-tokens)
-- [Atomic Design for Widgets](#atomic-design-for-widgets)
 
 ## Scope
 
@@ -36,33 +26,11 @@ beyond `Semantics` notes in [atomic-design.md](atomic-design.md#accessibility).
 HTTP service internals are covered at boundary level in
 [networking.md](networking.md).
 
-```mermaid
-sequenceDiagram
-  participant W as Widget (organism/page)
-  participant N as Notifier
-  participant R as IRepository
-  participant DS as IDatasource
-  participant API as Remote / Hive
-  W->>N: ref.watch / call action
-  N->>R: fetchAll() / save()
-  R->>DS: fetchAll() / save()
-  DS->>API: HTTP / Hive box op
-  API-->>DS: payload / error
-  DS-->>R: model[] / throws
-  R-->>N: entity[] / wrapped error
-  N->>N: state = state.copyWith(...)
-  N-->>W: rebuild from selector
-```
+## Scale Rules
 
-## Tradeoffs
-
-- **Atomic hierarchy** — overhead under ~10 screens. Small app: one
-  `widgets/` per feature. Promote to full hierarchy when shared across 2+ features.
-- **`keepAlive: true` everywhere** — startup memory vs rebuild predictability.
-  Default `@riverpod` (auto-dispose) for computed/per-screen. Reserve
-  `keepAlive: true` for repos, app-wide services, nav-surviving notifiers.
-- **Interface per datasource/repo** — file-per-layer cost vs mockability.
-  Pure overhead on one-screen demo; pays off instantly multi-feature.
+- Small feature: one `widgets/` dir. Promote to atomic hierarchy when widgets span 2+ features.
+- Default providers: `@riverpod`. Use `keepAlive: true` only for repos, app-wide services, nav-surviving notifiers.
+- Define interfaces for repos/datasources in multi-feature code.
 
 ## Rules — NEVER Violate
 
@@ -78,18 +46,6 @@ sequenceDiagram
 10. **MUST NEVER** call a storage SDK (Hive, SharedPreferences, secure_storage, `dart:io`, `path_provider`) from a notifier, widget, or service. Storage lives in `Local<X>Datasource` only, exposed via `<X>Repository`. Imports of `package:hive_ce`, `package:hive_ce_flutter`, `package:shared_preferences`, `package:flutter_secure_storage`, `package:path_provider`, or `dart:io` are forbidden in `presentation/`, `*_notifier.dart`, `*_service.dart`, and `*_repository.dart` files. See [hive-persistence.md](hive-persistence.md).
 11. **MUST NEVER** prop-drill state. Child widgets read providers directly with `ref.watch` / `ref.read` / `ref.listen`. Widget constructors take only `Key`, callbacks, primitive props, and immutable IDs — never entities / models / states / notifiers / repositories / datasources. See [state-management.md](state-management.md).
 12. **MUST** keep typed GoRouter routes as the navigation SSOT. Route definitions live in the router package boundary, and app code navigates with generated route helpers such as `SomeRoute(...).go(context)` / `.push<T>(context)`. Local sheets/dialogs use local semantic helpers and `Navigator.pop` for dismissal.
-
-```mermaid
-graph LR
-  subgraph "Interface Contract Flow"
-    I1[abstract interface class<br/>IProductRemoteDatasource] --> C1[ProductRemoteDatasource<br/>implements IProductRemoteDatasource]
-    I2[abstract interface class<br/>IProductRepository] --> C2[ProductRepository<br/>implements IProductRepository]
-    C2 -->|constructor takes| I1
-    P[Provider] -->|returns| I2
-  end
-```
-
-**Contents:** [Full Directory Structure](#full-directory-structure) | [Layer Responsibilities](#layer-responsibilities) | [Complexity Tiers](#complexity-tiers) | [Design Tokens](#design-tokens) | [Atomic Design for Widgets](#atomic-design-for-widgets)
 
 Mixin vs interface vs extension: see [mixins.md](mixins.md).
 
@@ -472,9 +428,3 @@ Container(color: Theme.of(context).colorScheme.primary)
 Shared widgets in `core/widgets/` follow atomic design: tokens → atoms → molecules → organisms → templates → pages. See [atomic-design.md](atomic-design.md) for rules, examples, placement.
 
 Feature widgets go in `features/x/presentation/widgets/`, not `core/widgets/`.
-
-## Recap
-
-1. MUST separate data models from domain entities — NEVER reuse one class for both.
-2. MUST define `abstract interface class` for every repository and datasource. Constructors MUST take interfaces, NEVER concrete types.
-3. MUST NEVER put `fromJson`/`toJson` on domain entities — serialization is a Data-layer concern.

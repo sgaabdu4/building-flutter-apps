@@ -1,11 +1,17 @@
 # Dart MCP E2E Testing
 
-Dart MCP first. Shell fallback only for project commands that MCP cannot run.
+## Read first
+
+1. Use Dart MCP before shell. Shell fallback only for project cmds MCP cannot run.
+2. Use requested device class, app entrypoint, env, actors, accounts, data.
+3. Select by semantics/text/tooltips/central `ValueKey`; no coordinate-tap primary selectors.
+4. Wait on observable UI/backend state, never blind sleep.
+5. Verify source-of-truth via admin/API/CLI/read model for remote/shared state.
 
 ## Trigger
 
 Signals: E2E testing, Dart MCP, flutter_driver, integration_test, source-of-truth verification
-Before generating code in this area, output verbatim: `Reading: dart-mcp-e2e-testing.md`
+Before code: output `Reading: dart-mcp-e2e-testing.md`
 
 
 https://docs.flutter.dev/ai/mcp-server
@@ -16,7 +22,7 @@ Runtime E2E means real app behavior on a real simulator/device. Static review, s
 
 1. MUST use Dart MCP tools before terminal commands.
 2. MUST run on the asked device class. iOS request means iOS simulator/device; Android request means Android emulator/device.
-3. MUST test the real app entrypoint/config the user asked for. Do not silently switch environments.
+3. MUST test the requested app entrypoint/config. Do not switch environments.
 4. MUST define actors, devices, accounts, and test data before running remote/shared-state flows.
 5. MUST use stable text, semantics, tooltips, or `ValueKey` selectors from the widget tree. NEVER coordinate-tap as the primary selector.
 6. MUST wait for semantic UI state or backend/source-of-truth state. NEVER rely on blind sleeps.
@@ -47,26 +53,6 @@ Runtime E2E means real app behavior on a real simulator/device. Static review, s
 | Stop app | `mcp_dart_stop_app` |
 | Remove roots | `mcp_dart_remove_roots` |
 
-## Fast Path
-
-```mermaid
-graph LR
-  A[add_roots] --> B[analyze_files]
-  B --> C[list_devices]
-  C --> D[launch app instances]
-  D --> E[drive flow]
-  E --> F[verify UI + logs]
-  F --> G{remote/shared state?}
-  G -->|yes| H[verify source of truth + observer]
-  G -->|no| I[next segment]
-  H --> I
-  I --> J{failure?}
-  J -->|yes| K[fix + restart/relaunch + rerun segment/downstream]
-  K --> E
-  J -->|no| L[run tests]
-  L --> M[cleanup + stop apps]
-```
-
 ## Planning Matrix
 
 Choose the smallest matrix that proves the feature:
@@ -78,7 +64,7 @@ Choose the smallest matrix that proves the feature:
 | Sync/realtime/cache invalidation | Writer app + observer app, observer updates without manual refresh |
 | Collaboration/team/chat/shared document | Two actors or two app instances minimum; ownership/member/removal/destructive paths |
 | Invite/code/link/token/slug/order generated remotely | Verify generated value in source of truth, then UI shows same value after mutation |
-| Permissions/auth gates | Allowed actor succeeds, denied/removed actor sees blocked or fallback state |
+| Permissions/auth gates | Allowed actor succeeds, denied/revoked actor sees blocked or fallback state |
 | Offline/retry/persistence | Disconnect or simulate failure when feasible, relaunch, retry, and verify no duplicate writes |
 
 ## End-to-End Loop
@@ -91,7 +77,7 @@ Choose the smallest matrix that proves the feature:
 6. Start from a known state: signed-out/signed-in actor, clean route, known backend/source-of-truth data.
 7. Run one segment at a time: setup, create, observe, update, observe, destructive/remove, relaunch, cleanup.
 8. After each segment, verify UI state, logs, and remote/source-of-truth state when applicable.
-9. On failure, capture logs, patch the smallest root cause, hot restart or relaunch, rerun the failed segment and downstream impacted segments.
+9. On failure, capture logs, patch smallest failing area, hot restart/relaunch, rerun failed + impacted segments.
 10. After all runtime flows pass, run relevant unit/widget tests.
 11. Clean test data, sign out if needed, stop all app processes.
 
@@ -133,7 +119,7 @@ Copy this per feature.
 - Update/edit path works
 - Observer sees update without manual refresh when shared/sync applies
 - Delete/remove/leave/revoke path works
-- Observer or removed actor sees correct fallback/empty/blocked state
+- Observer or revoked actor sees correct fallback/empty/blocked state
 - Generated values shown in UI equal source-of-truth values
 - Back/deep-link/reopen path works
 - Persisted data survives app restart when persistence applies
@@ -167,7 +153,7 @@ Verify:
 
 - IDs used by the app match transport/source-of-truth IDs where required.
 - Generated fields, counters, order indexes, invites, slugs, and membership rows are current.
-- Deleted/removed records are actually gone or marked inactive as designed.
+- Deleted/revoked records are gone or marked inactive as designed.
 - Observer permissions match final state.
 - No duplicate records were created by retry/relaunch.
 
@@ -189,7 +175,7 @@ Verify:
 - Observer stale: check event contract, exact subscriptions, source-of-truth refetch, provider invalidation/sync, and actor permissions.
 - Widget not tappable: inspect tree, add deterministic key/semantics, retest.
 - Generated value stale: force source-of-truth refresh after mutation and before navigation/success.
-- Removed actor still sees detail: clear selected state, route fallback, and invalidate/refetch affected providers.
+- Revoked actor still sees detail: clear selected state, route fallback, invalidate/refetch affected providers.
 - Duplicate data after retry/relaunch: fix idempotency, mutation pending state, and cleanup.
 
 ## Exit Criteria
@@ -202,10 +188,4 @@ Verify:
 6. Relevant tests pass after final runtime fix pass.
 7. Test data cleaned.
 8. All app processes stopped.
-
-## Recap
-
-1. MUST use Dart MCP tools (hot restart, screenshot, tap, input, log inspection) before falling back to shell commands — shell fallback is only for project commands MCP cannot run.
-2. MUST wait for semantic UI state or backend/source-of-truth state — NEVER use blind `sleep` or fixed-duration waits. Waits must be conditional on observable state.
-3. MUST verify source-of-truth state with an admin/API/CLI/read model when remote data is involved. UI-only verification is insufficient for sync/collaboration/cloud behavior.
 

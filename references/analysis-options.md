@@ -1,18 +1,55 @@
 # analysis_options.yaml
 
+## Read first
+
+1. `dart analyze` from package root. No path arg. Never `flutter analyze lib`.
+2. Analyzer plugins live ONLY in `analysis_options.yaml` top-level `plugins:` — never `pubspec.yaml` deps.
+3. Enable strict casts/inference/raw types. Exclude generated files.
+
 ## Trigger
 
 Signals: analysis_options, dart analyze, flutter_skill_lints, riverpod_lint
-Before generating code in this area, output verbatim: `Reading: analysis-options.md`
+Before code: output `Reading: analysis-options.md`
 
 
-Copy `references/analysis_options.yaml` to every Flutter project root.
+Copy `references/analysis_options.yaml` to every Flutter project root. For new Flutter apps,
+also copy `templates/flutter/lib/core/extensions/` to `lib/core/extensions/`
+so shared context primitives such as `context.isCurrentModalRoute` exist before
+feature code needs them.
 
 ## Required
 
 - `strict-casts`, `strict-inference`, `strict-raw-types`: true
 - Async: `unawaited_futures`, `discarded_futures`, `avoid_void_async`
 - Resources: `avoid_print`, `cancel_subscriptions`, `close_sinks`
+- Effective Dart Design API shape: `always_declare_return_types`,
+  `type_annotate_public_apis`, `avoid_positional_boolean_parameters`,
+  `avoid_equals_and_hash_code_on_mutable_classes`,
+  `avoid_null_checks_in_equality_operators`,
+  `avoid_private_typedef_functions`, `avoid_returning_this`,
+  `avoid_setters_without_getters`, `prefer_mixin`,
+  `use_to_and_as_if_applicable`
+- Effective Dart Design API safety plugin rules:
+  `avoid_futureor_return_type`,
+  `avoid_nullable_async_or_collection_return_type`,
+  `avoid_public_late_final_without_initializer`
+- `prefer_type_over_var` is forbidden in this profile: it conflicts with
+  Effective Dart's preference for inferred initialized local variables.
+- Do not enable `avoid_types_on_closure_parameters`: `strict-inference`
+  sometimes requires explicit closure parameter types at weakly typed APIs
+  such as `testWidgets`.
+- Do not enable `avoid_classes_with_only_static_members` in Flutter app
+  profiles: the skill uses `abstract final class` namespaces for tiny
+  constants/platform facade APIs where a named owner improves discovery.
+- Do not enable `one_member_abstracts` for architecture profiles:
+  one-method repository/datasource/service contracts are valid dependency
+  boundaries.
+- Do not enable `omit_local_variable_types` until the project has removed
+  explicit local types mechanically; this profile no longer enforces the
+  opposite rule.
+- Do not enable `use_setters_to_change_properties` for async persistence APIs:
+  Dart setters cannot be `async`, and these mutation methods must remain
+  awaitable.
 - Codegen: `invalid_annotation_target: ignore`
 - Exclude: `*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`
 
@@ -26,15 +63,24 @@ Plugin block:
 
 ```yaml
 plugins:
+  # Stable Riverpod lint pin verified for Riverpod 3.3-era lint coverage.
+  riverpod_lint: 3.1.4
   flutter_skill_lints:
-  # Pre-release pin: latest stable is 3.1.3; use 3.1.4-dev.3 for Riverpod 3.3-era lint coverage.
-  # Verify pub.dev before ship. Promote to a stable release when compatible.
-  # Pre-release silently adopts dev behavior — review.
-  riverpod_lint: 3.1.4-dev.3
 ```
 
 Match bundled [`references/analysis_options.yaml`](analysis_options.yaml)
 exactly. Both pin `flutter_skill_lints` version OR neither — keep aligned.
+
+New-project baseline:
+
+```bash
+cp <skill>/references/analysis_options.yaml ./analysis_options.yaml
+mkdir -p lib/core/extensions
+cp <skill>/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
+```
+
+If `lib/core/extensions/` already exists, merge the template files. Do not
+overwrite project-specific extensions.
 
 ## Rules
 
@@ -50,68 +96,28 @@ exactly. Both pin `flutter_skill_lints` version OR neither — keep aligned.
 4. One `flutter_skill_lints` diagnostic
 5. One `riverpod_lint` diagnostic
 
-Scope: `dart analyze` is the analyzer/plugin gate. It can surface analyzer-owned
-pubspec diagnostics and plugin diagnostics, but it is not a complete
-`pubspec.yaml` validator. Use `flutter pub get`, dependency solving, and
-publish/dry-run checks for package-resolution and publishing validity.
-`flutter_skill_lints` project-config diagnostics are reported through Dart
-analysis units.
+Scope: `dart analyze` = analyzer/plugin gate. Use `flutter pub get` + publish/dry-run for package validity.
 
 ## Use `dart analyze`, NOT `flutter analyze`
 
 Run `dart analyze` from package root. No path arg. Avoid `flutter analyze` + `flutter analyze lib` + `dart analyze lib`.
 
-Why: `flutter analyze lib` exits before plugin diagnostics report → plugin lints silently dropped. Repro Flutter 3.41.9 / Dart 3.11.5: `flutter analyze` → 12 plugin diagnostics; `flutter analyze lib` → `No issues found`. Tracking: https://github.com/flutter/flutter/issues/184190.
-
 CI/scripts: `dart analyze`. Never `flutter analyze lib`.
+Tracking: https://github.com/flutter/flutter/issues/184190.
 
-## Troubleshoot — analysis server crash
+## Fix plugin crash
 
-Symptom: `server.pluginError`, `analysis server crashed`, `plugin failed to load`, `IsolateSpawnException`, hang, IDE Dart pane dies.
+1. Remove analyzer plugins from `pubspec.yaml` deps: `riverpod_lint`, `custom_lint`, `custom_lint_builder`, `flutter_skill_lints`, any package listed under `plugins:`.
+2. Keep analyzer plugins only in `analysis_options.yaml plugins:`.
+3. Keep included lint packages as normal dev deps, e.g. `flutter_lints`.
+4. Run `flutter pub get`.
+5. Restart analysis server or rerun `dart analyze`.
 
-Cause: analyzer plugin packages (`riverpod_lint`, `custom_lint`, `flutter_skill_lints`, ...) listed in `pubspec.yaml` `dependencies:`/`dev_dependencies:` AND top-level `plugins:` block. Two paths conflict → crash.
-
-Fix:
-1. Open `pubspec.yaml`.
-2. Remove analyzer plugin packages from `dependencies:`/`dev_dependencies:`: `riverpod_lint`, `custom_lint`, `custom_lint_builder`, `flutter_skill_lints`, any other package listed under top-level `plugins:`.
-3. Keep analyzer plugins ONLY in `analysis_options.yaml` `plugins:`.
-4. Keep lint packages referenced by `include:` as normal dev dependencies; this config includes `package:flutter_lints/flutter.yaml`.
-5. `flutter pub get` → restart analysis server (IDE: "Restart Analysis Server"; CLI: re-run `dart analyze`).
-
-Rule: plugins live in `analysis_options.yaml plugins:`. Never both places.
-
-## Troubleshoot — stale `~/.dartServer` cache crash
-
-Symptom: `Bad state: The analysis server crashed unexpectedly` on every `dart analyze` invocation, even single-file. Plugin loads fine; `flutter analyze lib/main.dart` works.
-
-Repro:
-
-```bash
-dart analyze --format=machine lib/main.dart
-# Bad state: The analysis server crashed unexpectedly
-
-dart analyze --cache=$HOME/.dartServer --format=machine lib/main.dart
-# Bad state: The analysis server crashed unexpectedly
-
-dart analyze --cache=/tmp/dart_analysis_cache_fresh --format=machine lib/main.dart
-# works — normal diagnostics
-```
-
-Cause: stale/corrupt analyzer cache + plugin-manager state under `~/.dartServer`. Triggered by recent plugin/dependency churn (add/remove `custom_lint`, `riverpod_lint`, version bumps).
-
-Fix:
+## Fix stale `~/.dartServer`
 
 ```bash
 mv ~/.dartServer ~/.dartServer.bak-$(date +%Y%m%d%H%M%S)
 dart analyze
 ```
 
-Caveat: never use relative `--cache=` (e.g. `--cache=.dart_tool/cache`). Dart 3.11 resolves it relative to the SDK analysis-server snapshot dir → `invalid plugin.aot`. Absolute paths only.
-
-After fresh cache: remaining diagnostics are real plugin lints, not crashes.
-
-## Recap
-
-1. Run `dart analyze` from package root with no path argument. `flutter analyze lib` exits before plugin diagnostics report — plugin lints are silently dropped.
-2. Analyzer plugins live in `analysis_options.yaml` top-level `plugins:` block ONLY. NEVER list `riverpod_lint`, `custom_lint`, or `flutter_skill_lints` in `pubspec.yaml` `dependencies:`/`dev_dependencies:` — two paths conflict and crash the analysis server. Keep `flutter_lints` as a dev dependency when `include: package:flutter_lints/flutter.yaml` is present.
-3. Exclude generated files (`*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`) and enable `strict-casts`, `strict-inference`, `strict-raw-types: true`.
+Use absolute `--cache=` paths only.

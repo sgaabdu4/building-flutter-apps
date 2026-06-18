@@ -1,54 +1,32 @@
 # Freezed 3.x Sealed Classes
 
-All Freezed classes MUST use `sealed class` — NEVER `abstract class`.
+## Read first
+
+1. `@freezed` classes use `sealed class`, never `abstract class`.
+2. Add `const X._()` before methods/getters.
+3. `build.yaml` owns `explicit_to_json: true`; no per-class `@JsonSerializable(explicitToJson: true)`.
+4. Match unions with Dart `switch`; no `.when()`/`.map()`.
+5. JSON belongs on data models only. Domain entities have no `fromJson`/`toJson`.
+6. One Freezed declaration per Dart file.
+7. Do not use `@immutable` or `@unfreezed`; use Freezed instead.
 
 ## Trigger
 
 Signals: Freezed, sealed class, @freezed, build.yaml, explicit_to_json, copyWith, union types
-Before generating code in this area, output verbatim: `Reading: freezed-sealed.md`
+Before code: output `Reading: freezed-sealed.md`
 
-
-## Contents
-
-- [Rules — NEVER Violate](#rules--never-violate)
-- [Setup](#setup)
-- [Simple Data Classes](#simple-data-classes)
-- [Adding Methods and Getters](#adding-methods-and-getters)
-- [Union Types](#union-types)
-- [AsyncValue Pattern Matching](#asyncvalue-pattern-matching)
-- [Feature State](#feature-state)
-- [Deep Copy](#deep-copy)
-- [JSON Serialization](#json-serialization)
-- [Non-Constant Default Values](#non-constant-default-values)
-- [Inheritance](#inheritance)
-- [Mutable Classes](#mutable-classes)
-- [Configuration](#configuration)
-- [Linting](#linting)
-- [Rich Models](#rich-models)
-- [Deep Serialization](#deep-serialization)
 
 ## Rules — NEVER Violate
 
 1. **MUST** use `sealed class` with `@freezed` — NEVER `abstract class`.
 2. **MUST** add `const Entity._()` private constructor when adding methods or getters.
 3. **MUST** use `build.yaml` with `explicit_to_json: true` — NEVER per-class `@JsonSerializable(explicitToJson: true)`.
-4. **MUST** use Dart native `switch` expressions — NEVER Freezed legacy `when`/`map` (removed in 3.0).
+4. **MUST** use Dart native `switch` expressions — NEVER Freezed `when`/`map`.
 5. **NEVER** use `@Freezed(toJson: true)` when `fromJson` factory exists — Freezed auto-generates `toJson`.
 6. **MUST** put `fromJson`/`toJson` ONLY on data models — NEVER on domain entities.
 7. **MUST** put Rich Model methods deriving from own fields on model — NEVER in repository.
-
-```mermaid
-graph TD
-  Q1{Has fromJson factory?} -->|Yes| A1["toJson auto-generated — use plain @freezed"]
-  Q1 -->|No| Q2{Needs toJson?}
-  Q2 -->|Yes| A2["Use @Freezed(toJson: true)"]
-  Q2 -->|No| A3["Plain @freezed — no serialization"]
-  A1 --> Q3{Has nested Freezed objects?}
-  Q3 -->|Yes| A4["MUST have explicit_to_json: true in build.yaml"]
-  Q3 -->|No| A5["Works out of the box"]
-```
-
-**Contents:** [Setup](#setup) | [Simple Data Classes](#simple-data-classes) | [Adding Methods and Getters](#adding-methods-and-getters) | [Union Types](#union-types) | [AsyncValue Pattern Matching](#asyncvalue-pattern-matching) | [Feature State](#feature-state) | [Deep Copy](#deep-copy) | [JSON Serialization](#json-serialization) | [Non-Constant Default Values](#non-constant-default-values) | [Inheritance](#inheritance) | [Mutable Classes](#mutable-classes) | [Configuration](#configuration) | [Linting](#linting) | [Rich Models](#rich-models) | [Deep Serialization](#deep-serialization)
+8. **MUST** put each Freezed declaration in its own Dart source file — NEVER define two `@freezed`/`@Freezed` classes in one file.
+9. **NEVER** use `@immutable` or `@unfreezed` for value/state classes — use `@freezed sealed class` instead.
 
 ## Setup
 
@@ -69,7 +47,7 @@ dev_dependencies:
 
 Pin `json_serializable` to `6.13.0`. `6.13.1+` needs analyzer `>=10`. Riverpod + Hive CE generator stack resolves on analyzer 9. **Re-check pin** after Riverpod/Hive CE generator upgrade. Both compat w/ analyzer 10 → lift to `^6.13.x`. Run `dart pub deps -s compact | rg analyzer` first.
 
-Every file need:
+Every Freezed source file owns exactly one Freezed declaration and needs:
 
 ```dart
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -77,6 +55,10 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'my_file.freezed.dart';
 part 'my_file.g.dart';  // only if using fromJson/toJson
 ```
+
+If a feature needs `User`, `UserState`, and `UserFilters`, create
+`user.dart`, `user_state.dart`, and `user_filters.dart`; do not group the
+three Freezed declarations in one file.
 
 ## Simple Data Classes
 
@@ -147,7 +129,7 @@ Widget build(BuildContext context, WidgetRef ref) {
 }
 ```
 
-Use Dart native `switch` expressions. NEVER use Freezed legacy `when`/`map` (removed in Freezed 3.0).
+Use Dart native `switch` expressions. Never use Freezed `when`/`map`.
 
 ## AsyncValue Pattern Matching
 
@@ -178,7 +160,7 @@ sealed class ProductState with _$ProductState {
     @Default(false) bool hasMore,
     @Default(0) int page,
     AppError? error,
-    String? searchQuery,
+    @Default('') String searchQuery,
   }) = _ProductState;
 }
 ```
@@ -316,17 +298,33 @@ sealed class Product extends BaseEntity with _$Product {
 }
 ```
 
-## Mutable Classes
+## Manual Immutable Classes
 
-Use `@unfreezed` for mutable state (rare — prefer immutable):
+Do not use `@immutable` or `@unfreezed` for app value/state classes. `@immutable`
+only checks fields, and `@unfreezed` creates a second mutability model. Freezed is
+the single project pattern for value/state classes because it owns equality,
+`copyWith`, unions, serialization, and generated implementation boundaries.
+
+Wrong:
 
 ```dart
-@unfreezed
+@immutable
 sealed class FormData with _$FormData {
-  factory FormData({
+  const FormData({
     required String name,
     required String email,
-    required final int id, // final = still immutable
+  });
+}
+```
+
+Right:
+
+```dart
+@freezed
+sealed class FormData with _$FormData {
+  const factory FormData({
+    required String name,
+    required String email,
   }) = _FormData;
 }
 ```
@@ -396,15 +394,11 @@ Data models follow same rule: `toEntity()`, `toRequestBody()`, `toCsvRow()` all 
 
 ## Deep Serialization
 
-Freezed not deep-serialize nested objects by default. Without explicit config, nested Freezed objects serialize as `Instance of '_XYZ'` instead of JSON maps — cause `type '_XYZ' is not a subtype of Map<String, dynamic>` crashes in release builds.
+Enable nested JSON once in `build.yaml`. Generated `toJson()` must call nested `.toJson()` via `explicit_to_json: true`. `@Freezed(toJson: true)` is redundant when `fromJson` exists.
 
-### Why build.yaml Is Required
+### build.yaml
 
-Generated `toJson()` does NOT call `.toJson()` on nested objects unless `explicit_to_json` enabled. `@Freezed(toJson: true)` does NOT enable deep serialization — redundant when `fromJson` exists.
-
-### Global Fix: build.yaml
-
-Set `explicit_to_json: true` once in `build.yaml`. All nested objects serialize correctly project-wide:
+Set `explicit_to_json: true`:
 
 ```yaml
 # build.yaml (project root)
@@ -423,11 +417,4 @@ targets:
 | `@freezed` + `fromJson` factory | Generates both `fromJson` and `toJson` | Always — standard Freezed pattern |
 | `build.yaml explicit_to_json` | Calls `.toJson()` on nested objects | Always — set once, forget |
 | `@Freezed(toJson: true)` | Forces `toJson` generation | Only if class has NO `fromJson` factory (rare) |
-| `@JsonSerializable(explicitToJson: true)` | Per-class deep serialization (legacy) | NEVER — build.yaml replaces it |
-
-## Recap
-
-1. MUST use `sealed class` with `@freezed` — NEVER `abstract class`. Required by Freezed 3.x.
-2. MUST configure `build.yaml` with `explicit_to_json: true` — NEVER use per-class `@JsonSerializable(explicitToJson: true)`.
-3. MUST use Dart native `switch` expressions for union matching — NEVER Freezed legacy `.when()`/`.map()` (removed in Freezed 3.0). Native switch is exhaustive and does not require default cases on sealed types.
-
+| `@JsonSerializable(explicitToJson: true)` | Per-class deep serialization | NEVER — use build.yaml |

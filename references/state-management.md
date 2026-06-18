@@ -1,27 +1,23 @@
 # State Management
 
+## Read first
+
+1. No prop-drilling state. Child widgets watch providers by ID.
+2. Provider-derived caches have one SSOT: generated computed provider, notifier/repo state, or memoized service/repo/datasource cache.
+3. Widgets are UI + dispatch only: no `try/catch`, no awaited notifier result branching, no top-level/global helper functions, no `*Data` helper namespaces that filter/map/sort/index collections, no private collection helpers.
+4. Notifiers/widgets never touch storage SDKs; use Local Datasource → Repository.
+5. After every notifier/repo await: `if (!ref.mounted) return;`. In `finally`: `if (ref.mounted) { ... }`.
+6. After every widget/State await: `if (!context.mounted) return;`. No bare `mounted`.
+7. No `ref.watch()` inside notifier methods; `ref.watch` in `build()` only.
+8. Mutation methods lazily init deps; sync `Notifier.build()` never reads `state` before first return.
+9. Collections in state are non-null with empty defaults. Model `not loaded` / `not applicable` as AsyncValue or a sealed state, not `List<T>?`.
+10. Empty string is allowed only for explicit transient draft/search/input text. Domain-required strings use VOs; optional strings normalize blank to `null`.
+
 ## Trigger
 
 Signals: ref.mounted, Notifier, AsyncNotifier, state.copyWith, ref.onDispose, sync notifier trap
-Before generating code in this area, output verbatim: `Reading: state-management.md`
+Before code: output `Reading: state-management.md`
 
-
-## Contents
-
-- [Notifier Structure](#notifier-structure)
-- [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap)
-- [ref.mounted Guard](#refmounted-guard)
-- [Dependency Readiness For Mutations](#dependency-readiness-for-mutations)
-- [Optimistic Updates](#optimistic-updates)
-- [Preventing Duplicate Fetches](#preventing-duplicate-fetches)
-- [Async Initialization](#async-initialization)
-- [AsyncNotifier Pattern](#asyncnotifier-pattern)
-- [AsyncValue.requireValue](#asyncvaluerequirevalue)
-- [Loading Progress](#loading-progress)
-- [Cleanup](#cleanup)
-- [Error Handling Strategy](#error-handling-strategy)
-- [Domain Error Types](#domain-error-types)
-- [Cross-Provider Communication](#cross-provider-communication)
 
 ## Rules — NEVER Violate
 
@@ -31,31 +27,44 @@ Before generating code in this area, output verbatim: `Reading: state-management
 
 0c. **MUST extract shared behavior to a mixin.** When the same logic appears in 2+ notifiers, widgets, or services, write `mixin XxxMixin on Y` and apply via `with`. Suffix the name with `Mixin`. Copy-paste sharing across notifiers / widgets / services is forbidden. See [mixins.md](mixins.md).
 
+0d. **NEVER duplicate provider-derived caches or mutation events.** One generated computed provider/notifier/repo/service owns the cached/indexed/snapshot value and one-shot event serials/payloads. `ConsumerState` may own UI lifecycle handles only (controller/focus/animation/timer). Fields like `*Cache`, `*Source`, `*Snapshot`, `*Memo`, `*ById`, provider-family arg wrappers (`config`/`args`/`params`), and `ProviderSubscription` in widget state are forbidden. Standalone `*Signal` / `*Event` / `*Pulse` / `*Serial` providers are forbidden; fold the serial/payload into the owning notifier state and listen to a concrete field with `select`. Durable status providers must be named by the state they own, e.g. `*StatusNotifier` / `*Lifecycle`, not `*Signal`. `ref.listenManual` is forbidden. Use `ref.listen` in `build` for UI side effects; move durable sync to the provider/notifier SSOT. Lints: `riverpod_consumer_state_derived_cache`, `riverpod_widget_provider_arg_wrapper`, `riverpod_consumer_state_provider_subscription`, `riverpod_listen_manual_forbidden`, `riverpod_event_counter_signal_forbidden`.
+
 1. **MUST** check `if (!ref.mounted) return;` after EVERY `await` in notifier.
 2. **MUST** check `if (!context.mounted) return;` after EVERY `await` in widget.
-3. **MUST** catch error in notifier by default. Datasource, repo propagate. `try/catch` at data layer allowed **only** for: (a) domain error translation, (b) idempotency recovery (404/409), (c) transaction rollback, (d) local-first fire-and-forget sync. Plain log-and-rethrow forbidden — delete.
-4. **MUST** `ref.read()` one-time access in callback. MUST `ref.watch()` rebuild on dep change.
-5. **MUST** dispose timer, controller, subscription via `ref.onDispose()`.
-6. **NEVER** `ref.watch()` inside notifier method — use `ref.read()` or `ref.listen()`.
-7. **NEVER** set state after mounted check fail — return now.
-8. **NEVER** read `state` (incl `state.copyWith`) inside sync `Notifier.build()` or any path sync before `build()` returns. First `state` assign in sync notifier must be direct value (e.g. `state = const FooState(isLoading: true)`), or deferred via `Future.microtask`. Read state before first `state=` throw *"Tried to read the state of an uninitialized provider"*. `AsyncNotifier` exempt (pre-init `AsyncLoading`). See [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap).
-9. **MUST** init repo/dep inside mutation method before write (`create*`, `update*`, `delete*`, `set*`, `reorder*`). Never rely on background `_init*()` timing.
-10. **MUST** avoid broad parent-provider invalidation in nav-critical flow (wizard/deep-link route param). Use targeted sync (`upsert`/replace/remove).
-11. **NEVER** swap `context.mounted` to `mounted` to suppress lint. Style = `context.mounted`. In `State` methods, use `final context = this.context;` before `await`, then `if (!context.mounted) return;`.
+3. **MUST** catch error in notifier by default. Datasource, repo propagate. `try/catch` at data layer allowed **only** for: (a) domain error translation, (b) idempotency recovery (404/409), (c) transaction rollback, (d) local-first fire-and-forget sync. Plain log-and-rethrow forbidden — delete. Widget `try/catch` is forbidden; lint: `widget_try_catch_boundary`.
+4. **NEVER** make widgets branch on awaited notifier results or own local busy flags for provider mutations. `final ok = await ref.read(xProvider.notifier).save(); if (ok) ...` and `bool _isSaving = false;` beside `ref.read(xProvider.notifier).save()` both turn the widget into a controller. Notifier owns the decision, exposes `isSaving` / `isSubmitting` and success serials, and widgets observe/listen. Lints: `widget_awaits_notifier_result`, `widget_local_mutation_flag`.
+5. **NEVER** declare top-level/global helper functions in widget/screen files. Put behavior on a widget class, `abstract final class` namespace, notifier, or computed provider. Lint: `widget_top_level_function_boundary`.
+6. **MUST** `ref.read()` one-time access in callback. MUST `ref.watch()` rebuild on dep change.
+7. **MUST** dispose timer, controller, subscription via `ref.onDispose()`.
+8. **NEVER** `ref.watch()` inside notifier method — use `ref.read()` or `ref.listen()`.
+9. **NEVER** set state after mounted check fail — return now.
+10. **NEVER** read `state` (incl `state.copyWith`) inside sync `Notifier.build()` or any path sync before `build()` returns. First `state` assign in sync notifier must be direct value (e.g. `state = const FooState(isLoading: true)`), or deferred via `Future.microtask`. Read state before first `state=` throw *"Tried to read the state of an uninitialized provider"*. `AsyncNotifier` exempt (pre-init `AsyncLoading`). See [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap).
+11. **MUST** init repo/dep inside mutation method before write (`create*`, `update*`, `delete*`, `set*`, `reorder*`). Never rely on background `_init*()` timing.
+11b. **MUST** guard async `_init*` / `_restore*` / `_load*` notifier writes with a generation/request token. A background load/restore that started before a user mutation must not assign `state` after the mutation. Lint: `notifier_async_init_stale_state_write`.
+12. **MUST** avoid broad parent-provider invalidation in nav-critical flow (wizard/deep-link route param). Use targeted sync (`upsert`/replace/remove).
+13. **NEVER** swap `context.mounted` to `mounted` to suppress lint. Style = `context.mounted`. In `State` methods, use `final context = this.context;` before `await`, then `if (!context.mounted) return;`.
+14. **NEVER** use nullable collection state (`List<T>?`, `Map<K, V>?`, `Set<T>?`). Use `@Default([])` / `@Default({})`, or model tri-state with a sealed union / `AsyncValue`.
+15. **NEVER** use `''` or boolean `"1"` / `"0"` strings as state sentinels. Name transient text fields explicitly (`query`, `searchQuery`, `draftName`, `inputText`). Keep booleans typed; if a wire protocol truly needs `"1"` / `"0"`, convert at the datasource boundary with a named encoder. Required domain text becomes a VO before it reaches domain. Optional text is `String?`, with blank normalized to `null` at the notifier/repo boundary. Lints: `nullable_collection_type`, `state_empty_string_sentinel`, `state_bool_string_sentinel`.
 
-```mermaid
-graph TD
-  A[API call in notifier] --> B{Success?}
-  B -->|Yes| C{ref.mounted?}
-  B -->|No| D[catch error]
-  C -->|Yes| E[Update state with data]
-  C -->|No| F[return — do nothing]
-  D --> G{ref.mounted?}
-  G -->|Yes| H[Set error state]
-  G -->|No| F
+## Nullability + Empty Values
+
+Dart null safety makes non-nullable the default, but `null` is still correct
+for real absence. Do not fight the type system with sentinels.
+
+| Situation | Use |
+|---|---|
+| Loaded, no items | `@Default([]) List<T> items` |
+| Not loaded vs loaded empty | `AsyncValue<List<T>>` or sealed state |
+| Optional note / bio / description | `String?`, blank input normalized to `null` |
+| Required email / ID / slug / name | Value Object with non-empty validation |
+| Search box / form draft before submit | `@Default('') String query` / `draftName` |
+
+```dart
+String? optionalTextFromInput(String value) {
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
 ```
-
-**Contents:** [Notifier Structure](#notifier-structure) | [Sync Notifier Initialization Trap](#sync-notifier-initialization-trap) | [ref.mounted Guard](#refmounted-guard) | [Dependency Readiness For Mutations](#dependency-readiness-for-mutations) | [Optimistic Updates](#optimistic-updates) | [Preventing Duplicate Fetches](#preventing-duplicate-fetches) | [Async Initialization](#async-initialization) | [AsyncNotifier Pattern](#asyncnotifier-pattern) | [AsyncValue.requireValue](#asyncvaluerequirevalue) | [Loading Progress](#loading-progress) | [Cleanup](#cleanup) | [Error Handling Strategy](#error-handling-strategy) | [Domain Error Types](#domain-error-types) | [Cross-Provider Communication](#cross-provider-communication)
 
 ## Widget Context After Await
 
@@ -96,19 +105,23 @@ sealed class ProductState with _$ProductState {
 
 @Riverpod(keepAlive: true)
 class ProductNotifier extends _$ProductNotifier {
+  int _loadGeneration = 0;
+
   @override
   ProductState build() {
     // Defer work — avoids reading uninitialized state during build.
     // See "Sync Notifier Initialization Trap".
-    Future.microtask(_load);
+    final generation = ++_loadGeneration;
+    Future.microtask(() => _load(generation));
     return const ProductState(isLoading: true);
   }
 
-  Future<void> _load() async {
+  Future<void> _load(int generation) async {
     if (!ref.mounted) return;
     try {
       final items = await ref.read(productRepositoryProvider).fetchAll();
       if (!ref.mounted) return;
+      if (generation != _loadGeneration) return;
       state = state.copyWith(items: items, isLoading: false);
     } on Exception catch (e, s) {
       if (!ref.mounted) return;
@@ -118,8 +131,9 @@ class ProductNotifier extends _$ProductNotifier {
   }
 
   Future<void> refresh() async {
+    final generation = ++_loadGeneration;
     state = state.copyWith(isLoading: true, error: null);
-    await _load();
+    await _load(generation);
   }
 }
 ```
@@ -260,36 +274,54 @@ Same rule for `context.mounted` in `State` cleanup, and bare `mounted` inside `S
 
 ## Dependency Readiness For Mutations
 
-Notifier init repo async in `build()`/`_init()` → mutation method can run before dep ready + silently no-op.
+Mutation methods must resolve deps before writes. Do not add notifier-local
+repository cache fields; Riverpod provider caching is the SSOT.
 
 ### ❌ Wrong — null repo short-circuit in user action
 
 ```dart
 Future<void> saveThing(Thing thing) async {
   final repo = _repository;
-  if (repo == null) return; // silently does nothing if init is racing
+  if (repo == null) return; // drops user action
   await repo.save(thing);
 }
 ```
 
-### ✅ Right — ensure before write
+### ❌ Wrong — notifier-local repository cache
 
 ```dart
-Future<IThingRepository?> _ensureRepository() async {
-  _repository ??= await ref.read(thingRepositoryProvider.future);
+class ThingNotifier extends _$ThingNotifier {
+  IThingRepository? _repository;
+
+  Future<IThingRepository?> _ensureRepository() async {
+    _repository ??= await ref.read(thingRepositoryProvider.future);
+    if (!ref.mounted) return null;
+    return _repository;
+  }
+}
+```
+
+### ✅ Right — resolve before write from provider SSOT
+
+```dart
+Future<IThingRepository?> thingRepositoryOrNull(Ref ref) async {
+  final repo = await ref.read(thingRepositoryProvider.future);
   if (!ref.mounted) return null;
-  return _repository;
+  return repo;
 }
 
 Future<void> saveThing(Thing thing) async {
-  final repo = await _ensureRepository();
+  final repo = await thingRepositoryOrNull(ref);
   if (repo == null) return;
   await repo.save(thing);
   if (!ref.mounted) return;
 }
 ```
 
-Rule of thumb: method mutates data → must call `ensure` helper first.
+Rule of thumb: method mutates data → resolve dependencies first via a
+stateless helper/mixin, then write. No `_repository` / `_repo` / `_service`
+cache fields in generated notifiers unless the field owns a real lifecycle
+resource that must be disposed. Lint: `notifier_local_dependency_cache`.
 
 ## Optimistic Updates
 
@@ -495,143 +527,6 @@ final removeDispose = ref.onDispose(() => cleanup());
 removeDispose();
 ```
 
-## Error Handling Strategy
+## State Teardown, Errors, and Cross-Provider Communication
 
-Default: catch error once — in notifier. Datasource, repo propagate.
-
-```dart
-// Datasource — default: propagate
-Future<List<ProductModel>> fetchAll() => _http.get('/products');
-
-// Repository — default: propagate
-Future<List<Product>> fetchAll() async {
-  final models = await _remote.fetchAll();
-  return models.map((m) => m.toEntity()).toList();
-}
-```
-
-### Legitimate `try/catch` in data layer
-
-Default rule has four narrow exception. Each MUST have reason beyond "log + rethrow":
-
-1. **Domain error translation** — map raw SDK exception to typed domain error so notifier matches on sealed types.
-2. **Idempotency recovery** — swallow "already exists" / "not found" on op whose contract is idempotent (e.g. 404 on delete in batch).
-3. **Transaction rollback** — catch, run compensating write, rethrow.
-4. **Local-first fire-and-forget sync** — remote mirror of local write where caller not await remote. Swallow + log so dead backend no break local path.
-
-❌ WRONG — bare `try { … } catch (e) { log(...); rethrow; }` add nothing. Delete; let notifier catch.
-
-```dart
-// ❌ pointless
-Future<void> remove(String id) async {
-  try {
-    await _remote.remove(id);
-  } on Exception catch (e, s) {
-    Crash.error(e, s, reason: 'remove');
-    rethrow;
-  }
-}
-
-// ✅ propagate
-Future<void> remove(String id) => _remote.remove(id);
-```
-
-```dart
-// Notifier — MUST catch here. Translate to typed AppError; never store raw String.
-Future<void> _load() async {
-  try {
-    final items = await ref.read(productRepositoryProvider).fetchAll();
-    if (!ref.mounted) return;
-    state = state.copyWith(items: items);
-  } on Exception catch (e, s) {
-    if (!ref.mounted) return;
-    state = state.copyWith(error: AppError.from(e));
-    Crash.error(e, s, reason: 'ProductNotifier._load');
-  }
-}
-```
-
-### Domain Error Types
-
-**Rule.** `AppError` = **sole** error type in notifier state. Never store
-`String? error` — pattern-match typed error in UI. Catch in notifier, wrap
-`AppError.from(e)`, then `Crash.error(e, s, reason: …)`.
-
-```dart
-// core/domain/app_error.dart — `from` ctor for notifier wrap
-sealed class AppError {
-  static AppError from(Object e) => switch (e) {
-        SocketException() || TimeoutException() => AppError.network(e.toString()),
-        FormatException() => AppError.unexpected(e),
-        _ => AppError.unexpected(e),
-      };
-}
-```
-
-Define sealed error hierarchy for typed error handling in notifier:
-
-```dart
-// core/domain/app_error.dart
-@freezed
-sealed class AppError with _$AppError {
-  const factory AppError.network(String message) = NetworkError;
-  const factory AppError.validation(String field, String message) = ValidationError;
-  const factory AppError.notFound(String resource) = NotFoundError;
-  const factory AppError.unauthorized() = UnauthorizedError;
-  const factory AppError.unexpected(Object error) = UnexpectedError;
-}
-```
-
-Use in notifier state, pattern-match in UI:
-
-```dart
-// State holds typed error instead of raw string
-@freezed
-sealed class ProductState with _$ProductState {
-  const factory ProductState({
-    @Default([]) List<Product> items,
-    @Default(false) bool isLoading,
-    AppError? error,
-  }) = _ProductState;
-}
-
-// UI pattern-matches for user-friendly display
-if (state.error case NetworkError(:final message))
-  ErrorBanner(message: message, onRetry: () => ref.read(productProvider.notifier).refresh())
-else if (state.error case NotFoundError(:final resource))
-  Text('$resource not found')
-```
-
-## Cross-Provider Communication
-
-Read other provider via `ref`:
-
-```dart
-@Riverpod(keepAlive: true)
-class OrderNotifier extends _$OrderNotifier {
-  @override
-  OrderState build() => const OrderState();
-
-  Future<void> placeOrder() async {
-    final cart = ref.read(cartProvider);
-    final user = ref.read(authProvider);
-
-    if (user case Authenticated(:final user)) {
-      await ref.read(orderRepositoryProvider).create(
-        userId: user.id,
-        items: cart.items,
-      );
-      if (!ref.mounted) return;
-
-      // Reset cart after order
-      ref.read(cartProvider.notifier).clear();
-    }
-  }
-}
-```
-
-## Recap
-
-1. MUST `if (!ref.mounted) return;` after EVERY `await` in a notifier — the provider may be disposed while the async operation is in flight, and writing to disposed state throws.
-2. NEVER call `ref.watch()` inside a notifier method — use `ref.read()` for one-time access or `ref.listen()` for reactive side effects. `ref.watch()` in a method body causes rebuild loops.
-3. NEVER read `state` (including `state.copyWith`) before the first assignment in a sync `Notifier.build()` — defer via `Future.microtask` to avoid the "uninitialized provider" exception that fires before `build()` returns.
+Read [state-management-lifecycle.md](state-management-lifecycle.md) for notifier-owned teardown, error handling strategy, domain error types, and cross-provider communication.

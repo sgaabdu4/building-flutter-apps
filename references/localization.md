@@ -1,9 +1,17 @@
 # Localization
 
+## Read first
+
+1. All user-visible production copy uses gen-l10n ARB, never ad hoc UI strings.
+2. Add keys to template ARB first; include descriptions, placeholders, plural/select where needed.
+3. Widgets bind `final l10n = context.l10n;`; no `AppLocalizations.of(context)!` or chained `context.l10n.key`.
+4. Domain/repos/datasources/notifiers expose semantic state, not localized copy.
+5. Configure ARB/generated paths explicitly; import generated `app_localizations.dart` from that path.
+
 ## Trigger
 
 Signals: gen-l10n, ARB, AppLocalizations, plural, select, l10n.yaml
-Before generating code in this area, output verbatim: `Reading: localization.md`
+Before code: output `Reading: localization.md`
 
 
 ## Rules
@@ -211,11 +219,3 @@ class InviteStatusLabel extends StatelessWidget {
 - [ ] Placeholders/plurals/selects are used instead of string concatenation.
 - [ ] Notifiers expose semantic state, not translated copy.
 - [ ] Widget tests/previews include localization delegates or app preview shell.
-
-## Recap
-
-1. MUST use Flutter gen-l10n for all user-visible copy in production UI — NEVER ad hoc string constants for user-facing text.
-2. MUST NOT call `AppLocalizations.of(context)!` directly — configure `nullable-getter: false` in `l10n.yaml` or use a context extension to avoid null-assertion boilerplate.
-3. MUST bind `final l10n = context.l10n;` before localized key reads in widgets — do not chain `context.l10n.someKey`.
-4. MUST NOT store localized copy in domain entities, repositories, datasources, or notifiers — expose semantic state and let the UI layer render translated copy.
-5. Configure gen-l10n paths explicitly — ARB in `arb-dir`; generated Dart in `${arb-dir}` or `${output-dir}`; import `app_localizations.dart` from that directory.

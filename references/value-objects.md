@@ -1,26 +1,29 @@
 # Value Objects
 
-Wrap domain primitives in sealed Freezed classes. Kills primitive obsession. Sidesteps `arch_domain_import`.
+## Read first
 
-Raw redirects private (`._name`). Validated public factory only. No named primitive factories on entities. No hand-rolled `copyWith` in `/domain/`. Convert primitives at data/notifier/import boundaries — never inside `/domain/`.
+1. Domain-meaning primitives (unit/currency/identity/format) become sealed Freezed VOs in `/domain/values/`.
+2. Public factories validate; raw redirects stay private (`._raw`, `._meters`). No passthrough factories.
+3. Domain entities do not expose named primitive factories; convert at data/notifier/import boundaries.
+4. Hive/data models keep primitives; mappers bridge model primitives ↔ domain VOs.
+5. Use VO when concept spans 2+ entities; one-off derivation can be an entity getter.
+6. Required domain strings are non-empty VOs. Optional strings are `String?` and blank input is normalized to `null` before domain construction.
 
 ## Trigger
 
 Signals: `Distance`, `Money`, `Email`, `Username`, `Slug`, `PhoneNumber`, `HeartRate`, `Weight`, `Pace`, unit conversion in domain, currency math in domain, bare `double distanceMeters` / `int amountCents` / `String email` at entity boundary, `arch_domain_import` fighting `core/extensions/` import.
 
-Before code: output verbatim `Reading: value-objects.md`
+Before code: output `Reading: value-objects.md`
 
-## Why
-
-Domain inner, `core/extensions/` outer. Dependency Rule: inner never depend on outer. Lint `arch_domain_import` (ERROR) blocks. Three options:
+## Decision
 
 | Scope | Use |
 |---|---|
 | 1 entity, 1 derivation | Entity getter |
-| 2+ entities share primitive concept | **Value Object** in `/domain/values/` |
-| Only widgets/notifiers/repos use it | `core/extensions/` |
+| 2+ entities share primitive concept | Value Object in `/domain/values/` |
+| Widget/notifier/repo-only helper | `core/extensions/` |
 
-VO wins: lives in `/domain/` (lint pass), encodes invariants, type-safe API, unit conversions as getters.
+Domain never imports `core/extensions/`; `arch_domain_import` = ERROR.
 
 ## Where
 
@@ -28,6 +31,27 @@ VO wins: lives in `/domain/` (lint pass), encodes invariants, type-safe API, uni
 - Shared: `lib/core/domain/values/<name>.dart`
 
 Both match `/domain/` → both allowed.
+
+## Nullability + Empty Text
+
+`null` means absence. `''` means a present empty string. Do not use `''` as a
+missing-value sentinel in domain code.
+
+| Situation | Use |
+|---|---|
+| Required ID / slug / email / display name | VO factory that trims and rejects blank |
+| Optional note / bio / description | `String?`, with blank normalized to `null` at data/notifier/import boundary |
+| Search query / form draft | non-domain state field named `query`, `searchQuery`, `draftName`, or `inputText` |
+| No items | non-null collection default `[]` / `{}` |
+
+Boundary normalization:
+
+```dart
+String? optionalTextFromInput(String input) {
+  final trimmed = input.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+```
 
 ## Distance
 
@@ -115,6 +139,31 @@ sealed class Email with _$Email {
 ```
 
 `User({required Email email})` — invalid string impossible.
+
+## Non-empty text
+
+```dart
+@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+sealed class DisplayName with _$DisplayName {
+  const DisplayName._();
+  const factory DisplayName._raw(String value) = _DisplayName;
+
+  factory DisplayName(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(input, 'input', 'DisplayName cannot be blank');
+    }
+    return DisplayName._raw(trimmed);
+  }
+
+  String get value => switch (this) {
+        _DisplayName(:final value) => value,
+      };
+}
+```
+
+No `@Default('') String name` in domain entities. Required text uses a VO;
+optional text uses `String?`.
 
 ## Decision matrix
 

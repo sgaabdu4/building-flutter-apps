@@ -1,11 +1,10 @@
 include: package:flutter_lints/flutter.yaml
 
 plugins:
+  # Stable Riverpod lint pin verified for Riverpod 3.3-era lint coverage.
+  # Re-check pub.dev before release when Riverpod or analyzer versions move.
+  riverpod_lint: 3.1.4
   flutter_skill_lints:
-  # Pre-release pin: latest stable is 3.1.3; use 3.1.4-dev.3 for Riverpod 3.3-era lint coverage.
-  # Verify pub.dev before ship. Promote to a stable release when compatible.
-  # Pre-release silently adopts dev behavior — review.
-  riverpod_lint: 3.1.4-dev.3
 
 analyzer:
   exclude:
@@ -38,6 +37,17 @@ linter:
     - prefer_const_literals_to_create_immutables
     - prefer_final_locals
     - avoid_redundant_argument_values
+    # Effective Dart Design additions not covered by flutter_lints.
+    - always_declare_return_types
+    - type_annotate_public_apis
+    - avoid_positional_boolean_parameters
+    - avoid_equals_and_hash_code_on_mutable_classes
+    - avoid_null_checks_in_equality_operators
+    - avoid_private_typedef_functions
+    - avoid_returning_this
+    - avoid_setters_without_getters
+    - prefer_mixin
+    - use_to_and_as_if_applicable
     - avoid_dynamic_calls
     - avoid_print
     - avoid_void_async

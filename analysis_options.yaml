@@ -3,5 +3,6 @@
 analyzer:
   exclude:
     - references/analysis_options.yaml
+    - templates/**
     - "**/*.g.dart"
     - "**/*.freezed.dart"

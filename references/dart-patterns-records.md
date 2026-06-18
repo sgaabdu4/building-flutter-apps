@@ -1,16 +1,16 @@
 # Dart Patterns & Records
 
+## Read first
+
+1. Multiple return values → Records, not `Map<String, dynamic>` or parallel lists.
+2. Multiple ID types → extension types, not raw `String`.
+3. Pattern null-bind with `if (value case final v?)`; never `value!`.
+4. Switch cases use guard clauses; do not nest if/else in case bodies.
+
 ## Trigger
 
 Signals: Records, pattern matching, extension types, destructuring, sealed class switch
-Before generating code in this area, output verbatim: `Reading: dart-patterns-records.md`
-
-
-Rules:
-1. MUST use Records for multiple return values — NEVER `Map<String, dynamic>` or parallel lists.
-2. MUST use Extension Types for entity IDs — NEVER raw `String` when multiple ID types coexist.
-3. MUST use guard clauses in switch — NEVER nest if-else in case body.
-4. MUST use `if (value case final v?)` for null-binding — NEVER value!.
+Before code: output `Reading: dart-patterns-records.md`
 
 ## Records (Dart 3.0)
 
@@ -41,7 +41,7 @@ final (:items, :hasMore) = await repo.fetchPage(1);
 
 ## Extension Types (Dart 3.3)
 
-Zero-cost compile-time wrapper. No runtime overhead — identical to underlying type at runtime.
+Compile-time wrapper; runtime = underlying type.
 
 ```dart
 extension type UserId(String value) {
@@ -149,11 +149,5 @@ final children = [
   ...?conditionalItems,   // spread skipped if null
   const FooterWidget(),
 ];
-
-## Recap
-
-1. MUST use Records for multiple return values — NEVER `Map<String, dynamic>` or parallel lists. Records are typed, destructurable, and require no class definition.
-2. MUST use Extension Types for entity IDs — NEVER raw `String` when multiple ID types coexist. Extension types give compile-time safety at zero runtime cost.
-3. MUST use `if (value case final v?)` for null-binding — NEVER `value!`. Force-unwrap bypasses the type system and throws at runtime instead of failing at compile time.
 
 ```

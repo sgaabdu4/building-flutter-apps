@@ -312,7 +312,7 @@ EOF
 
 # Route fallback helper
 cat > "$TEST_DIR/lib/fallback_route_call.dart" <<'EOF'
-void popOrGo(fallbackRoute) {
+void popWithFallback(fallbackRoute) {
   fallbackRoute.go(this);
 }
 EOF

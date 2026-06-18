@@ -1,9 +1,17 @@
 # Layout Diagnostics
 
+## Read first
+
+1. Fix the first layout exception; later errors are usually cascades.
+2. Constraints go down, sizes go up, parent sets position.
+3. Never use `shrinkWrap: true` to silence unbounded height; add constraints or slivers.
+4. `Expanded`/`Flexible` only under `Row`/`Column`/`Flex`; `Positioned` only under `Stack`.
+5. Adapt via `LayoutBuilder`/`MediaQuery.sizeOf`, not device type/orientation.
+
 ## Trigger
 
 Signals: layout exception, unbounded height, viewport, LayoutBuilder, Expanded, Flexible
-Before generating code in this area, output verbatim: `Reading: layout-diagnostics.md`
+Before code: output `Reading: layout-diagnostics.md`
 
 
 ## Core Rule
@@ -13,13 +21,13 @@ sets position.
 
 ## Error Map
 
-| Error | Usual cause | Preferred fix |
+| Error | Check | Fix |
 |---|---|---|
 | `Vertical viewport was given unbounded height` | `ListView`/`GridView` inside unconstrained `Column` | Use `Expanded`, `Flexible`, fixed constraints, or slivers |
 | `InputDecorator cannot have an unbounded width` | `TextField` inside unconstrained `Row` | Wrap field in `Expanded` or `Flexible` |
 | `RenderFlex overflowed` | Row/Column child wider/taller than available space | Constrain the child, allow wrapping, or change layout at breakpoint |
 | `Incorrect use of ParentDataWidget` | `Expanded`, `Flexible`, or `Positioned` under wrong parent | Move it directly under `Row`/`Column`/`Flex` or `Stack` |
-| `RenderBox was not laid out` | Cascading symptom after earlier constraint failure | Fix the first constraint error in logs |
+| `RenderBox was not laid out` | Earlier constraint error | Fix first layout error in logs |
 
 ## List in Column
 
@@ -171,16 +179,10 @@ Material 3 width classes:
 
 ## Checklist
 
-- [ ] First layout error, not cascading symptom, was fixed.
+- [ ] First layout error was fixed.
 - [ ] Scrollables inside columns have real constraints.
 - [ ] Text fields and long text inside rows are constrained.
 - [ ] ParentDataWidgets are direct children of the required parent.
 - [ ] Layout decisions use `LayoutBuilder` or `MediaQuery.sizeOf`, not device type.
 - [ ] Compact, medium, expanded, keyboard-open, and large text-scale states were checked.
-
-## Recap
-
-1. Fix the FIRST layout exception in the log — cascading errors below it are symptoms, not causes. Fixing a downstream error while the root persists wastes time.
-2. NEVER use `shrinkWrap: true` to silence unbounded-height errors — add real constraints or switch to Slivers. `shrinkWrap` forces a full layout pass and is prohibited project-wide.
-3. Base adaptive layout decisions on `LayoutBuilder` or `MediaQuery.sizeOf` — NEVER on device type or orientation. Screen size is the correct input; platform/orientation assumptions break on foldables and tablets.
 

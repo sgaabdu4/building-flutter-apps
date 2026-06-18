@@ -1,11 +1,17 @@
 # Extensions & Utilities
 
-Context/type extensions + utilities. Kill boilerplate. Snackbars use `SnackBarUtils`, not `ScaffoldMessenger.of(context)`.
+## Read first
+
+1. Primitive ops live in `core/extensions/`; never inline repeated format/parse/math/string/date code.
+2. Domain never imports `core/extensions/`; use entity getter or VO.
+3. Widgets use context extensions (`context.colors`, `context.textTheme`, `context.isCurrentModalRoute`, etc.).
+4. Notifiers/services own snackbars; widgets call notifier methods, not `ScaffoldMessenger`.
+5. Search/API inputs use `Debouncer` (500ms min).
 
 ## Trigger
 
 Signals: SnackBarUtils, context extensions, Debouncer, Validators, extension types, Result type, **any** `DateTime` / `String` / `int` / `double` / `num` / `Duration` formatting / parsing / arithmetic / capitalize / titleCase / truncate / initials / timeAgo / diff / startOfDay / endOfDay / isToday / clamped / pluralized / asCurrency / percent / toFixed / inWords / `NumberFormat` / `DateFormat` / locale-format.
-Before generating code in this area, output verbatim: `Reading: extensions-utilities.md`
+Before code: output `Reading: extensions-utilities.md`
 
 ## SSOT rule
 
@@ -27,31 +33,18 @@ Primitive manipulation lives in `core/extensions/`. NEVER inline at call site. A
 | `DateTime(d.year, d.month, d.day)` for day boundary     | `d.startOfDay` / `d.endOfDay`|
 | Manual `year == now.year && month == ...` for today     | `d.isToday` / `d.isYesterday`|
 | `NumberFormat.currency(...).format(amount)` ad-hoc      | `amount.asCurrency()`        |
+| `DateFormat('MM/dd').format(date)` or `date.formatted(pattern: 'MM/dd')` | semantic `DateTime` getter owned by `date_time_extensions.dart` |
 | `(value * 100).toStringAsFixed(n) + '%'`                | `value.asPercent(n)`         |
 | `value.clamp(lo, hi)` repeated at call site             | `value.clamped(lo, hi)`      |
 | `count == 1 ? 'item' : 'items'`                         | `count.pluralized('item')`   |
+| `items.indexBy((item) => item.id)[id]` for one-off lookup | `items.lookupByKey(id, (item) => item.id)` |
+| `items.indexPositionsBy((item) => item.id)[id] ?? -1`    | `items.indexOfByKey(id, (item) => item.id)` |
 | `Theme.of(context).colorScheme` / `MediaQuery.sizeOf(context)` | `context.colors` / `context.screenSize` |
+| `ModalRoute.of(context)?.isCurrent` / `ModalRoute.isCurrentOf(context)` | `context.isCurrentModalRoute` |
 | Raw key/id/limit/threshold literals                     | named constants, VOs, or semantic helpers |
 
 Missing case? Add to extension file in `core/extensions/`, export in barrel, then call. Don't inline "just this once".
 
-
-## Contents
-
-- [Context Extensions](#context-extensions)
-- [String Extensions](#string-extensions)
-- [DateTime Extensions](#datetime-extensions)
-- [Int Extensions](#int-extensions)
-- [Double / Num Extensions](#double--num-extensions)
-- [Duration Extensions](#duration-extensions)
-- [Iterable Extensions](#iterable-extensions)
-- [Widget List Extensions](#widget-list-extensions)
-- [SnackBar Utility](#snackbar-utility)
-- [Debouncer](#debouncer)
-- [Validators](#validators)
-- [Result Type](#result-type)
-- [Extension Types](#extension-types)
-- [Barrel Export](#barrel-export)
 
 ## Context Extensions
 
@@ -67,6 +60,11 @@ extension ContextExtensions on BuildContext {
   EdgeInsets get viewInsets => MediaQuery.viewInsetsOf(this);
   double get screenWidth => MediaQuery.sizeOf(this).width;
   double get screenHeight => MediaQuery.sizeOf(this).height;
+  bool get isCurrentModalRoute {
+    final isCurrent = ModalRoute.isCurrentOf(this);
+    if (isCurrent == null) return true;
+    return isCurrent;
+  }
 
   bool get isCompact => screenWidth < 600;
   bool get isMedium => screenWidth >= 600 && screenWidth < 840;
@@ -191,7 +189,8 @@ extension DateTimeExtensions on DateTime {
     return '${diff.inDays ~/ 365}y ago';
   }
 
-  /// Locale format via `intl`. Default `yMMMd` (e.g. `Jan 5, 2026`).
+  /// Locale format via `intl`. Keep raw pattern literals inside this file or
+  /// pass a named constant from a dedicated owner.
   String formatted({String pattern = 'yMMMd', String? locale}) =>
       DateFormat(pattern, locale).format(this);
 
@@ -201,7 +200,7 @@ extension DateTimeExtensions on DateTime {
 }
 ```
 
-Pattern reference: `intl` `DateFormat`. Skill convention — date display ALWAYS via `.formatted(...)` / `.asDate` / `.asTime`, never inline `DateFormat(...)` at widget/notifier site.
+Pattern reference: `intl` `DateFormat`. Skill convention — date display call sites use semantic getters (`.asDate`, `.asTime`, product-specific compact date getters, etc.). Never inline `DateFormat(...)` or `.formatted(pattern: ...)` at widget/notifier sites.
 
 ## Int Extensions
 
@@ -601,10 +600,3 @@ export 'duration_extensions.dart';
 export 'iterable_extensions.dart';
 export 'widget_extensions.dart';
 ```
-
-## Recap
-
-1. Notifiers and services own snackbar side effects — widgets MUST NOT call `SnackBarUtils.show*` or `ScaffoldMessenger.of(context)` directly. Widget callbacks dispatch to notifier methods only.
-2. MUST use context extensions (`context.theme`, `context.colors`, `context.textTheme`, `context.screenWidth`) — NEVER call `Theme.of(context)` or `MediaQuery.sizeOf(context)` inline in widget build methods.
-3. MUST use `Debouncer` for search inputs with a minimum 500 ms duration. NEVER trigger API calls on every keystroke without debouncing.
-4. MUST use extensions for `DateTime` / `String` / `int` / `double` / `num` / `Duration` manipulation — capitalize / titleCase / truncate / timeAgo / startOfDay / asCurrency / asPercent / clamped / pluralized / inWords / formatted. NEVER inline at call site. Missing case? Add to `core/extensions/<type>_extensions.dart`, export in barrel, then call.

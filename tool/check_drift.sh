@@ -159,10 +159,10 @@ rule_a4_raw() {
     "Use AppException or structured error types, not e.toString()"
 }
 
-# ── Rule: V7 — riverpod_lint pre-release pin must have comment ───────────────
+# ── Rule: V7 — riverpod_lint prerelease pin must have comment ────────────────
 rule_v7() {
   local hits
-  # Detect pre-release version pins (e.g. riverpod_lint: 2.3.4-dev.1)
+  # Detect prerelease version pins (e.g. riverpod_lint: 2.3.4-dev.1)
   # The preceding line must start with '#' (a comment)
   # We use awk to do context-aware checking
   local tmp_hits=""
@@ -195,9 +195,9 @@ rule_v7() {
   # Strip leading newline
   hits="${tmp_hits#$'\n'}"
   emit_tap "v7" \
-    "riverpod_lint pre-release pin must have preceding comment line" \
+    "riverpod_lint prerelease pin must have preceding comment line" \
     "$hits" \
-    "Add '# Pinned pre-release for X reason' on the line before riverpod_lint: X.Y.Z-dev"
+    "Add '# Pinned prerelease for X reason' on the line before riverpod_lint: X.Y.Z-dev"
 }
 
 # ── Rule: B4 — @Riverpod(keepAlive:true) must not be followed by family decl ─
@@ -334,39 +334,25 @@ rule_v6() {
     "Add '// experimental API' or prose warning near Mutation< usage"
 }
 
-# ── Rule: V11 — runZonedGuarded must include legacy warning nearby ────────────
+# ── Rule: V11 — runZonedGuarded is forbidden ─────────────────────────────────
 rule_v11() {
   local tmp_hits=""
   for scanpath in "${SCAN_PATHS[@]}"; do
     if [ -d "$scanpath" ]; then
       while IFS= read -r f; do
-        result=$(grep -n 'runZonedGuarded' "$f" 2>/dev/null | while IFS=: read -r lineno rest; do
-          start=$(( lineno - 10 ))
-          end=$(( lineno + 10 ))
-          [ "$start" -lt 1 ] && start=1
-          if ! awk "NR>=$start && NR<=$end" "$f" | grep -qi 'legacy'; then
-            echo "$f:$lineno: runZonedGuarded without 'legacy' context nearby"
-          fi
-        done || true)
+        result=$(grep -n 'runZonedGuarded' "$f" 2>/dev/null || true)
         [ -n "$result" ] && tmp_hits="$tmp_hits"$'\n'"$result"
       done < <(find "$scanpath" -type f -name '*.md' 2>/dev/null)
     elif [ -f "$scanpath" ]; then
-      result=$(grep -n 'runZonedGuarded' "$scanpath" 2>/dev/null | while IFS=: read -r lineno rest; do
-        start=$(( lineno - 10 ))
-        end=$(( lineno + 10 ))
-        [ "$start" -lt 1 ] && start=1
-        if ! awk "NR>=$start && NR<=$end" "$scanpath" | grep -qi 'legacy'; then
-          echo "$scanpath:$lineno: runZonedGuarded without 'legacy' context nearby"
-        fi
-      done || true)
+      result=$(grep -n 'runZonedGuarded' "$scanpath" 2>/dev/null || true)
       [ -n "$result" ] && tmp_hits="$tmp_hits"$'\n'"$result"
     fi
   done
   hits="${tmp_hits#$'\n'}"
   emit_tap "v11" \
-    "runZonedGuarded must appear with 'legacy' context within ±10 lines" \
+    "runZonedGuarded must not appear" \
     "$hits" \
-    "Add note that runZonedGuarded is legacy — prefer FlutterError.onError + PlatformDispatcher"
+    "Use Crash.init() before runApp instead"
 }
 
 # ── Rule: D5 — README.md must have Core Stack table; SKILL.md must link to it ─

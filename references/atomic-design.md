@@ -1,27 +1,17 @@
 # Atomic Design
 
-Build UI from composable pieces: tokens → atoms → molecules → organisms → templates → pages.
+## Read first
+
+1. Use tokens for spacing/colors/radii/type/icon sizes. No raw literals/styles.
+2. Atoms/molecules: `const`, no provider reads. Provider access only organisms/pages.
+3. Use `context.textTheme`/`context.colors`, not raw `TextStyle()`/`Color()`.
+4. Feature widgets stay in feature; shared widgets move to `core/widgets/` after 2+ feature uses.
 
 ## Trigger
 
 Signals: atomic design, atoms, molecules, organisms, design tokens, widget hierarchy
-Before generating code in this area, output verbatim: `Reading: atomic-design.md`
+Before code: output `Reading: atomic-design.md`
 
-
-## Contents
-
-- [Rules — NEVER Violate](#rules--never-violate)
-- [Hierarchy](#hierarchy)
-- [Tokens](#tokens)
-- [Atoms](#atoms)
-- [Molecules](#molecules)
-- [Organisms](#organisms)
-- [Templates](#templates)
-- [Pages](#pages)
-- [Placement Rules](#placement-rules)
-- [Promotion Rules](#promotion-rules)
-- [Accessibility](#accessibility)
-- [Theming](#theming)
 
 ## Rules — NEVER Violate
 
@@ -31,17 +21,6 @@ Before generating code in this area, output verbatim: `Reading: atomic-design.md
 4. **MUST** use `context.textTheme` and `context.colors` — NEVER raw `TextStyle()` or `Color()`.
 5. **MUST** place shared widgets in `core/widgets/`, feature-specific in `features/x/presentation/widgets/`.
 6. **MUST** promote widget to `core/widgets/` when 2+ features use it w/ no feature-specific logic.
-
-```mermaid
-graph LR
-  T[Tokens<br/>colors, spacing, radii] --> A[Atoms<br/>buttons, badges]
-  A --> M[Molecules<br/>tiles, cards]
-  M --> O[Organisms<br/>grids, headers]
-  O --> TP[Templates<br/>layout slots]
-  TP --> P[Pages<br/>screens + state]
-```
-
-**Contents:** [Hierarchy](#hierarchy) | [Tokens](#tokens) | [Atoms](#atoms) | [Molecules](#molecules) | [Organisms](#organisms) | [Templates](#templates) | [Pages](#pages) | [Placement Rules](#placement-rules) | [Promotion Rules](#promotion-rules) | [Accessibility](#accessibility) | [Theming](#theming)
 
 ## Hierarchy
 
@@ -200,6 +179,7 @@ Common atoms: `AppBadge`, `AppIconButton`, `AppTextField`, `LoadingIndicator`, `
 
 - MUST compose atoms + basic layout/Material widgets (`ListTile`, `Card`, `Column`, `Row`)
 - MUST wrap frequently restyled Material components as atoms first
+- MUST NOT instantiate raw `Material(...)`, `Ink(...)`, or `InkWell(...)`; surface/ink/tap policy belongs in atoms, app shell, or a dedicated surface primitive. Lint: `widget_material_boundary`
 - NEVER use `ref.watch` or `ref.read`
 - MUST accept data via constructor
 
@@ -290,6 +270,7 @@ class StatCard extends StatelessWidget {
 
 - May use `ref.watch` + `ref.read` (not required — data-only organisms valid)
 - Compose molecules + atoms
+- MUST NOT instantiate raw `Material(...)`, `Ink(...)`, or `InkWell(...)`; compose an owned atom/surface primitive instead
 - Represent distinct page section (header, grid, comment list)
 - Feature-specific: `features/x/presentation/widgets/`
 - Shared: `core/widgets/organisms/`
@@ -515,9 +496,3 @@ Container(color: context.colors.primary)
 ```
 
 Exceptions: `SemanticColors` + `Spacing` tokens — static constants independent of theme mode.
-
-## Recap
-
-1. MUST use design tokens for ALL measurements — NEVER hardcode spacing, colors, radii, font sizes, or icon sizes. Use `Spacing.s16`, `context.colors.primary`, `Radii.rounded12`.
-2. NEVER use `ref.watch` or `ref.read` in atoms, molecules, or templates — provider access ONLY in organisms and pages.
-3. MUST use `const` constructors on all atoms and molecules.
