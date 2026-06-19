@@ -566,7 +566,7 @@ def main() -> None:
     )
     parser.add_argument("--skill-path", required=True, help="Path to skill directory containing SKILL.md")
     parser.add_argument("--eval-set", required=True, help="Path to evals.json")
-    parser.add_argument("--workspace-root", default="/Users/abid/Workspaces/skills/building-flutter-apps-workspace",
+    parser.add_argument("--workspace-root", default=".",
                         help="cwd for answerer subprocess (must have .claude/)")
     parser.add_argument("--num-workers", type=int, default=1)
     parser.add_argument("--timeout", type=int, default=240, help="Answerer timeout in seconds")
