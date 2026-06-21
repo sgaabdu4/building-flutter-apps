@@ -1,0 +1,47 @@
+{
+  "runner": "codex",
+  "mode": "trigger",
+  "model": "gpt-5.4-mini",
+  "judge_model": null,
+  "skill_name": "building-flutter-apps",
+  "skill_path": "/Users/abid/Workspaces/skills/building-flutter-apps-all/building-flutter-apps",
+  "eval_set": "/Users/abid/Workspaces/skills/building-flutter-apps-all/building-flutter-apps/evals/trigger-eval.json",
+  "summary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "false_negatives": 0,
+    "false_positives": 0,
+    "duration_seconds": 15.0,
+    "tokens_used": 37690
+  },
+  "results": [
+    {
+      "query": "I'm building a new user profile feature for my Flutter app \u2014 it needs a ProfileNotifier to manage the state, a Freezed entity for the user data, and a repository that fetches from a REST API. Can you set up the feature module with proper architecture layers?",
+      "should_trigger": true,
+      "pass": true,
+      "trigger_rate": 1.0,
+      "triggers": 1,
+      "runs": 1,
+      "reasons": [
+        "Mentions Flutter, ProfileNotifier, Freezed, and repository architecture, so the Flutter skill is required."
+      ],
+      "duration_seconds": 7.25,
+      "tokens_used": 18920
+    },
+    {
+      "query": "my riverpod provider keeps rebuilding everything when only one field changes, how do I use select() to minimize rebuilds in leaf widgets? I'm using riverpod 3.x with codegen",
+      "should_trigger": true,
+      "pass": true,
+      "trigger_rate": 1.0,
+      "triggers": 1,
+      "runs": 1,
+      "reasons": [
+        "Yes. The query explicitly mentions Riverpod and codegen, which are direct triggers for the building-flutter-apps skill."
+      ],
+      "duration_seconds": 7.75,
+      "tokens_used": 18770
+    }
+  ]
+}

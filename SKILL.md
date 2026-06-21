@@ -1,21 +1,23 @@
 ---
 name: building-flutter-apps
 description: >-
-  CRITICAL — invoke this skill BEFORE answering any Flutter or Dart question.
-  Do NOT answer Flutter/Dart questions from training knowledge alone. The
-  skill encodes project-specific architecture rules and anti-patterns that
-  supersede public Flutter best practices; answering without it WILL produce
-  code that fails review. Invoke for any prompt mentioning Flutter, Dart,
+  CRITICAL — invoke this skill BEFORE answering any Flutter app, Flutter
+  package, or Flutter-architecture Dart question. Do NOT answer Flutter/Dart
+  app questions from training knowledge alone. The skill encodes
+  project-specific architecture rules and anti-patterns that supersede public
+  Flutter best practices; answering without it WILL produce code that fails
+  review. Invoke for any prompt mentioning Flutter, Dart in a Flutter app,
   Riverpod, Freezed, GoRouter, Hive, Notifier, AsyncNotifier,
   AsyncValue, ref.watch, ref.read, ref.mounted, context.mounted, BuildContext,
   Widget, ConsumerWidget, repository, datasource, sealed class, copyWith,
   json_serializable, build_runner, AppLocalizations, gen-l10n,
   firebase_messaging, Crashlytics, pubspec.yaml, build.yaml,
-  analysis_options.yaml, .dart files. SKIP entirely (do NOT invoke) for:
+  analysis_options.yaml, .dart files in Flutter apps. SKIP entirely (do NOT invoke) for:
   React, React Native, Next.js, SwiftUI, native Android/iOS, flutter_bloc,
   BLoC, Cubit, GetX, Provider package, ChangeNotifierProvider, MobX, Redux,
-  pure-Dart CLI, shelf, Dart server. Invoke first; base your answer on the
-  skill.
+  pure-Dart CLI, pure-Dart libraries/packages, pure-Dart algorithms/business
+  logic/unit tests with no Flutter app/framework/Riverpod context, shelf, Dart
+  server. Invoke first; base your answer on the skill.
 license: MIT
 metadata:
   author: sgaabdu4

@@ -136,7 +136,7 @@ Check root + local Navigator stacks before typed fallback.
 ```dart
 extension GoRouterPopX on BuildContext {
   bool popIfCan<T extends Object?>([T? result]) {
-    if (!mounted) return false;
+    if (!this.mounted) return false;
     final rootNavigator = Navigator.maybeOf(this, rootNavigator: true);
     if (rootNavigator != null && rootNavigator.canPop()) {
       rootNavigator.pop<T>(result);

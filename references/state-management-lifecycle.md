@@ -33,8 +33,10 @@ Future<bool> save(Entity entity) async {
   } catch (e, s) {
     if (!ref.mounted) return false;
     Crash.error(e, s);
-    SnackBarUtils.showError(...);
-    state = state.copyWith(isSaving: false); // preserve, allow retry
+    state = state.copyWith(
+      isSaving: false,
+      saveError: SaveError.from(e), // UI observes and shows feedback
+    ); // preserve, allow retry
     return false;
   }
 }

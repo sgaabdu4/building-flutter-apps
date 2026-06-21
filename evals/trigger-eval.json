@@ -74,5 +74,25 @@
   {
     "query": "Can you help me set up a SwiftUI app with MVVM architecture and Combine for reactive data binding? I'm building an iOS-only app",
     "should_trigger": false
+  },
+  {
+    "query": "My Flutter root widget returns MaterialApp.router and I'm starting sync services from build with ref.read. How should I bootstrap providers without app-shell side effects?",
+    "should_trigger": true
+  },
+  {
+    "query": "For flutter_local_notifications on Android, my reminder service launches REQUEST_SCHEDULE_EXACT_ALARM with AndroidIntent. What's the right exact alarm permission flow?",
+    "should_trigger": true
+  },
+  {
+    "query": "In a Riverpod ConsumerStatefulWidget I have ProviderSubscription fields, local provider-derived caches, and an isSaving flag for a notifier mutation. Can you review the lifecycle/state ownership?",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm writing a native Android Kotlin app and need to request SCHEDULE_EXACT_ALARM permission with an intent to settings. No Flutter or Dart involved.",
+    "should_trigger": false
+  },
+  {
+    "query": "I have a Flutter widget file with _buildHeader helpers, private ConsumerWidget classes, and visible strings hardcoded in Text widgets. Please refactor it to match the app's Riverpod/Freezed conventions.",
+    "should_trigger": true
   }
 ]

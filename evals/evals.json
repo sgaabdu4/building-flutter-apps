@@ -354,6 +354,132 @@
         "Uses pattern matching (switch) on CheckoutState variants",
         "Step transitions are protected: either GoRouter redirect guards prevent accessing step URLs directly, or notifier enforces ordering via type checks when using in-screen state machine"
       ]
+    },
+    {
+      "id": 16,
+      "prompt": "Review this settings screen snippet and fix the skill-rule issues: it uses `Text('Save')`, `Text('Settings')`, a `SettingsStrings.title` constant for visible copy, and `context.l10n.saveButton` chained directly inside build. It is a Flutter app using gen-l10n.",
+      "expected_output": "Moves all user-facing strings to gen-l10n/AppLocalizations, obtains `final l10n = context.l10n;` at the top of build, uses l10n fields for visible copy, and keeps constants only for non-user-facing IDs.",
+      "files": [],
+      "expectations": [
+        "Requires AppLocalizations/gen-l10n for every user-facing string",
+        "Replaces literal visible strings such as `Text('Save')` and `Text('Settings')`",
+        "Rejects `SettingsStrings` constants for user-facing copy",
+        "Gets `final l10n = context.l10n;` at the top of build",
+        "Does not chain `context.l10n.someKey` directly at call sites",
+        "Allows constants only for non-user-facing IDs or keys"
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "My root App widget returns MaterialApp.router. I currently call `ref.read(syncServiceProvider).start()` and `ref.read(notificationBootstrapProvider).initialize()` inside build before returning the app. What's the skill-approved way to bootstrap app-wide services?",
+      "expected_output": "Keeps the app shell declarative. Uses provider graph/watch for eager initialization and root-level ref.listen only for UI side effects, not imperative service starts inside the MaterialApp owner build.",
+      "files": [],
+      "expectations": [
+        "Identifies imperative bootstrap calls in the MaterialApp owner build as an app-shell boundary violation",
+        "Keeps the widget returning MaterialApp/CupertinoApp/WidgetsApp declarative",
+        "Uses ref.watch for eager provider initialization where stable readiness can be selected",
+        "Uses ref.listen at the root of build only for UI side effects such as navigation, dialogs, snackbars, logging, or splash removal",
+        "Does not put service start/init side effects directly in build",
+        "Mentions moving startup ownership into providers/services owned by the provider graph"
+      ]
+    },
+    {
+      "id": 27,
+      "prompt": "I need to request Android exact alarm permission for scheduled reminders with flutter_local_notifications. My current code launches `android.settings.REQUEST_SCHEDULE_EXACT_ALARM` using AndroidIntent. Can you fix the approach?",
+      "expected_output": "Uses AndroidFlutterLocalNotificationsPlugin.canScheduleExactNotifications and requestExactAlarmsPermission, avoids manual AndroidIntent settings launches, and handles PlatformException at the service or repository boundary.",
+      "files": [],
+      "expectations": [
+        "Uses AndroidFlutterLocalNotificationsPlugin.canScheduleExactNotifications()",
+        "Calls requestExactAlarmsPermission() when permission is needed",
+        "Rejects launching android.settings.REQUEST_SCHEDULE_EXACT_ALARM manually with AndroidIntent",
+        "Explains the plugin handles the app-specific settings intent and re-checks permission on return",
+        "Catches PlatformException at a service or repository boundary",
+        "Returns a deterministic failure state instead of leaking platform exceptions into UI/notifier code"
+      ]
+    },
+    {
+      "id": 28,
+      "prompt": "Review this local notifications code: `flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();` It works, but our lints complain. What should I do?",
+      "expected_output": "Resolves the nullable platform implementation into a local variable, handles null explicitly, then calls platform-specific members. It avoids direct ?. or ! chaining off resolvePlatformSpecificImplementation.",
+      "files": [],
+      "expectations": [
+        "Explains that resolvePlatformSpecificImplementation returns a nullable platform implementation",
+        "Assigns the result to a local variable or narrow helper getter",
+        "Handles null explicitly before calling platform-specific members",
+        "Does not chain directly into `?.requestNotificationsPermission()`",
+        "Does not use `!.requestNotificationsPermission()`",
+        "Shows a deterministic null branch such as returning false or unsupported"
+      ]
+    },
+    {
+      "id": 29,
+      "prompt": "I have a UserSettingsNotifier that imports shared_preferences and calls SharedPreferences.getInstance() directly. For tests, the repository constructor has `SharedPreferences? prefs` and falls back to `SharedPreferences.getInstance()` when null. Please refactor the ownership model.",
+      "expected_output": "Moves SharedPreferences access behind a LocalUserSettingsDatasource, called by a repository. Notifiers do not import storage SDKs. Dependencies are required and wired at the provider/composition root without nullable fallback constructors.",
+      "files": [],
+      "expectations": [
+        "Moves SharedPreferences SDK calls into a LocalUserSettingsDatasource or equivalent local datasource",
+        "Repository depends on the local datasource interface rather than calling SharedPreferences directly",
+        "Notifier does not import shared_preferences or call storage SDK APIs",
+        "Removes nullable dependency fallback such as `prefs ?? SharedPreferences.getInstance()`",
+        "Requires dependencies to be explicitly wired at the provider/composition root",
+        "Uses ref.read for stable infrastructure dependencies rather than ref.watch unless output is intentionally reactive"
+      ]
+    },
+    {
+      "id": 30,
+      "prompt": "My ConsumerStatefulWidget keeps `late List<Product> _productsCache`, `Map<String, Product> _byId`, a `ProviderSubscription`, and a local `_isSaving` flag for a provider-owned save action. How should this be modeled?",
+      "expected_output": "Keeps ConsumerState for UI lifecycle handles only. Moves provider-derived caches and indexes to computed providers, moves mutation status into durable provider state, and avoids ref.listenManual/ProviderSubscription fields.",
+      "files": [],
+      "expectations": [
+        "States that ConsumerState may own UI lifecycle handles only, such as controllers, focus, or animation handles",
+        "Rejects provider-derived cache/snapshot/memo/index fields in ConsumerState",
+        "Moves product list and by-id projections to computed providers or entity/value getters as appropriate",
+        "Rejects ProviderSubscription fields and ref.listenManual for provider-derived state",
+        "Moves `_isSaving` or `_isSubmitting` into provider-owned mutation state",
+        "Does not recommend Expando or top-level side tables for derived provider data"
+      ]
+    },
+    {
+      "id": 31,
+      "prompt": "Review this Flutter widget file. It has `_buildHeader()`, `_buildSaveButton()`, a top-level `formatDate(DateTime d)`, and a private `_ProfileHeader extends ConsumerWidget`. What should change under the skill?",
+      "expected_output": "Extracts build helpers to public widget classes, marks file-internal widgets visibleForTesting when needed, moves primitive/date formatting to core extensions, and avoids top-level helper functions in widget files.",
+      "files": [],
+      "expectations": [
+        "Rejects `_buildXxx()` widget helper methods",
+        "Extracts UI chunks to public widget classes",
+        "Rejects private widget classes such as `_ProfileHeader extends ConsumerWidget`",
+        "Allows private State subclasses as the Flutter convention exception only",
+        "Moves DateTime formatting to core/extensions rather than a top-level widget-file helper",
+        "Uses @visibleForTesting for file-internal widgets when they remain file scoped"
+      ]
+    },
+    {
+      "id": 32,
+      "prompt": "I have domain entities `Clinic`, `Patient`, and `Appointment` that all store raw `String id`, `String phoneNumber`, and `double distanceMeters`. Some constructors use empty string defaults for missing values. Should I keep primitives or create something else?",
+      "expected_output": "Introduces sealed Freezed value objects for repeated domain primitives and validates required domain text by construction. Hive/data models may keep primitives; mappers bridge to domain value objects.",
+      "files": [],
+      "expectations": [
+        "Identifies repeated domain primitives as value-object candidates",
+        "Creates sealed Freezed value objects in /domain/values/",
+        "Rejects empty-string defaults for required domain text",
+        "Validates or normalizes raw values before domain entity creation",
+        "Keeps Hive/data models primitive when needed",
+        "Uses mappers to bridge data primitives to domain value objects"
+      ]
+    },
+    {
+      "id": 33,
+      "prompt": "My app state has `List<Order>? orders`, `String? statusLabel`, `bool? isActive`, and UI code like `orders ?? []`, `statusLabel ?? ''`, and `isActive == true ? '1' : '0'`. It made rendering easy. Is that okay?",
+      "expected_output": "Treats nullability as semantic. Uses non-null collections with empty defaults, explicit sealed/AsyncValue state when not-loaded differs from empty, value objects for required strings, and rejects silent null/string/bool fallbacks.",
+      "files": [],
+      "expectations": [
+        "Explains that nullability must represent a real semantic absence",
+        "Uses non-null collections with empty defaults when empty is a loaded state",
+        "Uses sealed state or AsyncValue when not-loaded differs from loaded-empty",
+        "Rejects `value ?? ''` and `value ?? []` as silent fallbacks when they hide state",
+        "Rejects bool/string sentinel conversions such as `flag ? '1' : '0'` for domain state",
+        "Recommends required domain strings be validated value objects rather than nullable strings with UI fallbacks"
+      ]
     }
   ]
 }

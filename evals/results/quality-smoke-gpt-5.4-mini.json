@@ -1,0 +1,47 @@
+{
+  "runner": "codex",
+  "mode": "quality",
+  "model": "gpt-5.4-mini",
+  "judge_model": "gpt-5.4-mini",
+  "skill_name": "building-flutter-apps",
+  "skill_path": "/Users/abid/Workspaces/skills/building-flutter-apps-all/building-flutter-apps",
+  "eval_set": "/Users/abid/Workspaces/skills/building-flutter-apps-all/building-flutter-apps/evals/evals.json",
+  "summary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "expectations_met": 5,
+    "expectations_total": 6,
+    "mean_expectation_rate": 0.8333,
+    "duration_seconds": 119.89,
+    "tokens_used": 59206
+  },
+  "results": [
+    {
+      "id": 16,
+      "prompt": "Review this settings screen snippet and fix the skill-rule issues: it uses `Text('Save')`, `Text('Settings')`, a `SettingsStrings.title` constant for visible copy, and `context.l10n.saveButton` chained directly inside build. It is a Flutter app using gen-l10n.",
+      "pass": true,
+      "met": 5,
+      "total": 6,
+      "score": 0.8333,
+      "expectations_met": [
+        true,
+        true,
+        true,
+        false,
+        true,
+        true
+      ],
+      "notes": "The answer fixes the visible copy rules and avoids chaining `context.l10n.someKey` at call sites, but it does not use the explicitly required `AppLocalizations.of(context)!` binding at the top of `build`.",
+      "response_length": 1043,
+      "response_excerpt": "building-flutter-apps active. Pre-flight required.\nReading: localization.md\n\nUse ARB-backed copy and bind localizations once at the top of `build`:\n\n```dart\n@override\nWidget build(BuildContext context) {\n  final l10n = context.l10n;\n\n  return Scaffold(\n    appBar: AppBar(\n      title: Text(l10n.settingsTitle),\n    ),\n    body: ...\n    // wherever the save action is rendered\n    child: Text(l10n.saveButton),\n  );\n}\n```\n\nFixes:\n- `Text('Save')` -> `Text(l10n.saveButton)`\n- `Text('Settings')` -> `Text(l10n.settingsTitle)`\n- `SettingsStrings.title` -> do not use it for visible copy; keep `SettingsStrings` only for non-user-facing IDs, or remove it if it exists just for UI text\n- `context.l10n.saveButton` chained directly in `build` -> bind `final l10n = context.l10n;` once, then use `l10n.saveButton`\n\nAdd the title key to ARB if it does not already exist:\n\n```json\n{\n  \"settingsTitle\": \"Settings\",\n  \"@settingsTitle\": {\n    \"description\": \"Title shown on the settings screen\"\n  }\n}\n```\n\nIf `saveButton` already exists, reuse it as-is.\n",
+      "duration_seconds": 119.89,
+      "tokens_used": 59206,
+      "answer_tokens_used": 36359,
+      "judge_tokens_used": 22847,
+      "judge_returncode": 0,
+      "judge_stderr_excerpt": "    title: Text(l10n.settingsTitle),\n    ),\n    body: ...\n    // wherever the save action is rendered\n    child: Text(l10n.saveButton),\n  );\n}\n```\n\nFixes:\n- `Text('Save')` -> `Text(l10n.saveButton)`\n- `Text('Settings')` -> `Text(l10n.settingsTitle)`\n- `SettingsStrings.title` -> do not use it for visible copy; keep `SettingsStrings` only for non-user-facing IDs, or remove it if it exists just for UI text\n- `context.l10n.saveButton` chained directly in `build` -> bind `final l10n = context.l10n;` once, then use `l10n.saveButton`\n\nAdd the title key to ARB if it does not already exist:\n\n```json\n{\n  \"settingsTitle\": \"Settings\",\n  \"@settingsTitle\": {\n    \"description\": \"Title shown on the settings screen\"\n  }\n}\n```\n\nIf `saveButton` already exists, reuse it as-is.\n\n\nhook: SessionStart\nhook: SessionStart Completed\nhook: UserPromptSubmit\nhook: UserPromptSubmit Completed\ncodex\n{\"expectations_met\":[true,true,true,false,true,true],\"notes\":\"The answer fixes the visible copy rules and avoids chaining `context.l10n.someKey` at call sites, but it does not use the explicitly required `AppLocalizations.of(context)!` binding at the top of `build`.\"}\nhook: Stop\nhook: Stop Completed\ntokens used\n22,847\n"
+    }
+  ]
+}
