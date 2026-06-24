@@ -52,16 +52,19 @@ Future<void> deleteByIds(Set<String> ids) async {
 ```dart
 // Per-table delta sync:
 // 1. Read per-table lastSyncDate from settings
-// 2. If null → first sync full getAll + saveAll
+// 2. If null → first sync full getAll + mergeAll
 // 3. If exists → getUpdatedSince(lastSyncDate) + mergeAll
 // 4. getAllIds from remote, compare to local IDs, deleteByIds for missing
-// 5. Store new per-table lastSyncDate
+// 5. Store newest remote updatedAt; for a successful empty first pull, store
+//    an epoch/sentinel watermark so the next run uses delta, not another full pull.
 
 final lastTableSync = await settingsRepo.getTableSyncDate(tableKey);
+final DateTime? watermark;
 
 if (lastTableSync == null) {
   final all = await remote.getAll(userId);
-  if (all.isNotEmpty) await repo.saveAll(all.map((m) => m.toEntity()).toList());
+  if (all.isNotEmpty) await repo.mergeAll(all.map((m) => m.toEntity()).toList());
+  watermark = newestUpdatedAt(all) ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 } else {
   final changed = await remote.getUpdatedSince(userId, lastTableSync);
   if (changed.isNotEmpty) await repo.mergeAll(changed.map((m) => m.toEntity()).toList());
@@ -70,10 +73,18 @@ if (lastTableSync == null) {
   final localIds = (await repo.getAll()).map((e) => e.id).toSet();
   final deleted = localIds.difference(remoteIds);
   if (deleted.isNotEmpty) await repo.deleteByIds(deleted);
+  watermark = newestUpdatedAt(changed);
 }
 
-await settingsRepo.setTableSyncDate(tableKey, DateTimeX.nowUtc());
+if (watermark != null) {
+  await settingsRepo.setTableSyncDate(tableKey, watermark);
+}
 ```
+
+Reference/catalog data should follow the same contract: full pull only when the
+per-table marker is missing, then delta pulls on later launches. Do not force an
+`alwaysFullPull` path for normal app open; reserve explicit full refreshes for
+manual repair/admin flows.
 
 ### Per-Table Sync Date Storage
 

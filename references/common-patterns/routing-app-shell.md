@@ -89,6 +89,7 @@ Keep redirect decisions pure. The GoRouter closure should read providers, call a
 **Redirect rules for apps with multi-step setup (profile completion, roles):**
 
 - **During loading, MUST stay put.** Return `null` — NEVER bounce to splash. On web refresh, redirecting `/chat` → `/` → `/home` loses URL. One exception: authenticated users on login/signup redirect to splash.
+- **Initial sync MUST NOT hold splash.** Once auth/setup state is known, redirect from splash to the shell and keep sync/data refresh running in the background. A cover screen that waits on `InitialSyncStatus.syncing` blocks startup on network, remote query, and local merge latency. Lint: `router_splash_waits_for_initial_sync`.
 - **Auth pages MUST navigate explicitly.** Add `ref.listen(authProvider)` in login/signup pages, navigate on auth success. `refreshListenable` timing unreliable; explicit nav guarantees transition.
 - **OAuth MUST skip auth-level `isLoading`.** Use per-button loading (`isGoogleLoading`). Auth `isLoading` triggers premature splash redirect.
 - **keepAlive providers survive hot reload.** Redirect closure changes need hot restart.
@@ -270,6 +271,7 @@ if (context.canPop()) {
 | Injected router or `context.go(route.location)` usage | `router_direct_route_call` |
 | Raw `GoRouter` / `GoRoute` definitions outside the router boundary or shared test router helper | `router_raw_route_definition` |
 | Direct `Navigator` page route usage | `router_untyped_navigator_push` |
+| Splash/cover waits for initial sync | `router_splash_waits_for_initial_sync` |
 | Extra navigation wrapper around typed routes | navigation SSOT lints |
 
 ### StatefulShellRoute Tabs

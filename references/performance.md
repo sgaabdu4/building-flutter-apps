@@ -39,8 +39,9 @@ Flutter rendering/animations/slivers/isolates/app-size → see [flutter-optimiza
 14. **NEVER** allocate Map/List/Set in getters used from `build()` / `.select()` / hot notifier paths. Use computed providers/service caches, or non-const instance-owned `late final` immutable indexes; do not use top-level/global `Expando` side tables.
 15. **NEVER** do repeated id lookups with `firstWhere` / `indexWhere` / `for` loops in hot paths. Pre-index by id with `Map`.
 16. **NEVER** persist full collections after changing a subset. Write changed rows via `mergeAll` / `saveMany`; debounce draft persistence with a real `Timer` / `Debouncer` at <=50ms.
-17. **NEVER** add foreground hard sleeps or slow debounces. Search/realtime debounce <=150ms, visual animation <=120ms, persistence/hard waits <=50ms. Lint: `user_visible_duration_too_long`.
-17. **MUST** use `onReorderItem` semantics directly for `ReorderableListView`, `SliverReorderableList`, and `ReorderableList`: `newIndex` is already post-removal. Insert at `newIndex`; do not use deprecated framework `onReorder`, `newIndex > oldIndex ? newIndex + 1 : newIndex`, or `if (oldIndex < newIndex) newIndex -= 1`. Lint: `use_on_reorder_item_index_semantics`.
+17. **NEVER** block splash/cover routes on background sync, table backfill, or local merge work. Route to the shell when auth/setup is known, then hydrate data behind local state. Lint: `router_splash_waits_for_initial_sync`.
+18. **NEVER** add foreground hard sleeps or slow debounces. Search/realtime debounce <=150ms, visual animation <=120ms, persistence/hard waits <=50ms. Lint: `user_visible_duration_too_long`.
+19. **MUST** use `onReorderItem` semantics directly for `ReorderableListView`, `SliverReorderableList`, and `ReorderableList`: `newIndex` is already post-removal. Insert at `newIndex`; do not use deprecated framework `onReorder`, `newIndex > oldIndex ? newIndex + 1 : newIndex`, or `if (oldIndex < newIndex) newIndex -= 1`. Lint: `use_on_reorder_item_index_semantics`.
 
 ## Widget Rebuild Rules
 

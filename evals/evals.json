@@ -480,6 +480,20 @@
         "Rejects bool/string sentinel conversions such as `flag ? '1' : '0'` for domain state",
         "Recommends required domain strings be validated value objects rather than nullable strings with UI fallbacks"
       ]
+    },
+    {
+      "id": 34,
+      "prompt": "My Flutter app shows the branded splash for nearly a minute after sign-in because the GoRouter redirect returns null while `InitialSyncStatus.syncing`. The sync does Appwrite pulls and local merges before going to home. What should change?",
+      "expected_output": "Stops using initial sync as a splash/cover routing gate. Once auth and setup/onboarding are resolved, redirects to the authenticated shell while sync continues in the background, and fixes delta-sync watermarks so successful empty first pulls do not cause repeated full pulls.",
+      "files": [],
+      "expectations": [
+        "Identifies waiting on InitialSyncStatus.syncing in router redirect as the startup blocker",
+        "Routes from splash to the authenticated shell once auth/setup are known",
+        "Keeps Appwrite/data sync in background owners rather than the cover route",
+        "Persists a per-table watermark after successful empty first pulls",
+        "Uses delta pull after a table sync marker exists, including reference/catalog data",
+        "Mentions lint enforcement such as router_splash_waits_for_initial_sync"
+      ]
     }
   ]
 }
