@@ -92,6 +92,28 @@ The hard project gate is still package-root `dart analyze` with
 `flutter_skill_lints` and `riverpod_lint` wired under top-level `plugins:` in
 `analysis_options.yaml`.
 
+## Enforcement Coverage
+
+The README is intentionally short, so it does not list every rule. The full
+contract lives in [SKILL.md](SKILL.md) and the task-specific files under
+[references/](references/). In practice, the enforcement covers more than folder
+layout:
+
+| Area | What gets enforced |
+|---|---|
+| Analyzer setup | `analysis_options.yaml` exists, strict analyzer flags stay on, generated files are excluded, and both `flutter_skill_lints` and `riverpod_lint` are proven active. |
+| Riverpod | Generated providers only, no legacy provider constructors, no `ref.watch` in notifier methods, no provider-derived caches in `ConsumerState`, and no standalone event/signal providers. |
+| Async lifecycle | `ref.mounted` / `context.mounted` guards after awaits, safe `finally` handling, cancelled subscriptions/timers/controllers, and stale async write protection. |
+| Widgets | No `_buildXxx()` helpers, no private widget classes except private `State<T>`, no widget-owned infra dependencies, no mutation result branching, and no raw snackbar dispatch from widgets. |
+| State and domain | Sealed Freezed classes, semantic nullability, no sentinel fallbacks, Value Objects for meaningful primitives, pure domain imports, and no hand-written domain `copyWith`. |
+| Storage and IO | Hive, SharedPreferences, secure storage, file APIs, and path-provider calls stay in local datasources, then flow through repositories. |
+| Navigation | Typed GoRouter helpers own page navigation, raw route strings and named navigation are blocked, redirects are pure and matrix-tested, and modal helpers keep local dismissal separate. |
+| Localization and accessibility | User-facing copy, tooltips, semantic labels, image labels, and accessibility text come from l10n; app-root text-scale clamps are blocked. |
+| Performance and interaction | High-frequency inputs debounce/throttle/coalesce, expensive widgets are gated, repeated lookups use shared indexes/extensions, and broad collection watches are avoided. |
+| Platform APIs | Exact-alarm permission uses `flutter_local_notifications`; platform-specific plugin implementations are resolved and null-checked before use. |
+| Previews and E2E | Widget previews use deterministic fakes only; runtime E2E proves behavior with stable selectors, logs, cleanup, and writer-plus-observer proof for shared state. |
+| Repo drift | Drift checks keep docs/examples honest, smoke tests exercise hook fixtures, markdown examples are parsed, and `gpt-5.4-mini` evals cover trigger and answer quality. |
+
 ## Architecture
 
 ```text
