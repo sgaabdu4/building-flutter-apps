@@ -1,6 +1,6 @@
 [
   {
-    "query": "I'm building a new user profile feature for my Flutter app — it needs a ProfileNotifier to manage the state, a Freezed entity for the user data, and a repository that fetches from a REST API. Can you set up the feature module with proper architecture layers?",
+    "query": "I'm building a new user profile feature for my Flutter app \u2014 it needs a ProfileNotifier to manage the state, a Freezed entity for the user data, and a repository that fetches from a REST API. Can you set up the feature module with proper architecture layers?",
     "should_trigger": true
   },
   {
@@ -52,11 +52,11 @@
     "should_trigger": false
   },
   {
-    "query": "I'm using GetX for my Flutter app — can you help me create a GetxController with reactive state and GetMaterialApp routing?",
+    "query": "I'm using GetX for my Flutter app \u2014 can you help me create a GetxController with reactive state and GetMaterialApp routing?",
     "should_trigger": false
   },
   {
-    "query": "Write a Dart CLI tool that reads a CSV file and generates a JSON report. No Flutter, no UI — just a command-line script that uses dart:io",
+    "query": "Write a Dart CLI tool that reads a CSV file and generates a JSON report. No Flutter, no UI \u2014 just a command-line script that uses dart:io",
     "should_trigger": false
   },
   {
@@ -94,5 +94,61 @@
   {
     "query": "I have a Flutter widget file with _buildHeader helpers, private ConsumerWidget classes, and visible strings hardcoded in Text widgets. Please refactor it to match the app's Riverpod/Freezed conventions.",
     "should_trigger": true
+  },
+  {
+    "query": "I need to add Firebase Crashlytics to my Flutter app and decide whether notifiers should call FirebaseCrashlytics directly or use the skill's Crash wrapper.",
+    "should_trigger": true
+  },
+  {
+    "query": "My Flutter confirmation dialog watches a Riverpod provider, mutates the same provider, then pops and clears state. Can you review the modal ownership pattern?",
+    "should_trigger": true
+  },
+  {
+    "query": "In my Flutter app a TextField calls the search API on every keystroke and sync rewrites the whole Hive box after one row changes. How should I debounce and batch this?",
+    "should_trigger": true
+  },
+  {
+    "query": "I need E2E proof for a shared Flutter shopping list with writer and observer users on an iOS simulator, including source-of-truth verification.",
+    "should_trigger": true
+  },
+  {
+    "query": "Our Flutter analysis_options.yaml has riverpod_lint under analyzer and CI runs flutter analyze lib. How should I wire flutter_skill_lints correctly?",
+    "should_trigger": true
+  },
+  {
+    "query": "I want @Preview coverage for a Flutter ProductCard using provider overrides and fake repositories without real Hive, Firebase, or HTTP.",
+    "should_trigger": true
+  },
+  {
+    "query": "My Flutter screen has Vertical viewport unbounded height, a TextField unbounded in a Row, and RenderFlex overflow at large text scale.",
+    "should_trigger": true
+  },
+  {
+    "query": "My Flutter deep link /orders/123 throws in build when the order is missing, and the GoRouter redirect uses ref.watch.",
+    "should_trigger": true
+  },
+  {
+    "query": "Two Flutter Riverpod notifiers copy-paste retry logic and my analytics singleton returns bool with setBackend for tests. Should I use a mixin or provider?",
+    "should_trigger": true
+  },
+  {
+    "query": "In a Flutter repository, should I return a Map<String, dynamic> for paginated results or use Dart records and typed IDs?",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm writing an Appwrite Function in TypeScript for backend cleanup and want to know whether to use xasync. No Flutter client code is involved.",
+    "should_trigger": false
+  },
+  {
+    "query": "For a pure Dart command-line package with no Flutter, Riverpod, widgets, or app architecture, should I use records and extension types?",
+    "should_trigger": false
+  },
+  {
+    "query": "In my Flutter ProductCard, IconButton lacks tooltip, Image.network has no semanticLabel, and chips are too small for touch targets. Can you review accessibility?",
+    "should_trigger": true
+  },
+  {
+    "query": "I need WCAG alt text and keyboard navigation fixes in a Next.js marketing page, no Flutter or Dart involved.",
+    "should_trigger": false
   }
 ]

@@ -4,8 +4,8 @@
   "model": "gpt-5.4-mini",
   "judge_model": null,
   "skill_name": "building-flutter-apps",
-  "skill_path": "/Users/abid/Workspaces/skills/building-flutter-apps-all/building-flutter-apps",
-  "eval_set": "/Users/abid/Workspaces/skills/building-flutter-apps-all/building-flutter-apps/evals/trigger-eval.json",
+  "skill_path": "$HOME/Workspaces/skills/building-flutter-apps-all/building-flutter-apps",
+  "eval_set": "$HOME/Workspaces/skills/building-flutter-apps-all/building-flutter-apps/evals/trigger-eval.json",
   "summary": {
     "total": 24,
     "passed": 24,
@@ -18,316 +18,245 @@
   },
   "results": [
     {
-      "query": "I'm building a new user profile feature for my Flutter app \u2014 it needs a ProfileNotifier to manage the state, a Freezed entity for the user data, and a repository that fetches from a REST API. Can you set up the feature module with proper architecture layers?",
+      "case_index": 1,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "Flutter app request mentions Notifier, Freezed, and repository layers, so the Flutter skill is required first."
-      ],
       "duration_seconds": 8.26,
       "tokens_used": 1372
     },
     {
-      "query": "my riverpod provider keeps rebuilding everything when only one field changes, how do I use select() to minimize rebuilds in leaf widgets? I'm using riverpod 3.x with codegen",
+      "case_index": 2,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "The question is about Riverpod 3.x in a Flutter app and asks for widget rebuild behavior using `select()`, so the Flutter/Riverpod skill must be invoked first."
-      ],
       "duration_seconds": 8.63,
       "tokens_used": 1397
     },
     {
-      "query": "I have a GoRouter redirect that uses ref.watch and it keeps resetting my route stack whenever auth state changes. What's going wrong and how do I fix it?",
+      "case_index": 3,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "This is a Flutter/Riverpod/GoRouter question, and the skill is required before answering."
-      ],
       "duration_seconds": 8.82,
       "tokens_used": 1389
     },
     {
-      "query": "can you review this notifier for anti-patterns? it's using StateNotifierProvider and an abstract class with Freezed, and I don't think it's following best practices for Riverpod 3.x: class CartNotifier extends StateNotifier<CartState> { ... }",
+      "case_index": 4,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "Yes. This is a Flutter/Riverpod architecture question involving `StateNotifierProvider`, `StateNotifier`, and Freezed, so the `building-flutter-apps` skill should be invoked first."
-      ],
       "duration_seconds": 10.04,
       "tokens_used": 1509
     },
     {
-      "query": "I need to add Hive persistence to my Flutter app for caching machine configs locally. The model has id, name, isActive, lastSyncedAt fields. How do I set up @GenerateAdapters and a repository?",
+      "case_index": 5,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "This is a Flutter app question involving Hive and a repository, so the building-flutter-apps skill must be used before answering."
-      ],
       "duration_seconds": 8.2,
       "tokens_used": 350
     },
     {
-      "query": "When I serialize my Freezed model to JSON in release mode, nested objects come out as 'Instance of _XYZ' instead of proper JSON maps. Both models have fromJson factories. How do I fix the nested serialization?",
+      "case_index": 6,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "This is a Flutter/Dart Freezed serialization question in a Flutter app, so the building-flutter-apps skill must be invoked before answering."
-      ],
       "duration_seconds": 8.77,
       "tokens_used": 1423
     },
     {
-      "query": "what's the right way to structure a Flutter feature module? I keep putting everything in one file and it's getting messy. Using riverpod for state management",
+      "case_index": 7,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "This is a Flutter app architecture question and explicitly uses Riverpod, so the skill is required before answering."
-      ],
       "duration_seconds": 10.54,
       "tokens_used": 18929
     },
     {
-      "query": "I need to implement pagination with infinite scroll in my product list. The API returns pages of 20 items, and I need isLoadingMore and hasMore state tracking in my notifier",
+      "case_index": 8,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "Flutter/Riverpod notifier pagination question; skill is required before answering."
-      ],
       "duration_seconds": 12.3,
       "tokens_used": 19154
     },
     {
-      "query": "Should I use abstract class or sealed class for my Freezed union types? My team lead says sealed is better for Dart 3 but I'm not sure why",
+      "case_index": 9,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "Yes. The query is about Freezed union types and Dart 3 sealed vs abstract classes, which falls under the Flutter/Dart skill trigger."
-      ],
       "duration_seconds": 8.82,
       "tokens_used": 1457
     },
     {
-      "query": "I'm setting up a new React Native project with Redux Toolkit and React Navigation. Can you create the folder structure with feature-based architecture and set up the store?",
+      "case_index": 10,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "React Native, not Flutter/Dart; the skill is explicitly skipped for React Native projects."
-      ],
       "duration_seconds": 10.63,
       "tokens_used": 335
     },
     {
-      "query": "How do I implement server-side rendering with Next.js 14 app router? I need to fetch data on the server and pass it to client components",
+      "case_index": 11,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "This is a Next.js/App Router question, not Flutter/Dart or Flutter-architecture context, so the building-flutter-apps skill should not be invoked."
-      ],
       "duration_seconds": 12.13,
       "tokens_used": 304
     },
     {
-      "query": "I need to build a REST API in Dart using shelf package with middleware for authentication and logging. No Flutter, just a backend server",
+      "case_index": 12,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "This is a pure Dart shelf backend server, which the skill explicitly says to skip; no Flutter app/framework/Riverpod context is involved."
-      ],
       "duration_seconds": 12.08,
       "tokens_used": 18800
     },
     {
-      "query": "Can you help me set up Provider (not Riverpod) for state management in my Flutter app? I want to use ChangeNotifierProvider and Consumer widgets",
+      "case_index": 13,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "Provider/ChangeNotifierProvider is explicitly excluded from this skill\u2019s trigger scope."
-      ],
       "duration_seconds": 12.72,
       "tokens_used": 440
     },
     {
-      "query": "I'm using GetX for my Flutter app \u2014 can you help me create a GetxController with reactive state and GetMaterialApp routing?",
+      "case_index": 14,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "GetX is explicitly excluded from the building-flutter-apps skill; it applies to Flutter/Riverpod architecture, not GetX."
-      ],
       "duration_seconds": 12.05,
       "tokens_used": 1365
     },
     {
-      "query": "I need to configure my Flutter app's Firebase Cloud Messaging for push notifications. How do I set up the firebase_messaging plugin and handle background messages?",
+      "case_index": 15,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "Flutter app and firebase_messaging are in scope; this skill must be invoked before answering."
-      ],
       "duration_seconds": 14.36,
       "tokens_used": 352
     },
     {
-      "query": "Write a Dart CLI tool that reads a CSV file and generates a JSON report. No Flutter, no UI \u2014 just a command-line script that uses dart:io",
+      "case_index": 16,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "Pure Dart CLI with no Flutter/framework context; the skill explicitly says to skip pure-Dart CLI tasks."
-      ],
       "duration_seconds": 17.46,
       "tokens_used": 378
     },
     {
-      "query": "Help me write unit tests for a pure Dart function that calculates shipping costs. No Flutter widgets or state management involved, just testing business logic",
+      "case_index": 17,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "Pure Dart business logic/unit tests with no Flutter or Riverpod context, which the skill says to skip."
-      ],
       "duration_seconds": 15.59,
       "tokens_used": 316
     },
     {
-      "query": "I'm using BLoC pattern with flutter_bloc package for my app's state management. How do I create a Cubit with states and emit changes?",
+      "case_index": 18,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "The query is about flutter_bloc/BLoC Cubit, which this skill explicitly excludes from invocation."
-      ],
       "duration_seconds": 14.73,
       "tokens_used": 371
     },
     {
-      "query": "Can you help me set up a SwiftUI app with MVVM architecture and Combine for reactive data binding? I'm building an iOS-only app",
+      "case_index": 19,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "SwiftUI/iOS-only is explicitly out of scope for the Flutter/Dart skill, which should be skipped for native iOS apps."
-      ],
       "duration_seconds": 9.06,
       "tokens_used": 296
     },
     {
-      "query": "In a Riverpod ConsumerStatefulWidget I have ProviderSubscription fields, local provider-derived caches, and an isSaving flag for a notifier mutation. Can you review the lifecycle/state ownership?",
+      "case_index": 20,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "Flutter/Riverpod lifecycle and state-ownership review in a ConsumerStatefulWidget."
-      ],
       "duration_seconds": 7.81,
       "tokens_used": 374
     },
     {
-      "query": "For flutter_local_notifications on Android, my reminder service launches REQUEST_SCHEDULE_EXACT_ALARM with AndroidIntent. What's the right exact alarm permission flow?",
+      "case_index": 21,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "Flutter Android permission flow for flutter_local_notifications; skill is required before answering."
-      ],
       "duration_seconds": 10.85,
       "tokens_used": 369
     },
     {
-      "query": "I'm writing a native Android Kotlin app and need to request SCHEDULE_EXACT_ALARM permission with an intent to settings. No Flutter or Dart involved.",
+      "case_index": 22,
       "should_trigger": false,
       "pass": true,
       "trigger_rate": 0.0,
       "triggers": 0,
       "runs": 1,
-      "reasons": [
-        "Native Android Kotlin, not Flutter/Dart, so the Flutter skill should be skipped."
-      ],
       "duration_seconds": 10.01,
       "tokens_used": 18700
     },
     {
-      "query": "My Flutter root widget returns MaterialApp.router and I'm starting sync services from build with ref.read. How should I bootstrap providers without app-shell side effects?",
+      "case_index": 23,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "This is a Flutter app-architecture question: it mentions `MaterialApp.router`, `build`, and `ref.read`, which are explicit trigger terms for the skill."
-      ],
       "duration_seconds": 28.47,
       "tokens_used": 12010
     },
     {
-      "query": "I have a Flutter widget file with _buildHeader helpers, private ConsumerWidget classes, and visible strings hardcoded in Text widgets. Please refactor it to match the app's Riverpod/Freezed conventions.",
+      "case_index": 24,
       "should_trigger": true,
       "pass": true,
       "trigger_rate": 1.0,
       "triggers": 1,
       "runs": 1,
-      "reasons": [
-        "This is a Flutter app widget refactor and explicitly mentions Riverpod, Freezed, ConsumerWidget, and Flutter UI conventions, so the skill must be invoked first."
-      ],
       "duration_seconds": 19.09,
       "tokens_used": 428
     }
-  ]
+  ],
+  "artifact_note": "Compacted/sanitized: prompts, reasons, response excerpts, and stderr excerpts omitted; home paths are written as $HOME or repo-relative paths."
 }

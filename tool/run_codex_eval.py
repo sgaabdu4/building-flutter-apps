@@ -144,6 +144,36 @@ def timeout_text(value: Any) -> str:
     return str(value)
 
 
+def public_path(path: Path, *, base: Path) -> str:
+    resolved = path.resolve()
+    base = base.resolve()
+    try:
+        relative = resolved.relative_to(base)
+        return "." if str(relative) == "." else str(relative)
+    except ValueError:
+        pass
+
+    home = Path.home().resolve()
+    try:
+        return "$HOME/" + str(resolved.relative_to(home))
+    except ValueError:
+        return str(resolved)
+
+
+def sanitize_text(text: str) -> str:
+    return text.replace(str(Path.home()), "$HOME")
+
+
+def sanitize_json(value: Any) -> Any:
+    if isinstance(value, str):
+        return sanitize_text(value)
+    if isinstance(value, list):
+        return [sanitize_json(item) for item in value]
+    if isinstance(value, dict):
+        return {key: sanitize_json(item) for key, item in value.items()}
+    return value
+
+
 def codex_exec(
     prompt: str,
     *,
@@ -257,6 +287,7 @@ def run_quality_case(
     timeout: int,
     judge_timeout: int,
     pass_threshold: float,
+    include_excerpts: bool,
 ) -> dict[str, Any]:
     expectations = list(item["expectations"])
     answer = codex_exec(
@@ -266,9 +297,8 @@ def run_quality_case(
         timeout=timeout,
     )
     if answer["returncode"] != 0:
-        return {
+        result = {
             "id": item.get("id"),
-            "prompt": item["prompt"],
             "pass": False,
             "met": 0,
             "total": len(expectations),
@@ -276,12 +306,15 @@ def run_quality_case(
             "expectations_met": [False] * len(expectations),
             "notes": "answerer command failed",
             "response_length": len(answer["stdout"]),
-            "response_excerpt": answer["stdout"][-1200:],
             "duration_seconds": answer["duration_seconds"],
             "tokens_used": answer["tokens_used"],
             "returncode": answer["returncode"],
-            "stderr_excerpt": answer["stderr"][-1200:],
         }
+        if include_excerpts:
+            result["prompt"] = item["prompt"]
+            result["response_excerpt"] = answer["stdout"][-1200:]
+            result["stderr_excerpt"] = answer["stderr"][-1200:]
+        return result
 
     judge = codex_exec(
         build_judge_prompt(item["prompt"], expectations, answer["stdout"]),
@@ -301,9 +334,8 @@ def run_quality_case(
 
     met = sum(1 for value in expectations_met if value)
     score = met / len(expectations) if expectations else 0.0
-    return {
+    result = {
         "id": item.get("id"),
-        "prompt": item["prompt"],
         "pass": score >= pass_threshold,
         "met": met,
         "total": len(expectations),
@@ -311,14 +343,17 @@ def run_quality_case(
         "expectations_met": expectations_met,
         "notes": notes,
         "response_length": len(answer["stdout"]),
-        "response_excerpt": answer["stdout"][-1200:],
         "duration_seconds": round(answer["duration_seconds"] + judge["duration_seconds"], 2),
         "tokens_used": (answer["tokens_used"] or 0) + (judge["tokens_used"] or 0),
         "answer_tokens_used": answer["tokens_used"],
         "judge_tokens_used": judge["tokens_used"],
         "judge_returncode": judge["returncode"],
-        "judge_stderr_excerpt": judge["stderr"][-1200:],
     }
+    if include_excerpts:
+        result["prompt"] = item["prompt"]
+        result["response_excerpt"] = answer["stdout"][-1200:]
+        result["judge_stderr_excerpt"] = judge["stderr"][-1200:]
+    return result
 
 
 def build_trigger_prompt(skill_name: str, description: str, query: str) -> str:
@@ -348,6 +383,7 @@ def run_trigger_case(
     timeout: int,
     trigger_threshold: float,
     runs_per_query: int,
+    include_excerpts: bool,
 ) -> dict[str, Any]:
     triggered_runs: list[bool] = []
     reasons: list[str] = []
@@ -373,17 +409,20 @@ def run_trigger_case(
     trigger_rate = sum(triggered_runs) / len(triggered_runs)
     should_trigger = bool(item["should_trigger"])
     passed = trigger_rate >= trigger_threshold if should_trigger else trigger_rate < trigger_threshold
-    return {
-        "query": item["query"],
+    result = {
+        "case_index": item.get("_case_index"),
         "should_trigger": should_trigger,
         "pass": passed,
         "trigger_rate": trigger_rate,
         "triggers": sum(triggered_runs),
         "runs": len(triggered_runs),
-        "reasons": reasons,
         "duration_seconds": round(total_duration, 2),
         "tokens_used": total_tokens,
     }
+    if include_excerpts:
+        result["query"] = item["query"]
+        result["reasons"] = reasons
+    return result
 
 
 def run_pool(
@@ -468,6 +507,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--ids", default=None, help="Comma-separated quality eval ids")
     parser.add_argument("--output", default=None)
+    parser.add_argument("--include-excerpts", action="store_true")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -475,6 +515,8 @@ def main() -> None:
     eval_path = Path(args.eval_set).resolve()
     skill_name, description, _ = parse_skill_md(skill_path)
     items = filter_items(load_eval_items(eval_path), args.limit, args.ids)
+    for index, item in enumerate(items, 1):
+        item["_case_index"] = index
 
     if args.mode == "quality":
         results = run_pool(
@@ -488,6 +530,7 @@ def main() -> None:
                 "timeout": args.timeout,
                 "judge_timeout": args.judge_timeout,
                 "pass_threshold": args.pass_threshold,
+                "include_excerpts": args.include_excerpts,
             },
         )
         results.sort(key=lambda item: (item.get("id") is None, item.get("id")))
@@ -505,6 +548,7 @@ def main() -> None:
                 "timeout": args.timeout,
                 "trigger_threshold": args.trigger_threshold,
                 "runs_per_query": args.runs_per_query,
+                "include_excerpts": args.include_excerpts,
             },
         )
         summary = summarize_trigger(results)
@@ -515,12 +559,13 @@ def main() -> None:
         "model": args.model,
         "judge_model": args.judge_model or args.model if args.mode == "quality" else None,
         "skill_name": skill_name,
-        "skill_path": str(skill_path),
-        "eval_set": str(eval_path),
+        "skill_path": public_path(skill_path, base=Path.cwd()),
+        "eval_set": public_path(eval_path, base=Path.cwd()),
         "summary": summary,
         "results": results,
     }
 
+    output = sanitize_json(output)
     text = json.dumps(output, indent=2)
     if args.output:
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)

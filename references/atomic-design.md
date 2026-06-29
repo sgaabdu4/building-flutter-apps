@@ -429,6 +429,7 @@ class ProductDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final isLoading = ref.watch(
       productProvider.select((s) => s.isLoading),
     );
@@ -439,12 +440,12 @@ class ProductDashboardScreen extends ConsumerWidget {
 
     return DashboardTemplate(
       header: AppHeader(
-        title: 'Products',
+        title: l10n.productsTitle,
         actions: [
           AppIconButton(
             icon: Icons.add,
             onPressed: () => const ProductCreateRoute().push<void>(context),
-            tooltip: 'Add product',
+            tooltip: l10n.addProductTooltip,
           ),
         ],
       ),
@@ -477,7 +478,9 @@ Folder layout SSOT: [architecture.md → Full Directory Structure](architecture.
 
 ## Accessibility
 
-For `Semantics` wrappers, `MergeSemantics`, 48x48 tap targets, contrast ratios, see Accessibility section in [flutter-optimizations.md](flutter-optimizations.md).
+For `Semantics` wrappers, `MergeSemantics`, localized tooltips/semantic labels,
+48x48 tap targets, contrast ratios, and text-scale proof, see Accessibility
+section in [flutter-optimizations.md](flutter-optimizations.md#accessibility).
 
 ## Theming
 

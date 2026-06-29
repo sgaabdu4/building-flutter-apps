@@ -4,8 +4,8 @@ Two harnesses, two intents. Sizes intentionally differ.
 
 | File | Count | Purpose |
 |---|---|---|
-| `evals.json` | 33 | Full skill-output evals: `prompt` + expected behaviour graded. |
-| `trigger-eval.json` | 24 | Trigger-classification evals: `query` + `should_trigger` boolean for skill description gate. |
+| `evals.json` | 45 | Full skill-output evals: `prompt` + expected behaviour graded. |
+| `trigger-eval.json` | 38 | Trigger-classification evals: `query` + `should_trigger` boolean for skill description gate. |
 
 Adding cases:
 - New full eval → append to `evals.json` `evals` array, increment `id`.
@@ -29,3 +29,7 @@ python3 tool/run_codex_eval.py quality \
   --model gpt-5.4-mini \
   --output evals/results/quality-gpt-5.4-mini.json
 ```
+
+Artifacts are compact by default: paths are written relative to the repo or
+`$HOME`, and answer/stderr excerpts are omitted. Add `--include-excerpts` only
+for temporary local debugging.

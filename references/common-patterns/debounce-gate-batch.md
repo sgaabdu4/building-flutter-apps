@@ -263,4 +263,4 @@ Future<T?> openConfirm<T>(BuildContext context) => showDialog<T>(
 
 Lint: `modal_helper_requires_route_settings`.
 
-Cross-link: [Modal Snapshot Pattern](#modal-snapshot-pattern) covers the dialog mutation half. [State Teardown Belongs in the Notifier](../state-management-lifecycle.md#state-teardown-belongs-in-the-notifier) covers the success-path teardown half.
+Cross-link: [Modal Snapshot Pattern](modals-navigation.md#modal-snapshot-pattern) covers the dialog mutation half. [State Teardown Belongs in the Notifier](../state-management-lifecycle.md#state-teardown-belongs-in-the-notifier) covers the success-path teardown half.

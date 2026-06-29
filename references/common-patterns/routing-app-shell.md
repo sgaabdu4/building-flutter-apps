@@ -205,7 +205,7 @@ methods such as `context.showScrollableBottomSheet<T>(...)` or
 Modals are pop-with-result, not mutation hosts. The dialog widget never
 subscribes to a provider its own action mutates, never runs code after
 `Navigator.pop`, and never owns its caller's teardown. See
-[Modal Snapshot Pattern](#modal-snapshot-pattern).
+[Modal Snapshot Pattern](modals-navigation.md#modal-snapshot-pattern).
 
 ## Long-Running Sync/Auth Cancellation
 

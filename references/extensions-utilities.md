@@ -574,7 +574,7 @@ switch (result) {
 
 ## Extension Types
 
-Zero-cost compile-time wrappers (Dart 3.3). See [dart-patterns-records.md](dart-patterns-records.md#extension-types-dart-33) for full ref.
+Zero-cost compile-time wrappers (Dart 3.3). See [dart-patterns-records.md](dart-patterns-records.md#extension-types-dart-3.3) for full ref.
 
 ```dart
 extension type UserId(String value) {}

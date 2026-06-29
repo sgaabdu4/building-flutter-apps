@@ -1,23 +1,18 @@
 ---
 name: building-flutter-apps
 description: >-
-  CRITICAL — invoke this skill before answering Flutter app/package
-  architecture work. It encodes project-specific Riverpod, Freezed, GoRouter,
-  Hive, l10n, testing, and lifecycle rules that override generic Flutter
-  advice; skipping it causes review failures. Use for prompts mentioning
-  Flutter apps, Riverpod, Freezed, GoRouter, Hive, Notifier/AsyncNotifier,
-  AsyncValue, Widget/BuildContext/ConsumerWidget, ref.watch/read/mounted,
-  repository/datasource, sealed class/copyWith, json_serializable/build_runner,
-  AppLocalizations/gen-l10n, firebase_messaging/Crashlytics,
-  pubspec.yaml/build.yaml/analysis_options.yaml, or .dart files in a Flutter
-  app. Skip React/React Native/Next.js/SwiftUI/native iOS/Android,
+  CRITICAL: invoke before Flutter app/package work using Riverpod/codegen,
+  Freezed, GoRouter, Hive, l10n, testing/E2E, Crashlytics, Firebase messaging,
+  analysis_options, pubspec/build.yaml, widgets/layout/a11y, deep links,
+  previews, repositories/datasources, notifiers, AsyncValue, ref.mounted, or
+  `.dart` files in a Flutter app. Skip React/Next/SwiftUI/native,
   flutter_bloc/BLoC/Cubit/GetX/Provider/ChangeNotifier/MobX/Redux, pure-Dart
-  CLI/libs/algorithms/business logic/unit tests with no Flutter/Riverpod/app
-  context, shelf, and Dart server. Invoke first; base your answer on the skill.
+  CLI/server/libs/business logic/unit tests without Flutter/Riverpod/app
+  context.
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.1.4"
+  version: "5.1.5"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -46,7 +41,7 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 
 ## Critical Rules
 
-1. **Use package-root `dart analyze` only.** Never `flutter analyze` or path-scoped analyze. Copy [references/analysis_options.yaml](references/analysis_options.yaml); wire `flutter_skill_lints` + `riverpod_lint` under `plugins:`. Ref: [flutter#184190](https://github.com/flutter/flutter/issues/184190).
+1. **Use package-root `dart analyze` only.** Never `flutter analyze` or path-scoped analyze. Copy [references/analysis_options.yaml](references/analysis_options.yaml); wire `flutter_skill_lints` + `riverpod_lint` under top-level `plugins:` only. Canonical analysis keeps `strict-casts`, `strict-inference`, and `strict-raw-types` true, excludes generated outputs, and setup answers explicitly prove one `flutter_skill_lints` diagnostic plus one `riverpod_lint` diagnostic can fire. Ref: [flutter#184190](https://github.com/flutter/flutter/issues/184190).
 
 2. **Use `@riverpod` / `@Riverpod` codegen for every provider** — state, computed, repository, datasource, service, family, stream. Never manual `Provider`, `FutureProvider`, `StreamProvider`, `StateProvider`, `StateNotifierProvider`, `NotifierProvider`, `AsyncNotifierProvider`, `ChangeNotifierProvider`. Run `dart run build_runner watch --delete-conflicting-outputs`.
 
@@ -62,7 +57,7 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 
 8. **Never prop-drill state, infrastructure, or surface policy.** Child widgets read providers directly with `ref.watch` / `ref.read` / `ref.listen`. Do not pass entity / state / notifier instances through constructors. Do not pass provider-derived primitive values as `initial*` props when the child can read the provider by ID. Do not pass concrete cache managers, clients, storage, services, repositories, datasources, queues, or plugins into widgets; infra wiring belongs behind the owning provider, repository, datasource, service, or utility API. Constructor params allowed: immutable IDs (for routing/lookup), callbacks, `Key`, and primitive props on leaf atoms. Provider-derived caches must have one SSOT: generated computed provider, notifier/repo state, non-const instance-owned `late final` derived field, or memoized service/repo/datasource cache. Const Freezed state/entities cannot own `late final` caches; use computed providers for hot projections. Never use top-level/global `Expando` side tables for derived state or collection indexes. `ConsumerState` may own UI lifecycle handles only (controllers, focus, animation); never provider-derived `*Cache`/`*Source`/`*Snapshot`/`*Memo`/`*ById` fields, provider-family arg wrappers (`config`/`args`/`params`), local `isSubmitting`/`isSaving` flags for provider-owned mutations, or `ProviderSubscription` fields. `ref.listenManual` is forbidden; use `ref.listen` in `build` for widget UI side effects, or move durable subscriptions into provider/notifier/service lifecycles. Do not create standalone Riverpod `*Signal` / `*Event` / `*Pulse` / `*Serial` providers for one-shot UI events; fold the serial/payload into the owning notifier state and `ref.listen` to a concrete `.select((state) => state.successSerial)` field. Durable status providers must be named by the state they own, e.g. `*StatusNotifier` / `*Lifecycle`, not `*Signal`. Widgets are UI + dispatch only: no `try/catch`, no assigning/branching on awaited notifier results, no raw `Material(...)` / `Ink(...)` / `InkWell(...)` surfaces outside atoms/app shell/dedicated primitives, no top-level/global helper functions, no widget-file `*Actions` namespaces that accept `WidgetRef`/`BuildContext` and call providers, no provider-triggered `addPostFrameCallback` in `build`, no `*Data` helper namespaces that filter/map/sort/index collections, and no private collection/filter/sort helpers. Move that logic to notifiers, computed providers, a non-widget service/model class, or an owned atom/surface primitive. Lints: `riverpod_consumer_state_derived_cache`, `riverpod_widget_provider_arg_wrapper`, `riverpod_consumer_state_provider_subscription`, `riverpod_listen_manual_forbidden`, `riverpod_event_counter_signal_forbidden`, `expando_derived_cache_forbidden`, `widget_infra_dependency_boundary`, `widget_material_boundary`, `widget_top_level_function_boundary`, `widget_try_catch_boundary`, `widget_awaits_notifier_result`, `widget_local_mutation_flag`, `widget_derived_collection_logic`.
 
-9. **Use a mixin when the same behavior appears in 2+ classes.** Extract to a `mixin` with an `on` clause (e.g. `mixin RetryMixin on AsyncNotifier<X>`). Suffix the name with `Mixin`. Copy-paste sharing across notifiers, widgets, or services is forbidden — replace with a mixin.
+9. **Use a mixin when the same behavior appears in 2+ classes.** Extract to a small, single-purpose `mixin` with an `on` clause (e.g. `mixin RetryMixin on AsyncNotifier<X>`). Suffix the name with `Mixin`. Mixins have no mutable state fields. Copy-paste sharing across notifiers, widgets, or services is forbidden — replace with a mixin.
 
 10. **Storage SDK calls live in Local Datasource, never in Notifier.** Hive (`Hive.openBox`, `box.get/put/delete`, `Hive.box`), `SharedPreferences`, `dart:io` file ops, `path_provider` directory access — all live behind a `Local<X>Datasource` interface, called by `<X>Repository`. Secret-store SDKs are not default app caches; add one only for real secrets after an explicit product/security requirement. Notifiers and widgets never import `hive_ce` / `shared_preferences` / `flutter_secure_storage` / `dart:io` / `path_provider`. Dependencies are required and explicitly wired at the provider/composition root; never hide production wiring behind `dependency ?? ConcreteDependency()`, optional/defaulted function seams such as `clock/delay/generator/authenticator/createExecution`, inline concrete dependency constructors such as `Service(plugin: ConcretePlugin())`, or `ref.watch` for stable service/repository/datasource/client/plugin wiring. Use `ref.read` for stable infrastructure deps; use `ref.watch` only where the provider's output is intentionally reactive. Lints: `hidden_dependency_fallback`, `hidden_dependency_default_param`, `service_inline_concrete_dependency`, `service_provider_watch_dependency`.
 
@@ -70,7 +65,7 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 
 12. **Wrap domain primitives in Value Objects.** Domain-meaning `double`/`int`/`String` (unit, currency, measure, identity, format) → sealed Freezed VO in `/domain/values/`. Required domain text must be non-empty by construction; reject/normalize blank strings before entity creation. Raw redirects private (`._meters`/`._raw`). Public factories validate in body; no passthrough redirects. No named primitive factories on domain entities; convert at data/notifier/import boundaries. No hand-written `copyWith` in `/domain/`. Hive models keep primitives; domain entities hold VOs; mapper bridges. Never change ctor param type/order on shipped `@GenerateAdapters` class. Primitive in 2+ entities → VO. Bare `double distanceMeters` or `String email` at entity boundary = smell. See [value-objects.md](references/value-objects.md), [hive-persistence.md](references/hive-persistence.md). Lints: `vo_public_raw_constructor`, `domain_empty_string_sentinel`, `domain_entity_primitive_factory`, `domain_custom_copy_with`, `hive_field_no_vo_type`.
 
-13. **Keep typed GoRouter routes as the navigation SSOT.** Define routes once with `go_router_builder`, then navigate with generated route helpers such as `SomeRoute(...).go(context)` and `SomeRoute(...).push<T>(context)`. Keep route paths inside route definitions and generated helpers. Same-flow child routes whose success exits the whole flow (auth/login/signup, onboarding step, destructive confirm, import wizard) use typed `pushReplacement`, not `push`, so success does not leave dead flow screens underneath. Local sheets/dialogs use semantic helpers and `Navigator.pop` for dismissal. Generic `BuildContext` pop fallback helpers (`popIfCan` / `popOrGo`) must check `mounted`, root `Navigator.maybeOf(...).canPop()`, and local `Navigator.maybeOf(...).canPop()` before falling back to typed route navigation. Splash/cover redirects must not wait for long-running initial sync; once auth/setup is known, route to the shell and let sync hydrate local data in the background. Navigation lints enforce typed routes, local modal helpers, and typed fallback behavior. Lints: `pop_fallback_helper_must_check_navigator_stack`, `router_splash_waits_for_initial_sync`.
+13. **Keep typed GoRouter routes as the navigation SSOT.** Define routes once with `go_router_builder`, then navigate with generated route helpers such as `SomeRoute(...).go(context)` and `SomeRoute(...).push<T>(context)`. Keep route paths inside route definitions and generated helpers. Validate route params at the route boundary; route-id lookups in widgets are nullable by-id providers plus fallback UI or typed redirects, never throws from `build()`. Redirect policy lives in a pure resolver matrix-tested across loading, signed-out, setup-incomplete, signed-in, stale-link, and missing-resource states. Same-flow child routes whose success exits the whole flow (auth/login/signup, onboarding step, destructive confirm, import wizard) use typed `pushReplacement`, not `push`, so success does not leave dead flow screens underneath. Local sheets/dialogs use semantic helpers and `Navigator.pop` for dismissal. Generic `BuildContext` pop fallback helpers (`popIfCan` / `popOrGo`) must check `mounted`, root `Navigator.maybeOf(...).canPop()`, and local `Navigator.maybeOf(...).canPop()` before falling back to typed route navigation. Splash/cover redirects must not wait for long-running initial sync; once auth/setup is known, route to the shell and let sync hydrate local data in the background. App Links / Universal Links need hosted association files plus cold/warm signed-state E2E proof. Navigation lints enforce typed routes, local modal helpers, and typed fallback behavior. Lints: `pop_fallback_helper_must_check_navigator_stack`, `router_splash_waits_for_initial_sync`.
 
 14. **Dialogs/sheets pop with result; they do not host mutations.** Caller computes immutable `<Feature>Summary` via `ref.read`; dialog renders from snapshot. Dialog may watch only low-frequency primitive state (e.g. `isSaving`); timer/ticker/progress watches live in leaf controls. Buttons call `Navigator.pop(result)` with no code after. Notifier owns teardown (`reset()` on success, preserve failure state). Under `PopScope(canPop: false)` after awaited modal, use `<Route>().go(context)`, never pop fallback. `.select((value) => value)` is forbidden: select concrete fields/records, or watch a generated computed projection provider directly when the provider's whole value is already the render projection. Lints: `dialog_widget_subscribes_to_mutable_provider`, `modal_high_frequency_watch_not_leaf`, `dialog_button_pop_then_state_mutation`, `riverpod_select_identity_forbidden`, `select_returns_unstable_record_identity`, `build_method_assigns_to_field`, `build_calls_mutating_instance_method`, `widget_calls_notifier_teardown_after_await`, `popscope_bypass_uses_go_not_pop`. See [common-patterns.md](references/common-patterns.md#modal-snapshot-pattern), [state-management-lifecycle.md](references/state-management-lifecycle.md#state-teardown-belongs-in-the-notifier).
 
@@ -86,6 +81,12 @@ After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` /
 
 20. **Resolve platform-specific plugin implementations before use.** `resolvePlatformSpecificImplementation<T>()` returns a nullable platform implementation. Assign it to a local variable or narrow helper getter, handle `null` explicitly, then call platform-specific members. Do not chain directly into `?.method()`, `?.property`, or `!.method()`. Lint: `resolve_platform_specific_implementation_before_use`.
 
+21. **Keep widget previews preview-only.** `package:flutter/widget_previews.dart` imports live only in preview files or preview-only blocks. Wrap targets in an app preview shell, override repos/datasources/auth/config/clock with deterministic small fakes, and never run real HTTP, Firebase, Hive boxes, native plugins, platform channels, or `dart:io` from previews. Reusable preview matrices cover empty, loading, data, long text, error, compact, and expanded states when relevant. See [widget-previews.md](references/widget-previews.md).
+
+22. **Runtime E2E proof is behavior proof, not screenshots.** Use Dart MCP before shell when available, requested device class and entrypoint, named actors/accounts/data, stable text/semantics/tooltips/central `AppWidgetKeys`, source-of-truth verification, logs after major segments/failures, and cleanup of test data and app processes. Shared/sync flows need writer + observer proof without manual refresh. See [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md).
+
+23. **Accessibility is UI correctness.** Action/icon buttons need localized tooltips; informative images need localized `semanticLabel`; decorative images set `excludeFromSemantics: true`; tappable controls meet 48x48 targets; styled copy prefers `Text.rich` over `RichText`; never hardcode tooltip, semantic label, or visible accessibility copy. Verify text scale and contrast locally, not by global clamps. Lints: `prefer_action_button_tooltip`, `avoid_missing_image_alt`, `avoid_hardcoded_strings`, `prefer_text_rich`, `a11y_text_scale_clamp`.
+
 ## Trigger Map
 
 Before writing code in any row below, output `Reading: <ref-name>` and read the listed reference(s).
@@ -100,6 +101,7 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | GoRouter, typed route, redirect, `context.go`, deep link, cold-start, navigation gate | [architecture.md](references/architecture.md) + [deep-linking.md](references/deep-linking.md) |
 | HTTP, network, REST, source-of-truth fetch after mutation, long-running remote function, async-start + reconcile, transport id vs domain id | [networking.md](references/networking.md) + [common-patterns.md](references/common-patterns.md#remote-functions-destructive-reconciliation) |
 | Atom, molecule, organism, design tokens, atomic widgets, `core/widgets/` promotion | [atomic-design.md](references/atomic-design.md) |
+| Accessibility, semantics, tooltip, semanticLabel, image alt text, tap target, contrast, text scaling | [atomic-design.md](references/atomic-design.md#accessibility) + [flutter-optimizations.md](references/flutter-optimizations.md#semantics) |
 | Widget test, `ProviderContainer.test()`, `UncontrolledProviderScope`, fakes, mocks, `AppWidgetKeys`, event-contract tests | [testing.md](references/testing.md) |
 | `flutter_driver`, Dart MCP, E2E, `integration_test`, semantic selectors, log capture | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 | Hive, `TypeAdapter`, TypeId, box, persistence migration, retired field accounting | [hive-persistence.md](references/hive-persistence.md) |
@@ -123,11 +125,11 @@ Version SSOT: [README.md → Core Stack](README.md).
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| flutter_riverpod + riverpod_annotation + riverpod_generator | `^3.3.1` / `^4.0.2` / `^4.0.3` | State management (codegen) |
+| flutter_riverpod + riverpod_annotation + riverpod_generator | `^3.3.2` / `^4.0.3` / `^4.0.4` | State management (codegen) |
 | freezed + freezed_annotation | `^3.2.5` / `^3.1.0` | Immutable data classes, unions |
-| go_router + go_router_builder | `^17.2.3` / `^4.3.0` | Declarative, type-safe routing |
-| json_serializable + build_runner | `6.13.0` / `^2.15.0` | JSON serialization + code generation |
-| hive_ce + hive_ce_flutter + hive_ce_generator | `^2.19.3` / `^2.3.4` / `1.11.0` | Local persistence |
+| go_router + go_router_builder | `^17.3.0` / `^4.3.0` | Declarative, type-safe routing |
+| json_serializable + build_runner | `6.14.0` / `^2.15.0` | JSON serialization + code generation |
+| hive_ce + hive_ce_flutter + hive_ce_generator | `^2.19.3` / `^2.3.4` / `1.11.2` | Local persistence |
 
 ## Architecture
 
@@ -194,55 +196,28 @@ runtime hooks or run scanners. Use plugin installs when enforcement matters.
 
 ## Pre-Flight
 
-Fill T0 always after any `.dart` write. Fill T1 if state / notifier / mutation touched. Fill T2 if network / E2E / stream / route touched. Emit before yielding the turn.
+After any `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write, emit a checked list before yielding. Fill T0 always. Add T1 for state/notifier/mutation changes and T2 for network/E2E/stream/route changes. Cite rule IDs or refs for any failed item.
 
-### T0
+### T0 — Core
 
-- [ ] `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint` wired
-- [ ] `if (!ref.mounted) return;` after every `await` in notifiers and repositories
-- [ ] `if (!context.mounted) return;` after every `await` in widgets and `State`; no bare `mounted` / `this.mounted` anywhere in widgets (`bare_state_mounted_forbidden`)
-- [ ] Inside `finally`, use guard form `if (ref.mounted) { ... }` — never early-return
-- [ ] No `_buildXxx()`, no top-level/global helper functions in widget/screen files, and no private widget classes extending Stateless / Stateful / Consumer / Hook widgets (`State` subclasses exempt)
-- [ ] App shell widget (`MaterialApp` / `CupertinoApp` / `WidgetsApp`) has no bootstrap/service-wiring `ref.listen`; root lifecycle listeners live in a dedicated bootstrap widget
-- [ ] No `dynamic` except `Map<String, dynamic>` for JSON; no `value!`
-- [ ] Nullability has semantics: no nullable collection types outside wire DTOs; no empty-string sentinels in domain/state; no boolean `'1'`/`'0'` string sentinels; no primitive/string/toString/chained `??` sentinel fallbacks; optional strings normalize blank to `null`, required strings use VOs (`nullable_collection_type`, `state_empty_string_sentinel`, `state_bool_string_sentinel`, `domain_empty_string_sentinel`, `implicit_null_fallback`)
-- [ ] Widgets bind `final l10n = context.l10n;` before localized key reads; no chained `context.l10n.someKey`
-- [ ] All providers `@riverpod` codegen; no manual `Provider(...)` family
-- [ ] No prop-drilling: children watch providers directly. No entity / state / notifier in constructors
-- [ ] No concrete infra deps in widget constructors/props: cache managers, clients, storage, services, repositories, datasources, queues, plugins (`widget_infra_dependency_boundary`)
-- [ ] Provider-derived caches and one-shot event serials/payloads have one SSOT (computed provider/notifier/repo/service or non-const instance `late final` derived field); no standalone `*Signal` / `*Event` / `*Pulse` / `*Serial` providers, `ConsumerState` cache/source/snapshot/memo/by-id fields, provider-family arg wrappers (`config`/`args`/`params`), top-level/global `Expando` derived caches, local `isSubmitting`/`isSaving` flags for provider-owned mutations, or `ProviderSubscription` fields; no `ref.listenManual` (`riverpod_consumer_state_derived_cache`, `riverpod_widget_provider_arg_wrapper`, `riverpod_consumer_state_provider_subscription`, `riverpod_listen_manual_forbidden`, `riverpod_event_counter_signal_forbidden`, `expando_derived_cache_forbidden`, `widget_local_mutation_flag`)
-- [ ] Widgets are UI + dispatch only: no `try/catch`, no awaited notifier result branching, no raw `Material(...)` / `Ink(...)` / `InkWell(...)` surfaces outside atoms/app shell/dedicated primitives, no top-level/global helper functions, no widget-file `*Actions` namespaces with `WidgetRef`/provider calls, no provider-triggered `addPostFrameCallback` in `build`, no `*Data` helper namespaces that filter/map/sort/index collections, no private collection/filter/sort helpers (`widget_material_boundary`, `widget_top_level_function_boundary`, `widget_try_catch_boundary`, `widget_awaits_notifier_result`, `widget_local_mutation_flag`, `widget_derived_collection_logic`)
-- [ ] Shared behavior across 2+ classes lives in a `mixin` (suffixed `Mixin`), not copy-pasted
-- [ ] No `hive_ce` / `shared_preferences` / `flutter_secure_storage` / `dart:io` / `path_provider` imports in notifier or widget files — storage goes through `Local<X>Datasource` → `<X>Repository`; secret-store SDKs only by explicit product/security requirement; no production `dependency ?? ConcreteDependency()` or optional/defaulted dependency/function seams (`hidden_dependency_fallback`, `hidden_dependency_default_param`)
-- [ ] No inline concrete dependency construction inside service wiring; SDK/plugin/client instances have one provider/composition-root owner, and stable service/repository/datasource/client/plugin wiring uses `ref.read`, not `ref.watch` (`service_inline_concrete_dependency`, `service_provider_watch_dependency`)
-- [ ] No unnecessary `else` after an exiting branch (`return` / `throw` / `break` / `continue`); flatten guard-style control flow (`avoid_unnecessary_else_after_control_flow`)
-- [ ] Reorderable widgets use `onReorderItem` directly: no framework `onReorder`, no inverse adapter math, no downstream `newIndex -= 1` legacy adjustment (`use_on_reorder_item_index_semantics`)
-- [ ] Android exact-alarm permission flows using `flutter_local_notifications` call `canScheduleExactNotifications()` / `requestExactAlarmsPermission()` directly; no manual `AndroidIntent(action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM')` (`use_local_notifications_exact_alarm_permission_api`)
-- [ ] Platform-specific plugin access resolves `resolvePlatformSpecificImplementation<T>()` before use with explicit null handling; no direct `?.method()`, `?.property`, or `!.method()` chain (`resolve_platform_specific_implementation_before_use`)
-- [ ] No inline primitive ops outside `core/extensions/` — use `.capitalized` / `.timeAgo` / `.asCurrency` / `.clamped(...)` / `.pluralized(...)` / `DateTimeX.nowUtc()` / `context.isCurrentModalRoute`. Forbidden: `'${s[0].toUpperCase()}...'`, date now/diff/UTC/timestamp chains, local calendar windows, ad-hoc `NumberFormat`, ad-hoc `DateFormat`, inline `.formatted(pattern: ...)`, inline `.clamp(...)`, raw `ModalRoute` current-route checks, raw key/id/limit/threshold literals
-- [ ] Domain entity imports = `freezed_annotation` + `/domain/` paths only. Zero `core/`, `data/`, `presentation/`, `package:flutter`, `dart:ui`
-- [ ] Value/state classes use `@freezed sealed class` only: no `@immutable`, no `@unfreezed`, no multiple Freezed declarations in one source file (`use_freezed_instead_of_immutable`, `freezed_one_class_per_file`)
-- [ ] Domain primitives with unit / currency / measure / identity wrapped in VO (`Distance`/`Money`/`Email`) — no bare `double distanceMeters` / `int amountCents` / `String email` at entity boundary
-- [ ] VO raw redirects PRIVATE (`._meters` / `._raw`); only validated factories public (`vo_public_raw_constructor`)
-- [ ] No named primitive factories on `@freezed` domain entities (`factory User.fromPrimitives(...)` forbidden — convert at data/notifier/import boundary) (`domain_entity_primitive_factory`)
-- [ ] No hand-written `copyWith` in `/domain/` — let Freezed generate from the redirect (`domain_custom_copy_with`)
+- [ ] Package-root `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin.
+- [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
+- [ ] Providers, state, and widgets follow Rules 2-8 and 14: codegen, semantic nullability, l10n, no prop drilling, widgets UI + dispatch only, no provider-derived caches/events/`listenManual`/`Expando`.
+- [ ] Domain/data/platform follow Rules 7, 10-13, 17-23: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y.
+- [ ] Any row touched in Trigger Map was read; exact lint names are cited when a scanner should enforce the rule.
 
 ### T1 — State / Notifier / Mutation
 
-- [ ] Mutation methods (`create*`, `update*`, `delete*`, `set*`, `reorder*`) resolve deps lazily via a stateless helper/mixin; no notifier-local `_repository` / `_repo` / `_service` cache fields unless the field owns a disposable lifecycle resource (`notifier_local_dependency_cache`)
-- [ ] Sync `Notifier.build()` does not read `state` before first return; seed via constructor; defer async with `Future.microtask`
-- [ ] `ref.onDispose()` cancels every subscription / controller / timer
-- [ ] No provider-derived `*Cache`/`*Source`/`*DayStart`/`*TodayStart` fields in `ConsumerState`; use computed providers or local `build` values
-- [ ] Notifier owns snackbar dispatch — widgets do not call `SnackBarUtils.show*` or `ScaffoldMessenger.of(context)`
-- [ ] Long-running sync / auth / import flows guard stale async writes
-- [ ] No `ref.watch` inside notifier method body — `ref.watch` in `build()` only; `ref.read` in callbacks
+- [ ] Mutation deps resolve lazily via stateless helper/mixin; no notifier-local repo/service cache except disposable lifecycle owners.
+- [ ] Sync `Notifier.build()` avoids pre-return `state` reads; async defers with `Future.microtask`.
+- [ ] `ref.onDispose()` cancels subscriptions/controllers/timers; durable status/snackbar/teardown belongs to notifier state.
+- [ ] Long-running sync/auth/import guards stale writes; no `ref.watch` inside notifier methods.
 
 ### T2 — Network / E2E / Stream / Route
 
-- [ ] Source-of-truth fetch after mutation when backend generates / normalizes / reorders / derives values
-- [ ] Observer + writer E2E proof present for shared / realtime / collaborative state
-- [ ] All `ValueKey` from central `AppWidgetKeys` registry — no inline string `ValueKey('...')`
-- [ ] E2E entrypoint deterministic (`lib/main_dev.dart` or equivalent); test overrides isolated from `main.dart`
-- [ ] GoRouter redirect logic in pure `resolveAppRedirect(...)`, matrix-tested; nullable by-id provider for route params with fallback UI; call sites use generated typed route helpers
-- [ ] Cross-runtime constants / schema / function contracts have drift tests
-- [ ] No `MediaQuery.withClampedTextScaling` in `MaterialApp` builder
+- [ ] Source-of-truth fetch/reconcile after generated, normalized, reordered, destructive, or remote-function mutations.
+- [ ] Shared/realtime state has writer + observer E2E proof without manual refresh.
+- [ ] Selectors use stable text/semantics/tooltips or central `AppWidgetKeys`; no inline string keys or coordinate primary taps.
+- [ ] E2E entrypoint is deterministic and isolated from production `main.dart`; logs and cleanup are captured.
+- [ ] GoRouter redirects use pure matrix-tested resolver, nullable by-id providers/fallback UI, and generated typed route helpers.
+- [ ] Cross-runtime constants, schemas, and function contracts have drift tests; no app-root text-scale clamp.

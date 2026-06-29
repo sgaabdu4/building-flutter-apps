@@ -11,33 +11,33 @@
     "passed": 1,
     "failed": 0,
     "pass_rate": 1.0,
-    "expectations_met": 5,
+    "expectations_met": 6,
     "expectations_total": 6,
-    "mean_expectation_rate": 0.8333,
-    "duration_seconds": 119.89,
-    "tokens_used": 59206
+    "mean_expectation_rate": 1.0,
+    "duration_seconds": 273.81,
+    "tokens_used": 112822
   },
   "results": [
     {
-      "id": 16,
+      "id": 43,
       "pass": true,
-      "met": 5,
+      "met": 6,
       "total": 6,
-      "score": 0.8333,
+      "score": 1.0,
       "expectations_met": [
         true,
         true,
         true,
-        false,
+        true,
         true,
         true
       ],
-      "notes": "The answer fixes the visible copy rules and avoids chaining `context.l10n.someKey` at call sites, but it does not use the explicitly required `AppLocalizations.of(context)!` binding at the top of `build`.",
-      "response_length": 1043,
-      "duration_seconds": 119.89,
-      "tokens_used": 59206,
-      "answer_tokens_used": 36359,
-      "judge_tokens_used": 22847,
+      "notes": "The answer explicitly covers typed route helpers, route-boundary validation, nullable by-id providers, a pure redirect resolver with matrix states, ref.listen/refreshListenable wiring, and App Links/Universal Links association files with cold/warm E2E proof.",
+      "response_length": 2192,
+      "duration_seconds": 273.81,
+      "tokens_used": 112822,
+      "answer_tokens_used": 79759,
+      "judge_tokens_used": 33063,
       "judge_returncode": 0
     }
   ],

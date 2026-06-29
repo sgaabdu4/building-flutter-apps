@@ -100,7 +100,7 @@ testWidgets('confirm dialog renders from summary', (tester) async {
 
 Lints: `dialog_widget_subscribes_to_mutable_provider`, `modal_high_frequency_watch_not_leaf`, `dialog_button_pop_then_state_mutation`, `select_returns_unstable_record_identity`, `build_method_assigns_to_field`, `build_calls_mutating_instance_method`, `widget_calls_notifier_teardown_after_await`, `popscope_bypass_uses_go_not_pop`, `modal_helper_requires_route_settings`.
 
-See also: [State Teardown Belongs in the Notifier](../state-management-lifecycle.md#state-teardown-belongs-in-the-notifier), [Dismiss Modal → Push Route](#dismiss-modal--push-route-bottom-sheet-navigation).
+See also: [State Teardown Belongs in the Notifier](../state-management-lifecycle.md#state-teardown-belongs-in-the-notifier), [Dismiss Modal → Push Route](#dismiss-modal-push-route-bottom-sheet-navigation).
 
 ## Dismiss Modal → Push Route (Bottom Sheet Navigation)
 

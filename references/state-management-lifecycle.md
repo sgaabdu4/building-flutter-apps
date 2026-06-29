@@ -1,5 +1,7 @@
 # State Management Lifecycle And Errors
 
+## Read first
+
 Read with [state-management.md](state-management.md) for notifier initialization, mutation readiness, async guards, optimistic updates, and loading patterns.
 
 ## State Teardown Belongs in the Notifier

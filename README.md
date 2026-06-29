@@ -146,24 +146,24 @@ changing it.
 
 | Package | Constraint | Purpose |
 |---------|-----------|---------|
-| flutter_riverpod | `^3.3.1` | State mgmt |
-| riverpod_annotation | `^4.0.2` | Codegen annotations |
-| riverpod_generator | `^4.0.3` | Provider codegen (dev_dependency) |
+| flutter_riverpod | `^3.3.2` | State mgmt |
+| riverpod_annotation | `^4.0.3` | Codegen annotations |
+| riverpod_generator | `^4.0.4` | Provider codegen (dev_dependency) |
 | freezed_annotation | `^3.1.0` | Sealed-union annotations |
 | freezed | `^3.2.5` | Immutable classes (dev_dependency) — needs Dart SDK ≥ 3.8 |
-| json_annotation | `^4.11.0` | JSON annotations |
-| json_serializable | `6.13.0` | JSON codegen (**exact pin** — see note) |
-| go_router | `^17.2.3` | Declarative routing |
+| json_annotation | `^4.12.0` | JSON annotations |
+| json_serializable | `6.14.0` | JSON codegen (**exact pin** — see note) |
+| go_router | `^17.3.0` | Declarative routing |
 | go_router_builder | `^4.3.0` | Typed route codegen (dev_dependency) |
 | hive_ce | `^2.19.3` | Binary local persist |
 | hive_ce_flutter | `^2.3.4` | Flutter glue for `hive_ce` |
-| hive_ce_generator | `1.11.0` | Hive type adapters (**exact pin** — see note) |
+| hive_ce_generator | `1.11.2` | Hive type adapters (**exact pin** — see note) |
 | build_runner | `^2.15.0` | Codegen runner (dev_dependency) |
 
 **Pin note.** `json_serializable` and `hive_ce_generator` stay at exact pins
-because they bind the analyzer version and the Riverpod generator stack
-currently resolves on analyzer 9. Lift to caret ranges only after
-`dart pub deps -s compact | rg analyzer` no longer shows analyzer 9.
+because code generators bind analyzer constraints. Lift to caret ranges only
+after a real project pub solve and `dart analyze` prove the full
+Riverpod/Freezed/Hive generator stack is compatible.
 
 ### Architecture
 4-layer clean arch:

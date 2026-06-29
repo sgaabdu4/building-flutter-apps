@@ -5,6 +5,7 @@
 1. `dart analyze` from package root. No path arg. Never `flutter analyze lib`.
 2. Analyzer plugins live ONLY in `analysis_options.yaml` top-level `plugins:` — never `pubspec.yaml` deps.
 3. Enable strict casts/inference/raw types. Exclude generated files.
+4. Setup/fix answers must explicitly verify one `flutter_skill_lints` diagnostic and one `riverpod_lint` diagnostic can fire before calling setup complete.
 
 ## Trigger
 
@@ -95,6 +96,9 @@ overwrite project-specific extensions.
 3. Fail on `server.pluginError`
 4. One `flutter_skill_lints` diagnostic
 5. One `riverpod_lint` diagnostic
+
+Do not omit steps 4-5 in analyzer setup answers; green analysis alone does not
+prove both plugins are loaded.
 
 Scope: `dart analyze` = analyzer/plugin gate. Use `flutter pub get` + publish/dry-run for package validity.
 

@@ -45,7 +45,10 @@ dev_dependencies:
   json_serializable: <version>
 ```
 
-Pin `json_serializable` to `6.13.0`. `6.13.1+` needs analyzer `>=10`. Riverpod + Hive CE generator stack resolves on analyzer 9. **Re-check pin** after Riverpod/Hive CE generator upgrade. Both compat w/ analyzer 10 → lift to `^6.13.x`. Run `dart pub deps -s compact | rg analyzer` first.
+Pin `json_serializable` to the README Core Stack exact version. Do not raise it
+or switch to a caret range until a real project pub solve plus `dart analyze`
+proves the Riverpod/Freezed/Hive generator stack is compatible. Run
+`dart pub deps -s compact | rg analyzer` before changing the pin.
 
 Every Freezed source file owns exactly one Freezed declaration and needs:
 

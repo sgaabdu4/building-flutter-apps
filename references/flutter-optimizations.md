@@ -310,16 +310,19 @@ Open output JSON in DevTools > App Size tool for per-package breakdown.
 
 ```dart
 Semantics(
-  label: 'Delete product ${product.name}',
+  label: l10n.deleteProductSemantics(product.name),
   button: true,
   child: IconButton(
+    tooltip: l10n.deleteProductTooltip,
     icon: const Icon(Icons.delete),
     onPressed: () => onDelete(product.id),
   ),
 )
 ```
 
-Hide decorative: `ExcludeSemantics(child: decorativeWidget)`.
+Hide decorative: `ExcludeSemantics(child: decorativeWidget)`. Tooltips,
+semantic labels, form labels, and visible accessibility copy come from
+`AppLocalizations`, never hardcoded widget strings.
 
 ### Checklist
 
@@ -328,7 +331,7 @@ Hide decorative: `ExcludeSemantics(child: decorativeWidget)`.
 | Tap targets | Min 48x48 logical pixels |
 | Contrast ratio | Min 4.5:1 (text vs background) |
 | Color dependence | Never rely on color alone |
-| Screen reader | Every interactive widget has a label |
+| Screen reader | Every interactive widget has a localized label/tooltip |
 | Scale factors | UI legible at 200% text scale |
 
 Test with TalkBack (Android) + VoiceOver (iOS) on real devices.

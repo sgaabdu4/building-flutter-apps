@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "I need a new 'notifications' feature module for my Flutter app. It should have a Freezed entity NotificationItem with fields: id (String), title (String), body (String), isRead (bool, default false), createdAt (DateTime). Then a NotificationsNotifier using Riverpod codegen that holds a list of NotificationItem, with methods to markAsRead(id) and clearAll(). Wire it up with proper architecture layers. The app uses the stack from the building-flutter-apps skill.",
-      "expected_output": "Creates a properly layered feature module with domain entity (sealed Freezed class with const constructor and Rich Model getter), repository, notifier using @Riverpod(keepAlive: true) codegen, and checks ref.mounted after awaits. No prop drilling, no StateProvider, no abstract class.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "NotificationItem uses `sealed class` not `abstract class`",
@@ -22,7 +22,7 @@
     {
       "id": 2,
       "prompt": "Review this notifier for anti-patterns and fix it: ```dart\nimport 'package:flutter_riverpod/flutter_riverpod.dart'; class CartState { final List<String> items; final bool isLoading; CartState({this.items = const [], this.isLoading = false});\n} final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) => CartNotifier(ref)); class CartNotifier extends StateNotifier<CartState> { final Ref ref; CartNotifier(this.ref) : super(CartState()); Future<void> loadItems() async { state = CartState(isLoading: true); final items = await ref.read(cartRepoProvider).fetchItems(); state = CartState(items: items, isLoading: false); } void addItem(String item) { state = CartState(items: [...state.items, item]); }\n}\n```",
-      "expected_output": "Identifies multiple anti-patterns: StateNotifierProvider (should use @riverpod codegen), plain class instead of Freezed sealed class, missing ref.mounted check, no copyWith. Rewrites using Freezed + Riverpod codegen.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Identifies StateNotifierProvider as a legacy anti-pattern",
@@ -37,7 +37,7 @@
     {
       "id": 3,
       "prompt": "I have a Freezed model `Invoice` that contains a nested `List<LineItem>` where LineItem is also a Freezed class. When I serialize Invoice to JSON in release mode, I get `type '_$LineItemImpl' is not a subtype of type 'Map<String, dynamic>'`. How do I fix this? Both models already have fromJson factories.",
-      "expected_output": "Identifies the root cause as missing explicit_to_json configuration. Recommends adding `explicit_to_json: true` in build.yaml under json_serializable options as the project-wide fix. Explains that without it, json_serializable calls toString() on nested objects instead of toJson(). Mentions running build_runner after the fix.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Identifies the root cause as missing explicitToJson / explicit_to_json configuration",
@@ -50,7 +50,7 @@
     {
       "id": 4,
       "prompt": "I'm building a settings screen in my Flutter app. The parent settings page fetches the user's preferences and I want to pass them down to child widgets like ThemeSelector, NotificationToggle, etc. What's the right way to share this data with child widgets? I'm using Riverpod.",
-      "expected_output": "Advises AGAINST prop drilling — child widgets should watch the provider directly instead of receiving data through constructor parameters. Shows leaf widgets using ref.watch(provider.select(...)) for minimal rebuilds.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Explicitly warns against prop drilling (passing state through constructors)",
@@ -63,7 +63,7 @@
     {
       "id": 5,
       "prompt": "I need to add offline persistence to my Flutter app's MachineConfig data using Hive. The MachineConfig has fields: id (String), name (String), isActive (bool), lastSyncedAt (DateTime?). Set up the Hive adapter registration and a repository that reads/writes to a Hive box. The app uses @GenerateAdapters.",
-      "expected_output": "Creates a Hive-persisted model using @GenerateAdapters with proper TypeId assignment, a repository with box open/close lifecycle, and follows the project's Hive CE patterns.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Uses @GenerateAdapters annotation (not @HiveType/@HiveField manually)",
@@ -76,8 +76,8 @@
     },
     {
       "id": 6,
-      "prompt": "I'm starting a new Flutter project for a small clinic. It needs: patient list, patient detail, and an 'add patient' form. I'm using Riverpod, Freezed, GoRouter, and Hive. Can you set up the project architecture — folder structure, entities, routing — just the scaffolding, no actual API calls yet.",
-      "expected_output": "Creates a 4-layer architecture (data/domain/repositories/presentation) under a 'patients' feature module. Patient entity uses Freezed sealed class with Rich Model methods. GoRouter with typed routes for list, detail, and add screens. Main.dart bootstraps with ProviderScope and MaterialApp.router.",
+      "prompt": "I'm starting a new Flutter project for a small clinic. It needs: patient list, patient detail, and an 'add patient' form. I'm using Riverpod, Freezed, GoRouter, and Hive. Can you set up the project architecture \u2014 folder structure, entities, routing \u2014 just the scaffolding, no actual API calls yet.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Creates lib/features/patients/ with data/, domain/, repositories/, presentation/ subdirectories",
@@ -92,14 +92,14 @@
     {
       "id": 7,
       "prompt": "I have a product list screen and I want to add a search bar that filters products as the user types. It should debounce the input so we're not firing a filter on every keystroke. The products come from a Riverpod provider. Show me how to wire this up.",
-      "expected_output": "Creates a SearchNotifier with debounce using a Debouncer utility. State holds query and filtered results. Uses ref.onDispose to cancel the debouncer. Search bar widget watches the notifier directly (no prop drilling).",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Uses a Debouncer utility (Timer-based) for debouncing input",
         "Debouncer is disposed via ref.onDispose in the notifier",
         "SearchState is a Freezed sealed class with query and results fields",
         "Search bar widget is a ConsumerWidget that watches the notifier",
-        "No prop drilling — widgets watch providers directly",
+        "No prop drilling \u2014 widgets watch providers directly",
         "Uses @riverpod or @Riverpod codegen annotation",
         "Contains ref.mounted check if there's an async operation"
       ]
@@ -107,12 +107,12 @@
     {
       "id": 8,
       "prompt": "I need to write tests for my OrderNotifier. It has methods: loadOrders(), placeOrder(order), and cancelOrder(id). The notifier depends on an OrderRepository provider. Show me the full test file with mocks and different test cases.",
-      "expected_output": "Creates a test file with Mocktail mocks for the repository interface. Uses ProviderContainer.test() with overrides. Tests each method including state transitions, error handling, and verifying repository calls.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Declares a Mocktail mock for IOrderRepository, not a concrete OrderRepository mock",
         "Uses ProviderContainer.test() with overrides",
-        "Tests loadOrders: verifies state transitions (loading → loaded)",
+        "Tests loadOrders: verifies state transitions (loading \u2192 loaded)",
         "Tests placeOrder: verifies repository.create is called",
         "Tests cancelOrder: verifies item removal from state",
         "Tests error case: verifies error is set in state on failure",
@@ -123,7 +123,7 @@
     {
       "id": 9,
       "prompt": "My Flutter app crashes sometimes after awaiting a network call in a notifier. The error says something about using a disposed ref. Also, I have a form screen where tapping submit after navigating away crashes too. What's going on and how do I fix both?",
-      "expected_output": "Identifies both as async gap issues. Notifier needs ref.mounted check after await. Widget form needs context.mounted check after await before using BuildContext (e.g., for navigation or showing snackbar). Shows the correct patterns for both.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Identifies the notifier crash as missing ref.mounted check after await",
@@ -137,7 +137,7 @@
     {
       "id": 10,
       "prompt": "I need auth-protected routes in my Flutter app using GoRouter. Users should be redirected to /login if not authenticated, and back to the page they were trying to access after login. I have an AuthNotifier with states: Authenticated(user), Unauthenticated, and AuthLoading. Show me the router setup with redirect logic.",
-      "expected_output": "Creates a GoRouter with typed routes and a redirect function that checks authState. Uses ref.read (not ref.watch) in redirect. Redirects to login when unauthenticated, back to intended route after login. AuthState is a Freezed sealed union with pattern matching.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Uses typed GoRouter routes (go_router_builder), not string paths",
@@ -152,7 +152,7 @@
     {
       "id": 11,
       "prompt": "I'm building a product catalog with infinite scroll. The API returns paginated data with a cursor. I need a notifier that fetches the first page on init, then loads more when the user scrolls near the bottom. Show me the notifier, state, and the scroll detection in the widget.",
-      "expected_output": "Creates a paginated notifier with cursor-based pagination state, loadMore method with duplicate fetch prevention, and a widget that detects scroll position to trigger loading.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "State has a cursor/nextPage field and hasMore flag",
@@ -167,7 +167,7 @@
     {
       "id": 12,
       "prompt": "My app has a registration form with: email, password, confirm password, and phone number. Password must be at least 8 chars with one uppercase and one number. Confirm password must match. Phone is optional but if provided must be valid. Show me the form notifier with validation and the form UI.",
-      "expected_output": "Creates a FormNotifier with per-field validation, cross-field validation (confirm matches password), computed isValid, and a submit guard. Form UI uses leaf ConsumerWidgets for each field.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "FormState is a Freezed sealed class with per-field error strings",
@@ -183,7 +183,7 @@
     {
       "id": 13,
       "prompt": "I want to add proper error handling to my Flutter app. Right now I'm just doing error: e.toString() everywhere. I need a typed error hierarchy that I can pattern match on in the UI to show different messages. For network errors show retry, for validation errors show the field, for auth errors redirect to login.",
-      "expected_output": "Creates an AppError sealed union with NetworkError, ValidationError, UnauthorizedError variants. Shows notifier catching and mapping exceptions to AppError types. Shows UI pattern matching with different widgets per error type.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "AppError is a Freezed sealed class with multiple variants",
@@ -198,8 +198,8 @@
     },
     {
       "id": 14,
-      "prompt": "My list screen is really janky — it rebuilds every widget in the list whenever any state changes. I have a parent widget watching the full notifier state and passing items to children. The notifier state has items, selectedId, and isLoading. How do I optimize this?",
-      "expected_output": "Identifies the problem as watching full state and prop drilling. Fixes by having leaf widgets watch providers directly with .select(). Separates concerns so list items only rebuild when their specific data changes.",
+      "prompt": "My list screen is really janky \u2014 it rebuilds every widget in the list whenever any state changes. I have a parent widget watching the full notifier state and passing items to children. The notifier state has items, selectedId, and isLoading. How do I optimize this?",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Identifies watching full state as the cause of unnecessary rebuilds",
@@ -213,7 +213,7 @@
     {
       "id": 15,
       "prompt": "I need a provider that takes a user ID parameter and fetches that user's profile. Multiple screens might request different user IDs. How do I set this up with Riverpod codegen?",
-      "expected_output": "Creates a family provider via codegen by adding the userId parameter to the generated function or notifier build method. Shows proper usage in widgets.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Uses codegen family: parameter on the generated function or build() method",
@@ -227,22 +227,22 @@
     {
       "id": 17,
       "prompt": "I have a Product entity and I need to fetch products from an API but also cache them locally in Hive so the app works offline. When online, fetch from API and update cache. When offline, fall back to cache. Show me the repository pattern.",
-      "expected_output": "Creates a repository with remote and local datasources. Fetches from remote first, caches results locally. On remote failure, falls back to local cache. Uses the skill's repository bridge pattern.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Repository has both remote and local datasource dependencies",
         "fetchAll tries remote first, then caches results locally on success",
         "On remote failure, falls back to local cache",
-        "Model has toEntity() mapping (data layer → domain layer)",
+        "Model has toEntity() mapping (data layer \u2192 domain layer)",
         "Repository is a @Riverpod(keepAlive: true) provider",
         "Local datasource uses Hive box for persistence",
-        "No try-catch in datasources — repository or notifier handles errors"
+        "No try-catch in datasources \u2014 repository or notifier handles errors"
       ]
     },
     {
       "id": 18,
       "prompt": "I have an OrderNotifier that needs to read the current user from AuthNotifier and the cart items from CartNotifier when placing an order. How should notifiers communicate with each other in Riverpod?",
-      "expected_output": "Shows cross-provider communication using ref.read to access other providers. Does NOT create circular dependencies. Uses ref.listen if reactive updates are needed.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "OrderNotifier uses ref.read(authProvider) to get current auth state",
@@ -257,7 +257,7 @@
     {
       "id": 19,
       "prompt": "I have a preview-stage config entity stored in Hive: AppConfig with fields theme (String), language (String), measurementUnit (String, default 'metric'), lastUpdated (DateTime). I need to replace it with a new AppConfig shape that adds notificationsEnabled (bool, default true). What's the reset approach?",
-      "expected_output": "Shows how to update the Hive-persisted entity for a preview-stage reset. Uses @Default annotation for the new field and explicitly clears app-owned cached data instead of adding a retention bridge.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "New field uses @Default(true) so existing records get the default when read",
@@ -271,7 +271,7 @@
     {
       "id": 20,
       "prompt": "I need an AsyncNotifier that fetches user settings on initialization. While loading, show a shimmer placeholder. On error, show a retry button. On success, show the settings form. Show me the notifier and the UI that handles all three states.",
-      "expected_output": "Creates an AsyncNotifier using @riverpod codegen. UI uses AsyncValue pattern matching (when/switch) to handle loading, error, and data states separately.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Notifier extends AsyncNotifier pattern (returns Future from build)",
@@ -287,7 +287,7 @@
     {
       "id": 21,
       "prompt": "I have a chat screen with a TextEditingController and a ScrollController. Where do I put these controllers when using Riverpod? My screen is a ConsumerWidget right now but I need to dispose the controllers properly.",
-      "expected_output": "Explains that controllers need lifecycle management → use ConsumerStatefulWidget. Controllers are created in initState, disposed in dispose. Chat state itself lives in a Riverpod notifier, but controllers are local widget state.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Recommends ConsumerStatefulWidget (not ConsumerWidget) for controllers",
@@ -301,7 +301,7 @@
     {
       "id": 22,
       "prompt": "I need bottom tab navigation with 3 tabs: Home, Search, Profile. Each tab should keep its own scroll position and state when switching between tabs. How do I set this up with GoRouter?",
-      "expected_output": "Uses StatefulShellRoute with GoRouter for persistent tab navigation. Each tab has its own navigation stack. Uses NavigationShell/StatefulNavigationShell.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Uses StatefulShellRoute from GoRouter for tab navigation",
@@ -315,7 +315,7 @@
     {
       "id": 23,
       "prompt": "I have separate providers for userProvider (returns User) and cartProvider (returns CartState with items). I need a computed provider that calculates the order summary: user's name, total items, total price, and whether the user has a discount. How do I create this derived provider?",
-      "expected_output": "Creates a functional @riverpod provider that watches both userProvider and cartProvider, computes the OrderSummary from their values. Auto-disposes when unused.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Uses @riverpod functional provider (not class-based)",
@@ -329,7 +329,7 @@
     {
       "id": 24,
       "prompt": "I need to write a widget test for my ProductListScreen. It depends on a ProductNotifier provider. The screen shows a list of products and a loading spinner. Test that it shows the spinner when loading and the product names when loaded.",
-      "expected_output": "Creates a widget test with ProviderContainer.test, UncontrolledProviderScope, repository/provider overrides, pumpWidget, and finder assertions for loading and loaded states.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Uses ProviderContainer.test for overrides",
@@ -343,8 +343,8 @@
     },
     {
       "id": 25,
-      "prompt": "I'm building a checkout flow with 4 steps: Cart Review → Shipping Address → Payment → Confirmation. Each step can go back to the previous one. The user shouldn't be able to jump to Payment without completing Shipping. How do I model this as state?",
-      "expected_output": "Models checkout as a Freezed sealed union with one variant per step. Uses a notifier that enforces step ordering. GoRouter routes map to each step with redirect guards.",
+      "prompt": "I'm building a checkout flow with 4 steps: Cart Review \u2192 Shipping Address \u2192 Payment \u2192 Confirmation. Each step can go back to the previous one. The user shouldn't be able to jump to Payment without completing Shipping. How do I model this as state?",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "CheckoutState is a Freezed sealed union with one variant per step",
@@ -358,7 +358,7 @@
     {
       "id": 16,
       "prompt": "Review this settings screen snippet and fix the skill-rule issues: it uses `Text('Save')`, `Text('Settings')`, a `SettingsStrings.title` constant for visible copy, and `context.l10n.saveButton` chained directly inside build. It is a Flutter app using gen-l10n.",
-      "expected_output": "Moves all user-facing strings to gen-l10n/AppLocalizations, obtains `final l10n = context.l10n;` at the top of build, uses l10n fields for visible copy, and keeps constants only for non-user-facing IDs.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Requires AppLocalizations/gen-l10n for every user-facing string",
@@ -372,7 +372,7 @@
     {
       "id": 26,
       "prompt": "My root App widget returns MaterialApp.router. I currently call `ref.read(syncServiceProvider).start()` and `ref.read(notificationBootstrapProvider).initialize()` inside build before returning the app. What's the skill-approved way to bootstrap app-wide services?",
-      "expected_output": "Keeps the app shell declarative. Uses provider graph/watch for eager initialization and root-level ref.listen only for UI side effects, not imperative service starts inside the MaterialApp owner build.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Identifies imperative bootstrap calls in the MaterialApp owner build as an app-shell boundary violation",
@@ -386,7 +386,7 @@
     {
       "id": 27,
       "prompt": "I need to request Android exact alarm permission for scheduled reminders with flutter_local_notifications. My current code launches `android.settings.REQUEST_SCHEDULE_EXACT_ALARM` using AndroidIntent. Can you fix the approach?",
-      "expected_output": "Uses AndroidFlutterLocalNotificationsPlugin.canScheduleExactNotifications and requestExactAlarmsPermission, avoids manual AndroidIntent settings launches, and handles PlatformException at the service or repository boundary.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Uses AndroidFlutterLocalNotificationsPlugin.canScheduleExactNotifications()",
@@ -400,7 +400,7 @@
     {
       "id": 28,
       "prompt": "Review this local notifications code: `flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();` It works, but our lints complain. What should I do?",
-      "expected_output": "Resolves the nullable platform implementation into a local variable, handles null explicitly, then calls platform-specific members. It avoids direct ?. or ! chaining off resolvePlatformSpecificImplementation.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Explains that resolvePlatformSpecificImplementation returns a nullable platform implementation",
@@ -414,7 +414,7 @@
     {
       "id": 29,
       "prompt": "I have a UserSettingsNotifier that imports shared_preferences and calls SharedPreferences.getInstance() directly. For tests, the repository constructor has `SharedPreferences? prefs` and falls back to `SharedPreferences.getInstance()` when null. Please refactor the ownership model.",
-      "expected_output": "Moves SharedPreferences access behind a LocalUserSettingsDatasource, called by a repository. Notifiers do not import storage SDKs. Dependencies are required and wired at the provider/composition root without nullable fallback constructors.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Moves SharedPreferences SDK calls into a LocalUserSettingsDatasource or equivalent local datasource",
@@ -428,7 +428,7 @@
     {
       "id": 30,
       "prompt": "My ConsumerStatefulWidget keeps `late List<Product> _productsCache`, `Map<String, Product> _byId`, a `ProviderSubscription`, and a local `_isSaving` flag for a provider-owned save action. How should this be modeled?",
-      "expected_output": "Keeps ConsumerState for UI lifecycle handles only. Moves provider-derived caches and indexes to computed providers, moves mutation status into durable provider state, and avoids ref.listenManual/ProviderSubscription fields.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "States that ConsumerState may own UI lifecycle handles only, such as controllers, focus, or animation handles",
@@ -442,7 +442,7 @@
     {
       "id": 31,
       "prompt": "Review this Flutter widget file. It has `_buildHeader()`, `_buildSaveButton()`, a top-level `formatDate(DateTime d)`, and a private `_ProfileHeader extends ConsumerWidget`. What should change under the skill?",
-      "expected_output": "Extracts build helpers to public widget classes, marks file-internal widgets visibleForTesting when needed, moves primitive/date formatting to core extensions, and avoids top-level helper functions in widget files.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Rejects `_buildXxx()` widget helper methods",
@@ -456,7 +456,7 @@
     {
       "id": 32,
       "prompt": "I have domain entities `Clinic`, `Patient`, and `Appointment` that all store raw `String id`, `String phoneNumber`, and `double distanceMeters`. Some constructors use empty string defaults for missing values. Should I keep primitives or create something else?",
-      "expected_output": "Introduces sealed Freezed value objects for repeated domain primitives and validates required domain text by construction. Hive/data models may keep primitives; mappers bridge to domain value objects.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Identifies repeated domain primitives as value-object candidates",
@@ -470,7 +470,7 @@
     {
       "id": 33,
       "prompt": "My app state has `List<Order>? orders`, `String? statusLabel`, `bool? isActive`, and UI code like `orders ?? []`, `statusLabel ?? ''`, and `isActive == true ? '1' : '0'`. It made rendering easy. Is that okay?",
-      "expected_output": "Treats nullability as semantic. Uses non-null collections with empty defaults, explicit sealed/AsyncValue state when not-loaded differs from empty, value objects for required strings, and rejects silent null/string/bool fallbacks.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Explains that nullability must represent a real semantic absence",
@@ -484,7 +484,7 @@
     {
       "id": 34,
       "prompt": "My Flutter app shows the branded splash for nearly a minute after sign-in because the GoRouter redirect returns null while `InitialSyncStatus.syncing`. The sync does Appwrite pulls and local merges before going to home. What should change?",
-      "expected_output": "Stops using initial sync as a splash/cover routing gate. Once auth and setup/onboarding are resolved, redirects to the authenticated shell while sync continues in the background, and fixes delta-sync watermarks so successful empty first pulls do not cause repeated full pulls.",
+      "expected_output": "See expectations.",
       "files": [],
       "expectations": [
         "Identifies waiting on InitialSyncStatus.syncing in router redirect as the startup blocker",
@@ -493,6 +493,163 @@
         "Persists a per-table watermark after successful empty first pulls",
         "Uses delta pull after a table sync marker exists, including reference/catalog data",
         "Mentions lint enforcement such as router_splash_waits_for_initial_sync"
+      ]
+    },
+    {
+      "id": 35,
+      "prompt": "I want to add Crashlytics. Right now three notifiers import FirebaseCrashlytics directly, `main()` wraps `runApp` in `runZonedGuarded`, and I was going to add `ICrashBackend` plus fake/debug implementations. What should the building-flutter-apps skill recommend?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Uses a tiny `abstract final class Crash` facade with public `init`, `log`, and `error` only",
+        "Runs `Crash.init()` once in `main()` before `runApp`",
+        "Keeps feature code and notifiers from importing or calling `FirebaseCrashlytics` directly",
+        "Rejects adding backend interfaces, fake implementations, debug injection seams, or global hooks by default",
+        "Prevents PII in crash reason, message, and extras",
+        "Keeps startup simple and does not recommend `runZonedGuarded` as the default wrapper"
+      ]
+    },
+    {
+      "id": 36,
+      "prompt": "My checkout confirmation dialog watches `checkoutProvider`, calls `await ref.read(checkoutProvider.notifier).submit()` inside the dialog button, then pops and clears state after the pop. The helper does not pass routeSettings. How should I redesign it?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Caller computes an immutable checkout summary using `ref.read` before opening the dialog",
+        "Dialog renders from the snapshot rather than watching provider state that its own action mutates",
+        "Any dialog watch is limited to low-frequency primitive state such as `isSaving`",
+        "Dialog button returns with `Navigator.pop(result)` and does not run follow-up code after pop",
+        "Notifier owns success teardown and preserves failure state",
+        "The modal helper passes `routeSettings` with a stable route name"
+      ]
+    },
+    {
+      "id": 37,
+      "prompt": "My search field calls the API on every keystroke, a Slider writes preferences on every drag tick, local sync rewrites the whole Hive box after one row changes, and an Appwrite delete function waits synchronously before logging Crash on timeout. What changes should the skill require?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Debounces TextField search before it reaches notifier, network, or disk",
+        "Moves Slider side effects to `onChangeEnd` or another terminal event",
+        "Uses a real cancel-and-restart debounce for persistence helpers rather than only a generation token",
+        "Persists changed subsets with merge/save-many semantics instead of full `saveAll` after one row changes",
+        "Starts long-running Appwrite or remote functions asynchronously rather than blocking the client",
+        "Reconciles source-of-truth state before logging destructive failure telemetry"
+      ]
+    },
+    {
+      "id": 38,
+      "prompt": "I need the exact building-flutter-apps E2E proof checklist for a shared shopping list sync flow between two signed-in users on an iOS simulator. Include tool ordering, actors/accounts/test data, selectors, source-of-truth checks after create/update/delete, deterministic entrypoint, logs, and cleanup. Is a screenshot after adding an item enough?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Uses Dart MCP tooling before shell commands for E2E when available",
+        "Defines actors, device class, accounts, and test data before the run",
+        "Uses stable text, semantics, tooltips, or central `AppWidgetKeys` selectors rather than coordinate taps",
+        "Requires writer and observer proof where the observer sees changes without manual refresh",
+        "Verifies remote or backend source-of-truth state after create, update, and delete",
+        "Uses a deterministic E2E entrypoint such as `lib/main_dev.dart` when overrides/connectivity are needed",
+        "Captures logs and cleans test data/app processes at the end"
+      ]
+    },
+    {
+      "id": 39,
+      "prompt": "Our Flutter app added `flutter_skill_lints` and `riverpod_lint` to `dev_dependencies`, put plugins under `analyzer:`, and CI runs `flutter analyze lib`. How should the skill fix this analyzer setup?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Keeps `flutter_skill_lints` and `riverpod_lint` only in top-level `analysis_options.yaml` `plugins:`",
+        "Removes analyzer plugins from `pubspec.yaml` dependencies or dev_dependencies",
+        "Runs `dart analyze` from the package root with no path argument",
+        "Rejects `flutter analyze lib` and path-scoped analyzer gates for this skill",
+        "Requires strict casts, strict inference, and strict raw types",
+        "Excludes generated files such as `.g.dart`, `.freezed.dart`, `.gr.dart`, and ARB outputs",
+        "Verifies both a `flutter_skill_lints` diagnostic and a `riverpod_lint` diagnostic can fire"
+      ]
+    },
+    {
+      "id": 40,
+      "prompt": "I want previews for ProductCard, but my `@Preview` imports `package:flutter/widget_previews.dart` inside the production widget file and hits the real API, Hive box, Firebase auth, and platform channels. How should the skill structure previews?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Imports `package:flutter/widget_previews.dart` only in preview files or preview-only blocks",
+        "Wraps preview targets in an app shell or `AppPreviewShell` with theme and localization",
+        "Overrides repositories, datasources, auth, config, and clock dependencies with fakes",
+        "Avoids real HTTP, Firebase, Hive boxes, platform channels, native plugins, and `dart:io` in previews",
+        "Keeps preview data deterministic and small",
+        "Covers empty, loading, data, long text, error, and compact/expanded states when relevant"
+      ]
+    },
+    {
+      "id": 41,
+      "prompt": "A dashboard has `Vertical viewport was given unbounded height`, a TextField in a Row with unbounded width, and RenderFlex overflow at large text scale. I fixed it with `shrinkWrap: true`, orientation checks, and a global text scale clamp in MaterialApp. What should change?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Starts from the first layout exception rather than chasing cascading errors",
+        "Uses real constraints such as `Expanded`, `Flexible`, fixed constraints, or slivers for scrollables in columns",
+        "Wraps TextField or long text row children with `Expanded` or `Flexible`",
+        "Rejects `shrinkWrap: true` as the default fix for unbounded viewport errors",
+        "Uses `LayoutBuilder` or `MediaQuery.sizeOf(context)` instead of device type or orientation checks",
+        "Rejects global text-scale clamping to hide overflow and fixes the local layout instead"
+      ]
+    },
+    {
+      "id": 42,
+      "prompt": "Two notifiers copy-paste the same retry/backoff code. I also added an Analytics singleton with public constructor, `setBackend`, `FakeAnalyticsService`, and methods returning `bool`. Some callbacks call async analytics without `unawaited`. Give the exact skill-approved decision, including mixin constraints, allowed singleton shape, provider fallback, and fire-and-forget error handling.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Extracts shared behavior that appears in two classes into a small `mixin XxxMixin on Y` or reusable module helper",
+        "Keeps mixins single-purpose, suffixed `Mixin`, and free of mutable state fields",
+        "Allows a singleton only as private constructor plus one static final instance for fire-and-forget infrastructure",
+        "Rejects singleton public constructors, backend setters, fake/debug seams, and returned data/state",
+        "Uses a Riverpod provider or repository/datasource boundary when data, state, config reactivity, disposal, or test replacement is needed",
+        "Uses `unawaited(...)` for intentional fire-and-forget calls",
+        "Ensures the fire-and-forget callee catches and reports errors internally"
+      ]
+    },
+    {
+      "id": 43,
+      "prompt": "Deep link `/orders/123` sometimes throws in `build()` when the order is missing, widgets call `context.go('/orders/$id')`, the GoRouter redirect watches auth with `ref.watch`, and App Links are not tested for signed-out cold start. Give the exact skill checklist, including route-boundary validation, nullable by-id providers, redirect matrix states including loading, ref.listen/refreshListenable wiring, and cold/warm signed-state App Links or Universal Links proof.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Uses generated typed route helpers such as `OrderRoute(id: id).go(context)` instead of raw route strings",
+        "Validates route parameters at the route boundary before passing them to widgets",
+        "Uses nullable by-id providers and fallback UI or typed redirects for missing/stale resources instead of throwing in `build()`",
+        "Keeps redirect policy in a pure resolver with matrix tests for loading, signed-out, setup, signed-in, and stale-link states",
+        "Uses `ref.listen` plus `refreshListenable` rather than `ref.watch` inside GoRouter redirect",
+        "Requires Android App Links or iOS Universal Links association files and cold/warm signed-state E2E proof when URLs open the installed app"
+      ]
+    },
+    {
+      "id": 44,
+      "prompt": "In a Flutter repository I return `Map<String, dynamic>` for `(items, hasMore)`, pass raw `String userId` and `String orderId` everywhere, write `user!` after a lookup, and put nested if/else blocks inside sealed-state switch cases. What Dart 3 patterns should the skill push?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Uses records, preferably named records when fields add clarity, instead of `Map<String, dynamic>` for multiple return values",
+        "Uses extension types or domain value objects for distinct IDs instead of raw `String` IDs",
+        "Binds nullable values with `if (value case final v?)` or equivalent pattern matching instead of `value!`",
+        "Uses Dart native `switch` with object/list patterns for sealed state handling",
+        "Uses switch guards (`when`) rather than deeply nested if/else bodies inside cases"
+      ]
+    },
+    {
+      "id": 45,
+      "prompt": "Review a Flutter ProductCard and include the analyzer/lint coverage: IconButton has no tooltip, Image.network has neither semanticLabel nor excludeFromSemantics, tappable chips are 36x36, RichText is used for styled copy, and semanticLabel/tooltip text is hardcoded. What should the skill require?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Requires localized tooltips for IconButton or other action buttons",
+        "Requires informative images to provide a localized semanticLabel",
+        "Allows decorative images only when excluded from semantics explicitly",
+        "Requires touch targets of at least 48x48 for tappable controls",
+        "Prefers Text.rich over RichText when it preserves text scaling and accessibility",
+        "Rejects hardcoded tooltip, semanticLabel, label, and visible accessibility copy in widgets",
+        "Mentions analyzer/lint coverage such as prefer_action_button_tooltip, avoid_missing_image_alt, avoid_hardcoded_strings, prefer_text_rich, or a11y_text_scale_clamp"
       ]
     }
   ]
