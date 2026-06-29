@@ -1,24 +1,127 @@
-# Flutter Riverpod Clean Architecture Skill
+# Building Flutter Apps
 
-> Flutter clean arch w/ Riverpod 3.x codegen, Freezed 3.x sealed, GoRouter, Hive CE persist.
+> A strict Flutter architecture skill and plugin for teams that want Riverpod,
+> Freezed, typed GoRouter, Hive CE, localization, tests, accessibility, and
+> runtime proof enforced the same way every time.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B.svg)](https://flutter.dev)
-[![Riverpod](https://img.shields.io/badge/Riverpod-3.x-00B4D8.svg)](https://riverpod.dev)
+<p align="center">
+  <img src="docs/assets/readme-hero.png" alt="Dash reviewing Flutter architecture enforcement checks" width="100%">
+</p>
 
-> **Disclaimer:** Unofficial. No affiliation w/ Google, Flutter team, Riverpod maintainers. "Flutter" trademark Google LLC. "Riverpod" by Remi Rousselet.
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+  <a href="https://flutter.dev"><img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.x-02569B.svg"></a>
+  <a href="https://riverpod.dev"><img alt="Riverpod" src="https://img.shields.io/badge/Riverpod-3.x-00B4D8.svg"></a>
+</p>
 
-> **Highly opinionated by design:** This skill intentionally favors a strict
-> Riverpod/codegen/clean-architecture workflow over broad Flutter flexibility.
-> Treat it as a project policy package, not a neutral best-practices checklist.
-> Until v1.0.0, assume every release may include breaking changes as the policy
-> surface is refined.
+This is not a generic Flutter tips repo. It is an opinionated policy package for
+building Flutter apps with one clear architecture and enough local enforcement
+that an agent cannot quietly drift into weaker patterns.
 
-## Installation
+It is unofficial. It is not affiliated with Google, Flutter, Dart, Riverpod, or
+their maintainers.
 
-Install this as a plugin, not as a raw skill, when you want enforcement. Raw
-Agent Skills installs only provide prompt guidance; they cannot register hooks
-or run scanners.
+## What It Enforces
+
+The target app shape is simple:
+
+```text
+UI widgets
+  -> generated Riverpod providers and notifiers
+  -> repositories
+  -> local or remote datasources
+  -> APIs, Hive boxes, platform plugins
+
+Domain entities stay pure Dart.
+Navigation goes through typed GoRouter routes.
+User-facing copy goes through gen-l10n.
+Behavior is proven with tests, lints, hooks, evals, and E2E evidence.
+```
+
+The main rules:
+
+- Providers are generated with `@riverpod` / `@Riverpod`; manual provider
+  constructors are out.
+- State and domain models use sealed Freezed classes; hand-written immutable
+  patterns are out.
+- Widgets render and dispatch only. Business logic, storage, networking, and
+  policy live behind their owning provider, notifier, repository, datasource, or
+  service.
+- Async work is guarded with `ref.mounted` or `context.mounted`.
+- Domain primitives with meaning become Value Objects.
+- Route strings are owned by typed GoRouter definitions and generated helpers.
+- Visible strings, tooltips, and semantic labels come from `AppLocalizations`.
+- Shared/realtime flows need writer plus observer proof, not screenshots.
+
+## Why This Is Opinionated
+
+Flutter lets teams build the same feature many ways. That flexibility is useful
+for experiments, but it is expensive when agents are writing production code:
+each extra acceptable pattern becomes another place for drift, hidden state, weak
+tests, or shallow wrappers.
+
+This architecture chooses one path on purpose. It is better for this workflow
+because it makes ownership obvious:
+
+| Common drift | This architecture forces |
+|---|---|
+| Widgets reaching into storage, HTTP, or plugins. | Widgets render localized UI and dispatch user intent only. |
+| Notifiers mixing state transitions with SDK details. | Notifiers own state; repositories and datasources own IO boundaries. |
+| Domain models shaped by JSON, Hive, or Flutter widgets. | Domain stays pure Dart with explicit Value Objects and invariants. |
+| Route strings copied through the app. | Typed GoRouter routes are the navigation source of truth. |
+| "Looks fine" UI changes without proof. | Lints, hooks, tests, accessibility checks, evals, and E2E proof all matter. |
+
+The tradeoff is deliberate: less framework freedom, more repeatability. The goal
+is not to cover every valid Flutter style. The goal is to make one strict style
+easy to review, easy to test, and hard for an agent to accidentally weaken.
+
+## How Enforcement Works
+
+Install it as a plugin when you want enforcement. A raw `SKILL.md` install is
+guidance-only and cannot register runtime hooks.
+
+| Layer | What it does | Source |
+|---|---|---|
+| Skill | Loads the rules, trigger map, and pre-flight checklist into the agent context. | [SKILL.md](SKILL.md) |
+| Hooks | Blocks obvious drift after edits and before the agent stops. | [hooks/](hooks/) |
+| Analyzer | Enforces AST-level Flutter/Riverpod rules through `dart analyze`. | [analysis_options.yaml](references/analysis_options.yaml) |
+| Evals | Checks trigger behavior and answer quality with `gpt-5.4-mini`. | [evals/](evals/) |
+| References | Holds detailed guidance so `SKILL.md` stays small and direct. | [references/](references/) |
+
+The hard project gate is still package-root `dart analyze` with
+`flutter_skill_lints` and `riverpod_lint` wired under top-level `plugins:` in
+`analysis_options.yaml`.
+
+## Architecture
+
+```text
+lib/
+├── core/
+│   ├── extensions/
+│   ├── navigation/
+│   ├── services/
+│   ├── theme/
+│   └── widgets/
+├── features/
+│   └── feature_x/
+│       ├── data/           # DTOs, models, local/remote datasources
+│       ├── domain/         # Pure Dart entities and value objects
+│       ├── repositories/   # Orchestration and model/entity mapping
+│       └── presentation/   # Notifiers, screens, atoms, widgets
+└── main.dart
+```
+
+Ownership rules are the point:
+
+| Owner | Belongs here | Does not belong here |
+|---|---|---|
+| Widget | Layout, localized rendering, user dispatch. | Storage, HTTP, mutation policy, provider-derived caches. |
+| Notifier | State transitions, mutation flow, durable UI status. | Hive calls, plugin calls, raw HTTP, hidden dependency construction. |
+| Repository | Domain-facing contract and orchestration. | UI state, BuildContext, widget concerns. |
+| Datasource | API/Hive/platform details and wire models. | Domain policy or presentation decisions. |
+| Domain | Pure entities, Value Objects, invariants. | Flutter imports, JSON, Hive annotations, UI copy. |
+
+## Install
 
 ### Claude Code
 
@@ -27,12 +130,8 @@ or run scanners.
 /plugin install building-flutter-apps@building-flutter-apps
 ```
 
-Reads `.claude-plugin/marketplace.json` + `.claude-plugin/plugin.json`.
-Auto-loads `hooks/hooks.json`:
-
-- **PostToolUse** (`dart_gate.sh`) — grep + awk checks after every `Write|Edit|MultiEdit`; blocks turn with violation reason.
-- **Stop** (`preflight_audit.sh`) — full repo audit + package-root `dart analyze` before turn ends.
-- **UserPromptSubmit** (`skill_reminder.sh`) — top-5 rules reminder per turn in Flutter projects.
+Claude reads `.claude-plugin/marketplace.json` and
+`.claude-plugin/plugin.json`, then loads `hooks/hooks.json`.
 
 ### Codex CLI
 
@@ -44,29 +143,9 @@ codex
 /plugins
 ```
 
-In `/plugins`, choose the `building-flutter-apps` marketplace tab, open the
-`building-flutter-apps` plugin, and select `Install plugin`.
-
-Reads `.codex-plugin/plugin.json` from the installed plugin. Codex marketplaces
-can be added from GitHub shorthand (`owner/repo`), Git URLs, SSH URLs, or local
-marketplace roots; Codex also recognizes repo-local
-`.claude-plugin/marketplace.json` entries. Auto-loads the manifest-declared
-`hooks/hooks.json` — same `PostToolUse`/`Stop`/`UserPromptSubmit` events, same
-scripts as Claude.
-
-The `hooks` feature enables Codex lifecycle hooks. Current Codex builds also
-require `plugin_hooks` for plugin-bundled lifecycle configs. If you edit
-`~/.codex/config.toml` directly, use:
-
-```toml
-[features]
-hooks = true
-plugin_hooks = true
-```
-
-Public Codex docs may still show `codex_hooks` for the lifecycle hook gate.
-Use the CLI commands above on current Codex builds; `codex features list`
-shows the feature key your installed CLI accepts.
+In `/plugins`, open the `building-flutter-apps` marketplace entry and install
+the plugin. Codex reads `.codex-plugin/plugin.json` and loads
+`hooks/hooks.json`.
 
 ### Copilot CLI
 
@@ -75,225 +154,138 @@ copilot plugin marketplace add sgaabdu4/building-flutter-apps
 copilot plugin install building-flutter-apps@building-flutter-apps
 ```
 
-Reads `.github/plugin/marketplace.json` + root `plugin.json`. Auto-loads `hooks/hooks.copilot.json` (camelCase event names, `bash`/`powershell` fields per Copilot schema):
+Copilot reads `.github/plugin/marketplace.json` and root `plugin.json`, then
+loads `hooks/hooks.copilot.json`.
 
-- **postToolUse** → `dart_gate.sh`
-- **agentStop** → `preflight_audit.sh`
-- **userPromptSubmitted** → `skill_reminder.sh`
-
-All scripts no-op outside Flutter projects (gated on upward `pubspec.yaml` discovery).
-
-### Enforcement model
-
-Install-time script execution is not a safe assumption across agent runtimes.
-The enforceable contract is:
-
-1. **Plugin install wires hooks** for Claude Code, Codex CLI, and Copilot CLI.
-2. **First Flutter prompt/edit/stop proves hooks are active** because the
-   `UserPromptSubmit`, `PostToolUse`, and `Stop`/`agentStop` hooks fire from the
-   installed plugin.
-3. **Project CI remains the hard gate** through `dart analyze` with
-   `flutter_skill_lints` and `riverpod_lint` in `analysis_options.yaml`.
-
-If a user installs only `SKILL.md` or copies `~/.agents/skills/building-flutter-apps`,
-none of the scanners run. Treat that as guidance-only mode.
-
-### Project bootstrap (one-time per Flutter project)
+## Bootstrap A Flutter Project
 
 ```bash
 cp <plugin-cache>/references/analysis_options.yaml ./analysis_options.yaml
 mkdir -p lib/core/extensions
 cp <plugin-cache>/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
 dart pub get
-dart analyze   # confirms wiring
+dart analyze
 ```
 
-`flutter_skill_lints` is an external analyzer plugin. List it ONLY under `plugins:` in `analysis_options.yaml` (NEVER in `pubspec.yaml`). The bundled `analysis_options.yaml` already wires it.
-If a project already has `lib/core/extensions/`, merge the template files instead of overwriting them.
+Notes:
 
-## How drift is prevented
-
-SSOTs:
-
-| Surface | Source |
-|---|---|
-| Skill rules + trigger map | `SKILL.md` |
-| Deep guidance | `references/*.md` first `## Read first`, then task section |
-| Analyzer config | `references/analysis_options.yaml` |
-| New-project extension template | `templates/flutter/lib/core/extensions/` |
-| Runtime hooks | `hooks/hooks.json`, `hooks/hooks.copilot.json`, `hooks/scripts/*.sh` |
-| Analyzer diagnostics | `flutter_skill_lints` repo → `doc/building-flutter-apps-lint-coverage.md` |
-
-Tiers:
-
-| Tier | Mechanism |
-|---|---|
-| Prompt | `SKILL.md` Gate + Critical Rules + Trigger Map + Pre-Flight |
-| Hooks | `dart_gate.sh`, `preflight_audit.sh`, `skill_reminder.sh` |
-| AST | `dart analyze` with `flutter_skill_lints` + `riverpod_lint` |
-
-Do not duplicate exhaustive diagnostic lists outside the lint coverage doc.
-Cross-tool installs wire the same hook scripts for Claude Code, Codex CLI, and Copilot CLI.
+- `flutter_skill_lints` is an analyzer plugin. Keep it only in
+  `analysis_options.yaml` under `plugins:`; do not add it to `pubspec.yaml`.
+- If `lib/core/extensions/` already exists, merge the template files instead of
+  overwriting them.
+- A healthy setup should prove that at least one `flutter_skill_lints`
+  diagnostic and one `riverpod_lint` diagnostic can fire.
 
 ## What's Included
 
-Flutter dev guidance, modern best practices:
-
 ### Core Stack
 
-This is the canonical version table (SSOT). Update related setup snippets when
-changing it.
+This table is the version source of truth. Keep setup snippets and examples in
+sync with it.
 
 | Package | Constraint | Purpose |
-|---------|-----------|---------|
-| flutter_riverpod | `^3.3.2` | State mgmt |
-| riverpod_annotation | `^4.0.3` | Codegen annotations |
-| riverpod_generator | `^4.0.4` | Provider codegen (dev_dependency) |
-| freezed_annotation | `^3.1.0` | Sealed-union annotations |
-| freezed | `^3.2.5` | Immutable classes (dev_dependency) — needs Dart SDK ≥ 3.8 |
-| json_annotation | `^4.12.0` | JSON annotations |
-| json_serializable | `6.14.0` | JSON codegen (**exact pin** — see note) |
-| go_router | `^17.3.0` | Declarative routing |
-| go_router_builder | `^4.3.0` | Typed route codegen (dev_dependency) |
-| hive_ce | `^2.19.3` | Binary local persist |
-| hive_ce_flutter | `^2.3.4` | Flutter glue for `hive_ce` |
-| hive_ce_generator | `1.11.2` | Hive type adapters (**exact pin** — see note) |
-| build_runner | `^2.15.0` | Codegen runner (dev_dependency) |
+|---|---:|---|
+| `flutter_riverpod` | `^3.3.2` | State management |
+| `riverpod_annotation` | `^4.0.3` | Codegen annotations |
+| `riverpod_generator` | `^4.0.4` | Provider codegen |
+| `freezed_annotation` | `^3.1.0` | Sealed-union annotations |
+| `freezed` | `^3.2.5` | Immutable classes; needs Dart SDK >= 3.8 |
+| `json_annotation` | `^4.12.0` | JSON annotations |
+| `json_serializable` | `6.14.0` | JSON codegen; exact pin |
+| `go_router` | `^17.3.0` | Declarative routing |
+| `go_router_builder` | `^4.3.0` | Typed route codegen |
+| `hive_ce` | `^2.19.3` | Binary local persistence |
+| `hive_ce_flutter` | `^2.3.4` | Flutter glue for `hive_ce` |
+| `hive_ce_generator` | `1.11.2` | Hive type adapters; exact pin |
+| `build_runner` | `^2.15.0` | Codegen runner |
 
-**Pin note.** `json_serializable` and `hive_ce_generator` stay at exact pins
-because code generators bind analyzer constraints. Lift to caret ranges only
-after a real project pub solve and `dart analyze` prove the full
-Riverpod/Freezed/Hive generator stack is compatible.
+`json_serializable` and `hive_ce_generator` stay exact because code generators
+bind analyzer constraints. Lift them only after a real project pub solve and
+`dart analyze` prove the full Riverpod/Freezed/Hive generator stack is
+compatible.
 
-### Architecture
-4-layer clean arch:
-```
-lib/
-├── core/           # Shared: theme, utils, widgets, navigation, services
-├── features/       # Feature modules (auth, products, home, ...)
-│   └── feature_x/
-│       ├── data/           # Models, datasources
-│       ├── domain/         # Entities (pure Dart)
-│       ├── repositories/   # Data orchestration
-│       └── presentation/   # Notifiers, screens, widgets
-└── main.dart
-```
+### Hook Events
 
-### Key Patterns
-- **Codegen-only providers** — no `StateProvider`, `StateNotifierProvider`, legacy
-- **Sealed classes** — exhaustive match w/ Dart `switch`
-- **Interface contracts** — `abstract interface class` per repo, datasource
-- **No prop drilling** — children watch providers direct
-- **Async safety** — `if (!ref.mounted) return;` after every `await`
-- **Unified Ref** — single `Ref` (no `AutoDisposeRef`, `ExampleRef`)
-- **Widget classes only** — no `_buildXxx` helpers
-- **No `dynamic`** — use `Object?` or proper type
-- **Data-layer networking** — widgets/notifiers never call HTTP directly
-- **Navigation SSOT** — widgets/notifiers call generated typed GoRouter route helpers directly
-- **Localized UI copy** — gen-l10n/ARB for user-facing strings
-- **Preview-safe components** — Flutter Widget Previewer with provider fakes
-- **Primary static analysis** — `flutter_skill_lints` + `riverpod_lint`
+| Runtime | Edit hook | Stop hook | Prompt hook |
+|---|---|---|---|
+| Claude Code | `PostToolUse` | `Stop` | `UserPromptSubmit` |
+| Codex CLI | `PostToolUse` | `Stop` | `UserPromptSubmit` |
+| Copilot CLI | `postToolUse` | `agentStop` | `userPromptSubmitted` |
 
-## Reference Files
+The hook scripts no-op outside Flutter projects by walking upward for
+`pubspec.yaml`.
+
+### Reference Guide
 
 | Topic | File |
-|-------|------|
-| Architecture layers | [architecture.md](references/architecture.md) |
-| Canonical analyzer config | [analysis_options.yaml](references/analysis_options.yaml) |
-| Atomic design (tokens → pages) | [atomic-design.md](references/atomic-design.md) |
-| Widget previews | [widget-previews.md](references/widget-previews.md) |
-| Riverpod 3.x codegen | [riverpod-codegen.md](references/riverpod-codegen.md) |
-| Freezed 3.x sealed classes | [freezed-sealed.md](references/freezed-sealed.md) |
-| State management patterns | [state-management.md](references/state-management.md) |
-| State teardown and errors | [state-management-lifecycle.md](references/state-management-lifecycle.md) |
-| Testing with ProviderContainer.test | [testing.md](references/testing.md) |
-| HTTP/networking boundaries | [networking.md](references/networking.md) |
-| Localization/gen-l10n | [localization.md](references/localization.md) |
-| Deep linking/App Links/Universal Links | [deep-linking.md](references/deep-linking.md) |
-| Pagination, search, forms | [common-patterns.md](references/common-patterns.md) |
-| Layout diagnostics | [layout-diagnostics.md](references/layout-diagnostics.md) |
-| Performance optimization | [performance.md](references/performance.md) |
-| Flutter optimizations | [flutter-optimizations.md](references/flutter-optimizations.md) |
-| Extensions & utilities | [extensions-utilities.md](references/extensions-utilities.md) |
-| Hive CE persistence, TypeAdapters | [hive-persistence.md](references/hive-persistence.md) |
+|---|---|
+| Architecture and layers | [references/architecture.md](references/architecture.md) |
+| Analyzer setup | [references/analysis-options.md](references/analysis-options.md) |
+| Atomic UI and accessibility | [references/atomic-design.md](references/atomic-design.md) |
+| Riverpod codegen | [references/riverpod-codegen.md](references/riverpod-codegen.md) |
+| Freezed and sealed state | [references/freezed-sealed.md](references/freezed-sealed.md) |
+| State lifecycle | [references/state-management-lifecycle.md](references/state-management-lifecycle.md) |
+| Testing | [references/testing.md](references/testing.md) |
+| Networking boundaries | [references/networking.md](references/networking.md) |
+| l10n and ARB files | [references/localization.md](references/localization.md) |
+| Typed routing and deep links | [references/deep-linking.md](references/deep-linking.md) |
+| Common patterns | [references/common-patterns.md](references/common-patterns.md) |
+| Hive CE persistence | [references/hive-persistence.md](references/hive-persistence.md) |
+| Widget previews | [references/widget-previews.md](references/widget-previews.md) |
+| Runtime E2E proof | [references/dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 
-## Compatible Agents
+## Evals And Proof
 
-| Tool | Hooks | Install command |
-|---|---|---|
-| [Claude Code](https://code.claude.com/) | PostToolUse + Stop + UserPromptSubmit | `/plugin marketplace add sgaabdu4/building-flutter-apps` |
-| [Codex CLI](https://developers.openai.com/codex/cli) | PostToolUse + Stop + UserPromptSubmit | `codex features enable hooks`, `codex features enable plugin_hooks`, `codex plugin marketplace add sgaabdu4/building-flutter-apps`, then `codex` → `/plugins` |
-| [Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/copilot-cli) | postToolUse + agentStop + userPromptSubmitted | `copilot plugin marketplace add sgaabdu4/building-flutter-apps`, then `copilot plugin install building-flutter-apps@building-flutter-apps` |
-| Any other Agent Skills tool | Skill text only (no hooks) | Read SKILL.md directly |
+The eval harnesses are deliberately split:
 
-## Usage
+| File | Purpose |
+|---|---|
+| [evals/trigger-eval.json](evals/trigger-eval.json) | Checks when the skill should and should not activate. |
+| [evals/evals.json](evals/evals.json) | Checks whether answers follow the policy. |
+| [evals/results/](evals/results/) | Stores compact `gpt-5.4-mini` proof artifacts. |
+| [evals/gpt-5.4-mini-eval-decisions.md](evals/gpt-5.4-mini-eval-decisions.md) | Records eval decisions, tradeoffs, and proof. |
 
-Auto-activates on:
-- Build/review/refactor Flutter apps
-- Riverpod state mgmt work
-- Freezed data classes
-- GoRouter nav setup
+Run the local structural checks before publishing changes:
 
-Or invoke direct:
-```
-/building-flutter-apps
+```bash
+bash tool/check_drift.sh
+bash tool/smoke_test.sh
+ruby tool/verify_markdown_examples.rb
 ```
 
 ## Code Generation
 
-`-d` is shorthand for `--delete-conflicting-outputs` (used below).
+Use the long flag in documentation and automation:
 
 ```bash
-# Watch mode (dev)
-dart run build_runner watch -d   # --delete-conflicting-outputs
-
-# One-time build
-dart run build_runner build -d   # --delete-conflicting-outputs
-
-# Clean build
-dart run build_runner clean && dart run build_runner build -d   # --delete-conflicting-outputs
+dart run build_runner watch --delete-conflicting-outputs
+dart run build_runner build --delete-conflicting-outputs
+dart run build_runner clean && dart run build_runner build --delete-conflicting-outputs
 ```
 
-## Upstream Drift Check
+## Upstream Drift
 
 This repo tracks the upstream `flutter/skills` Flutter skill set by commit and
-per-skill hash in [flutter_skills.lock.json](tool/upstream/flutter_skills.lock.json).
+per-skill hash in [tool/upstream/flutter_skills.lock.json](tool/upstream/flutter_skills.lock.json).
 
 ```bash
-# Flag when upstream Flutter skill content changed
 ruby tool/check_upstream_flutter_skills.rb
-
-# Refresh the lock after reviewing/adopting upstream changes
 ruby tool/check_upstream_flutter_skills.rb --update
 ```
 
-Default behavior exits non-zero only when upstream skill content changes. Use
-`--strict-commit` if CI should also fail on upstream repo commits that do not
-touch tracked Flutter skill files.
+Use `--strict-commit` when CI should fail on upstream commits even if tracked
+Flutter skill files did not change.
 
 ## Contributing
 
-PRs welcome:
+Keep changes small and enforceable:
 
-1. Fork repo
-2. Create branch (`git checkout -b feature/add-pattern`)
-3. Match existing doc style
-4. Submit PR
-
-### Guidelines
-- SKILL.md <500 lines
-- Detailed patterns → `references/` files
-- Working code examples
-- Test w/ Riverpod 3.x + Freezed 3.x
-- Follow arch guidelines
+- Put detailed guidance in `references/`, not in `SKILL.md`.
+- Keep `README.md -> Core Stack` as the package-version SSOT.
+- Add or update hook fixtures when changing scanner behavior.
+- Add eval cases when changing trigger behavior or answer policy.
+- Run drift, smoke, markdown-example, and relevant eval checks before release.
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
-
-## Resources
-
-- [Riverpod Documentation](https://riverpod.dev)
-- [Freezed Package](https://pub.dev/packages/freezed)
-- [GoRouter Documentation](https://pub.dev/packages/go_router)
-- [Flutter Documentation](https://flutter.dev/docs)
+MIT. See [LICENSE](LICENSE).
