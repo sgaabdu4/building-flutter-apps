@@ -10,13 +10,19 @@
 
 ## Trigger
 
-Signals: hive_ce, TypeAdapter, @GenerateAdapters, IsolatedHive, HiveField
+Signals: hive_ce, hive_ce_flutter, TypeAdapter, @GenerateAdapters, IsolatedHive, HiveField
 Before code: output `Reading: hive-persistence.md`
 
 
 ## Core Stack
 
 `hive_ce`, `hive_ce_flutter`, `hive_ce_generator`. Constraints: see [README.md → Core Stack](../README.md#whats-included).
+
+Flutter app source imports Hive through `hive_ce_flutter`, not `hive_ce`
+directly. `hive_ce_flutter` re-exports the core Hive API and adds Flutter
+integration helpers; using it keeps the Flutter package surface visible even
+when code uses core types such as `Box`, `Hive`, `AdapterSpec`, or
+`GenerateAdapters`.
 
 ## Setup
 
@@ -48,7 +54,7 @@ Gen TypeAdapters for Freezed classes sans @HiveType.
 
 ```dart
 // lib/core/hive/hive_adapters.dart
-import 'package:hive_ce/hive_ce.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:my_app/features/user/data/models/user_model.dart';
 import 'package:my_app/features/order/data/models/order_model.dart';
 
@@ -83,12 +89,11 @@ Generates:
 ### Step 3: Register Adapters
 
 ```dart
-import 'package:hive_ce_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:my_app/core/hive/hive_registrar.g.dart';
 
 Future<void> initializeStorage() async {
-  final path = (await getApplicationSupportDirectory()).path;
-  Hive.init(path);
+  await Hive.initFlutter('my_app');
   Hive.registerAdapters(); // One call registers all adapters
 }
 ```
@@ -296,7 +301,13 @@ void _registerAdapters() {
 ## Storage Location
 
 ```dart
-// Use Application Support (not Documents)
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
+
+// Standard Flutter setup: Documents directory + optional subdirectory.
+await Hive.initFlutter('my_app');
+
+// Custom path setup: keep this explicit when preserving an existing data path,
+// e.g. Application Support. Still import through hive_ce_flutter.
 final path = (await getApplicationSupportDirectory()).path;
 Hive.init(path);
 ```
@@ -312,7 +323,7 @@ Hive.init(path);
 7. **Idempotent registration** — Check `isAdapterRegistered` in tests
 8. **Store entities, not JSON** — TypeAdapters for direct object storage
 9. **Close boxes** — Call `Hive.close()` in tearDown
-10. **Hive lives in `Local<X>Datasource` ONLY** — Notifiers and widgets NEVER import `package:hive_ce` / `package:hive_ce_flutter` and NEVER call `Hive.openBox` / `Hive.box` / `box.get` / `box.put` / `box.delete`. Datasource implements interface; repository exposes domain entities; notifier depends on repository provider. The hook blocks Hive imports outside `data/datasources/` and `*_datasource.dart` files.
+10. **Hive lives in `Local<X>Datasource` ONLY** — Notifiers and widgets NEVER import `package:hive_ce` / `package:hive_ce_flutter` and NEVER call `Hive.openBox` / `Hive.box` / `box.get` / `box.put` / `box.delete`. Production Flutter `lib/` files that do use Hive import `package:hive_ce_flutter/hive_ce_flutter.dart`, not `package:hive_ce/hive_ce.dart`. Datasource implements interface; repository exposes domain entities; notifier depends on repository provider. The hook blocks Hive imports outside `data/datasources/` and `*_datasource.dart` files.
 
 ## VO Interop
 
@@ -361,6 +372,7 @@ extension WorkoutSetToModel on WorkoutSet {
 Constructor signature = append-only schema.
 
 **Lint (ERROR):**
+- `use_hive_ce_flutter_import` — production Flutter `lib/` files import Hive through `package:hive_ce_flutter/hive_ce_flutter.dart`, not `package:hive_ce/hive_ce.dart`. Test helpers may use manual temp-dir setup.
 - `hive_field_no_vo_type` — `/data/models/` `@freezed` ctor: no VO types. Hard-coded set: `Distance`/`Money`/`Email`/`Slug`/`PhoneNumber`/`HeartRate`/`Weight`/`Pace`/`Username`. Auto-extends w/ types imported from `*/domain/values/<name>.dart` (PascalCase filename heuristic) + `show` clause names.
 
 ## Retiring entities
@@ -427,4 +439,4 @@ test/shared/
 
 - [Hive CE Documentation](https://docs.hivedb.dev/)
 - [hive_ce on pub.dev](https://pub.dev/packages/hive_ce)
-
+- [hive_ce_flutter on pub.dev](https://pub.dev/packages/hive_ce_flutter)
