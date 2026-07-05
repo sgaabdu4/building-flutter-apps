@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Codex-native eval harness for the building-flutter-apps skill.
 
-Runs two project-local eval modes:
+Runs three project-local eval modes:
 
 - quality: ask Codex to answer with the local skill, then judge the answer
   against each case's expectation checklist.
 - trigger: ask Codex to classify whether the skill description should trigger.
+- routing: ask Codex whether to invoke and which Trigger Map refs to read.
 
 This intentionally stays independent from the Claude-oriented harnesses so the
 same eval files can be exercised with OpenAI model ids such as gpt-5.4-mini.
@@ -51,6 +52,21 @@ TRIGGER_SCHEMA = {
         "reason": {"type": "string"},
     },
     "required": ["triggered", "reason"],
+    "additionalProperties": False,
+}
+
+
+ROUTING_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "triggered": {"type": "boolean"},
+        "refs": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "reason": {"type": "string"},
+    },
+    "required": ["triggered", "refs", "reason"],
     "additionalProperties": False,
 }
 
@@ -247,8 +263,9 @@ Use the local skill at:
 
 Read SKILL.md first. If SKILL.md routes this request to specific references,
 read only the relevant referenced files before answering. Do not edit files.
-Answer the user's Flutter/Dart request directly, including code snippets or
-review notes when useful.
+Answer the user's Flutter/Dart request directly and concisely. Include only the
+code snippets or review notes needed for the request. Prefer compact,
+expectation-covering examples over full app dumps.
 
 User prompt:
 {user_prompt}
@@ -373,6 +390,149 @@ Return JSON only:
 """
 
 
+def extract_trigger_map(skill_body: str) -> str:
+    match = re.search(r"## Trigger Map\n(?P<body>.*?)(?:\n## |\Z)", skill_body, re.S)
+    if not match:
+        return ""
+    return match.group("body").strip()
+
+
+def build_routing_prompt(
+    skill_name: str,
+    description: str,
+    trigger_map: str,
+    query: str,
+) -> str:
+    return f"""Decide whether Codex should invoke this skill and, if invoked, which
+Trigger Map references it should read before acting.
+
+Use exact relative Markdown paths from the Trigger Map, such as
+`references/state-management/async-mutations.md`. Prefer the narrowest matching
+row. Scenario/subsystem rows own incidental stack/file words. Do not include
+bulky parent refs when a scenario row exists. Return no refs when the skill
+should not trigger.
+
+Skill name:
+{skill_name}
+
+Skill description:
+{description}
+
+Trigger Map:
+{trigger_map}
+
+User query:
+{query}
+
+Return JSON only:
+{{"triggered": true|false, "refs": ["references/..."], "reason": "<short reason>"}}
+"""
+
+
+def trigger_map_aliases(trigger_map: str) -> dict[str, str]:
+    aliases: dict[str, str] = {}
+    for target in re.findall(r"\[[^\]]+\]\(([^)]+)\)", trigger_map):
+        ref = target.split("#", 1)[0].strip().removeprefix("./")
+        if not ref or "://" in ref:
+            continue
+        aliases[ref] = ref
+        aliases[Path(ref).name] = ref
+        aliases[f"references/{Path(ref).name}"] = ref
+    return aliases
+
+
+def normalized_refs(value: Any, aliases: dict[str, str] | None = None) -> set[str]:
+    if not isinstance(value, list):
+        return set()
+    refs: set[str] = set()
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        ref = item.strip().strip("`").strip()
+        ref = ref.removeprefix("./")
+        ref = ref.split("#", 1)[0]
+        if aliases:
+            ref = aliases.get(ref, ref)
+        if ref:
+            refs.add(ref)
+    return refs
+
+
+def run_routing_case(
+    item: dict[str, Any],
+    *,
+    skill_name: str,
+    description: str,
+    trigger_map: str,
+    skill_path: str,
+    model: str,
+    timeout: int,
+    include_excerpts: bool,
+) -> dict[str, Any]:
+    attempts: list[dict[str, Any]] = []
+    parsed: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
+    for _ in range(2):
+        result = codex_exec(
+            build_routing_prompt(skill_name, description, trigger_map, item["query"]),
+            model=model,
+            cwd=Path(skill_path),
+            timeout=timeout,
+            output_schema=ROUTING_SCHEMA,
+        )
+        attempts.append(result)
+        parsed = extract_first_json_object(result["stdout"])
+        if isinstance(parsed, dict):
+            break
+
+    assert result is not None
+    triggered = bool(parsed.get("triggered")) if isinstance(parsed, dict) else False
+    aliases = trigger_map_aliases(trigger_map)
+    refs = normalized_refs(parsed.get("refs"), aliases) if isinstance(parsed, dict) else set()
+    reason = str(parsed.get("reason", "")).strip() if isinstance(parsed, dict) else "invalid JSON"
+
+    should_trigger = bool(item["should_trigger"])
+    expected_refs = set(item.get("expected_refs", []))
+    forbidden_refs = set(item.get("forbidden_refs", []))
+    max_refs = int(item.get("max_refs", 4))
+
+    missing_refs = sorted(expected_refs - refs)
+    forbidden_selected = sorted(forbidden_refs & refs)
+    too_many_refs = len(refs) > max_refs
+    refs_when_skipped = bool(refs) if not should_trigger else False
+
+    passed = (
+        triggered == should_trigger
+        and not missing_refs
+        and not forbidden_selected
+        and not too_many_refs
+        and not refs_when_skipped
+        and result["returncode"] == 0
+    )
+
+    output = {
+        "id": item.get("id"),
+        "should_trigger": should_trigger,
+        "triggered": triggered,
+        "pass": passed,
+        "refs": sorted(refs),
+        "expected_refs": sorted(expected_refs),
+        "missing_refs": missing_refs,
+        "forbidden_selected": forbidden_selected,
+        "too_many_refs": too_many_refs,
+        "duration_seconds": round(sum(attempt["duration_seconds"] for attempt in attempts), 2),
+        "tokens_used": sum((attempt.get("tokens_used") or 0) for attempt in attempts),
+        "returncode": result["returncode"],
+        "attempts": len(attempts),
+        "reason": reason,
+    }
+    if include_excerpts:
+        output["query"] = item["query"]
+        output["stdout_excerpt"] = result["stdout"][-1200:]
+        output["stderr_excerpt"] = result["stderr"][-1200:]
+    return output
+
+
 def run_trigger_case(
     item: dict[str, Any],
     *,
@@ -482,6 +642,37 @@ def summarize_trigger(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def summarize_routing(results: list[dict[str, Any]]) -> dict[str, Any]:
+    total = len(results)
+    passed = sum(1 for item in results if item["pass"])
+    false_negatives = sum(
+        1 for item in results if item["should_trigger"] and not item["triggered"]
+    )
+    false_positives = sum(
+        1 for item in results if not item["should_trigger"] and item["triggered"]
+    )
+    routing_misses = sum(
+        1 for item in results if item["should_trigger"] and item["missing_refs"]
+    )
+    over_reads = sum(
+        1
+        for item in results
+        if item["forbidden_selected"] or item["too_many_refs"]
+    )
+    return {
+        "total": total,
+        "passed": passed,
+        "failed": total - passed,
+        "pass_rate": round(passed / total, 4) if total else 0.0,
+        "false_negatives": false_negatives,
+        "false_positives": false_positives,
+        "routing_misses": routing_misses,
+        "over_reads": over_reads,
+        "duration_seconds": round(sum(item["duration_seconds"] for item in results), 2),
+        "tokens_used": sum(item.get("tokens_used") or 0 for item in results),
+    }
+
+
 def filter_items(items: list[dict[str, Any]], limit: int | None, ids: str | None) -> list[dict[str, Any]]:
     if ids:
         selected = {int(part) for part in ids.split(",") if part.strip()}
@@ -493,7 +684,7 @@ def filter_items(items: list[dict[str, Any]], limit: int | None, ids: str | None
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run building-flutter-apps evals with Codex")
-    parser.add_argument("mode", choices=["quality", "trigger"])
+    parser.add_argument("mode", choices=["quality", "trigger", "routing"])
     parser.add_argument("--skill-path", required=True)
     parser.add_argument("--eval-set", required=True)
     parser.add_argument("--model", default=DEFAULT_MODEL)
@@ -513,7 +704,7 @@ def main() -> None:
 
     skill_path = Path(args.skill_path).resolve()
     eval_path = Path(args.eval_set).resolve()
-    skill_name, description, _ = parse_skill_md(skill_path)
+    skill_name, description, skill_body = parse_skill_md(skill_path)
     items = filter_items(load_eval_items(eval_path), args.limit, args.ids)
     for index, item in enumerate(items, 1):
         item["_case_index"] = index
@@ -535,7 +726,7 @@ def main() -> None:
         )
         results.sort(key=lambda item: (item.get("id") is None, item.get("id")))
         summary = summarize_quality(results)
-    else:
+    elif args.mode == "trigger":
         results = run_pool(
             run_trigger_case,
             items,
@@ -552,6 +743,23 @@ def main() -> None:
             },
         )
         summary = summarize_trigger(results)
+    else:
+        results = run_pool(
+            run_routing_case,
+            items,
+            num_workers=args.num_workers,
+            kwargs={
+                "skill_name": skill_name,
+                "description": description,
+                "trigger_map": extract_trigger_map(skill_body),
+                "skill_path": str(skill_path),
+                "model": args.model,
+                "timeout": args.timeout,
+                "include_excerpts": args.include_excerpts,
+            },
+        )
+        results.sort(key=lambda item: (item.get("id") is None, item.get("id")))
+        summary = summarize_routing(results)
 
     output = {
         "runner": "codex",

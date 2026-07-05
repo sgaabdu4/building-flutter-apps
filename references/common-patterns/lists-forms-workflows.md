@@ -1,5 +1,16 @@
 # Common Patterns — Lists, Forms, and Workflows
 
+## Read first
+
+1. Use Freezed state plus `@Riverpod` codegen for pagination, search, and forms.
+2. Debounce high-frequency input in the notifier/helper owner and dispose it with `ref.onDispose`.
+3. After async repository work, guard with `if (!ref.mounted) return;` before state writes.
+
+## Trigger
+
+Signals: pagination, infinite scroll, cursor loading, search debounce, form validation, batch processing, pull-to-refresh.
+Before code: output `Reading: lists-forms-workflows.md`.
+
 ## Pagination
 
 ```dart
@@ -100,8 +111,8 @@ sealed class SearchState with _$SearchState {
   }) = _SearchState;
 }
 
-// Uses Debouncer from core/utils/debouncer.dart
-// See extensions-utilities.md for the Debouncer class
+// Uses Debouncer from core/extensions/ helper owner.
+// See references/extensions/collections-helpers.md for the Debouncer class.
 @Riverpod(keepAlive: true)
 class SearchNotifier extends _$SearchNotifier {
   final _debouncer = Debouncer();

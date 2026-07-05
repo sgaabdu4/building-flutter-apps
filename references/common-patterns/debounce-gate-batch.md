@@ -1,5 +1,16 @@
 # Common Patterns — Debounce, Gate, and Batch
 
+## Read first
+
+1. Use this for high-frequency UI/network/storage boundaries and destructive remote reconciliation.
+2. For reusable `Debouncer` helper ownership or repeated ID lookup utilities, read [collections-helpers.md](../extensions/collections-helpers.md) instead.
+3. For search, pagination, and form state shape, read [lists-forms-workflows.md](lists-forms-workflows.md) first, then this file only for the boundary mechanics.
+
+## Trigger
+
+Signals: TextField per-keystroke side effects, Slider/scroll throttling, full-collection rewrite, persistence debounce, long-running remote function, destructive reconcile-before-log, reset/clear markers, WebView/VideoPlayer gate, storage-read memoization.
+Before code: output `Reading: debounce-gate-batch.md`.
+
 ## Debounce, Gate, and Batch
 
 High-frequency boundaries (keystrokes, drag gestures, scroll ticks, sync cycles, long-running remote work, destructive reset/delete flows) must coalesce or reconcile before they reach a notifier, network, or disk. Foreground waits must stay tiny: search/realtime debounce <=150ms, visual animation <=120ms, persistence/hard waits <=50ms. Retry/backoff, rest timers, reminders, and sync/backfill settle timers belong in background owners. Each lint below catches one specific shape of the same anti-pattern: treating asynchronous boundaries as if they complete atomically and cheaply.

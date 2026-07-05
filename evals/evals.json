@@ -68,9 +68,9 @@
       "expectations": [
         "Uses @GenerateAdapters annotation (not @HiveType/@HiveField manually)",
         "Assigns a unique TypeId that doesn't conflict with existing ones",
-        "Repository opens the Hive box and provides CRUD operations",
+        "Local datasource opens the Hive box; repository exposes CRUD operations through the datasource",
         "Handles DateTime serialization properly (Hive supports DateTime natively)",
-        "Box name is a constant, not a hardcoded string repeated everywhere",
+        "Box name is a constant owned by the datasource/storage layer, not a hardcoded string repeated everywhere",
         "Repository is a keepAlive Riverpod provider"
       ]
     },
@@ -113,7 +113,7 @@
         "Declares a Mocktail mock for IOrderRepository, not a concrete OrderRepository mock",
         "Uses ProviderContainer.test() with overrides",
         "Tests loadOrders: verifies state transitions (loading \u2192 loaded)",
-        "Tests placeOrder: verifies repository.create is called",
+        "Tests placeOrder: verifies the repository mutation method is called",
         "Tests cancelOrder: verifies item removal from state",
         "Tests error case: verifies error is set in state on failure",
         "Uses Mocktail closure syntax for when/thenAnswer and verify",

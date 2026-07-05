@@ -5,3 +5,4 @@
 .packages
 pubspec.lock
 node_modules/
+__pycache__/

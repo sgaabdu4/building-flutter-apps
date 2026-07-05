@@ -1,5 +1,16 @@
 # Common Patterns — Routing and App Shell
 
+## Read first
+
+1. Use `go_router_builder` typed route classes as the navigation API; route definitions own paths.
+2. `GoRouter.redirect` uses `ref.read`, never `ref.watch`; redirect policy is a pure matrix-tested resolver.
+3. `MaterialApp.router` stays declarative. Bootstrap listeners live in a sibling root `ConsumerWidget` under `ProviderScope`.
+
+## Trigger
+
+Signals: typed route, GoRouter redirect, auth-protected route, router provider, app shell, `MaterialApp.router`, `ProviderScope`, startup bootstrap.
+Before code: output `Reading: routing-app-shell.md`.
+
 ## Typed GoRouter Route SSOT
 
 Use `go_router_builder` for type-safe route definitions. The generated route

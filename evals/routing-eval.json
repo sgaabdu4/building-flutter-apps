@@ -1,0 +1,370 @@
+[
+  {
+    "id": 1,
+    "query": "I'm in a Flutter app using Riverpod codegen. A notifier crashes after an awaited repository call when the screen is gone. What should the agent read before fixing it?",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/state-management/async-mutations.md",
+      "references/state-management-lifecycle.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md",
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 2,
+    "query": "The team wants to add a new AsyncNotifier and is unsure how to structure build(), loading flags, cleanup, and AsyncValue usage.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/state-management/notifier-structure.md",
+      "references/state-management-lifecycle.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 3,
+    "query": "A Flutter screen uses GoRouter auth redirects and currently watches auth state in redirect. We need to fix the route stack reset.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/common-patterns/routing-app-shell.md",
+      "references/deep-linking.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 4,
+    "query": "We're starting a new Flutter clinic app with ProviderScope, MaterialApp.router, typed routes, patients feature folders, Riverpod, Freezed, and Hive.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/setup.md",
+      "references/architecture.md",
+      "references/common-patterns/routing-app-shell.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md",
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 5
+  },
+  {
+    "id": 5,
+    "query": "A product list needs cursor pagination, load-more guards, scroll detection, and hasMore/isLoadingMore state.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/common-patterns/lists-forms-workflows.md",
+      "references/state-management/async-mutations.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 6,
+    "query": "Search calls the API on every TextField keystroke and persistence rewrites the full local collection on one row change.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/common-patterns/debounce-gate-batch.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md",
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 5
+  },
+  {
+    "id": 7,
+    "query": "Registration form validation needs password, confirm password, optional phone, per-field errors, and async submit state.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/common-patterns/lists-forms-workflows.md",
+      "references/state-management/async-mutations.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 8,
+    "query": "A Freezed Invoice with nested Freezed line items serializes incorrectly in release mode despite fromJson factories.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/freezed-sealed.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 2
+  },
+  {
+    "id": 9,
+    "query": "MachineConfig should be cached with Hive CE, @GenerateAdapters, stable TypeIds, and a datasource/repository boundary.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/hive-persistence.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 10,
+    "query": "A Flutter ProductCard has an IconButton without tooltip, image with no semantic label, tiny chips, and large text overflow.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/atomic-design/accessibility.md",
+      "references/flutter-optimizations.md"
+    ],
+    "forbidden_refs": [
+      "references/atomic-design.md",
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 11,
+    "query": "The UI needs core atoms, molecules, design tokens, spacing constants, and rules for promoting widgets into core/widgets.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/atomic-design.md"
+    ],
+    "forbidden_refs": [
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 12,
+    "query": "A Flutter list screen rebuilds every row when selectedId changes; it watches full state and passes state down through constructors.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/performance.md",
+      "references/flutter-optimizations.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 13,
+    "query": "Date, currency, capitalization, duration labels, and ModalRoute current checks are scattered inline across Flutter widgets.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/extensions/primitive-formatting.md",
+      "references/extensions/context-ui.md"
+    ],
+    "forbidden_refs": [
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 14,
+    "query": "Repeated product ID lookups use firstWhere in hot paths and several widget files define local Debouncer helpers.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/extensions/collections-helpers.md"
+    ],
+    "forbidden_refs": [
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 15,
+    "query": "We need widget tests for a Riverpod notifier with ProviderContainer.test, mocktail interfaces, fakes, and stable selectors.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/testing.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 16,
+    "query": "A Flutter shared shopping list needs E2E proof with writer and observer accounts, source-of-truth checks, logs, and cleanup.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/dart-mcp-e2e-testing.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 17,
+    "query": "A delete-account remote function blocks the client request and reports Crashlytics before checking whether the backend already completed.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/networking.md",
+      "references/common-patterns/debounce-gate-batch.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 18,
+    "query": "Two Riverpod notifiers duplicate retry/backoff behavior and a service helper is growing copy-pasted logic.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/mixins.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 19,
+    "query": "A Flutter widget preview imports widget_previews.dart but also hits real Firebase, Hive, and HTTP.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/widget-previews.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 20,
+    "query": "analysis_options.yaml puts riverpod_lint under analyzer, CI runs flutter analyze lib, and flutter_skill_lints diagnostics never fire.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/analysis-options.md",
+      "references/analysis_options.yaml"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 21,
+    "query": "A Flutter route /orders/123 throws in build when the order is missing after a cold deep link.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/common-patterns/routing-app-shell.md",
+      "references/deep-linking.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 22,
+    "query": "A Flutter layout has Vertical viewport unbounded height, Expanded outside a Row, and text overflow at large text scale.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/layout-diagnostics.md"
+    ],
+    "forbidden_refs": [
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 23,
+    "query": "A domain model uses raw String email, double distanceMeters, and optional empty string fallbacks across multiple entities.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/value-objects.md"
+    ],
+    "forbidden_refs": [
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 24,
+    "query": "Crashlytics is being called directly from notifiers and main.dart wraps runApp in guarded zones.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/crashlytics.md"
+    ],
+    "forbidden_refs": [
+      "references/state-management.md"
+    ],
+    "max_refs": 4
+  },
+  {
+    "id": 25,
+    "query": "The app needs localized ARB placeholders, plural/select messages, and generated AppLocalizations wiring.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/localization.md"
+    ],
+    "forbidden_refs": [
+      "references/extensions-utilities.md"
+    ],
+    "max_refs": 3
+  },
+  {
+    "id": 26,
+    "query": "I am building a Next.js marketing page and need WCAG alt text, keyboard navigation, and React component advice.",
+    "should_trigger": false,
+    "expected_refs": [],
+    "forbidden_refs": [
+      "references/atomic-design/accessibility.md",
+      "references/flutter-optimizations.md"
+    ],
+    "max_refs": 0
+  },
+  {
+    "id": 27,
+    "query": "This is a pure Dart command line package with no Flutter, Riverpod, widgets, routes, or app architecture. Should I use records?",
+    "should_trigger": false,
+    "expected_refs": [],
+    "forbidden_refs": [
+      "references/dart-patterns-records.md"
+    ],
+    "max_refs": 0
+  },
+  {
+    "id": 28,
+    "query": "I am using flutter_bloc Cubit and BlocBuilder, not Riverpod. Help structure a Cubit state and events.",
+    "should_trigger": false,
+    "expected_refs": [],
+    "forbidden_refs": [
+      "references/state-management/notifier-structure.md"
+    ],
+    "max_refs": 0
+  },
+  {
+    "id": 29,
+    "query": "A native Android Kotlin app needs SCHEDULE_EXACT_ALARM permission flow with an intent to settings. No Flutter code.",
+    "should_trigger": false,
+    "expected_refs": [],
+    "forbidden_refs": [
+      "references/services-and-singletons.md"
+    ],
+    "max_refs": 0
+  },
+  {
+    "id": 30,
+    "query": "An Appwrite Function in TypeScript needs backend cleanup logic and xasync usage. No Flutter client code is involved.",
+    "should_trigger": false,
+    "expected_refs": [],
+    "forbidden_refs": [
+      "references/networking.md"
+    ],
+    "max_refs": 0
+  }
+]

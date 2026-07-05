@@ -35,7 +35,7 @@ Top-5 rules:
   (4) `Object?` not `dynamic` (Map<String, dynamic> for JSON is fine); no `value!`.
   (5) `@riverpod` codegen for every provider; no manual `Provider(...)`. Use `AppLocalizations` for UI strings, not hardcoded `Text('...')`.
 
-Read `references/` files via the trigger-map in SKILL.md before generating code in their domain. Emit the filled-in Pre-Flight checklist after every code change.
+Use the SKILL.md Trigger Map as a progressive-disclosure gate: read the narrowest matching refs only, never bulk-read `references/`, and cite exact refs in Pre-Flight after every code change.
 EOF
 
 exit 0

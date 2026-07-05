@@ -1,0 +1,630 @@
+{
+  "runner": "codex",
+  "mode": "routing",
+  "model": "gpt-5.4-mini",
+  "judge_model": null,
+  "skill_name": "building-flutter-apps",
+  "skill_path": ".",
+  "eval_set": "evals/routing-eval.json",
+  "summary": {
+    "total": 30,
+    "passed": 30,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "false_negatives": 0,
+    "false_positives": 0,
+    "routing_misses": 0,
+    "over_reads": 0,
+    "duration_seconds": 773.71,
+    "tokens_used": 104227
+  },
+  "results": [
+    {
+      "id": 1,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/state-management-lifecycle.md",
+        "references/state-management/async-mutations.md"
+      ],
+      "expected_refs": [
+        "references/state-management-lifecycle.md",
+        "references/state-management/async-mutations.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 10.74,
+      "tokens_used": 3080,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Async notifier/mutation crash after an awaited repository call and screen teardown matches the async-mutations + lifecycle row."
+    },
+    {
+      "id": 2,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/state-management-lifecycle.md",
+        "references/state-management/notifier-structure.md"
+      ],
+      "expected_refs": [
+        "references/state-management-lifecycle.md",
+        "references/state-management/notifier-structure.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 9.23,
+      "tokens_used": 2759,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "AsyncNotifier shape, build() init, loading/progress, AsyncValue, and cleanup are a direct match for the notifier row."
+    },
+    {
+      "id": 3,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/common-patterns/routing-app-shell.md",
+        "references/deep-linking.md"
+      ],
+      "expected_refs": [
+        "references/common-patterns/routing-app-shell.md",
+        "references/deep-linking.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 24.02,
+      "tokens_used": 4001,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter GoRouter auth redirect/navigation-gate issue matches the routing-app-shell row."
+    },
+    {
+      "id": 4,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/architecture.md",
+        "references/common-patterns/routing-app-shell.md",
+        "references/setup.md"
+      ],
+      "expected_refs": [
+        "references/architecture.md",
+        "references/common-patterns/routing-app-shell.md",
+        "references/setup.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 10.94,
+      "tokens_used": 3084,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "New Flutter app scaffolding with `ProviderScope`, `MaterialApp.router`, and typed routing fits the setup/startup-shell row."
+    },
+    {
+      "id": 5,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/common-patterns/lists-forms-workflows.md",
+        "references/state-management/async-mutations.md"
+      ],
+      "expected_refs": [
+        "references/common-patterns/lists-forms-workflows.md",
+        "references/state-management/async-mutations.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 12.83,
+      "tokens_used": 1033,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "The pagination/infinite-scroll row matches a cursor-paginated product list with load-more guards, scroll detection, and hasMore/isLoadingMore state."
+    },
+    {
+      "id": 6,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/common-patterns/debounce-gate-batch.md"
+      ],
+      "expected_refs": [
+        "references/common-patterns/debounce-gate-batch.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 18.34,
+      "tokens_used": 3466,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Matches the debounce/batch row: TextField keystroke search debounce plus full-collection rewrite after a subset mutation."
+    },
+    {
+      "id": 7,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/common-patterns/lists-forms-workflows.md",
+        "references/state-management/async-mutations.md"
+      ],
+      "expected_refs": [
+        "references/common-patterns/lists-forms-workflows.md",
+        "references/state-management/async-mutations.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 63.28,
+      "tokens_used": 14443,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter registration form validation with async submit state matches the form-validation trigger row."
+    },
+    {
+      "id": 8,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/freezed-sealed.md"
+      ],
+      "expected_refs": [
+        "references/freezed-sealed.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 10.49,
+      "tokens_used": 3066,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Freezed nested serialization/fromJson is covered by the Freezed entity/sealed union row, including `toJson` and `explicit_to_json`."
+    },
+    {
+      "id": 9,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/architecture.md",
+        "references/hive-persistence.md"
+      ],
+      "expected_refs": [
+        "references/hive-persistence.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 11.21,
+      "tokens_used": 1011,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Hive CE caching and repository/datasource layering both match the Trigger Map."
+    },
+    {
+      "id": 10,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/atomic-design/accessibility.md",
+        "references/flutter-optimizations.md"
+      ],
+      "expected_refs": [
+        "references/atomic-design/accessibility.md",
+        "references/flutter-optimizations.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 48.14,
+      "tokens_used": 5658,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter UI work touching tooltips, semantic labels, tap targets, and text scaling."
+    },
+    {
+      "id": 11,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/atomic-design.md"
+      ],
+      "expected_refs": [
+        "references/atomic-design.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 9.98,
+      "tokens_used": 929,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter UI design-system work: atoms, molecules, design tokens, spacing constants, and core/widgets promotion rules."
+    },
+    {
+      "id": 12,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/flutter-optimizations.md",
+        "references/performance.md"
+      ],
+      "expected_refs": [
+        "references/flutter-optimizations.md",
+        "references/performance.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 10.55,
+      "tokens_used": 926,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter list rebuild/per-row performance issue; the performance row covering `.select()`, build cost, and `ListView.builder` applies."
+    },
+    {
+      "id": 13,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/extensions/context-ui.md",
+        "references/extensions/primitive-formatting.md"
+      ],
+      "expected_refs": [
+        "references/extensions/context-ui.md",
+        "references/extensions/primitive-formatting.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 18.06,
+      "tokens_used": 1394,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter widget code is using inline date/currency/capitalization/duration formatting and `ModalRoute` current checks, so this skill applies and those are the narrow matching refs."
+    },
+    {
+      "id": 14,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/extensions/collections-helpers.md"
+      ],
+      "expected_refs": [
+        "references/extensions/collections-helpers.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 39.66,
+      "tokens_used": 5127,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter iterable lookup/indexing and local Debouncer helper patterns match the collections-helpers row."
+    },
+    {
+      "id": 15,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/testing.md"
+      ],
+      "expected_refs": [
+        "references/testing.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 10.97,
+      "tokens_used": 2294,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Widget tests with ProviderContainer.test, mocktail/fakes, and stable selectors match the testing row."
+    },
+    {
+      "id": 16,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/dart-mcp-e2e-testing.md"
+      ],
+      "expected_refs": [
+        "references/dart-mcp-e2e-testing.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 86.61,
+      "tokens_used": 6190,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter E2E proof with log capture."
+    },
+    {
+      "id": 17,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/common-patterns/debounce-gate-batch.md",
+        "references/networking.md"
+      ],
+      "expected_refs": [
+        "references/common-patterns/debounce-gate-batch.md",
+        "references/networking.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 170.84,
+      "tokens_used": 22638,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Long-running remote-function mutation with async-start + reconcile; read the network/reconcile pattern before acting."
+    },
+    {
+      "id": 18,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/mixins.md"
+      ],
+      "expected_refs": [
+        "references/mixins.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 32.77,
+      "tokens_used": 2559,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Riverpod notifiers sharing retry/backoff logic map to the retry-helper mixin row."
+    },
+    {
+      "id": 19,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/widget-previews.md"
+      ],
+      "expected_refs": [
+        "references/widget-previews.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 44.33,
+      "tokens_used": 5488,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter widget preview work matches the preview row; the Firebase/Hive/HTTP mentions are incidental."
+    },
+    {
+      "id": 20,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/analysis-options.md",
+        "references/analysis_options.yaml"
+      ],
+      "expected_refs": [
+        "references/analysis-options.md",
+        "references/analysis_options.yaml"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 7.86,
+      "tokens_used": 809,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "This is an analysis_options/analyzer configuration issue involving riverpod_lint and flutter analyze CI, so the analysis-options row applies."
+    },
+    {
+      "id": 21,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/common-patterns/routing-app-shell.md",
+        "references/deep-linking.md"
+      ],
+      "expected_refs": [
+        "references/common-patterns/routing-app-shell.md",
+        "references/deep-linking.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 13.84,
+      "tokens_used": 1021,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Cold deep link into a Flutter route is a GoRouter/deep-linking scenario, so the routing row applies."
+    },
+    {
+      "id": 22,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/layout-diagnostics.md"
+      ],
+      "expected_refs": [
+        "references/layout-diagnostics.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 17.65,
+      "tokens_used": 3063,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "This is Flutter layout work and matches the layout-diagnostics row for unbounded viewport height, misplaced Expanded, and text-scale overflow."
+    },
+    {
+      "id": 23,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/value-objects.md"
+      ],
+      "expected_refs": [
+        "references/value-objects.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 11.23,
+      "tokens_used": 2930,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "This is a domain-model primitive-obsession case: raw `String email`, `double distanceMeters`, and cross-entity empty-string fallbacks map to the value-object row."
+    },
+    {
+      "id": 24,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/crashlytics.md"
+      ],
+      "expected_refs": [
+        "references/crashlytics.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 43.88,
+      "tokens_used": 3055,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Flutter Crashlytics/error-reporting work is in scope; the narrowest match is the Crashlytics row."
+    },
+    {
+      "id": 25,
+      "should_trigger": true,
+      "triggered": true,
+      "pass": true,
+      "refs": [
+        "references/localization.md"
+      ],
+      "expected_refs": [
+        "references/localization.md"
+      ],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 6.73,
+      "tokens_used": 751,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Localization/ARB placeholders and plural/select messages fit the AppLocalizations/gen-l10n row."
+    },
+    {
+      "id": 26,
+      "should_trigger": false,
+      "triggered": false,
+      "pass": true,
+      "refs": [],
+      "expected_refs": [],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 6.84,
+      "tokens_used": 760,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "This is a Next.js/React task, not Flutter/Riverpod app work, so the building-flutter-apps skill should not trigger."
+    },
+    {
+      "id": 27,
+      "should_trigger": false,
+      "triggered": false,
+      "pass": true,
+      "refs": [],
+      "expected_refs": [],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 4.59,
+      "tokens_used": 597,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Pure Dart CLI/package work is out of scope for `building-flutter-apps`; no Flutter/Riverpod/app context, so no Trigger Map refs apply."
+    },
+    {
+      "id": 28,
+      "should_trigger": false,
+      "triggered": false,
+      "pass": true,
+      "refs": [],
+      "expected_refs": [],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 4.58,
+      "tokens_used": 592,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "This is a flutter_bloc Cubit/BlocBuilder task, which the skill explicitly excludes from triggering."
+    },
+    {
+      "id": 29,
+      "should_trigger": false,
+      "triggered": false,
+      "pass": true,
+      "refs": [],
+      "expected_refs": [],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 7.27,
+      "tokens_used": 812,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "Native Android Kotlin, not Flutter/Riverpod; this skill does not apply."
+    },
+    {
+      "id": 30,
+      "should_trigger": false,
+      "triggered": false,
+      "pass": true,
+      "refs": [],
+      "expected_refs": [],
+      "missing_refs": [],
+      "forbidden_selected": [],
+      "too_many_refs": false,
+      "duration_seconds": 6.25,
+      "tokens_used": 691,
+      "returncode": 0,
+      "attempts": 1,
+      "reason": "No Flutter/Riverpod app work; this is a TypeScript backend function, so the skill does not apply."
+    }
+  ]
+}
