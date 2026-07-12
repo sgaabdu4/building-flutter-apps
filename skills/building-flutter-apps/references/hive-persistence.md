@@ -16,7 +16,7 @@ Before code: output `Reading: hive-persistence.md`
 
 ## Core Stack
 
-`hive_ce`, `hive_ce_flutter`, `hive_ce_generator`. Constraints: see [README.md → Core Stack](../README.md#whats-included).
+`hive_ce`, `hive_ce_flutter`, `hive_ce_generator`. Constraints: see [core-stack.md](core-stack.md).
 
 Flutter app source imports Hive through `hive_ce_flutter`, not `hive_ce`
 directly. `hive_ce_flutter` re-exports the core Hive API and adds Flutter
@@ -27,7 +27,7 @@ when code uses core types such as `Box`, `Hive`, `AdapterSpec`, or
 ## Setup
 
 ```yaml
-# pubspec.yaml — see README.md Core Stack for canonical versions
+# pubspec.yaml — see core-stack.md for canonical versions
 dependencies:
   hive_ce: <version>
   hive_ce_flutter: <version>

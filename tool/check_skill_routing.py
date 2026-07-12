@@ -14,7 +14,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL = ROOT / "SKILL.md"
+SKILL_ROOT = ROOT / "skills" / "building-flutter-apps"
+SKILL = SKILL_ROOT / "SKILL.md"
 MAX_SKILL_LINES = 260
 MAX_SKILL_CHARS = 24_000
 FORBIDDEN_TRIGGER_REFS = {
@@ -64,7 +65,7 @@ def main() -> None:
                 continue
             if target in FORBIDDEN_TRIGGER_REFS:
                 fail(f"Trigger Map routes to bulky parent ref: {target}")
-            path = (ROOT / target).resolve()
+            path = (SKILL_ROOT / target).resolve()
             if not path.exists():
                 fail(f"Trigger Map target missing: {target}")
             if path.suffix == ".md":

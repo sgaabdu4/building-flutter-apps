@@ -98,9 +98,9 @@ test_rule() {
   fi
 }
 
-# ── d5 is special: tests file-level assertions on README/SKILL.md ─────────────
+# ── d5 is special: tests Core Stack ownership + README/SKILL links ────────────
 # The d5 violation fixture only tests the inline version pin sub-check (which
-# runs on arbitrary paths). The README Core Stack table and SKILL.md link checks
+# runs on arbitrary paths). The live Core Stack and README/SKILL link checks
 # are structural checks on the live repo files — we test them separately.
 
 test_d5_inline_version() {

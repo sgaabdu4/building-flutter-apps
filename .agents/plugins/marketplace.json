@@ -1,0 +1,21 @@
+{
+  "name": "building-flutter-apps",
+  "interface": {
+    "displayName": "Building Flutter Apps"
+  },
+  "plugins": [
+    {
+      "name": "building-flutter-apps",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/sgaabdu4/building-flutter-apps.git",
+        "ref": "master"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

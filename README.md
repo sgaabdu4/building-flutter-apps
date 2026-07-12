@@ -82,11 +82,11 @@ guidance-only and cannot register runtime hooks.
 
 | Layer | What it does | Source |
 |---|---|---|
-| Skill | Loads the rules, trigger map, and pre-flight checklist into the agent context. | [SKILL.md](SKILL.md) |
+| Skill | Loads the rules, trigger map, and pre-flight checklist into the agent context. | [SKILL.md](skills/building-flutter-apps/SKILL.md) |
 | Hooks | Blocks obvious drift after edits and before the agent stops. | [hooks/](hooks/) |
-| Analyzer | Enforces AST-level Flutter/Riverpod rules through `dart analyze`. | [analysis_options.yaml](references/analysis_options.yaml) |
+| Analyzer | Enforces AST-level Flutter/Riverpod rules through `dart analyze`. | [analysis_options.yaml](skills/building-flutter-apps/references/analysis_options.yaml) |
 | Evals | Checks trigger behavior and answer quality with `gpt-5.4-mini`. | [evals/](evals/) |
-| References | Holds detailed guidance so `SKILL.md` stays small and direct. | [references/](references/) |
+| References | Holds detailed guidance so `SKILL.md` stays small and direct. | [references/](skills/building-flutter-apps/references/) |
 
 The hard project gate is still package-root `dart analyze` with
 `flutter_skill_lints` and `riverpod_lint` wired under top-level `plugins:` in
@@ -95,8 +95,8 @@ The hard project gate is still package-root `dart analyze` with
 ## Enforcement Coverage
 
 The README is intentionally short, so it does not list every rule. The full
-contract lives in [SKILL.md](SKILL.md) and the task-specific files under
-[references/](references/). In practice, the enforcement covers more than folder
+contract lives in [SKILL.md](skills/building-flutter-apps/SKILL.md) and the task-specific files under
+[references/](skills/building-flutter-apps/references/). In practice, the enforcement covers more than folder
 layout:
 
 | Area | What gets enforced |
@@ -145,6 +145,15 @@ Ownership rules are the point:
 
 ## Install
 
+### Standalone agent skill
+
+```bash
+npx skills add https://github.com/sgaabdu4/building-flutter-apps --skill building-flutter-apps
+```
+
+Codex can invoke it explicitly with `$building-flutter-apps`; other harnesses
+use their own skill-selection syntax.
+
 ### Claude Code
 
 ```bash
@@ -154,20 +163,19 @@ Ownership rules are the point:
 
 Claude reads `.claude-plugin/marketplace.json` and
 `.claude-plugin/plugin.json`, then loads `hooks/hooks.json`.
+Invoke the skill explicitly with `/building-flutter-apps:building-flutter-apps`;
+Claude may also select it automatically from its description.
 
 ### Codex CLI
 
 ```bash
-codex features enable hooks
-codex features enable plugin_hooks
-codex plugin marketplace add sgaabdu4/building-flutter-apps
-codex
-/plugins
+codex plugin marketplace add sgaabdu4/building-flutter-apps --ref master
+codex plugin add building-flutter-apps@building-flutter-apps
 ```
 
-In `/plugins`, open the `building-flutter-apps` marketplace entry and install
-the plugin. Codex reads `.codex-plugin/plugin.json` and loads
-`hooks/hooks.json`.
+Codex reads `.codex-plugin/plugin.json`, loads the shared skill, and discovers
+`hooks/hooks.json`. Review and trust the hook definition in `/hooks`, then start
+a new task.
 
 ### Copilot CLI
 
@@ -182,9 +190,9 @@ loads `hooks/hooks.copilot.json`.
 ## Bootstrap A Flutter Project
 
 ```bash
-cp <plugin-cache>/references/analysis_options.yaml ./analysis_options.yaml
+cp <plugin-cache>/skills/building-flutter-apps/references/analysis_options.yaml ./analysis_options.yaml
 mkdir -p lib/core/extensions
-cp <plugin-cache>/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
+cp <plugin-cache>/skills/building-flutter-apps/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
 dart pub get
 dart analyze
 ```
@@ -202,29 +210,10 @@ Notes:
 
 ### Core Stack
 
-This table is the version source of truth. Keep setup snippets and examples in
-sync with it.
-
-| Package | Constraint | Purpose |
-|---|---:|---|
-| `flutter_riverpod` | `^3.3.2` | State management |
-| `riverpod_annotation` | `^4.0.3` | Codegen annotations |
-| `riverpod_generator` | `^4.0.4` | Provider codegen |
-| `freezed_annotation` | `^3.1.0` | Sealed-union annotations |
-| `freezed` | `^3.2.5` | Immutable classes; needs Dart SDK >= 3.8 |
-| `json_annotation` | `^4.12.0` | JSON annotations |
-| `json_serializable` | `6.14.0` | JSON codegen; exact pin |
-| `go_router` | `^17.3.0` | Declarative routing |
-| `go_router_builder` | `^4.3.0` | Typed route codegen |
-| `hive_ce` | `^2.19.3` | Binary local persistence |
-| `hive_ce_flutter` | `^2.3.4` | Flutter glue for `hive_ce` |
-| `hive_ce_generator` | `1.11.2` | Hive type adapters; exact pin |
-| `build_runner` | `^2.15.0` | Codegen runner |
-
-`json_serializable` and `hive_ce_generator` stay exact because code generators
-bind analyzer constraints. Lift them only after a real project pub solve and
-`dart analyze` prove the full Riverpod/Freezed/Hive generator stack is
-compatible.
+The installed skill owns the exact package constraints in
+[core-stack.md](skills/building-flutter-apps/references/core-stack.md), so the
+same source of truth is available to every supported agent harness. Constraint
+changes require a real project package solve and analyzer proof.
 
 ### Hook Events
 
@@ -241,20 +230,20 @@ The hook scripts no-op outside Flutter projects by walking upward for
 
 | Topic | File |
 |---|---|
-| Architecture and layers | [references/architecture.md](references/architecture.md) |
-| Analyzer setup | [references/analysis-options.md](references/analysis-options.md) |
-| Atomic UI and accessibility | [references/atomic-design.md](references/atomic-design.md) |
-| Riverpod codegen | [references/riverpod-codegen.md](references/riverpod-codegen.md) |
-| Freezed and sealed state | [references/freezed-sealed.md](references/freezed-sealed.md) |
-| State lifecycle | [references/state-management-lifecycle.md](references/state-management-lifecycle.md) |
-| Testing | [references/testing.md](references/testing.md) |
-| Networking boundaries | [references/networking.md](references/networking.md) |
-| l10n and ARB files | [references/localization.md](references/localization.md) |
-| Typed routing and deep links | [references/deep-linking.md](references/deep-linking.md) |
-| Common patterns | [references/common-patterns.md](references/common-patterns.md) |
-| Hive CE persistence | [references/hive-persistence.md](references/hive-persistence.md) |
-| Widget previews | [references/widget-previews.md](references/widget-previews.md) |
-| Runtime E2E proof | [references/dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
+| Architecture and layers | [references/architecture.md](skills/building-flutter-apps/references/architecture.md) |
+| Analyzer setup | [references/analysis-options.md](skills/building-flutter-apps/references/analysis-options.md) |
+| Atomic UI and accessibility | [references/atomic-design.md](skills/building-flutter-apps/references/atomic-design.md) |
+| Riverpod codegen | [references/riverpod-codegen.md](skills/building-flutter-apps/references/riverpod-codegen.md) |
+| Freezed and sealed state | [references/freezed-sealed.md](skills/building-flutter-apps/references/freezed-sealed.md) |
+| State lifecycle | [references/state-management-lifecycle.md](skills/building-flutter-apps/references/state-management-lifecycle.md) |
+| Testing | [references/testing.md](skills/building-flutter-apps/references/testing.md) |
+| Networking boundaries | [references/networking.md](skills/building-flutter-apps/references/networking.md) |
+| l10n and ARB files | [references/localization.md](skills/building-flutter-apps/references/localization.md) |
+| Typed routing and deep links | [references/deep-linking.md](skills/building-flutter-apps/references/deep-linking.md) |
+| Common patterns | [references/common-patterns.md](skills/building-flutter-apps/references/common-patterns.md) |
+| Hive CE persistence | [references/hive-persistence.md](skills/building-flutter-apps/references/hive-persistence.md) |
+| Widget previews | [references/widget-previews.md](skills/building-flutter-apps/references/widget-previews.md) |
+| Runtime E2E proof | [references/dart-mcp-e2e-testing.md](skills/building-flutter-apps/references/dart-mcp-e2e-testing.md) |
 
 ## Evals And Proof
 
@@ -302,8 +291,8 @@ Flutter skill files did not change.
 
 Keep changes small and enforceable:
 
-- Put detailed guidance in `references/`, not in `SKILL.md`.
-- Keep `README.md -> Core Stack` as the package-version SSOT.
+- Put detailed guidance in `skills/building-flutter-apps/references/`, not in `SKILL.md`.
+- Keep `skills/building-flutter-apps/references/core-stack.md` as the package-version SSOT.
 - Add or update hook fixtures when changing scanner behavior.
 - Add eval cases when changing trigger behavior or answer policy.
 - Run drift, smoke, markdown-example, and relevant eval checks before release.

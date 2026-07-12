@@ -108,7 +108,7 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 
 ## Core Stack
 
-Version SSOT: [README.md -> Core Stack](README.md). Stack: Riverpod codegen, Freezed, GoRouter builder, json_serializable/build_runner, Hive CE.
+Version SSOT: [core-stack.md](references/core-stack.md). Stack: Riverpod codegen, Freezed, GoRouter builder, json_serializable/build_runner, Hive CE.
 
 ## Architecture
 

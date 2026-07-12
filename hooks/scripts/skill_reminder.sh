@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# UserPromptSubmit hook for Claude Code.
+# UserPromptSubmit hook for compatible plugin runtimes.
 # When the active project is a Flutter project, inject a compact reminder of the top-5 rules
 # as additionalContext (stdout for UserPromptSubmit becomes context).
 # No-ops outside Flutter projects. Always exits 0.

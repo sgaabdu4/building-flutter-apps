@@ -21,19 +21,19 @@ Codex/GPT evals:
 
 ```bash
 python3 tool/run_codex_eval.py trigger \
-  --skill-path . \
+  --skill-path skills/building-flutter-apps \
   --eval-set evals/trigger-eval.json \
   --model gpt-5.4-mini \
   --output evals/results/trigger-gpt-5.4-mini.json
 
 python3 tool/run_codex_eval.py routing \
-  --skill-path . \
+  --skill-path skills/building-flutter-apps \
   --eval-set evals/routing-eval.json \
   --model gpt-5.4-mini \
   --output evals/results/routing-gpt-5.4-mini.json
 
 python3 tool/run_codex_eval.py quality \
-  --skill-path . \
+  --skill-path skills/building-flutter-apps \
   --eval-set evals/evals.json \
   --model gpt-5.4-mini \
   --output evals/results/quality-gpt-5.4-mini.json

@@ -2,13 +2,13 @@
 
 ## Read first
 
-1. Use this only for new app setup, lint wiring, plugin install routing, or broken analyzer plugin detection.
+1. Use this only for new app setup, lint wiring, or broken analyzer plugin detection.
 2. `flutter_skill_lints` is an analyzer plugin and belongs only under top-level `analysis_options.yaml` `plugins:`.
 3. Project setup is not complete until package-root `dart analyze` proves both `flutter_skill_lints` and `riverpod_lint` can fire.
 
 ## Trigger
 
-Signals: new Flutter app, `analysis_options.yaml`, `pubspec.yaml`, `dart analyze`, plugin install, missing lint diagnostics.
+Signals: new Flutter app, `analysis_options.yaml`, `pubspec.yaml`, `dart analyze`, missing lint diagnostics.
 Before code: output `Reading: setup.md`.
 
 ## Lint wiring
@@ -45,13 +45,3 @@ ModalRoute.isCurrentOf(context);
 ```
 
 Expected lint outside `lib/core/extensions/context_extensions.dart`: `use_context_is_current_modal_route`.
-
-## Per-tool hooks
-
-| Tool | Auto-install command | Hook source |
-|---|---|---|
-| Claude Code | `/plugin marketplace add sgaabdu4/building-flutter-apps` then `/plugin install building-flutter-apps@building-flutter-apps`; run `/reload-plugins` in the active session | `hooks/hooks.json` |
-| Codex CLI | `codex features enable hooks`, `codex features enable plugin_hooks`, `codex plugin marketplace add sgaabdu4/building-flutter-apps`, then `codex` -> `/plugins` -> install | `hooks/hooks.json` |
-| Copilot CLI | `copilot plugin marketplace add sgaabdu4/building-flutter-apps` then `copilot plugin install building-flutter-apps@building-flutter-apps` | `hooks/hooks.copilot.json` |
-
-Raw skill installs are guidance-only. They load `SKILL.md` but cannot register runtime hooks or run scanners. Use plugin installs when enforcement matters.

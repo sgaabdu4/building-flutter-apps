@@ -20,7 +20,7 @@ generated helpers directly.
 ### Setup
 
 ```yaml
-# pubspec.yaml — see README.md Core Stack table for canonical versions
+# pubspec.yaml — see ../core-stack.md for canonical versions
 dependencies:
   go_router: <version>
 

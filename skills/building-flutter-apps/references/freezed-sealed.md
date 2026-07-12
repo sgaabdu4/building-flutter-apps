@@ -31,7 +31,7 @@ Before code: output `Reading: freezed-sealed.md`
 ## Setup
 
 ```yaml
-# pubspec.yaml — see README.md Core Stack table for canonical versions
+# pubspec.yaml — see core-stack.md for canonical versions
 environment:
   sdk: '>=3.8.0 <4.0.0'   # freezed requires Dart >= 3.8
 
@@ -45,7 +45,7 @@ dev_dependencies:
   json_serializable: <version>
 ```
 
-Pin `json_serializable` to the README Core Stack exact version. Do not raise it
+Pin `json_serializable` to the core-stack exact version. Do not raise it
 or switch to a caret range until a real project pub solve plus `dart analyze`
 proves the Riverpod/Freezed/Hive generator stack is compatible. Run
 `dart pub deps -s compact | rg analyzer` before changing the pin.

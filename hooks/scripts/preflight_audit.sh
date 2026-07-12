@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Stop hook for Claude Code.
-# Runs a full pre-flight audit on the active Flutter project before letting Claude end the turn.
-# Always exits 0. Emits JSON {"decision":"block","reason":"..."} on stdout to keep Claude going if violations remain.
+# Stop hook for compatible plugin runtimes.
+# Runs a full pre-flight audit on the active Flutter project before the agent ends the turn.
+# Always exits 0. Emits JSON {"decision":"block","reason":"..."} on stdout to keep the agent going if violations remain.
 # No-ops outside Flutter projects.
 
 set -uo pipefail
@@ -31,7 +31,7 @@ add_violation() { VIOLATIONS+=("$1"); }
 
 # 1. analysis_options.yaml must exist at project root
 if [[ ! -f "$FLUTTER_ROOT/analysis_options.yaml" ]]; then
-  add_violation "Missing $FLUTTER_ROOT/analysis_options.yaml. Copy references/analysis_options.yaml from the skill to the project root."
+  add_violation "Missing $FLUTTER_ROOT/analysis_options.yaml. Copy skills/building-flutter-apps/references/analysis_options.yaml from the plugin to the project root."
 fi
 
 # 2. flutter_skill_lints wired in analysis_options.yaml plugins
@@ -304,7 +304,7 @@ if [[ -d "$FLUTTER_ROOT/lib" ]]; then
     [[ -z "$match" ]] && continue
     COUNT=$((COUNT + 1))
   done < <(ext_grep '\[0\]\.toUpperCase\(\)[^,)]*substring\([[:space:]]*1' | head -n 5)
-  [[ $COUNT -gt 0 ]] && add_violation "$COUNT inline capitalize anti-pattern found. Use String extension .capitalized — see references/extensions-utilities.md (Critical Rule 11)."
+  [[ $COUNT -gt 0 ]] && add_violation "$COUNT inline capitalize anti-pattern found. Use String extension .capitalized — see skills/building-flutter-apps/references/extensions-utilities.md (Critical Rule 11)."
 
   # Inline timeAgo: DateTime.now().difference(...)
   COUNT=0

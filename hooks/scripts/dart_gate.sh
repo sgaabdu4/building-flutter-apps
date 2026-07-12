@@ -3,7 +3,7 @@
 # Fires on .dart files and l10n.yaml inside a Flutter project (pubspec.yaml present in ancestor).
 # Runs ERE grep + awk context checks to catch grep-able rule violations.
 # Always exits 0. Violations emitted as JSON {"decision":"block","reason":"..."} on stdout,
-# which Claude Code interprets as a block + feedback message.
+# which compatible plugin runtimes interpret as a block + feedback message.
 
 set -uo pipefail
 

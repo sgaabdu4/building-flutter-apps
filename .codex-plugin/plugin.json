@@ -20,8 +20,20 @@
     "clean-architecture",
     "gen-l10n"
   ],
-  "hooks": "./hooks/hooks.json",
-  "skills": [
-    "./skills/"
-  ]
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Building Flutter Apps",
+    "shortDescription": "Strict Flutter architecture guidance and enforcement",
+    "longDescription": "Build and review Flutter apps with Riverpod codegen, Freezed, typed GoRouter, Hive CE, localization, accessibility, tests, and lifecycle hooks.",
+    "developerName": "sgaabdu4",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Guidance",
+      "Enforcement"
+    ],
+    "websiteURL": "https://github.com/sgaabdu4/building-flutter-apps",
+    "defaultPrompt": [
+      "$building-flutter-apps Review this Flutter change against the architecture contract."
+    ]
+  }
 }

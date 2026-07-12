@@ -27,8 +27,8 @@ Thanks for interest. This doc = guidelines for contributing.
 - Mermaid diagrams over prose where fit
 - Include working Dart/Flutter examples
 - Follow existing formatting
-- Keep SKILL.md under 500 lines; detailed content goes in `references/`
-- Run analyzer with `references/analysis_options.yaml`
+- Keep `skills/building-flutter-apps/SKILL.md` under 500 lines; detailed content goes in its sibling `references/`
+- Run analyzer with `skills/building-flutter-apps/references/analysis_options.yaml`
 - For package/version reviews, verify the documented install path exactly. Analyzer plugins in top-level `plugins:` are not the same as `pubspec.yaml` dependencies.
 - Run `ruby tool/check_upstream_flutter_skills.rb` before broad Flutter docs updates. If it flags upstream skill changes, review the changed upstream skill(s) before editing this repo. After adopting or intentionally ignoring those changes, refresh the lock with `ruby tool/check_upstream_flutter_skills.rb --update`.
 
@@ -45,18 +45,18 @@ Run `ruby tool/verify_markdown_examples.rb` before PR. Dart code belongs in `dar
 
 ### Package Versions
 
-`README.md → Core Stack` = **SSOT** for package constraints. Edit `README.md`
-first to change version. This file + per-ref setup blocks mirror that table.
-PRs diverging from `README.md` rejected on version-table diff.
+`skills/building-flutter-apps/references/core-stack.md` = **SSOT** for package
+constraints. Per-reference setup blocks use placeholders and link to that file.
+PRs with version pins elsewhere are rejected by the drift check.
 
-Examples MUST work w/ constraints in `README.md`. Don't upgrade
+Examples MUST work w/ constraints in `skills/building-flutter-apps/references/core-stack.md`. Don't upgrade
 analyzer-bound generators (`json_serializable`, `hive_ce_generator`) alone.
 Verify full solver: `dart pub deps -s compact | rg analyzer`.
 
 ### File Structure
 
-- `SKILL.md` - Main skill file (overview, critical rules, quick reference)
-- `references/` - Detailed topic docs
+- `skills/building-flutter-apps/SKILL.md` - Main skill file (overview, critical rules, quick reference)
+- `skills/building-flutter-apps/references/` - Detailed topic docs
 - `README.md` - GitHub-facing docs
 
 ### Commit Messages

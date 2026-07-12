@@ -10,7 +10,7 @@
 #   Add "# drift-ignore: <rule-id>" on the same line (or next line for multi-line hits)
 #   to suppress a specific rule for that location.
 #
-# Default scan paths: references/ SKILL.md README.md CONTRIBUTING.md
+# Default scan paths: skill package + README.md + CONTRIBUTING.md
 # Always excluded: AUDIT_REPORT.md tool/
 
 set -euo pipefail
@@ -19,6 +19,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SKILL_ROOT="$REPO_ROOT/skills/building-flutter-apps"
 
 # TAP counters
 _TAP_INDEX=0
@@ -105,9 +106,8 @@ done
 
 # Default scan paths (relative to repo root)
 if [ ${#SCAN_PATHS[@]} -eq 0 ]; then
-  for p in references SKILL.md README.md CONTRIBUTING.md; do
-    full="$REPO_ROOT/$p"
-    [ -e "$full" ] && SCAN_PATHS+=("$full")
+  for p in "$SKILL_ROOT/references" "$SKILL_ROOT/SKILL.md" "$REPO_ROOT/README.md" "$REPO_ROOT/CONTRIBUTING.md"; do
+    [ -e "$p" ] && SCAN_PATHS+=("$p")
   done
 fi
 
@@ -355,32 +355,37 @@ rule_v11() {
     "Use Crash.init() before runApp instead"
 }
 
-# ── Rule: D5 — README.md must have Core Stack table; SKILL.md must link to it ─
+# ── Rule: D5 — one installed Core Stack SSOT; SKILL.md + README.md link to it ──
 rule_d5() {
   local hits=""
 
-  # Check README.md for Core Stack table
+  local core_stack="$SKILL_ROOT/references/core-stack.md"
   local readme="$REPO_ROOT/README.md"
-  if [ -f "$readme" ]; then
-    if ! grep -qi 'Core Stack' "$readme" 2>/dev/null; then
-      hits="${hits}${readme}:0: README.md missing 'Core Stack' table"$'\n'
+  local skillmd="$SKILL_ROOT/SKILL.md"
+
+  if [ -f "$core_stack" ]; then
+    if ! grep -q '| Package | Constraint |' "$core_stack" 2>/dev/null; then
+      hits="${hits}${core_stack}:0: Core Stack package table missing"$'\n'
     fi
   else
-    hits="${hits}README.md not found"$'\n'
+    hits="${hits}${core_stack}:0: Core Stack SSOT missing"$'\n'
   fi
 
-  # Check SKILL.md links to README for versions
-  local skillmd="$REPO_ROOT/SKILL.md"
   if [ -f "$skillmd" ]; then
-    if ! grep -qi 'README' "$skillmd" 2>/dev/null; then
-      hits="${hits}${skillmd}:0: SKILL.md does not link to README for version table"$'\n'
+    if ! grep -q 'references/core-stack.md' "$skillmd" 2>/dev/null; then
+      hits="${hits}${skillmd}:0: SKILL.md does not link to Core Stack SSOT"$'\n'
     fi
   fi
 
-  # Check references/ for inline version pins (outside README/CONTRIBUTING)
+  if [ -f "$readme" ] && ! grep -q 'skills/building-flutter-apps/references/core-stack.md' "$readme" 2>/dev/null; then
+    hits="${hits}${readme}:0: README.md does not link to Core Stack SSOT"$'\n'
+  fi
+
+  # Check all scanned docs for version pins outside the Core Stack owner.
   local inline_hits
   inline_hits=$(rg -n --no-heading \
     '(riverpod|flutter_riverpod|go_router|hive|freezed):\s*\^?[0-9]+\.[0-9]+' \
+    --glob '!**/core-stack.md' \
     --glob '!**/README.md' \
     --glob '!**/CONTRIBUTING.md' \
     --glob '!**/AUDIT_REPORT.md' \
@@ -390,9 +395,9 @@ rule_d5() {
 
   hits="${hits%$'\n'}"
   emit_tap "d5" \
-    "Core Stack table in README; no inline version pins in references/" \
+    "installed Core Stack SSOT; SKILL.md + README.md links; no duplicate pins" \
     "$hits" \
-    "Version pins belong in README.md Core Stack table only (SSOT)"
+    "Version pins belong in skills/building-flutter-apps/references/core-stack.md only"
 }
 
 # ── Rule: D7 — build_runner -d shorthand must be accompanied by full flag ─────

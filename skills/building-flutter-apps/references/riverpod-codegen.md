@@ -21,7 +21,7 @@ Hard rule: this applies to every provider shape: state, computed value, reposito
 ## Setup
 
 ```yaml
-# pubspec.yaml — see README.md Core Stack table for canonical versions
+# pubspec.yaml — see core-stack.md for canonical versions
 dependencies:
   flutter_riverpod: <version>
   riverpod_annotation: <version>

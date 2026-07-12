@@ -1,8 +1,8 @@
-# Skill repo tooling only. Flutter apps copy references/analysis_options.yaml.
+# Skill repo tooling only. Flutter apps copy the skill's references/analysis_options.yaml.
 
 analyzer:
   exclude:
-    - references/analysis_options.yaml
-    - templates/**
+    - skills/building-flutter-apps/references/analysis_options.yaml
+    - skills/building-flutter-apps/templates/**
     - "**/*.g.dart"
     - "**/*.freezed.dart"

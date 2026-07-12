@@ -4,7 +4,7 @@
 markdown_files = Dir.glob(
   [
     '*.md',
-    'references/**/*.md',
+    'skills/building-flutter-apps/**/*.md',
     'evals/**/*.md',
   ],
 )

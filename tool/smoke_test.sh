@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke test for the `building-flutter-apps` Claude Code plugin.
+# Smoke test for the `building-flutter-apps` skill and plugin packages.
 # Run from any directory. Builds a temp Flutter project, drives each hook end-to-end
 # with crafted violators + clean fixtures, asserts every rule fires correctly and
 # nothing fires on clean code. Use this before publishing a release.
@@ -57,6 +57,7 @@ for f in \
   "$PLUGIN_ROOT/.claude-plugin/plugin.json" \
   "$PLUGIN_ROOT/.claude-plugin/marketplace.json" \
   "$PLUGIN_ROOT/.codex-plugin/plugin.json" \
+  "$PLUGIN_ROOT/.agents/plugins/marketplace.json" \
   "$PLUGIN_ROOT/plugin.json" \
   "$PLUGIN_ROOT/.github/plugin/marketplace.json" \
   "$PLUGIN_ROOT/hooks/hooks.json" \
@@ -71,19 +72,44 @@ done
 if python3 - "$PLUGIN_ROOT" <<'PY'
 import json
 import pathlib
+import re
 import sys
 
 root = pathlib.Path(sys.argv[1])
 claude = json.loads((root / ".claude-plugin/plugin.json").read_text())
 codex = json.loads((root / ".codex-plugin/plugin.json").read_text())
+codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_text())
 copilot = json.loads((root / "plugin.json").read_text())
+skill = root / "skills/building-flutter-apps"
 
 assert not (root / "hooks/hooks.codex.json").exists()
-assert claude.get("hooks") == "./hooks/hooks.json"
-assert claude.get("skills") == ["./skills/"]
-assert codex.get("hooks") == "./hooks/hooks.json"
-assert codex.get("skills") == ["./skills/"]
+assert not (root / "SKILL.md").exists()
+assert (skill / "SKILL.md").is_file()
+assert (skill / "references/setup.md").is_file()
+assert (skill / "references/analysis_options.yaml").is_file()
+assert (skill / "templates/flutter/lib/core/extensions/extensions.dart").is_file()
+assert claude.get("version") == "5.2.0"
+assert "hooks" not in claude
+assert "skills" not in claude
+assert "hooks" not in codex
+assert (root / "hooks/hooks.json").is_file()
+assert codex.get("skills") == "./skills/"
+assert codex_marketplace.get("name") == "building-flutter-apps"
+assert codex_marketplace.get("plugins", [])[0].get("name") == "building-flutter-apps"
+assert codex_marketplace["plugins"][0]["source"] == {
+    "source": "url",
+    "url": "https://github.com/sgaabdu4/building-flutter-apps.git",
+    "ref": "master",
+}
 assert copilot.get("hooks") == "hooks/hooks.copilot.json"
+
+for path in skill.rglob("*.md"):
+    text = path.read_text()
+    assert not re.search(
+        r"(?m)Claude Code|\bCodex\b|\bCopilot\b|\bChatGPT\b|\bAnthropic\b|\bOpenAI\b|(?:^|[`\s])/(?:plugin|reload-plugins)\b|\$building-flutter-apps",
+        text,
+        re.IGNORECASE,
+    ), f"harness-specific instruction leaked into installed skill: {path}"
 
 shared_hooks = json.loads((root / "hooks/hooks.json").read_text())
 commands = [
@@ -93,8 +119,10 @@ commands = [
     for hook in group["hooks"]
 ]
 assert commands
-assert all("CODEX_PLUGIN_ROOT" in command for command in commands)
+assert all("PLUGIN_ROOT" in command for command in commands)
 assert all("CLAUDE_PLUGIN_ROOT" in command for command in commands)
+assert all("CODEX_PLUGIN_ROOT" not in command for command in commands)
+assert all(".codex/plugins/cache" not in command for command in commands)
 PY
 then
   report pass "runtime manifests wire hooks"
