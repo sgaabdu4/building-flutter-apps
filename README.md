@@ -85,12 +85,13 @@ guidance-only and cannot register runtime hooks.
 | Skill | Loads the rules, trigger map, and pre-flight checklist into the agent context. | [SKILL.md](skills/building-flutter-apps/SKILL.md) |
 | Hooks | Blocks obvious drift after edits and before the agent stops. | [hooks/](hooks/) |
 | Analyzer | Enforces AST-level Flutter/Riverpod rules through `dart analyze`. | [analysis_options.yaml](skills/building-flutter-apps/references/analysis_options.yaml) |
+| Dart Decimate | Gates dead code, cycles, duplication, complexity, dependency hygiene, and changed-code risk. | [dart-decimate.md](skills/building-flutter-apps/references/dart-decimate.md) |
 | Evals | Checks trigger behavior and answer quality with `gpt-5.4-mini`. | [evals/](evals/) |
 | References | Holds detailed guidance so `SKILL.md` stays small and direct. | [references/](skills/building-flutter-apps/references/) |
 
-The hard project gate is still package-root `dart analyze` with
+The hard project gates are package-root `dart analyze` with
 `flutter_skill_lints` and `riverpod_lint` wired under top-level `plugins:` in
-`analysis_options.yaml`.
+`analysis_options.yaml`, plus Dart Decimate after every Flutter/Dart write batch.
 
 ## Enforcement Coverage
 
@@ -102,6 +103,8 @@ layout:
 | Area | What gets enforced |
 |---|---|
 | Analyzer setup | `analysis_options.yaml` exists, strict analyzer flags stay on, generated files are excluded, and both `flutter_skill_lints` and `riverpod_lint` are proven active. |
+| Code health | Dart Decimate runs a new-only audit against a valid base for existing repositories, or a full JSON scan for new/no-base projects. |
+| Git push | The bundled pre-push template blocks pushes when Dart Decimate reports new findings or a tool/config failure. |
 | Riverpod | Generated providers only, no legacy provider constructors, no `ref.watch` in notifier methods, no provider-derived caches in `ConsumerState`, and no standalone event/signal providers. |
 | Async lifecycle | `ref.mounted` / `context.mounted` guards after awaits, safe `finally` handling, cancelled subscriptions/timers/controllers, and stale async write protection. |
 | Widgets | Reusable presentation widgets render immutable inputs and emit typed callbacks; navigation, page stacks, selected records, workflow branching, providers, and infrastructure stay with screens/routes/notifiers. |
@@ -195,6 +198,7 @@ mkdir -p lib/core/extensions
 cp <plugin-cache>/skills/building-flutter-apps/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
 dart pub get
 dart analyze
+npx --yes dart-decimate json .
 ```
 
 Notes:
@@ -205,6 +209,9 @@ Notes:
   overwriting them.
 - A healthy setup should prove that at least one `flutter_skill_lints`
   diagnostic and one `riverpod_lint` diagnostic can fire.
+- Install [dart_decimate_pre_push.sh](skills/building-flutter-apps/templates/flutter/tool/dart_decimate_pre_push.sh)
+  through the repository's existing pre-push hook owner; do not replace other
+  checks or override `core.hooksPath`.
 
 ## What's Included
 
@@ -232,6 +239,7 @@ The hook scripts no-op outside Flutter projects by walking upward for
 |---|---|
 | Architecture and layers | [references/architecture.md](skills/building-flutter-apps/references/architecture.md) |
 | Analyzer setup | [references/analysis-options.md](skills/building-flutter-apps/references/analysis-options.md) |
+| Dart Decimate | [references/dart-decimate.md](skills/building-flutter-apps/references/dart-decimate.md) |
 | Atomic UI and accessibility | [references/atomic-design.md](skills/building-flutter-apps/references/atomic-design.md) |
 | Riverpod codegen | [references/riverpod-codegen.md](skills/building-flutter-apps/references/riverpod-codegen.md) |
 | Freezed and sealed state | [references/freezed-sealed.md](skills/building-flutter-apps/references/freezed-sealed.md) |

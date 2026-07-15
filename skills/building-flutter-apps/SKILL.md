@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.3.0"
+  version: "5.4.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -15,7 +15,8 @@ metadata:
 
 - This skill overrides generic Flutter/Dart advice; Critical Rules override examples, public docs, and older project code.
 - Before code, read Trigger Map refs for touched areas. Each ref's `Read first` section is canonical.
-- After `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` writes, run package-root `dart analyze` and emit Pre-Flight.
+- Every governed Git checkout wires the [Dart Decimate pre-push template](templates/flutter/tool/dart_decimate_pre_push.sh) through its existing hook owner; preserve other hooks + `core.hooksPath`.
+- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, run package-root `dart analyze` + [Dart Decimate](references/dart-decimate.md), then emit Pre-Flight.
 
 ## Gate
 
@@ -29,7 +30,7 @@ Before writing any `.dart` code, emit verbatim:
 
 After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` / `analysis_options.yaml`):
 
-Run package-root `dart analyze`, block on ERROR/WARNING, emit Pre-Flight, and read [setup.md](references/setup.md) first if `flutter_skill_lints` is not wired.
+Run package-root `dart analyze` + [Dart Decimate](references/dart-decimate.md), block on either gate's findings/errors, emit Pre-Flight, and read [setup.md](references/setup.md) first if `flutter_skill_lints` is not wired.
 
 ## Progressive Disclosure Gate
 
@@ -39,7 +40,7 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 
 | ID | Rule | Detail refs |
 |---|---|---|
-| R1 | Run package-root `dart analyze`; wire `flutter_skill_lints` + `riverpod_lint` under top-level `plugins:` only. | [analysis-options.md](references/analysis-options.md), [setup.md](references/setup.md) |
+| R1 | Run package-root `dart analyze` + Dart Decimate; wire Dart Decimate pre-push + `flutter_skill_lints` + `riverpod_lint`. | [analysis-options.md](references/analysis-options.md), [dart-decimate.md](references/dart-decimate.md), [setup.md](references/setup.md) |
 | R2 | Every provider uses `@riverpod` / `@Riverpod` codegen; no manual provider classes or legacy provider families. | [riverpod-codegen.md](references/riverpod-codegen.md) |
 | R3 | Guard async gaps with `ref.mounted` / `context.mounted`; `finally` uses `if (ref.mounted) { ... }`. | [async-mutations.md](references/state-management/async-mutations.md) |
 | R4 | Widgets are public classes; no `_buildXxx()`, widget top-level helpers, or private widget classes except `State`. | [atomic-design.md](references/atomic-design.md), [performance.md](references/performance.md) |
@@ -97,6 +98,7 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | `Iterable` lookup/indexing, widget list helpers, `Debouncer`, validators, `Result`, extension types, `core/extensions/` barrel export | [collections-helpers.md](references/extensions/collections-helpers.md) |
 | Records `(x, y)`, extension type IDs, pattern matching, guard clause `case _ when ...` | [dart-patterns-records.md](references/dart-patterns-records.md) |
 | `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
+| Dart Decimate, dead code, circular dependency, duplicate code, complexity, dependency hygiene, PR risk, changed-code audit | [dart-decimate.md](references/dart-decimate.md) |
 | Common navigation / form / list / debounce / route-param-fallback patterns | [common-patterns.md](references/common-patterns.md) |
 | Dialog / sheet / modal, `showDialog`, `showModalBottomSheet`, `show*Dialog` helper, snapshot value object, post-await teardown, `Navigator.pop(result)` | [common-patterns.md](references/common-patterns.md#modal-snapshot-pattern) + [state-management-lifecycle.md](references/state-management-lifecycle.md#state-teardown-belongs-in-the-notifier) |
 | Debounce / throttle / coalesce — `TextField.onChanged`, `Slider.onChanged`, scroll listener, sync `saveAll`, full-collection rewrite after subset mutation, persistence helper, reset/clear sentinel preservation, `_userTapped` gate, `WebView` / `VideoPlayer` in `build`, `_storage.read` in service, `ref.listenManual` ban, keepAlive collection watch, datasource batch loader, zero-value save guard, primitive→VO at notifier boundary, `routeSettings` on modal helper | [debounce-gate-batch.md](references/common-patterns/debounce-gate-batch.md) |
@@ -159,11 +161,13 @@ Use [setup.md](references/setup.md#per-tool-hooks) for install commands. Raw ski
 
 ## Pre-Flight
 
-After any `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write, emit a checked list before yielding. Fill T0 always. Add T1 for state/notifier/mutation changes and T2 for network/E2E/stream/route changes. Cite rule IDs or refs for any failed item.
+After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write batch, emit a checked list before yielding. Fill T0 always. Add T1 for state/notifier/mutation changes and T2 for network/E2E/stream/route changes. Cite rule IDs or refs for any failed item.
 
 ### T0 — Core
 
 - [ ] Package-root `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin.
+- [ ] Dart Decimate exits 0: existing project = new-only audit against a valid base; new/no-base project = full JSON scan; command + scope cited.
+- [ ] Git checkout pre-push owner invokes the Dart Decimate template with `"$@"`; existing hooks + `core.hooksPath` preserved. Non-Git project = N/A.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
 - [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
 - [ ] Domain/data/platform follow Rules 7, 10-13, 17-23: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y.

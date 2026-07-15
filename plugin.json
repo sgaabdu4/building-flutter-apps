@@ -1,7 +1,7 @@
 {
   "name": "building-flutter-apps",
-  "version": "5.3.0",
-  "description": "Flutter app architecture skill: Riverpod 3 codegen, Freezed 3 sealed, GoRouter typed-route SSOT, Hive CE persistence, Crashlytics, gen-l10n. Pairs with the external flutter_skill_lints analyzer plugin (wired via analysis_options.yaml) for AST-level enforcement. Runs write-time grep checks after Dart edits and a full grep + dart analyze audit at turn-end.",
+  "version": "5.4.0",
+  "description": "Flutter app architecture skill: Riverpod 3 codegen, Freezed 3 sealed, GoRouter typed-route SSOT, Hive CE persistence, Crashlytics, gen-l10n. Pairs flutter_skill_lints analyzer enforcement with Dart Decimate code-health and pre-push gates. Runs write-time grep checks after Dart edits and full turn-end gates.",
   "author": {
     "name": "sgaabdu4"
   },

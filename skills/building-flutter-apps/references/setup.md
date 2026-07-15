@@ -4,7 +4,7 @@
 
 1. Use this only for new app setup, lint wiring, or broken analyzer plugin detection.
 2. `flutter_skill_lints` is an analyzer plugin and belongs only under top-level `analysis_options.yaml` `plugins:`.
-3. Project setup is not complete until package-root `dart analyze` proves both `flutter_skill_lints` and `riverpod_lint` can fire.
+3. Project setup = package-root `dart analyze` proves both lint plugins can fire + [Dart Decimate](dart-decimate.md) full scan passes.
 
 ## Trigger
 
@@ -22,6 +22,7 @@ Run:
 ```bash
 dart pub get
 dart analyze
+npx --yes dart-decimate json .
 ```
 
 ## Extension template
@@ -45,3 +46,7 @@ ModalRoute.isCurrentOf(context);
 ```
 
 Expected lint outside `lib/core/extensions/context_extensions.dart`: `use_context_is_current_modal_route`.
+
+## Git pre-push
+
+Read [dart-decimate.md](dart-decimate.md#git-pre-push) → install its project hook template without replacing an existing hook owner or changing `core.hooksPath`.

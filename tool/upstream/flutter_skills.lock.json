@@ -2,10 +2,82 @@
   "version": 1,
   "source": "https://github.com/flutter/skills.git",
   "branch": "main",
-  "commit": "e4497873950727ee781fa411c1a2f624b1ec50c6",
-  "checked_at": "2026-05-12T21:39:20Z",
-  "skill_count": 10,
+  "commit": "fbb6bbcc0dd77ee4e0bb55738cfe47528c908aab",
+  "checked_at": "2026-07-15T11:29:40Z",
+  "skill_count": 22,
   "skills": {
+    "dart-add-unit-test": {
+      "path": "skills/dart-add-unit-test/SKILL.md",
+      "sha256": "1f52a9c88c35ba01d12c1a65cbe5c6034e9dde3799b49fe931d08baadf79be53",
+      "last_modified": "Fri, 24 Apr 2026 15:07:58 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-build-cli-app": {
+      "path": "skills/dart-build-cli-app/SKILL.md",
+      "sha256": "39c82e4ca39fadc8d065bad8c39a08cd719a3fc481b6a74ed6175f33ee3fb412",
+      "last_modified": "Fri, 04 May 2026 17:41:00 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-collect-coverage": {
+      "path": "skills/dart-collect-coverage/SKILL.md",
+      "sha256": "229035193bfd785368c48e3dd8ee059df43fcbdfe227dfd8a9a0178b995ee6c6",
+      "last_modified": "Fri, 24 Apr 2026 15:14:32 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-fix-runtime-errors": {
+      "path": "skills/dart-fix-runtime-errors/SKILL.md",
+      "sha256": "0c18be0cbda925cb1322c2c47a52c288cce1dc34218705a20c4c071eed1b066d",
+      "last_modified": "Fri, 24 Apr 2026 15:13:22 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-generate-test-mocks": {
+      "path": "skills/dart-generate-test-mocks/SKILL.md",
+      "sha256": "ca58b0e0d045595aa99990715bbf48fc75b1c5dca4053bc1940ef289cbcf2f00",
+      "last_modified": "Fri, 24 Apr 2026 15:13:58 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-migrate-to-checks-package": {
+      "path": "skills/dart-migrate-to-checks-package/SKILL.md",
+      "sha256": "005dbd697fcfb314e069a9954e46005f18b9333282057bad238b5e5a65976e77",
+      "last_modified": "Tue, 09 Jun 2026 19:30:00 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-resolve-package-conflicts": {
+      "path": "skills/dart-resolve-package-conflicts/SKILL.md",
+      "sha256": "967093ae2bca2784ba6a104dba3821ad809b399ca22071e9afc512915f60fa0a",
+      "last_modified": "Fri, 24 Apr 2026 15:11:14 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-run-static-analysis": {
+      "path": "skills/dart-run-static-analysis/SKILL.md",
+      "sha256": "5e41a03011647bcaee182ddc5d4471122f45f93fec6570480c237077e7f9438c",
+      "last_modified": "Fri, 24 Apr 2026 15:09:34 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-setup-ffi-assets": {
+      "path": "skills/dart-setup-ffi-assets/SKILL.md",
+      "sha256": "361b38a74d11abe5ba95aa9a6f0ad51e4850e5daf03acd7e1ab419bf0dfae0a8",
+      "last_modified": "Fri, 29 May 2026 09:10:00 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-use-ffigen": {
+      "path": "skills/dart-use-ffigen/SKILL.md",
+      "sha256": "129ae526e854ea73e829dfa0f4f90fa5cb6e9b80a86aefd1bdd5d761afa4b676",
+      "last_modified": "Thu, 28 May 2026 07:21:07 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-use-pattern-matching": {
+      "path": "skills/dart-use-pattern-matching/SKILL.md",
+      "sha256": "39d71b585417a2cca7958d41e19916303053c654a4de5aade8564addfaba1968",
+      "last_modified": "Fri, 24 Apr 2026 15:08:55 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
+    "dart-use-primary-constructors": {
+      "path": "skills/dart-use-primary-constructors/SKILL.md",
+      "sha256": "598d2fcb7641f6715861827840698450c3e8d077b4e92326e8bffe87e5b23c0c",
+      "last_modified": "Thu, 09 Jul 2026 23:13:25 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
     "flutter-add-integration-test": {
       "path": "skills/flutter-add-integration-test/SKILL.md",
       "sha256": "8d81b053c5fdf5b61aa7d0165cbc35e7a9a1c5bdcd7a301b8293a108771e6bab",

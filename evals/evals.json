@@ -564,7 +564,8 @@
         "Rejects `flutter analyze lib` and path-scoped analyzer gates for this skill",
         "Requires strict casts, strict inference, and strict raw types",
         "Excludes generated files such as `.g.dart`, `.freezed.dart`, `.gr.dart`, and ARB outputs",
-        "Verifies both a `flutter_skill_lints` diagnostic and a `riverpod_lint` diagnostic can fire"
+        "Verifies both a `flutter_skill_lints` diagnostic and a `riverpod_lint` diagnostic can fire",
+        "Runs Dart Decimate as a complementary graph/code-health gate after the analyzer"
       ]
     },
     {

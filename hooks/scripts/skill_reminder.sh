@@ -29,7 +29,7 @@ FLUTTER_ROOT=$(find_flutter_root "$PROJECT_ROOT") || exit 0
 cat <<'EOF'
 [building-flutter-apps active]
 Top-5 rules:
-  (1) `dart analyze` exits 0; `flutter_skill_lints` wired in `analysis_options.yaml plugins:`, never `pubspec.yaml`.
+  (1) `dart analyze` + Dart Decimate exit 0; every Git checkout wires the Dart Decimate pre-push template; `flutter_skill_lints` lives in `analysis_options.yaml plugins:`.
   (2) `if (!ref.mounted) return;` after every `await` in notifier; `if (!context.mounted) return;` in widgets/State.
   (3) Public widgets only — no `_buildXxx()` and no `class _Foo extends StatelessWidget|StatefulWidget|ConsumerWidget|HookWidget`. State<T> subclasses exempt.
   (4) `Object?` not `dynamic` (Map<String, dynamic> for JSON is fine); no `value!`.

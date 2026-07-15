@@ -17,8 +17,9 @@ fi
 HOOK="$PLUGIN_ROOT/hooks/scripts/dart_gate.sh"
 PREFLIGHT="$PLUGIN_ROOT/hooks/scripts/preflight_audit.sh"
 REMINDER="$PLUGIN_ROOT/hooks/scripts/skill_reminder.sh"
+GIT_PRE_PUSH="$PLUGIN_ROOT/skills/building-flutter-apps/templates/flutter/tool/dart_decimate_pre_push.sh"
 
-for f in "$HOOK" "$PREFLIGHT" "$REMINDER"; do
+for f in "$HOOK" "$PREFLIGHT" "$REMINDER" "$GIT_PRE_PUSH"; do
   if [[ ! -x "$f" ]]; then
     echo "✗ Missing or non-executable: $f" >&2
     exit 1
@@ -83,14 +84,16 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.3.0"
+expected_version = "5.4.0"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
 assert (skill / "SKILL.md").is_file()
 assert (skill / "references/setup.md").is_file()
+assert (skill / "references/dart-decimate.md").is_file()
 assert (skill / "references/analysis_options.yaml").is_file()
 assert (skill / "templates/flutter/lib/core/extensions/extensions.dart").is_file()
+assert (skill / "templates/flutter/tool/dart_decimate_pre_push.sh").is_file()
 assert claude.get("version") == expected_version
 assert codex.get("version") == expected_version
 assert copilot.get("version") == expected_version
@@ -146,6 +149,7 @@ echo "── 3. Shell syntax ──"
 for f in "$HOOK" "$PREFLIGHT" "$REMINDER"; do
   bash -n "$f" 2>/dev/null && report pass "$(basename "$f")" || report fail "$(basename "$f")"
 done
+bash -n "$GIT_PRE_PUSH" 2>/dev/null && report pass "$(basename "$GIT_PRE_PUSH")" || report fail "$(basename "$GIT_PRE_PUSH")"
 
 # --------- 4. Build temp Flutter project + fixtures ---------
 echo ""
@@ -432,15 +436,53 @@ assert_silent "l10n path config"                        "$TEST_DIR/l10n.yaml"
 # --------- 5. Stop hook ---------
 echo ""
 echo "── 5. Stop hook (preflight_audit.sh) ──"
-CLAUDE_PROJECT_DIR="$TEST_DIR" "$PREFLIGHT" > /tmp/smoke_pf.json 2>/dev/null
+TEST_BIN="$TEST_DIR/test-bin"
+DECIMATE_LOG="$TEST_DIR/dart-decimate.log"
+mkdir -p "$TEST_BIN"
+cat > "$TEST_BIN/dart" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+cat > "$TEST_BIN/npx" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$DART_DECIMATE_LOG"
+printf '{"verdict":"pass"}\n'
+exit 0
+EOF
+chmod +x "$TEST_BIN/dart" "$TEST_BIN/npx"
+
+PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" CLAUDE_PROJECT_DIR="$TEST_DIR" "$PREFLIGHT" > /tmp/smoke_pf.json 2>/dev/null
 if [[ -s /tmp/smoke_pf.json ]]; then
   report pass "dirty Flutter project → block"
 else
   report fail "dirty Flutter project (expected block)"
 fi
+if grep -q -- '--yes dart-decimate json .' "$DECIMATE_LOG" 2>/dev/null; then
+  report pass "new/no-base Flutter project → Dart Decimate full scan"
+else
+  report fail "Dart Decimate full scan missing"
+fi
+
+HOOK_REPO="$TEST_DIR/git-hook-repo"
+mkdir -p "$HOOK_REPO"
+git -C "$HOOK_REPO" init -b main >/dev/null 2>&1
+git -C "$HOOK_REPO" config user.name smoke-test
+git -C "$HOOK_REPO" config user.email smoke@example.invalid
+touch "$HOOK_REPO/pubspec.yaml"
+git -C "$HOOK_REPO" add pubspec.yaml
+git -C "$HOOK_REPO" commit -m baseline >/dev/null 2>&1
+git -C "$HOOK_REPO" update-ref refs/remotes/origin/main HEAD
+git -C "$HOOK_REPO" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+: > "$DECIMATE_LOG"
+(cd "$HOOK_REPO" && PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" "$GIT_PRE_PUSH" origin https://example.invalid/repo.git >/dev/null 2>&1)
+if grep -q -- '--yes dart-decimate audit . --base origin/main --format json --summary --gate new-only' "$DECIMATE_LOG" 2>/dev/null; then
+  report pass "Git pre-push → Dart Decimate new-only audit"
+else
+  report fail "Git pre-push Dart Decimate audit missing"
+fi
 
 NON_FL=$(mktemp -d)
-CLAUDE_PROJECT_DIR="$NON_FL" "$PREFLIGHT" > /tmp/smoke_pf2.json 2>/dev/null
+PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" CLAUDE_PROJECT_DIR="$NON_FL" "$PREFLIGHT" > /tmp/smoke_pf2.json 2>/dev/null
 [[ ! -s /tmp/smoke_pf2.json ]] && report pass "non-Flutter dir → silent" || report fail "non-Flutter dir (expected silent)"
 rm -rf "$NON_FL"
 

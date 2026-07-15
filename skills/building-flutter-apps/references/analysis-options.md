@@ -100,7 +100,7 @@ overwrite project-specific extensions.
 Do not omit steps 4-5 in analyzer setup answers; green analysis alone does not
 prove both plugins are loaded.
 
-Scope: `dart analyze` = analyzer/plugin gate. Use `flutter pub get` + publish/dry-run for package validity.
+Scope: `dart analyze` = analyzer/plugin gate. [Dart Decimate](dart-decimate.md) = complementary graph/code-health gate. Use `flutter pub get` + publish/dry-run for package validity.
 
 ## Use `dart analyze`, NOT `flutter analyze`
 
