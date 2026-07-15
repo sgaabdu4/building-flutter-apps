@@ -1,5 +1,6 @@
 # Riverpod 3.x Codegen
 
+
 ## Read first
 
 1. Every provider shape uses `@riverpod`/`@Riverpod(keepAlive: true)` codegen. No manual providers.
@@ -178,8 +179,8 @@ Use a generated computed provider, or a local `build` value for cheap transforms
 List<Workout> visibleHistory(Ref ref) =>
     ref.watch(historyProvider).where((item) => item.isVisible).toList();
 
-class HistoryCard extends ConsumerWidget {
-  const HistoryCard({super.key});
+class HistoryScreen extends ConsumerWidget {
+  const HistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -256,7 +257,7 @@ try {
 Mutations track side-effect state (idle, pending, success, error) separately from provider state. Prevent providers from being disposed while side-effect runs.
 
 ```dart
-// features/todos/presentation/widgets/add_todo_button.dart
+// features/todos/presentation/screens/add_todo_screen.dart
 //
 // Mutations = **file scope** (top-level), not inside class. Same instance
 // shared across rebuilds + consumers. Matches Riverpod docs: one mutation =
@@ -266,8 +267,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final addTodoMutation = Mutation<void>(); // experimental API — may change without major bump
 
-class AddTodoButton extends ConsumerWidget {
-  const AddTodoButton({super.key});
+class AddTodoScreen extends ConsumerWidget {
+  const AddTodoScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final addTodo = ref.watch(addTodoMutation);

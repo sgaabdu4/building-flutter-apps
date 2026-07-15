@@ -1,5 +1,6 @@
 # Hive CE Persistence
 
+
 ## Read first
 
 1. TypeIds + HiveField indexes are permanent after release. Never reuse/reorder; append/retire only.

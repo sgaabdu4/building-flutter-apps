@@ -1,11 +1,12 @@
 # Architecture
 
+
 ## Read first
 
 1. Data models != domain entities. Domain has no JSON, Flutter, storage, or SDK imports.
 2. Repos/datasources use `abstract interface class`; constructors take interfaces, not concretes.
 3. Storage SDK calls live in Local Datasource → Repository only. Not notifier/widget/service/repo.
-4. Child widgets watch providers directly. No entity/state/notifier prop-drilling.
+4. Screens bind providers; reusable widgets render immutable view inputs and emit typed callbacks.
 5. Typed GoRouter route helpers are nav SSOT; route defs own paths/params.
 
 ## Trigger
@@ -17,7 +18,7 @@ Before code: output `Reading: architecture.md`
 ## Scope
 
 In: state, nav, deep links, persistence, HTTP boundaries, models/JSON, DI,
-errors, forms (via [Validators](extensions-utilities.md#validators) +
+errors, forms (via [Validators](extensions/primitive-formatting.md#validators) +
 [common-patterns.md](common-patterns.md)), localization, atomic widgets,
 previews, codegen, tests.
 
@@ -39,12 +40,12 @@ HTTP service internals are covered at boundary level in
 3. **MUST NEVER** put `fromJson`/`toJson` on domain entities — serialization = Data layer.
 4. **MUST NEVER** import Flutter in Domain — entities pure Dart, zero deps.
 5. **MUST** use `model.toEntity()` in repositories for Data → Domain.
-6. **NEVER** try-catch in datasources or domain — catch once in repository or notifier.
+6. **MUST** follow the exception owner in [state-management-lifecycle.md](state-management-lifecycle.md#exception-ownership): notifiers catch by default; data layers catch only for documented boundary translations/recovery.
 7. **MUST** put feature widgets in `features/x/presentation/widgets/` — shared in `core/widgets/`.
 8. **MUST** keep persistence in data/repository layers by default (e.g. local datasource + repository).
 9. **MUST NEVER** run repository persistence and notifier persistence as dual SSOT for same state.
 10. **MUST NEVER** call a storage SDK (Hive, SharedPreferences, secure_storage, `dart:io`, `path_provider`) from a notifier, widget, or service. Storage lives in `Local<X>Datasource` only, exposed via `<X>Repository`. Imports of `package:hive_ce`, `package:hive_ce_flutter`, `package:shared_preferences`, `package:flutter_secure_storage`, `package:path_provider`, or `dart:io` are forbidden in `presentation/`, `*_notifier.dart`, `*_service.dart`, and `*_repository.dart` files. See [hive-persistence.md](hive-persistence.md).
-11. **MUST NEVER** prop-drill state. Child widgets read providers directly with `ref.watch` / `ref.read` / `ref.listen`. Widget constructors take only `Key`, callbacks, primitive props, and immutable IDs — never entities / models / states / notifiers / repositories / datasources. See [state-management.md](state-management.md).
+11. **MUST** bind providers in screens/subscreens, map domain state to immutable view data, and pass typed callbacks to reusable widgets. Widget dependencies MUST NOT include providers, notifiers, repositories, datasources, services, or routes. See [presentation-widgets.md](presentation-widgets.md).
 12. **MUST** keep typed GoRouter routes as the navigation SSOT. Route definitions live in the router package boundary, and app code navigates with generated route helpers such as `SomeRoute(...).go(context)` / `.push<T>(context)`. Local sheets/dialogs use local semantic helpers and `Navigator.pop` for dismissal.
 
 Mixin vs interface vs extension: see [mixins.md](mixins.md).
@@ -317,13 +318,13 @@ class ProductRepository implements IProductRepository {
 }
 ```
 
-NEVER try-catch in datasources or domain. Catch once in repository or notifier.
+Exception ownership = [state-management-lifecycle.md](state-management-lifecycle.md#exception-ownership).
 
 ### Presentation Layer
 
-Widgets MUST watch providers directly — NEVER prop drill.
+Screens bind providers and map domain state to immutable view data. Reusable widgets render those inputs and emit typed callbacks. Full boundary = [presentation-widgets.md](presentation-widgets.md).
 
-Full notifier patterns: [state-management.md](state-management.md).
+Notifier structure = [state-management/notifier-structure.md](state-management/notifier-structure.md). Async mutations = [state-management/async-mutations.md](state-management/async-mutations.md).
 
 ```dart
 // features/products/presentation/notifiers/product_notifier.dart
@@ -336,7 +337,6 @@ sealed class ProductState with _$ProductState {
   }) = _ProductState;
 }
 
-// Full notifier pattern in state-management.md
 @Riverpod(keepAlive: true)
 class ProductNotifier extends _$ProductNotifier {
   @override
@@ -345,7 +345,7 @@ class ProductNotifier extends _$ProductNotifier {
     return const ProductState(isLoading: true);
   }
 
-  // ... see state-management.md for _load(), optimistic updates, etc.
+  // ... see notifier-structure.md and async-mutations.md.
 }
 ```
 
@@ -360,24 +360,41 @@ class ProductListScreen extends ConsumerWidget {
       productProvider.select((s) => s.isLoading),
     );
 
-    if (isLoading) return const Center(child: CircularProgressIndicator());
-
-    return const ProductListView();
-  }
-}
-
-class ProductListView extends ConsumerWidget {
-  const ProductListView({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
       productProvider.select((s) => s.items),
     );
 
+    if (isLoading) return const Center(child: CircularProgressIndicator());
+
+    return ProductListView(
+      items: UnmodifiableListView([
+        for (final item in items)
+          ProductItemViewData(id: item.id, name: item.name),
+      ]),
+      onItemTap: (item) => ProductRoute(id: item.id).push<void>(context),
+    );
+  }
+}
+
+class ProductListView extends StatelessWidget {
+  const ProductListView({
+    required this.items,
+    required this.onItemTap,
+    super.key,
+  });
+
+  final UnmodifiableListView<ProductItemViewData> items;
+  final ValueChanged<ProductItemViewData> onItemTap;
+
+  @override
+  Widget build(BuildContext context) {
+
     return ListView.builder(
       itemCount: items.length,
-      itemBuilder: (context, index) => ProductCard(id: items[index].id),
+      itemBuilder: (context, index) => ProductCard(
+        item: items[index],
+        onTap: () => onItemTap(items[index]),
+      ),
     );
   }
 }

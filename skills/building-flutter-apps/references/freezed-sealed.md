@@ -1,5 +1,6 @@
 # Freezed 3.x Sealed Classes
 
+
 ## Read first
 
 1. `@freezed` classes use `sealed class`, never `abstract class`.

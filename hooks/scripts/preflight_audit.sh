@@ -304,7 +304,7 @@ if [[ -d "$FLUTTER_ROOT/lib" ]]; then
     [[ -z "$match" ]] && continue
     COUNT=$((COUNT + 1))
   done < <(ext_grep '\[0\]\.toUpperCase\(\)[^,)]*substring\([[:space:]]*1' | head -n 5)
-  [[ $COUNT -gt 0 ]] && add_violation "$COUNT inline capitalize anti-pattern found. Use String extension .capitalized — see skills/building-flutter-apps/references/extensions-utilities.md (Critical Rule 11)."
+  [[ $COUNT -gt 0 ]] && add_violation "$COUNT inline capitalize anti-pattern found. Use String extension .capitalized — see skills/building-flutter-apps/references/extensions/primitive-formatting.md."
 
   # Inline timeAgo: DateTime.now().difference(...)
   COUNT=0

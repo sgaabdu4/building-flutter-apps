@@ -1,5 +1,6 @@
 # Services, Singletons, Fire-and-Forget
 
+
 ## Read first
 
 1. Singletons and static service facades are allowed only for fire-and-forget infrastructure.

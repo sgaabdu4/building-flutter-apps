@@ -86,7 +86,7 @@ guidance-only and cannot register runtime hooks.
 | Hooks | Blocks obvious drift after edits and before the agent stops. | [hooks/](hooks/) |
 | Analyzer | Enforces AST-level Flutter/Riverpod rules through `dart analyze`. | [analysis_options.yaml](skills/building-flutter-apps/references/analysis_options.yaml) |
 | Dart Decimate | Gates dead code, cycles, duplication, complexity, dependency hygiene, and changed-code risk. | [dart-decimate.md](skills/building-flutter-apps/references/dart-decimate.md) |
-| Evals | Checks trigger behavior and answer quality with `gpt-5.4-mini`. | [evals/](evals/) |
+| Evals | Defines trigger, routing, and answer-quality regression cases. | [evals/](evals/) |
 | References | Holds detailed guidance so `SKILL.md` stays small and direct. | [references/](skills/building-flutter-apps/references/) |
 
 The hard project gates are package-root `dart analyze` with
@@ -115,7 +115,7 @@ layout:
 | Performance and interaction | High-frequency inputs debounce/throttle/coalesce, expensive widgets are gated, repeated lookups use shared indexes/extensions, and broad collection watches are avoided. |
 | Platform APIs | Exact-alarm permission uses `flutter_local_notifications`; platform-specific plugin implementations are resolved and null-checked before use. |
 | Previews and E2E | Widget previews use deterministic fakes only; runtime E2E proves behavior with stable selectors, logs, cleanup, and writer-plus-observer proof for shared state. |
-| Repo drift | Drift checks keep docs/examples honest, smoke tests exercise hook fixtures, markdown examples are parsed, and `gpt-5.4-mini` evals cover trigger and answer quality. |
+| Repo drift | Drift checks keep docs/examples honest, smoke tests exercise hook fixtures, markdown examples are parsed, and eval suites cover trigger, routing, and answer policy. |
 
 ## Architecture
 
@@ -260,27 +260,21 @@ The eval harnesses are deliberately split:
 | File | Purpose |
 |---|---|
 | [evals/trigger-eval.json](evals/trigger-eval.json) | Checks when the skill should and should not activate. |
+| [evals/routing-eval.json](evals/routing-eval.json) | Checks direct progressive-disclosure routing. |
 | [evals/evals.json](evals/evals.json) | Checks whether answers follow the policy. |
-| [evals/results/](evals/results/) | Stores compact `gpt-5.4-mini` proof artifacts. |
-| [evals/gpt-5.4-mini-eval-decisions.md](evals/gpt-5.4-mini-eval-decisions.md) | Records eval decisions, tradeoffs, and proof. |
 
 Run the local structural checks before publishing changes:
 
 ```bash
 bash tool/check_drift.sh
 bash tool/smoke_test.sh
+python3 tool/check_skill_routing.py
 ruby tool/verify_markdown_examples.rb
 ```
 
 ## Code Generation
 
-Use the long flag in documentation and automation:
-
-```bash
-dart run build_runner watch --delete-conflicting-outputs
-dart run build_runner build --delete-conflicting-outputs
-dart run build_runner clean && dart run build_runner build --delete-conflicting-outputs
-```
+Use the canonical commands in [core-stack.md](skills/building-flutter-apps/references/core-stack.md#code-generation).
 
 ## Upstream Drift
 

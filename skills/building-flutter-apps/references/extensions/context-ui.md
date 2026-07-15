@@ -68,7 +68,3 @@ ref.listen(
 ```
 
 The UI helper may wrap `SnackBarUtils`. Do not call `SnackBarUtils.show...` from notifiers, repositories, or datasources.
-
-## Full reference
-
-For examples of every extension owner, read [extensions-utilities.md](../extensions-utilities.md).

@@ -1,5 +1,6 @@
 # Flutter Optimizations
 
+
 ## Read first
 
 1. Never use `shrinkWrap` to fix layout; constrain or use slivers.
@@ -340,7 +341,7 @@ Test with TalkBack (Android) + VoiceOver (iOS) on real devices.
 
 ### MediaQuery.sizeOf
 
-Use `MediaQuery.sizeOf`, not `MediaQuery.of` — rebuild only on size change. With context extensions (see [extensions-utilities.md](extensions-utilities.md)):
+Use `MediaQuery.sizeOf`, not `MediaQuery.of` — rebuild only on size change. With context extensions (see [extensions/context-ui.md](extensions/context-ui.md)):
 
 ```dart
 @override

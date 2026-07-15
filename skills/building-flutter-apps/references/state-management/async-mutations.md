@@ -1,5 +1,6 @@
 # State Management — Async Mutations
 
+
 ## Read first
 
 1. Guard every notifier/repository `await` with `if (!ref.mounted) return;` before touching state or ref again.
@@ -105,7 +106,3 @@ ref.listen(
   },
 );
 ```
-
-## Full reference
-
-For rare edge cases not covered here, read [state-management.md](../state-management.md).

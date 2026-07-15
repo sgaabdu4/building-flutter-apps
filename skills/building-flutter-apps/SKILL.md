@@ -1,13 +1,13 @@
 ---
 name: building-flutter-apps
 description: >-
-  Flutter Riverpod app architecture. Invoke before changing a Flutter app or
+  Flutter Riverpod app architecture. Use before changing a Flutter app or
   package that uses Riverpod; skip non-Riverpod Flutter stacks and pure-Dart
   work without Flutter/Riverpod app context.
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.4.0"
+  version: "5.5.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -52,10 +52,10 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 | R10 | Storage SDK calls live in local datasources behind repositories; production Hive imports use `hive_ce_flutter`. | [hive-persistence.md](references/hive-persistence.md), [architecture.md](references/architecture.md) |
 | R11 | Primitive/context/collection operations live in `core/extensions/`; domain never imports those extensions. | [context-ui.md](references/extensions/context-ui.md), [primitive-formatting.md](references/extensions/primitive-formatting.md), [collections-helpers.md](references/extensions/collections-helpers.md) |
 | R12 | Domain primitives with meaning become validated Freezed Value Objects; Hive models keep primitives and mappers bridge. | [value-objects.md](references/value-objects.md), [hive-persistence.md](references/hive-persistence.md) |
-| R13 | Typed GoRouter routes are navigation SSOT; redirects are pure resolver logic with nullable by-id fallback UI. | [deep-linking.md](references/deep-linking.md), [common-patterns.md](references/common-patterns.md) |
-| R14 | Dialogs/sheets render immutable snapshots, pop results, and leave mutations/teardown to notifiers. | [common-patterns.md](references/common-patterns.md#modal-snapshot-pattern), [state-management-lifecycle.md](references/state-management-lifecycle.md) |
-| R15 | Debounce, gate, and batch high-frequency UI, sync, persistence, remote-function, reset, and lookup boundaries. | [common-patterns.md](references/common-patterns.md#debounce-gate-and-batch) |
-| R16 | App shell stays declarative; bootstrap listeners live in a sibling root `ConsumerWidget`. | [common-patterns.md](references/common-patterns.md#app-shell-bootstrap-boundary) |
+| R13 | Typed GoRouter routes are navigation SSOT; redirects are pure resolver logic with nullable by-id fallback UI. | [deep-linking.md](references/deep-linking.md), [routing-app-shell.md](references/common-patterns/routing-app-shell.md) |
+| R14 | Dialogs/sheets render immutable snapshots, pop results, and leave mutations/teardown to notifiers. | [modals-navigation.md](references/common-patterns/modals-navigation.md), [state-management-lifecycle.md](references/state-management-lifecycle.md) |
+| R15 | Debounce, gate, and batch high-frequency UI, sync, persistence, remote-function, reset, and lookup boundaries. | [debounce-gate-batch.md](references/common-patterns/debounce-gate-batch.md) |
+| R16 | App shell stays declarative; bootstrap listeners live in a sibling root `ConsumerWidget`. | [routing-app-shell.md](references/common-patterns/routing-app-shell.md) |
 | R17 | Keep control flow flat after exits; remove unnecessary `else` after `return` / `throw` / `break` / `continue`. | Lint: `avoid_unnecessary_else_after_control_flow` |
 | R18 | Use `onReorderItem` post-removal indexes directly; never add legacy `onReorder` adapter math. | Lint: `use_on_reorder_item_index_semantics` |
 | R19 | Android exact alarms use `flutter_local_notifications` permission APIs, not manual settings intents. | Lint: `use_local_notifications_exact_alarm_permission_api` |
@@ -100,56 +100,14 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
 | Dart Decimate, dead code, circular dependency, duplicate code, complexity, dependency hygiene, PR risk, changed-code audit | [dart-decimate.md](references/dart-decimate.md) |
 | Common navigation / form / list / debounce / route-param-fallback patterns | [common-patterns.md](references/common-patterns.md) |
-| Dialog / sheet / modal, `showDialog`, `showModalBottomSheet`, `show*Dialog` helper, snapshot value object, post-await teardown, `Navigator.pop(result)` | [common-patterns.md](references/common-patterns.md#modal-snapshot-pattern) + [state-management-lifecycle.md](references/state-management-lifecycle.md#state-teardown-belongs-in-the-notifier) |
+| Incremental remote pull, delta token, per-table sync date, merge/delete reconciliation | [delta-sync.md](references/common-patterns/delta-sync.md) |
+| Route-param safety, wizard sequencing, guarded next-step navigation | [navigation-flow.md](references/common-patterns/navigation-flow.md) |
+| Dialog / sheet / modal, snapshot value object, post-await teardown, dismiss-then-route, pop fallback, nested navigator dismissal | [modals-navigation.md](references/common-patterns/modals-navigation.md) + [state-management-lifecycle.md](references/state-management-lifecycle.md#state-teardown-belongs-in-the-notifier) |
 | Debounce / throttle / coalesce — `TextField.onChanged`, `Slider.onChanged`, scroll listener, sync `saveAll`, full-collection rewrite after subset mutation, persistence helper, reset/clear sentinel preservation, `_userTapped` gate, `WebView` / `VideoPlayer` in `build`, `_storage.read` in service, `ref.listenManual` ban, keepAlive collection watch, datasource batch loader, zero-value save guard, primitive→VO at notifier boundary, `routeSettings` on modal helper | [debounce-gate-batch.md](references/common-patterns/debounce-gate-batch.md) |
 
 ## Core Stack
 
 Version SSOT: [core-stack.md](references/core-stack.md). Stack: Riverpod codegen, Freezed, GoRouter builder, json_serializable/build_runner, Hive CE.
-
-## Architecture
-
-```mermaid
-flowchart LR
-  P[Presentation<br/>Notifier catches<br/>Widget watches] --> R[Repository<br/>returns Domain]
-  R --> D[Domain<br/>pure Dart<br/>no JSON]
-  R --> S[Datasource<br/>API/Hive<br/>throws typed exceptions]
-```
-
-```
-lib/
-├── core/
-├── features/
-│   └── feature_x/
-│       ├── data/           # Models, datasources (API / local)
-│       ├── domain/         # Entities (pure Dart, no Flutter imports)
-│       ├── repositories/   # Map models → entities
-│       └── presentation/   # Notifiers, screens, widgets
-└── main.dart
-```
-
-## Class Modifiers
-
-| Modifier | Extend outside lib | Implement outside lib | Instantiate | Mixin |
-|---|:---:|:---:|:---:|:---:|
-| `abstract class` | ✓ | ✓ | ✗ | ✗ |
-| `abstract interface class` | ✗ | ✓ | ✗ | ✗ |
-| `abstract final class` | ✗ | ✗ | ✗ | ✗ |
-| `sealed class` | ✗ | ✗ | ✗ | ✗ |
-| `base class` | ✓ | ✗ | ✓ | ✗ |
-| `interface class` | ✗ | ✓ | ✓ | ✗ |
-| `final class` | ✗ | ✗ | ✓ | ✗ |
-| `mixin class` | ✓ | ✓ | ✓ | ✓ |
-
-`abstract interface class` for repository / datasource contracts. `sealed class` for Freezed unions. `abstract final class` for pure helper namespaces and tiny fire-and-forget static facades (`Crash`, logging/analytics wrappers). Plain singleton = private constructor + one `static final instance` + fire-and-forget (`void` / `Future<void>`) API only.
-
-## Code Generation
-
-```bash
-dart run build_runner watch --delete-conflicting-outputs
-dart run build_runner build --delete-conflicting-outputs
-dart run build_runner clean && dart run build_runner build --delete-conflicting-outputs
-```
 
 ## Setup
 

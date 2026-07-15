@@ -9,7 +9,7 @@ Runs three project-local eval modes:
 - routing: ask Codex whether to invoke and which Trigger Map refs to read.
 
 This intentionally stays independent from the Claude-oriented harnesses so the
-same eval files can be exercised with OpenAI model ids such as gpt-5.4-mini.
+same eval files can be exercised with a configured Codex model.
 """
 
 from __future__ import annotations
@@ -26,174 +26,29 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+from codex_eval_support import (
+    JUDGE_SCHEMA,
+    ROUTING_SCHEMA,
+    TRIGGER_SCHEMA,
+    extract_first_json_object,
+    load_eval_items,
+    parse_skill_md,
+    parse_tokens,
+    public_path,
+    sanitize_json,
+    sanitize_text,
+    timeout_text,
+)
 
-DEFAULT_MODEL = "gpt-5.4-mini"
+DEFAULT_MODEL = "luna-5.6"
+DEFAULT_REASONING_EFFORT = "xhigh"
 DEFAULT_PASS_THRESHOLD = 0.8
-
-
-JUDGE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "expectations_met": {
-            "type": "array",
-            "items": {"type": "boolean"},
-        },
-        "notes": {"type": "string"},
-    },
-    "required": ["expectations_met", "notes"],
-    "additionalProperties": False,
-}
-
-
-TRIGGER_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "triggered": {"type": "boolean"},
-        "reason": {"type": "string"},
-    },
-    "required": ["triggered", "reason"],
-    "additionalProperties": False,
-}
-
-
-ROUTING_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "triggered": {"type": "boolean"},
-        "refs": {
-            "type": "array",
-            "items": {"type": "string"},
-        },
-        "reason": {"type": "string"},
-    },
-    "required": ["triggered", "refs", "reason"],
-    "additionalProperties": False,
-}
-
-
-def parse_skill_md(skill_path: Path) -> tuple[str, str, str]:
-    text = (skill_path / "SKILL.md").read_text()
-    match = re.match(r"^---\n(.*?)\n---\n(.*)$", text, re.DOTALL)
-    if not match:
-        raise ValueError(f"No frontmatter found in {skill_path / 'SKILL.md'}")
-
-    header, body = match.groups()
-    name = ""
-    desc_lines: list[str] = []
-    in_description = False
-
-    for line in header.splitlines():
-        if line.startswith("name:"):
-            name = line.split(":", 1)[1].strip().strip('"')
-            in_description = False
-            continue
-        if line.startswith("description:"):
-            raw = line.split(":", 1)[1].strip()
-            in_description = raw in {">", ">-", "|", "|-"}
-            if not in_description:
-                desc_lines.append(raw.strip('"'))
-            continue
-        if in_description:
-            if line and not line.startswith(" ") and ":" in line:
-                in_description = False
-            else:
-                desc_lines.append(line.strip())
-
-    description = " ".join(part for part in desc_lines if part).strip()
-    if not name or not description:
-        raise ValueError("SKILL.md must include name and description frontmatter")
-    return name, description, body
-
-
-def load_eval_items(path: Path) -> list[dict[str, Any]]:
-    data = json.loads(path.read_text())
-    if isinstance(data, dict):
-        return list(data.get("evals", []))
-    if isinstance(data, list):
-        return list(data)
-    raise ValueError(f"Unsupported eval file shape: {path}")
-
-
-def extract_first_json_object(text: str) -> dict[str, Any] | None:
-    start = text.find("{")
-    if start < 0:
-        return None
-    depth = 0
-    in_string = False
-    escaped = False
-    for idx in range(start, len(text)):
-        char = text[idx]
-        if in_string:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_string = False
-            continue
-        if char == '"':
-            in_string = True
-        elif char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(text[start : idx + 1])
-                except json.JSONDecodeError:
-                    return None
-    return None
-
-
-def parse_tokens(stderr: str) -> int | None:
-    match = re.search(r"tokens used\s+([\d,]+)", stderr, re.IGNORECASE)
-    if not match:
-        return None
-    return int(match.group(1).replace(",", ""))
-
-
-def timeout_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
-    return str(value)
-
-
-def public_path(path: Path, *, base: Path) -> str:
-    resolved = path.resolve()
-    base = base.resolve()
-    try:
-        relative = resolved.relative_to(base)
-        return "." if str(relative) == "." else str(relative)
-    except ValueError:
-        pass
-
-    home = Path.home().resolve()
-    try:
-        return "$HOME/" + str(resolved.relative_to(home))
-    except ValueError:
-        return str(resolved)
-
-
-def sanitize_text(text: str) -> str:
-    return text.replace(str(Path.home()), "$HOME")
-
-
-def sanitize_json(value: Any) -> Any:
-    if isinstance(value, str):
-        return sanitize_text(value)
-    if isinstance(value, list):
-        return [sanitize_json(item) for item in value]
-    if isinstance(value, dict):
-        return {key: sanitize_json(item) for key, item in value.items()}
-    return value
-
 
 def codex_exec(
     prompt: str,
     *,
     model: str,
+    reasoning_effort: str,
     cwd: Path,
     timeout: int,
     output_schema: dict[str, Any] | None = None,
@@ -205,6 +60,8 @@ def codex_exec(
             "exec",
             "--model",
             model,
+            "--config",
+            f'model_reasoning_effort="{reasoning_effort}"',
             "--sandbox",
             "read-only",
             "--skip-git-repo-check",
@@ -301,6 +158,7 @@ def run_quality_case(
     skill_path: str,
     model: str,
     judge_model: str,
+    reasoning_effort: str,
     timeout: int,
     judge_timeout: int,
     pass_threshold: float,
@@ -310,6 +168,7 @@ def run_quality_case(
     answer = codex_exec(
         build_answer_prompt(Path(skill_path), item["prompt"]),
         model=model,
+        reasoning_effort=reasoning_effort,
         cwd=Path(skill_path),
         timeout=timeout,
     )
@@ -336,6 +195,7 @@ def run_quality_case(
     judge = codex_exec(
         build_judge_prompt(item["prompt"], expectations, answer["stdout"]),
         model=judge_model,
+        reasoning_effort=reasoning_effort,
         cwd=Path(skill_path),
         timeout=judge_timeout,
         output_schema=JUDGE_SCHEMA,
@@ -466,6 +326,7 @@ def run_routing_case(
     trigger_map: str,
     skill_path: str,
     model: str,
+    reasoning_effort: str,
     timeout: int,
     include_excerpts: bool,
 ) -> dict[str, Any]:
@@ -476,6 +337,7 @@ def run_routing_case(
         result = codex_exec(
             build_routing_prompt(skill_name, description, trigger_map, item["query"]),
             model=model,
+            reasoning_effort=reasoning_effort,
             cwd=Path(skill_path),
             timeout=timeout,
             output_schema=ROUTING_SCHEMA,
@@ -540,6 +402,7 @@ def run_trigger_case(
     description: str,
     skill_path: str,
     model: str,
+    reasoning_effort: str,
     timeout: int,
     trigger_threshold: float,
     runs_per_query: int,
@@ -554,6 +417,7 @@ def run_trigger_case(
         result = codex_exec(
             build_trigger_prompt(skill_name, description, item["query"]),
             model=model,
+            reasoning_effort=reasoning_effort,
             cwd=Path(skill_path),
             timeout=timeout,
             output_schema=TRIGGER_SCHEMA,
@@ -688,6 +552,7 @@ def main() -> None:
     parser.add_argument("--skill-path", required=True)
     parser.add_argument("--eval-set", required=True)
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--reasoning-effort", default=DEFAULT_REASONING_EFFORT)
     parser.add_argument("--judge-model", default=None)
     parser.add_argument("--num-workers", type=int, default=1)
     parser.add_argument("--timeout", type=int, default=300)
@@ -718,6 +583,7 @@ def main() -> None:
                 "skill_path": str(skill_path),
                 "model": args.model,
                 "judge_model": args.judge_model or args.model,
+                "reasoning_effort": args.reasoning_effort,
                 "timeout": args.timeout,
                 "judge_timeout": args.judge_timeout,
                 "pass_threshold": args.pass_threshold,
@@ -736,6 +602,7 @@ def main() -> None:
                 "description": description,
                 "skill_path": str(skill_path),
                 "model": args.model,
+                "reasoning_effort": args.reasoning_effort,
                 "timeout": args.timeout,
                 "trigger_threshold": args.trigger_threshold,
                 "runs_per_query": args.runs_per_query,
@@ -754,6 +621,7 @@ def main() -> None:
                 "trigger_map": extract_trigger_map(skill_body),
                 "skill_path": str(skill_path),
                 "model": args.model,
+                "reasoning_effort": args.reasoning_effort,
                 "timeout": args.timeout,
                 "include_excerpts": args.include_excerpts,
             },
@@ -765,6 +633,7 @@ def main() -> None:
         "runner": "codex",
         "mode": args.mode,
         "model": args.model,
+        "reasoning_effort": args.reasoning_effort,
         "judge_model": args.judge_model or args.model if args.mode == "quality" else None,
         "skill_name": skill_name,
         "skill_path": public_path(skill_path, base=Path.cwd()),

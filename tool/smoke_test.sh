@@ -84,7 +84,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.4.0"
+expected_version = "5.5.0"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -201,12 +201,17 @@ class OrdersNotifier {
 }
 EOF
 
-# Prop-drill non-suffix (new rule 14, allowlist)
-cat > "$TEST_DIR/lib/widget_propdrill.dart" <<'EOF'
+# Immutable view-data input is canonical for reusable widgets.
+cat > "$TEST_DIR/lib/widget_view_data.dart" <<'EOF'
 import 'package:flutter/material.dart';
+final class FoodCardViewData {
+  const FoodCardViewData({required this.name});
+  final String name;
+}
 class FoodCard extends StatelessWidget {
-  const FoodCard({super.key, required this.food});
-  final Food food;
+  const FoodCard({super.key, required this.data, required this.onTap});
+  final FoodCardViewData data;
+  final ValueChanged<FoodCardViewData> onTap;
   @override
   Widget build(BuildContext context) => const SizedBox();
 }
@@ -406,7 +411,7 @@ assert_silent() {
 assert_block  "violator → 5 old rules fire"             "$TEST_DIR/lib/violator.dart"
 assert_silent "clean Map<String, dynamic>"              "$TEST_DIR/lib/clean.dart"
 assert_block  "storage SDK in notifier"                 "$TEST_DIR/lib/features/orders/presentation/orders_notifier.dart"
-assert_block  "prop-drill non-suffix domain"            "$TEST_DIR/lib/widget_propdrill.dart"
+assert_silent "immutable widget view data"              "$TEST_DIR/lib/widget_view_data.dart"
 assert_silent "datasource (storage allowed)"            "$TEST_DIR/lib/features/orders/data/datasources/orders_local_datasource.dart"
 assert_silent "main.dart Hive.initFlutter (allowed)"    "$TEST_DIR/lib/main.dart"
 assert_silent "test/ file Hive (allowed)"               "$TEST_DIR/test/foo_test.dart"

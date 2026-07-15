@@ -43,6 +43,8 @@ Thanks for interest. This doc = guidelines for contributing.
 
 Run `ruby tool/verify_markdown_examples.rb` before PR. Dart code belongs in `dart` fences, including examples marked `// WRONG`.
 
+Run `python3 tool/check_skill_routing.py` after changing `SKILL.md`, references, or routing evals. Every reference must be linked directly from `SKILL.md` and include `## Read first`.
+
 ### Package Versions
 
 `skills/building-flutter-apps/references/core-stack.md` = **SSOT** for package

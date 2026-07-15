@@ -94,7 +94,3 @@ For domain text with validation, prefer a Freezed Value Object.
 ## Barrel export
 
 Export extension owners from `core/extensions/extensions.dart`; do not import individual extension files throughout feature code.
-
-## Full reference
-
-For the complete helper catalog, read [extensions-utilities.md](../extensions-utilities.md).

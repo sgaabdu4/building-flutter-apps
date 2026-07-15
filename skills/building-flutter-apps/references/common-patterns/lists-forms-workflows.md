@@ -1,5 +1,6 @@
 # Common Patterns — Lists, Forms, and Workflows
 
+
 ## Read first
 
 1. Use Freezed state plus `@Riverpod` codegen for pagination, search, and forms.
@@ -31,7 +32,7 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
 
   @override
   PaginatedState build() {
-    Future.microtask(() => _loadPage(0)); // Defer — see state-management.md
+    Future.microtask(() => _loadPage(0)); // Defer — see notifier-structure.md.
     return const PaginatedState(isLoading: true);
   }
 
@@ -66,8 +67,8 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
 Widget with scroll detection:
 
 ```dart
-class PaginatedProductList extends ConsumerWidget {
-  const PaginatedProductList({super.key});
+class PaginatedProductListScreen extends ConsumerWidget {
+  const PaginatedProductListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

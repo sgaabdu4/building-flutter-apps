@@ -1,5 +1,6 @@
 # Dart MCP E2E Testing
 
+
 ## Read first
 
 1. Use Dart MCP before shell. Shell fallback only for project cmds MCP cannot run.
@@ -188,4 +189,3 @@ Verify:
 6. Relevant tests pass after final runtime fix pass.
 7. Test data cleaned.
 8. All app processes stopped.
-

@@ -1,5 +1,12 @@
 # Common Patterns — Delta Sync
 
+
+## Read first
+
+1. Delta sync = pull changed rows + deleted IDs after the last confirmed server cursor.
+2. Repository owns merge/delete reconciliation; notifier triggers sync + guards lifecycle.
+3. Advance the cursor only after every table applies successfully.
+
 ## Delta Sync (Incremental Remote Pull)
 
 Fetch only rows changed since last sync, not all data.

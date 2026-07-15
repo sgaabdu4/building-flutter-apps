@@ -1,5 +1,6 @@
 # Common Patterns — Routing and App Shell
 
+
 ## Read first
 
 1. Use `go_router_builder` typed route classes as the navigation API; route definitions own paths.

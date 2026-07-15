@@ -53,11 +53,11 @@
       "expected_output": "See expectations.",
       "files": [],
       "expectations": [
-        "Explicitly warns against prop drilling (passing state through constructors)",
-        "Shows child widgets watching the provider directly with ref.watch",
-        "Uses ref.watch(provider.select((s) => s.specificField)) for leaf widgets",
-        "Does not suggest passing the full state object as a constructor parameter",
-        "Each child widget is a ConsumerWidget, not a plain StatelessWidget"
+        "Binds the provider in the settings screen or smallest screen-owned Consumer boundary",
+        "Uses ref.watch(provider.select((s) => s.specificField)) at the binding boundary",
+        "Maps preferences to minimal immutable view inputs",
+        "Passes typed callbacks to reusable child widgets",
+        "Does not pass provider state, notifiers, repositories, or services into child widgets"
       ]
     },
     {
@@ -98,8 +98,8 @@
         "Uses a Debouncer utility (Timer-based) for debouncing input",
         "Debouncer is disposed via ref.onDispose in the notifier",
         "SearchState is a Freezed sealed class with query and results fields",
-        "Search bar widget is a ConsumerWidget that watches the notifier",
-        "No prop drilling \u2014 widgets watch providers directly",
+        "Screen binds the notifier and passes immutable search view data plus typed callbacks to the search widget",
+        "Reusable presentation widgets do not read providers",
         "Uses @riverpod or @Riverpod codegen annotation",
         "Contains ref.mounted check if there's an async operation"
       ]
@@ -176,7 +176,7 @@
         "Confirm password validates against password field (cross-field)",
         "Phone validation only runs if value is non-empty",
         "Submit method validates all fields first, then guards with isValid",
-        "Each form field is a separate ConsumerWidget (no prop drilling)",
+        "Screen binds form state; reusable form fields receive immutable values/errors and typed callbacks",
         "Uses ref.mounted check after async submit"
       ]
     },
@@ -204,8 +204,8 @@
       "expectations": [
         "Identifies watching full state as the cause of unnecessary rebuilds",
         "Uses ref.watch(provider.select((s) => s.specificField)) to watch only needed data",
-        "List items are separate ConsumerWidgets that watch their own data",
-        "Does NOT pass state through constructors (no prop drilling)",
+        "The smallest screen-owned Consumer boundary selects the list render projection",
+        "Reusable list items are provider-free and receive minimal immutable view data plus typed callbacks",
         "Uses const constructors where possible to prevent rebuilds",
         "Mentions or demonstrates that select() uses == to skip identical values"
       ]

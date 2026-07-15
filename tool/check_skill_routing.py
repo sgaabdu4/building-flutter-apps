@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""Validate SKILL.md progressive-disclosure routing.
-
-This is a structural guard for the skill itself. It keeps the hot-path
-SKILL.md lean and verifies trigger-map links route to existing files with a
-`Read first` section.
-"""
+"""Validate skill routing, reference hygiene, and canonical guidance."""
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -18,9 +14,15 @@ SKILL_ROOT = ROOT / "skills" / "building-flutter-apps"
 SKILL = SKILL_ROOT / "SKILL.md"
 MAX_SKILL_LINES = 260
 MAX_SKILL_CHARS = 24_000
-FORBIDDEN_TRIGGER_REFS = {
+LEGACY_REFERENCE_FILES = {
     "references/state-management.md",
     "references/extensions-utilities.md",
+}
+FORBIDDEN_GUIDANCE = {
+    "child widgets watch providers directly",
+    "widgets must watch providers directly",
+    "watch providers in leaf widgets",
+    "children watch providers directly",
 }
 
 
@@ -55,16 +57,24 @@ def main() -> None:
     if "Progressive Disclosure Gate" not in text:
         fail("SKILL.md missing Progressive Disclosure Gate")
 
+    for legacy in LEGACY_REFERENCE_FILES:
+        if (SKILL_ROOT / legacy).exists():
+            fail(f"legacy reference still exists: {legacy}")
+
     rows = trigger_map_rows(text)
     if not rows:
         fail("Trigger Map has no routed rows")
+
+    skill_links = {
+        target
+        for target in markdown_links(text)
+        if target and "://" not in target and target.startswith("references/")
+    }
 
     for row in rows:
         for target in markdown_links(row):
             if not target or "://" in target:
                 continue
-            if target in FORBIDDEN_TRIGGER_REFS:
-                fail(f"Trigger Map routes to bulky parent ref: {target}")
             path = (SKILL_ROOT / target).resolve()
             if not path.exists():
                 fail(f"Trigger Map target missing: {target}")
@@ -72,6 +82,40 @@ def main() -> None:
                 body = path.read_text()
                 if "## Read first" not in body:
                     fail(f"Trigger Map target lacks '## Read first': {target}")
+
+    references = sorted((SKILL_ROOT / "references").rglob("*.md"))
+    for path in references:
+        relative = path.relative_to(SKILL_ROOT).as_posix()
+        body = path.read_text()
+        if relative not in skill_links:
+            fail(f"reference is not linked directly from SKILL.md: {relative}")
+        if "## Read first" not in body:
+            fail(f"reference lacks '## Read first': {relative}")
+        lowered = body.lower()
+        for phrase in FORBIDDEN_GUIDANCE:
+            if phrase in lowered:
+                fail(f"conflicting widget guidance in {relative}: {phrase}")
+
+    routing_eval = json.loads((ROOT / "evals" / "routing-eval.json").read_text())
+    reference_names = {
+        path.relative_to(SKILL_ROOT).as_posix()
+        for path in (SKILL_ROOT / "references").rglob("*")
+        if path.is_file()
+    }
+    for case in routing_eval:
+        for target in case["expected_refs"] + case["forbidden_refs"]:
+            if target not in reference_names:
+                fail(f"routing eval {case['id']} names missing reference: {target}")
+        if case["should_trigger"]:
+            for target in case["expected_refs"]:
+                if target not in skill_links:
+                    fail(f"routing eval {case['id']} expects indirect reference: {target}")
+
+    stale_results = sorted((ROOT / "evals" / "results").glob("*.json"))
+    if stale_results:
+        fail("tracked/generated eval result artifacts must not be canonical package state")
+    if any((ROOT / "evals").glob("*eval-decisions.md")):
+        fail("historical eval decision log must not be canonical package state")
 
     print("SKILL_ROUTING_OK")
 

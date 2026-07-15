@@ -18,7 +18,9 @@ Widget `State` allowed = text/scroll/page/tab/animation controllers + focus node
 
 Widget `State` forbidden = domain entities + selected records + page/navigation stacks + workflow flags + provider-derived caches/snapshots/maps.
 
-Widget dependencies forbidden = GoRouter/Navigator + repositories + datasources + services + persistence/backend/HTTP SDKs + provider reads/mutations.
+Widget dependencies forbidden = GoRouter + page-route `Navigator.push*` + repositories + datasources + services + persistence/backend/HTTP SDKs + provider reads/mutations.
+
+Local modal dismissal allowed = `Navigator.pop(result)` with no work after pop; caller owns subsequent mutation/page navigation.
 
 Lints: `presentation_widget_navigation_forbidden`, `presentation_widget_controller_state`, `presentation_widget_infrastructure_dependency`.
 

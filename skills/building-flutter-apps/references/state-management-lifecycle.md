@@ -1,8 +1,9 @@
 # State Management Lifecycle And Errors
 
+
 ## Read first
 
-Read with [state-management.md](state-management.md) for notifier initialization, mutation readiness, async guards, optimistic updates, and loading patterns.
+Read with [notifier-structure.md](state-management/notifier-structure.md) for initialization/loading and [async-mutations.md](state-management/async-mutations.md) for mutation readiness, async guards, and optimistic updates.
 
 ## State Teardown Belongs in the Notifier
 
@@ -44,9 +45,9 @@ Future<bool> save(Entity entity) async {
 }
 ```
 
-Screen reacts to cleared state and self-navigates via existing `onMissing*` hook. No widget-side `.go(context)` chained off awaited future. See [Modal Snapshot Pattern](common-patterns.md#modal-snapshot-pattern).
+Screen reacts to cleared state and self-navigates via existing `onMissing*` hook. No widget-side `.go(context)` chained off awaited future. See [Modal Snapshot Pattern](common-patterns/modals-navigation.md#modal-snapshot-pattern).
 
-## Error Handling Strategy
+## Exception Ownership
 
 Default: catch error once — in notifier. Datasource, repo propagate.
 

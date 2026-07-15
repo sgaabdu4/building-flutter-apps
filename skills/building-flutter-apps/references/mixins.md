@@ -1,5 +1,6 @@
 # Mixin vs Interface vs Extension
 
+
 ## Read first
 
 1. Same behavior in 2+ classes → `mixin XxxMixin on Y`; no copy-paste sharing.
@@ -161,4 +162,3 @@ Rules:
 - **Partial-failure**: bulk op collects `SaveRowResult` per item. `throwOnPartialFailure` → `SaveAllRowsException` w/ failure list. No silent drop.
 - **Concurrency cap**: bulk default 4 (avoid 429 bucket swamp). Each item in `retryWithBackoff`.
 - **Not in widgets**: retry = infra. Notifier → datasource → mixin.
-

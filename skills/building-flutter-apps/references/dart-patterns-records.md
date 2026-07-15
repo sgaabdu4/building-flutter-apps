@@ -1,11 +1,27 @@
 # Dart Patterns & Records
 
+
 ## Read first
 
 1. Multiple return values → Records, not `Map<String, dynamic>` or parallel lists.
 2. Multiple ID types → extension types, not raw `String`.
 3. Pattern null-bind with `if (value case final v?)`; never `value!`.
 4. Switch cases use guard clauses; do not nest if/else in case bodies.
+
+## Class modifiers
+
+| Modifier | Extend outside lib | Implement outside lib | Instantiate | Mixin |
+|---|:---:|:---:|:---:|:---:|
+| `abstract class` | yes | yes | no | no |
+| `abstract interface class` | no | yes | no | no |
+| `abstract final class` | no | no | no | no |
+| `sealed class` | no | no | no | no |
+| `base class` | yes | no | yes | no |
+| `interface class` | no | yes | yes | no |
+| `final class` | no | no | yes | no |
+| `mixin class` | yes | yes | yes | yes |
+
+Contract = `abstract interface class`; Freezed union = `sealed class`; helper namespace = `abstract final class`.
 
 ## Trigger
 

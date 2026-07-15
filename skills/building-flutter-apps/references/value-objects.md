@@ -1,5 +1,6 @@
 # Value Objects
 
+
 ## Read first
 
 1. Domain-meaning primitives (unit/currency/identity/format) become sealed Freezed VOs in `/domain/values/`.

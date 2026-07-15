@@ -70,7 +70,3 @@ extension DurationX on Duration {
   }
 }
 ```
-
-## Full reference
-
-For the complete extension catalog, read [extensions-utilities.md](../extensions-utilities.md).

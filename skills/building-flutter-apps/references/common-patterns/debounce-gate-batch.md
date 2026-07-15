@@ -1,5 +1,6 @@
 # Common Patterns — Debounce, Gate, and Batch
 
+
 ## Read first
 
 1. Use this for high-frequency UI/network/storage boundaries and destructive remote reconciliation.
@@ -147,9 +148,18 @@ Lints: `collection_getter_allocates_each_access`, `linear_id_lookup_in_hot_path`
 ### Heavy widgets — gate behind a user action
 
 ```dart
-class VideoCard extends ConsumerWidget {
+class VideoCard extends StatefulWidget {
+  const VideoCard({super.key});
+
+  @override
+  State<VideoCard> createState() => _VideoCardState();
+}
+
+class _VideoCardState extends State<VideoCard> {
   bool _userTappedPlay = false;
-  Widget build(BuildContext context, WidgetRef ref) {
+
+  @override
+  Widget build(BuildContext context) {
     if (_userTappedPlay) return VideoPlayer(controller);
     return GestureDetector(
       onTap: () => setState(() => _userTappedPlay = true),

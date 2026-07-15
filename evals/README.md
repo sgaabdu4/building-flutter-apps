@@ -1,44 +1,51 @@
 # Evals
 
-Three harnesses, three intents. Sizes intentionally differ.
+## Read first
 
-| File | Count | Purpose |
-|---|---|---|
-| `evals.json` | 45 | Full skill-output evals: `prompt` + expected behaviour graded. |
-| `trigger-eval.json` | 38 | Trigger-classification evals: `query` + `should_trigger` boolean for skill description gate. |
-| `routing-eval.json` | 30 | Broad invocation/routing evals: trigger decision plus exact Trigger Map refs and forbidden over-reads. |
+- Trigger classification = `trigger-eval.json`.
+- Progressive-disclosure routing = `routing-eval.json`.
+- Answer policy = `evals.json`.
+- Generated outputs = local-only `evals/results/`; never canonical package state.
 
-Adding cases:
-- New full eval → append to `evals.json` `evals` array, increment `id`.
-- New trigger eval → append `{query, should_trigger}` to `trigger-eval.json`.
-- New routing eval → append `{id, query, should_trigger, expected_refs, forbidden_refs, max_refs}` to `routing-eval.json`.
+## Suites
 
-Counts need not match. Trigger and routing evals are cheap. Full output evals
-are expensive and should be reserved for behavior regressions. Routing coverage
-is the primary check for progressive disclosure and broad skill invocation.
+| File | Cases | Contract |
+|---|---:|---|
+| `evals.json` | 46 | Prompt + graded expectations. |
+| `trigger-eval.json` | 39 | Query + activation decision. |
+| `routing-eval.json` | 34 | Activation + exact refs + maximum read breadth. |
 
-Codex/GPT evals:
+## Add cases
+
+- Full answer regression → append next `id` under `evals.json` → update count.
+- Trigger regression → append `{query, should_trigger}` → update count.
+- Routing regression → append `{id, query, should_trigger, expected_refs, forbidden_refs, max_refs}` → update count.
+- Routing coverage = primary progressive-disclosure proof.
+- Full answer eval = behavior regression only.
+
+## Run
 
 ```bash
 python3 tool/run_codex_eval.py trigger \
   --skill-path skills/building-flutter-apps \
   --eval-set evals/trigger-eval.json \
-  --model gpt-5.4-mini \
-  --output evals/results/trigger-gpt-5.4-mini.json
+  --model luna-5.6 \
+  --reasoning-effort xhigh \
+  --output evals/results/trigger-luna-5.6-xhigh.json
 
 python3 tool/run_codex_eval.py routing \
   --skill-path skills/building-flutter-apps \
   --eval-set evals/routing-eval.json \
-  --model gpt-5.4-mini \
-  --output evals/results/routing-gpt-5.4-mini.json
+  --model luna-5.6 \
+  --reasoning-effort xhigh \
+  --output evals/results/routing-luna-5.6-xhigh.json
 
 python3 tool/run_codex_eval.py quality \
   --skill-path skills/building-flutter-apps \
   --eval-set evals/evals.json \
-  --model gpt-5.4-mini \
-  --output evals/results/quality-gpt-5.4-mini.json
+  --model luna-5.6 \
+  --reasoning-effort xhigh \
+  --output evals/results/quality-luna-5.6-xhigh.json
 ```
 
-Artifacts are compact by default: paths are written relative to the repo or
-`$HOME`, and answer/stderr excerpts are omitted. Add `--include-excerpts` only
-for temporary local debugging.
+Temporary debugging → add `--include-excerpts`; generated results stay untracked.

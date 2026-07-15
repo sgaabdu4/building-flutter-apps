@@ -4,7 +4,7 @@
     "should_trigger": true
   },
   {
-    "query": "my riverpod provider keeps rebuilding everything when only one field changes, how do I use select() to minimize rebuilds in leaf widgets? I'm using riverpod 3.x with codegen",
+    "query": "my riverpod provider keeps rebuilding everything when only one field changes, how do I use select() to minimize rebuilds at a screen binding boundary? I'm using riverpod 3.x with codegen",
     "should_trigger": true
   },
   {

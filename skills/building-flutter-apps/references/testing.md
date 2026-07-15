@@ -1,5 +1,6 @@
 # Testing
 
+
 ## Read first
 
 1. Mock interfaces, never concrete implementations.
@@ -35,8 +36,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   mocktail: ^1.0.5
-  build_runner: ^2.15.0
+  build_runner: <version>
 ```
+
+Resolve `<version>` from [core-stack.md](core-stack.md); do not duplicate its pin here.
 
 ## Mock Declaration
 
@@ -447,4 +450,3 @@ test('auth state transitions', () async {
 | Delete/remove leaves stale detail UI | Emit delete/remove event and assert selected state clears or route fallback appears |
 | Generated code/token stale after mutation | Fake source generates new value; notifier must refetch and expose source-of-truth value |
 | Event test passes but real app does not sync | Add writer/observer Dart MCP E2E from [dart-mcp-e2e-testing.md](dart-mcp-e2e-testing.md) |
-

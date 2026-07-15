@@ -95,7 +95,3 @@ SearchState build() {
 ```
 
 Do not keep provider-derived caches, repository instances, or subscriptions in widget state. Use generated providers, notifier state, repository/service memo fields, or computed providers as the single source of truth.
-
-## Full reference
-
-For rare edge cases not covered here, read [state-management.md](../state-management.md).

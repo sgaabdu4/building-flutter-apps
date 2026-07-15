@@ -1,9 +1,10 @@
 # Atomic Design
 
+
 ## Read first
 
 1. Use tokens for spacing/colors/radii/type/icon sizes. No raw literals/styles.
-2. Atoms/molecules: `const`, no provider reads. Provider access only organisms/pages.
+2. Atoms/molecules/organisms/templates: immutable view inputs + typed callbacks; provider access only screens/subscreens.
 3. Use `context.textTheme`/`context.colors`, not raw `TextStyle()`/`Color()`.
 4. Feature widgets stay in feature; shared widgets move to `core/widgets/` after 2+ feature uses.
 
@@ -17,7 +18,7 @@ Before code: output `Reading: atomic-design.md`
 
 1. **MUST** use design tokens for ALL measurements — NEVER hardcode spacing, colors, radii, font sizes, icon sizes.
 2. **MUST** use `const` constructors on all atoms and molecules.
-3. **NEVER** use `ref.watch` or `ref.read` in atoms, molecules, templates — provider access ONLY in organisms and pages.
+3. **NEVER** use `ref.watch` or `ref.read` in atoms, molecules, organisms, or templates — provider access ONLY in screens/subscreens.
 4. **MUST** use `context.textTheme` and `context.colors` — NEVER raw `TextStyle()` or `Color()`.
 5. **MUST** place shared widgets in `core/widgets/`, feature-specific in `features/x/presentation/widgets/`.
 6. **MUST** promote widget to `core/widgets/` when 2+ features use it w/ no feature-specific logic.
@@ -102,7 +103,7 @@ ThemeData buildAppTheme() {
 }
 ```
 
-Access via `context.textTheme.titleMedium` (see [extensions-utilities.md](extensions-utilities.md)), NEVER raw `TextStyle(fontSize: 16)`.
+Access via `context.textTheme.titleMedium` (see [extensions/context-ui.md](extensions/context-ui.md)), NEVER raw `TextStyle(fontSize: 16)`.
 
 ### Colors
 
@@ -268,7 +269,7 @@ class StatCard extends StatelessWidget {
 
 ### Rules
 
-- May use `ref.watch` + `ref.read` (not required — data-only organisms valid)
+- MUST accept immutable view inputs + typed callbacks; no provider reads
 - Compose molecules + atoms
 - MUST NOT instantiate raw `Material(...)`, `Ink(...)`, or `InkWell(...)`; compose an owned atom/surface primitive instead
 - Represent distinct page section (header, grid, comment list)
@@ -304,15 +305,14 @@ class StatsRow extends StatelessWidget {
 
 ```dart
 // features/products/presentation/widgets/product_grid.dart
-class ProductGrid extends ConsumerWidget {
-  const ProductGrid({super.key});
+class ProductGrid extends StatelessWidget {
+  const ProductGrid({required this.items, required this.onItemTap, super.key});
+
+  final List<ProductCardViewData> items;
+  final ValueChanged<ProductCardViewData> onItemTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(
-      productProvider.select((s) => s.items),
-    );
-
+  Widget build(BuildContext context) {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -321,7 +321,10 @@ class ProductGrid extends ConsumerWidget {
         childAspectRatio: 0.75,
       ),
       itemCount: items.length,
-      itemBuilder: (context, index) => ProductCard(product: items[index]),
+      itemBuilder: (context, index) => ProductCard(
+        data: items[index],
+        onTap: () => onItemTap(items[index]),
+      ),
     );
   }
 }
@@ -335,13 +338,11 @@ class ProductGrid extends ConsumerWidget {
 - MUST accept widgets via constructor (slots)
 - MUST handle responsive breakpoints here
 
-### Provider boundary — reconciles SKILL.md "widgets watch" rule
+### Provider boundary
 
-SKILL.md "widgets MUST watch providers, never prop drill" applies to
-**provider-entry layer** only: organisms + pages. Atoms/molecules/templates
-= pure presentation, ctor-injected data, no `ProviderScope` in tests.
-Templates = boundary: layout, no state read. Rules compose — drill props
-from the organism that watched, down through molecule/atom.
+Screens/subscreens = provider binding + domain-to-view-data mapping.
+Atoms/molecules/organisms/templates = immutable view inputs + typed callbacks; no provider reads or `ProviderScope` in widget tests.
+Full boundary = [presentation-widgets.md](presentation-widgets.md).
 
 ### Examples
 
@@ -433,6 +434,9 @@ class ProductDashboardScreen extends ConsumerWidget {
     final isLoading = ref.watch(
       productProvider.select((s) => s.isLoading),
     );
+    final items = ref.watch(
+      productProvider.select((s) => s.productCardViewData),
+    );
 
     if (isLoading) {
       return const Scaffold(body: Center(child: LoadingIndicator()));
@@ -450,7 +454,10 @@ class ProductDashboardScreen extends ConsumerWidget {
         ],
       ),
       stats: const ProductStatsRow(),
-      body: const ProductGrid(),
+      body: ProductGrid(
+        items: items,
+        onItemTap: (item) => ProductRoute(id: item.id).push<void>(context),
+      ),
     );
   }
 }
@@ -463,8 +470,8 @@ class ProductDashboardScreen extends ConsumerWidget {
 | Tokens | `core/theme/` | No |
 | Atoms | `core/widgets/atoms/` | No |
 | Molecules | `core/widgets/molecules/` | No |
-| Organisms (shared) | `core/widgets/organisms/` | Yes |
-| Organisms (feature) | `features/<feature>/presentation/widgets/` | Yes |
+| Organisms (shared) | `core/widgets/organisms/` | No |
+| Organisms (feature) | `features/<feature>/presentation/widgets/` | No |
 | Templates | `core/widgets/templates/` | No |
 | Pages | `features/<feature>/presentation/screens/` | Yes |
 

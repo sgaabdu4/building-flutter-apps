@@ -1,5 +1,6 @@
 # Widget Previews
 
+
 ## Read first
 
 1. Import `package:flutter/widget_previews.dart` only in preview files/preview blocks.
@@ -146,4 +147,3 @@ For reusable widgets, add enough previews to catch real UI states:
 - [ ] No native plugin, Hive, Firebase, platform channel, or real HTTP call runs in preview.
 - [ ] Long text, empty, error, and compact/expanded states are covered when applicable.
 - [ ] No inline string `ValueKey`s were added.
-

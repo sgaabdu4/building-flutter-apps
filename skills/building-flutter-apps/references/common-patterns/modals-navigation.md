@@ -1,8 +1,15 @@
 # Common Patterns — Modals and Navigation
 
+
+## Read first
+
+1. Modal renders immutable snapshot + returns a typed result.
+2. Screen/notifier owns mutation, teardown, and page navigation.
+3. Dismiss the active modal navigator before typed-route navigation.
+
 ## Modal Snapshot Pattern
 
-**Rule.** Caller computes immutable `<Feature>Summary` via `ref.read`. Dialog renders from snapshot. Allowed dialog watch: low-frequency primitive only (e.g. `isSaving`). Timer/ticker/progress watches live in leaf controls. Button does `Navigator.pop(result)` with no code after. Notifier owns success teardown; preserves failure state.
+**Rule.** Screen computes immutable `<Feature>Summary` via `ref.read`. Dialog renders the snapshot and returns a typed result. Screen dispatches the notifier mutation after dismissal. Dialog has no provider reads. Notifier owns success teardown and preserves failure state.
 
 ```dart
 // NEVER — dialog hosts mutation + watches mutable record
@@ -42,8 +49,8 @@ class ConfirmSummary {
   }
 }
 
-class ConfirmButton extends ConsumerWidget {
-  const ConfirmButton({required this.id});
+class ConfirmScreenBoundary extends ConsumerWidget {
+  const ConfirmScreenBoundary({required this.id, super.key});
   final String id;
 
   Future<void> _onPressed(BuildContext context, WidgetRef ref) async {
@@ -52,11 +59,13 @@ class ConfirmButton extends ConsumerWidget {
       state: ref.read(formProvider),
     );
     if (summary == null) return;
-    await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       routeSettings: const RouteSettings(name: 'confirm-dialog'),
       builder: (_) => ConfirmDialog(summary: summary),
     );
+    if (confirmed != true || !context.mounted) return;
+    await ref.read(formProvider.notifier).save(summary.entity);
   }
 
   @override
@@ -64,23 +73,15 @@ class ConfirmButton extends ConsumerWidget {
       AppTextButton(onPressed: () => _onPressed(context, ref), label: 'Confirm');
 }
 
-class ConfirmDialog extends ConsumerWidget {
-  const ConfirmDialog({required this.summary});
+class ConfirmDialog extends StatelessWidget {
+  const ConfirmDialog({required this.summary, super.key});
   final ConfirmSummary summary;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isSaving = ref.watch(formProvider.select((s) => s.isSaving)); // bool, stable
-    return AppPrimaryButton(
-      isLoading: isSaving,
-      onPressed: isSaving ? null : () async {
-        final nav = Navigator.of(context);                              // captured pre-await
-        final ok = await ref.read(formProvider.notifier).save(summary.entity);
-        nav.pop(ok);                                                    // pop result, exit
-      },
+  Widget build(BuildContext context) => AppPrimaryButton(
+      onPressed: () => Navigator.of(context).pop(true),
       label: summary.confirmed ? 'Confirm' : 'Exit',
     );
-  }
 }
 ```
 
@@ -89,9 +90,10 @@ class ConfirmDialog extends ConsumerWidget {
 ```dart
 testWidgets('confirm dialog renders from summary', (tester) async {
   await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: MaterialApp(home: ConfirmDialog(summary: const ConfirmSummary(entity: e, confirmed: true))),
+    MaterialApp(
+      home: ConfirmDialog(
+        summary: const ConfirmSummary(entity: e, confirmed: true),
+      ),
     ),
   );
   expect(find.text('Confirm'), findsOneWidget);

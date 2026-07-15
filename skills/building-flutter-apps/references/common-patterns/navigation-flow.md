@@ -1,5 +1,11 @@
 # Common Patterns — Navigation Flow
 
+## Read first
+
+1. Validate route params at the route boundary.
+2. Missing target = nullable provider + fallback UI; never throw from `build()`.
+3. Wizard next-step navigation waits for confirmed notifier state.
+
 ## Route-Param Safety + Wizard Sequencing
 
 Use nullable by-id providers. Keep mutation order strict before navigate.

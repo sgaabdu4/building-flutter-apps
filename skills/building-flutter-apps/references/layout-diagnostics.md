@@ -1,5 +1,6 @@
 # Layout Diagnostics
 
+
 ## Read first
 
 1. Fix the first layout exception; later errors are usually cascades.
@@ -185,4 +186,3 @@ Material 3 width classes:
 - [ ] ParentDataWidgets are direct children of the required parent.
 - [ ] Layout decisions use `LayoutBuilder` or `MediaQuery.sizeOf`, not device type.
 - [ ] Compact, medium, expanded, keyboard-open, and large text-scale states were checked.
-

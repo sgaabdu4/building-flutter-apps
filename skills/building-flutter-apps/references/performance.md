@@ -1,9 +1,10 @@
 # Performance
 
+
 ## Read first
 
-1. Watch providers in leaf widgets; `.select()` only the field needed. Never use `.select((value) => value)` (`riverpod_select_identity_forbidden`); use a field/record select, or watch a generated computed projection provider directly when the entire provider value is already the render projection.
-2. High-frequency values (`seconds`, `progress`, `isRunning`) stay in smallest leaf.
+1. Bind providers in the smallest screen/subscreen boundary; `.select()` only the field needed. Never use `.select((value) => value)` (`riverpod_select_identity_forbidden`); use a field/record select, or watch a generated computed projection provider directly when the entire provider value is already the render projection.
+2. High-frequency values (`seconds`, `progress`, `isRunning`) stay in the smallest screen-owned Consumer boundary; reusable widgets receive immutable values.
 3. Extract widget classes; no `_buildXxx()` helpers. Use `const` where possible.
 4. Dynamic lists use builders/slivers; no eager `ListView(children: [...])`.
 5. No expensive sort/filter/map in `build()`; use computed providers/cached indexes.
@@ -15,7 +16,7 @@
 
 ## Trigger
 
-Signals: ref.watch, leaf widget, .select(), ListView.builder, computed provider, ref.onDispose
+Signals: ref.watch, Consumer boundary, .select(), ListView.builder, computed provider, ref.onDispose
 Before code: output `Reading: performance.md`
 
 
@@ -23,8 +24,8 @@ Flutter rendering/animations/slivers/isolates/app-size → see [flutter-optimiza
 
 ## Rules — NEVER Violate
 
-1. **MUST** watch providers in leaf widgets — NEVER parents passing data down.
-2. **MUST** use `.select()` for specific fields in leaf widgets.
+1. **MUST** bind providers in the smallest screen/subscreen Consumer boundary and pass minimal immutable view data to reusable widgets.
+2. **MUST** use `.select()` for specific fields at provider-binding boundaries.
 3. **MUST** extract widget classes — NEVER helper methods (`_buildXxx()`).
 4. **MUST** use `const` constructors where possible.
 5. **MUST** use `ListView.builder` — NEVER `ListView(children: [...])` for dynamic lists.
@@ -35,7 +36,7 @@ Flutter rendering/animations/slivers/isolates/app-size → see [flutter-optimiza
 10. **MUST** dispose timers/controllers/subscriptions via `ref.onDispose()`.
 11. **NEVER** hold raw API responses in state — extract needed fields only.
 12. **NEVER** clamp text scaling at app root. Fix local responsive layout/overflow instead.
-13. **NEVER** watch timer/ticker/progress fields in a modal/sheet parent. Extract a leaf `ConsumerWidget` for the ticking controls.
+13. **NEVER** watch timer/ticker/progress fields in a broad modal/sheet parent. Extract the smallest screen-owned Consumer boundary for the ticking controls.
 14. **NEVER** allocate Map/List/Set in getters used from `build()` / `.select()` / hot notifier paths. Use computed providers/service caches, or non-const instance-owned `late final` immutable indexes; do not use top-level/global `Expando` side tables.
 15. **NEVER** do repeated id lookups with `firstWhere` / `indexWhere` / `for` loops in hot paths. Pre-index by id with `Map`.
 16. **NEVER** persist full collections after changing a subset. Write changed rows via `mergeAll` / `saveMany`; debounce draft persistence with a real `Timer` / `Debouncer` at <=50ms.
@@ -68,40 +69,49 @@ Fix the widget:
 - make compact controls icon-first
 - test large text sizes on small screens
 
-### Watch in Leaf Widgets
+### Bind Providers at Screen Boundaries
 
-Watch in smallest widget. NEVER watch in parent + pass down:
+Bind in the smallest screen/subscreen Consumer boundary. Reusable widgets receive minimal immutable view inputs:
 
 ```dart
-// WRONG — parent rebuilds all children (prop drilling)
-class ParentWidget extends ConsumerWidget {
+// WRONG — broad state watch rebuilds the whole screen subtree.
+class UserScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(userProvider);
-    return Column(children: [
-      UserName(name: user.name),   // prop drilling
-      UserEmail(email: user.email),
-    ]);
+    final userState = ref.watch(userProvider);
+    return UserSummary(user: userState.user);
   }
 }
 
-// RIGHT — each child watches only what it needs
-class UserName extends ConsumerWidget {
-  const UserName({super.key});
+// RIGHT — screen selects the render projection; widget stays provider-free.
+class UserSummaryScreen extends ConsumerWidget {
+  const UserSummaryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name = ref.watch(
-      userProvider.select((s) => s.name),
+    final (:name, :email) = ref.watch(
+      userProvider.select((s) => (name: s.name, email: s.email)),
     );
-    return Text(name);
+    return UserSummary(name: name, email: email);
   }
+}
+
+class UserSummary extends StatelessWidget {
+  const UserSummary({required this.name, required this.email, super.key});
+
+  final String name;
+  final String email;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [Text(name), Text(email)],
+      );
 }
 ```
 
 ### Use .select() to Watch Specific Fields
 
-`select` skip rebuild when unrelated fields change. `.select()` is necessary but not sufficient: if the selected field changes every second, the widget still rebuilds every second. Put timer/ticker/progress watches in the smallest leaf widget.
+`select` skips rebuilds when unrelated fields change. `.select()` is necessary but not sufficient: if the selected field changes every second, the binding boundary still rebuilds every second. Put timer/ticker/progress watches in the smallest screen-owned Consumer boundary.
 
 ```dart
 // Rebuilds only when items change, not when isLoading or error change
@@ -341,12 +351,13 @@ Relevant lints: `modal_high_frequency_watch_not_leaf`, `build_calls_mutating_ins
 ## Checklist
 
 ### Widget Rebuilds
-- Watch providers in leaf widgets, not parents
-- Use `.select()` for specific props
+- Bind providers in the smallest screen/subscreen Consumer boundary
+- Pass minimal immutable view data + typed callbacks to reusable widgets
+- Use `.select()` for specific fields
 - Extract widget classes, not helper methods
 - Use `const` constructors where possible
 - Never override `operator ==` on Widget — O(N²) rebuild check; use `const` + caching
-- Timer/ticker/progress provider watches live in leaf controls, not sheet/dialog parents
+- Timer/ticker/progress provider watches live in the smallest screen-owned Consumer boundary, not broad sheet/dialog parents
 - `build()` does not call private helpers that assign fields/controllers or call `setState`
 - Collection getters used from UI/notifiers are cached or provider-derived, not rebuilt per access
 - Id lookups in hot paths use `Map` indexes, not `firstWhere` / `indexWhere` / manual loops

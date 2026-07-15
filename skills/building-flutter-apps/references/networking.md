@@ -1,5 +1,6 @@
 # Networking
 
+
 ## Read first
 
 1. HTTP calls live only in datasources/infra services. Widgets/notifiers never call clients.
@@ -197,4 +198,3 @@ List<ProductModel> parseProducts(String responseBody) {
 - [ ] Destructive catch blocks reconcile before Crash/Sentry/Firebase reporting.
 - [ ] Large payload parsing uses isolate/compute path when needed.
 - [ ] Datasource, repository, notifier, and E2E coverage match the risk.
-

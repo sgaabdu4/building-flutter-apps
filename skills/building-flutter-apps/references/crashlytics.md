@@ -1,5 +1,6 @@
 # Firebase Crashlytics
 
+
 ## Read first
 
 1. Keep `Crash` boring: direct static wrapper over `FirebaseCrashlytics.instance`.

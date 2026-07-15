@@ -1,5 +1,6 @@
 # analysis_options.yaml
 
+
 ## Read first
 
 1. `dart analyze` from package root. No path arg. Never `flutter analyze lib`.
