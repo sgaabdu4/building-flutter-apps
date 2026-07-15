@@ -366,5 +366,18 @@
       "references/networking.md"
     ],
     "max_refs": 0
+  },
+  {
+    "id": 31,
+    "query": "A reusable Flutter Riverpod widget under presentation/widgets keeps a page stack and selected domain entity, calls context.pop, and reads a repository provider.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/presentation-widgets.md"
+    ],
+    "forbidden_refs": [
+      "references/architecture.md",
+      "references/state-management.md"
+    ],
+    "max_refs": 2
   }
 ]

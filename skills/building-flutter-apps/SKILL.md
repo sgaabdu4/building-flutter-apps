@@ -1,19 +1,13 @@
 ---
 name: building-flutter-apps
 description: >-
-  CRITICAL: invoke before Flutter app/package work using Riverpod/codegen,
-  Freezed, GoRouter, Hive, l10n, testing/E2E, Crashlytics, Firebase messaging,
-  analysis_options, pubspec/build.yaml, widgets/layout/a11y, deep links,
-  previews, repositories/datasources, notifiers, AsyncValue, ref.mounted, or
-  `.dart` files in a Flutter app. Do not invoke for non-Riverpod app stacks,
-  even in Flutter: flutter_bloc/BLoC/Cubit, GetX/GetxController/GetMaterialApp,
-  Provider/ChangeNotifier, MobX, Redux. Skip React/Next/SwiftUI/native and
-  pure-Dart CLI/server/libs/business logic/unit tests without
-  Flutter/Riverpod/app context.
+  Flutter Riverpod app architecture. Invoke before changing a Flutter app or
+  package that uses Riverpod; skip non-Riverpod Flutter stacks and pure-Dart
+  work without Flutter/Riverpod app context.
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.2.0"
+  version: "5.3.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -52,7 +46,7 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 | R5 | Nullability is semantic; no empty/null/bool sentinel fallbacks, `value!`, nullable collections, or raw required domain strings. | [value-objects.md](references/value-objects.md), [freezed-sealed.md](references/freezed-sealed.md) |
 | R6 | All user-facing strings, tooltips, semantics, and visible accessibility copy use `AppLocalizations`. | [localization.md](references/localization.md), [accessibility.md](references/atomic-design/accessibility.md) |
 | R7 | Immutable state/entities use sealed Freezed, one declaration per file, native `switch`, and VO map/when disabled. | [freezed-sealed.md](references/freezed-sealed.md), [value-objects.md](references/value-objects.md) |
-| R8 | No prop drilling of state/infra/policy; widgets dispatch only; provider-derived caches/events/subscriptions have one owner. | [architecture.md](references/architecture.md), [async-mutations.md](references/state-management/async-mutations.md) |
+| R8 | `presentation/widgets/` renders immutable inputs + emits typed callbacks; screens/routes/notifiers own navigation, workflow, domain state, and infrastructure. | [presentation-widgets.md](references/presentation-widgets.md) |
 | R9 | Duplicate behavior in 2+ classes becomes a small stateless `*Mixin` with an `on` clause. | [mixins.md](references/mixins.md) |
 | R10 | Storage SDK calls live in local datasources behind repositories; production Hive imports use `hive_ce_flutter`. | [hive-persistence.md](references/hive-persistence.md), [architecture.md](references/architecture.md) |
 | R11 | Primitive/context/collection operations live in `core/extensions/`; domain never imports those extensions. | [context-ui.md](references/extensions/context-ui.md), [primitive-formatting.md](references/extensions/primitive-formatting.md), [collections-helpers.md](references/extensions/collections-helpers.md) |
@@ -85,6 +79,7 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | GoRouter, typed route, redirect, auth-protected route, router provider, `context.go`, deep link, cold-start, navigation gate | [routing-app-shell.md](references/common-patterns/routing-app-shell.md) + [deep-linking.md](references/deep-linking.md) |
 | HTTP, network, REST, source-of-truth fetch after mutation, long-running remote function, async-start + reconcile, transport id vs domain id | [networking.md](references/networking.md) + [debounce-gate-batch.md](references/common-patterns/debounce-gate-batch.md) |
 | Atom, molecule, organism, design tokens, atomic widgets, `core/widgets/` promotion | [atomic-design.md](references/atomic-design.md) |
+| Reusable `presentation/widgets/`, widget-owned navigation/page stack/selected entity/workflow state, direct repository/service/provider access | [presentation-widgets.md](references/presentation-widgets.md) |
 | Accessibility, semantics, tooltip, semanticLabel, image alt text, tap target, contrast, text scaling | [accessibility.md](references/atomic-design/accessibility.md) + [flutter-optimizations.md](references/flutter-optimizations.md#semantics) |
 | Widget test, `ProviderContainer.test()`, `UncontrolledProviderScope`, fakes, mocks, `AppWidgetKeys`, event-contract tests | [testing.md](references/testing.md) |
 | `flutter_driver`, Dart MCP, E2E, `integration_test`, semantic selectors, log capture | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
@@ -170,7 +165,7 @@ After any `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` writ
 
 - [ ] Package-root `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
-- [ ] Providers, state, and widgets follow Rules 2-8 and 14: codegen, semantic nullability, l10n, no prop drilling, widgets UI + dispatch only, no provider-derived caches/events/`listenManual`/`Expando`.
+- [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
 - [ ] Domain/data/platform follow Rules 7, 10-13, 17-23: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y.
 - [ ] Any row touched in Trigger Map was read; exact lint names are cited when a scanner should enforce the rule.
 

@@ -651,6 +651,20 @@
         "Rejects hardcoded tooltip, semanticLabel, label, and visible accessibility copy in widgets",
         "Mentions analyzer/lint coverage such as prefer_action_button_tooltip, avoid_missing_image_alt, avoid_hardcoded_strings, prefer_text_rich, or a11y_text_scale_clamp"
       ]
+    },
+    {
+      "id": 46,
+      "prompt": "A reusable Flutter Riverpod widget under `presentation/widgets/` stores `List<Entity> _pageStack`, `Entity? _selected`, branches between child-list and article behavior, calls `context.pop()`, and reads a repository provider. Refactor the ownership and name the analyzer enforcement.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Keeps presentation/widgets focused on immutable view inputs and typed callback outputs",
+        "Moves page stacks, selected domain records, and workflow branching to a screen, typed route, or generated notifier/provider",
+        "Moves repository, service, SDK, and provider mutation access out of the reusable widget",
+        "Allows widget State to own UI lifecycle controllers, focus nodes, animations, and cancellable UI timers only",
+        "Uses typed callbacks such as onItemTap and onBack for widget dispatch",
+        "Names presentation_widget_navigation_forbidden, presentation_widget_controller_state, and presentation_widget_infrastructure_dependency"
+      ]
     }
   ]
 }

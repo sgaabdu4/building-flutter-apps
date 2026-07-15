@@ -104,7 +104,7 @@ layout:
 | Analyzer setup | `analysis_options.yaml` exists, strict analyzer flags stay on, generated files are excluded, and both `flutter_skill_lints` and `riverpod_lint` are proven active. |
 | Riverpod | Generated providers only, no legacy provider constructors, no `ref.watch` in notifier methods, no provider-derived caches in `ConsumerState`, and no standalone event/signal providers. |
 | Async lifecycle | `ref.mounted` / `context.mounted` guards after awaits, safe `finally` handling, cancelled subscriptions/timers/controllers, and stale async write protection. |
-| Widgets | No `_buildXxx()` helpers, no private widget classes except private `State<T>`, no widget-owned infra dependencies, no mutation result branching, and no raw snackbar dispatch from widgets. |
+| Widgets | Reusable presentation widgets render immutable inputs and emit typed callbacks; navigation, page stacks, selected records, workflow branching, providers, and infrastructure stay with screens/routes/notifiers. |
 | State and domain | Sealed Freezed classes, semantic nullability, no sentinel fallbacks, Value Objects for meaningful primitives, pure domain imports, and no hand-written domain `copyWith`. |
 | Storage and IO | Hive, SharedPreferences, secure storage, file APIs, and path-provider calls stay in local datasources, then flow through repositories. |
 | Navigation | Typed GoRouter helpers own page navigation, raw route strings and named navigation are blocked, redirects are pure and matrix-tested, and modal helpers keep local dismissal separate. |

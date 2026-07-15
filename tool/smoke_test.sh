@@ -77,10 +77,13 @@ import sys
 
 root = pathlib.Path(sys.argv[1])
 claude = json.loads((root / ".claude-plugin/plugin.json").read_text())
+claude_marketplace = json.loads((root / ".claude-plugin/marketplace.json").read_text())
 codex = json.loads((root / ".codex-plugin/plugin.json").read_text())
 codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_text())
 copilot = json.loads((root / "plugin.json").read_text())
+copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
+expected_version = "5.3.0"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -88,7 +91,14 @@ assert (skill / "SKILL.md").is_file()
 assert (skill / "references/setup.md").is_file()
 assert (skill / "references/analysis_options.yaml").is_file()
 assert (skill / "templates/flutter/lib/core/extensions/extensions.dart").is_file()
-assert claude.get("version") == "5.2.0"
+assert claude.get("version") == expected_version
+assert codex.get("version") == expected_version
+assert copilot.get("version") == expected_version
+assert claude_marketplace["metadata"]["version"] == expected_version
+assert claude_marketplace["plugins"][0]["version"] == expected_version
+assert copilot_marketplace["metadata"]["version"] == expected_version
+assert copilot_marketplace["plugins"][0]["version"] == expected_version
+assert f'version: "{expected_version}"' in (skill / "SKILL.md").read_text()
 assert "hooks" not in claude
 assert "skills" not in claude
 assert "hooks" not in codex

@@ -148,6 +148,10 @@
     "should_trigger": true
   },
   {
+    "query": "A reusable Flutter Riverpod widget under presentation/widgets keeps a page stack and selected domain entity, calls context.pop, and reads a repository provider. Where should that orchestration live?",
+    "should_trigger": true
+  },
+  {
     "query": "I need WCAG alt text and keyboard navigation fixes in a Next.js marketing page, no Flutter or Dart involved.",
     "should_trigger": false
   }
