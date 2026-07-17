@@ -84,7 +84,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.5.0"
+expected_version = "5.5.1"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -478,9 +478,12 @@ git -C "$HOOK_REPO" add pubspec.yaml
 git -C "$HOOK_REPO" commit -m baseline >/dev/null 2>&1
 git -C "$HOOK_REPO" update-ref refs/remotes/origin/main HEAD
 git -C "$HOOK_REPO" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+mkdir -p "$HOOK_REPO/tool"
+cp "$GIT_PRE_PUSH" "$HOOK_REPO/tool/dart_decimate_pre_push.sh"
+chmod +x "$HOOK_REPO/tool/dart_decimate_pre_push.sh"
 : > "$DECIMATE_LOG"
-(cd "$HOOK_REPO" && PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" "$GIT_PRE_PUSH" origin https://example.invalid/repo.git >/dev/null 2>&1)
-if grep -q -- '--yes dart-decimate audit . --base origin/main --format json --summary --gate new-only' "$DECIMATE_LOG" 2>/dev/null; then
+(cd "$HOOK_REPO" && PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" ./tool/dart_decimate_pre_push.sh origin https://example.invalid/repo.git >/dev/null 2>&1)
+if grep -q -- '--yes dart-decimate audit .* --base origin/main --format json --summary --gate new-only' "$DECIMATE_LOG" 2>/dev/null; then
   report pass "Git pre-push → Dart Decimate new-only audit"
 else
   report fail "Git pre-push Dart Decimate audit missing"

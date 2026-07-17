@@ -2,14 +2,16 @@
 
 set -uo pipefail
 
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
+PACKAGE_ROOT=$(cd "$(dirname "$0")/.." && pwd -P) || exit 2
+REPO_ROOT=$(git -C "$PACKAGE_ROOT" rev-parse --show-toplevel 2>/dev/null) || {
   echo "Dart Decimate pre-push: not inside a Git repository." >&2
   exit 2
 }
 cd "$REPO_ROOT" || exit 2
 
-if ! command -v npx >/dev/null 2>&1; then
-  echo "Dart Decimate pre-push: npx is required." >&2
+GATE="$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py"
+if [[ ! -f "$GATE" ]]; then
+  echo "Dart Decimate pre-push: canonical gate is missing." >&2
   exit 2
 fi
 
@@ -20,7 +22,7 @@ if [[ -z "$BASE_REF" ]]; then
 fi
 
 if [[ -n "$BASE_REF" ]] && git rev-parse --verify "$BASE_REF^{commit}" >/dev/null 2>&1; then
-  exec npx --yes dart-decimate audit . --base "$BASE_REF" --format json --summary --gate new-only
+  exec python3 "$GATE" --package "$PACKAGE_ROOT" --base "$BASE_REF"
 fi
 
-exec npx --yes dart-decimate json .
+exec python3 "$GATE" --package "$PACKAGE_ROOT" --full
