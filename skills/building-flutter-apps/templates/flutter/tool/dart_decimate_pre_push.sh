@@ -2,6 +2,10 @@
 
 set -uo pipefail
 
+# Git exports its per-invocation repository variables to hooks; inheriting them
+# overrides -C and discovery, so a worktree push would resolve the main checkout.
+unset $(git rev-parse --local-env-vars)
+
 PACKAGE_ROOT=$(cd "$(dirname "$0")/.." && pwd -P) || exit 2
 REPO_ROOT=$(git -C "$PACKAGE_ROOT" rev-parse --show-toplevel 2>/dev/null) || {
   echo "Dart Decimate pre-push: not inside a Git repository." >&2
