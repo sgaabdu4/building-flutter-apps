@@ -14,6 +14,6 @@
 
 ## Git pre-push
 
-- Bundle = [dart_decimate_pre_push.sh](../templates/flutter/tool/dart_decimate_pre_push.sh) + sibling `dart_decimate_gate.py` + `git_env.py`.
+- Bundle = [dart_decimate_pre_push.sh](../templates/flutter/tool/dart_decimate_pre_push.sh) + [dart_decimate_gate.py](../templates/flutter/tool/dart_decimate_gate.py) + [git_env.py](../templates/flutter/tool/git_env.py).
 - Existing hook → preserve + invoke template with `"$@"`.
 - Missing hook → copy the complete bundle into package-root `tool/` + install through current hook owner; preserve `core.hooksPath`.

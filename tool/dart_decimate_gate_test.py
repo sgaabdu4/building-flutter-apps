@@ -126,6 +126,17 @@ def main() -> int:
     if "bundled Dart Decimate adapter" not in reference.read_text(encoding="utf-8"):
         fail("public adapter ownership is missing")
     skill = ROOT / "skills/building-flutter-apps"
+    skill_text = (skill / "SKILL.md").read_text(encoding="utf-8")
+    bundle_resources = (
+        "templates/flutter/tool/dart_decimate_pre_push.sh",
+        "templates/flutter/tool/dart_decimate_gate.py",
+        "templates/flutter/tool/git_env.py",
+    )
+    for resource in bundle_resources:
+        if f"]({resource})" not in skill_text:
+            fail(f"SKILL.md does not directly link bundled resource: {resource}")
+    if "](templates/flutter/tool/)" in skill_text:
+        fail("SKILL.md links the bundle directory instead of concrete resources")
     for pattern in ("*.md", "*.sh", "*.py"):
         for path in skill.rglob(pattern):
             if ".agents/skills/deterministic-checks" in path.read_text(

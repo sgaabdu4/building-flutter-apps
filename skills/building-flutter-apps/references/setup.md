@@ -17,7 +17,7 @@ Copy [analysis_options.yaml](analysis_options.yaml) to the project root. It wire
 
 Do not add `flutter_skill_lints` to `pubspec.yaml`.
 
-Copy [templates/flutter/tool/](../templates/flutter/tool/) into package-root `tool/`.
+Copy [Dart Decimate pre-push](../templates/flutter/tool/dart_decimate_pre_push.sh) + [gate adapter](../templates/flutter/tool/dart_decimate_gate.py) + [Git environment helper](../templates/flutter/tool/git_env.py) into package-root `tool/`.
 
 Run:
 
