@@ -17,12 +17,14 @@ Copy [analysis_options.yaml](analysis_options.yaml) to the project root. It wire
 
 Do not add `flutter_skill_lints` to `pubspec.yaml`.
 
+Copy [templates/flutter/tool/](../templates/flutter/tool/) into package-root `tool/`.
+
 Run:
 
 ```bash
 dart pub get
 dart analyze
-python3 "$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py" --package . --full
+python3 tool/dart_decimate_gate.py --package . --full
 ```
 
 ## Extension template

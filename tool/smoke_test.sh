@@ -18,10 +18,18 @@ HOOK="$PLUGIN_ROOT/hooks/scripts/dart_gate.sh"
 PREFLIGHT="$PLUGIN_ROOT/hooks/scripts/preflight_audit.sh"
 REMINDER="$PLUGIN_ROOT/hooks/scripts/skill_reminder.sh"
 GIT_PRE_PUSH="$PLUGIN_ROOT/skills/building-flutter-apps/templates/flutter/tool/dart_decimate_pre_push.sh"
+GIT_GATE="$PLUGIN_ROOT/skills/building-flutter-apps/templates/flutter/tool/dart_decimate_gate.py"
+GIT_ENV="$PLUGIN_ROOT/skills/building-flutter-apps/templates/flutter/tool/git_env.py"
 
 for f in "$HOOK" "$PREFLIGHT" "$REMINDER" "$GIT_PRE_PUSH"; do
   if [[ ! -x "$f" ]]; then
     echo "✗ Missing or non-executable: $f" >&2
+    exit 1
+  fi
+done
+for f in "$GIT_GATE" "$GIT_ENV"; do
+  if [[ ! -f "$f" ]]; then
+    echo "✗ Missing: $f" >&2
     exit 1
   fi
 done
@@ -84,7 +92,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.5.3"
+expected_version = "5.5.4"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -94,6 +102,11 @@ assert (skill / "references/dart-decimate.md").is_file()
 assert (skill / "references/analysis_options.yaml").is_file()
 assert (skill / "templates/flutter/lib/core/extensions/extensions.dart").is_file()
 assert (skill / "templates/flutter/tool/dart_decimate_pre_push.sh").is_file()
+assert (skill / "templates/flutter/tool/dart_decimate_gate.py").is_file()
+assert (skill / "templates/flutter/tool/git_env.py").is_file()
+for pattern in ("*.md", "*.sh", "*.py"):
+    for path in skill.rglob(pattern):
+        assert ".agents/skills/deterministic-checks" not in path.read_text(), path
 assert claude.get("version") == expected_version
 assert codex.get("version") == expected_version
 assert copilot.get("version") == expected_version
@@ -480,9 +493,12 @@ git -C "$HOOK_REPO" update-ref refs/remotes/origin/main HEAD
 git -C "$HOOK_REPO" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
 mkdir -p "$HOOK_REPO/tool"
 cp "$GIT_PRE_PUSH" "$HOOK_REPO/tool/dart_decimate_pre_push.sh"
+cp "$GIT_GATE" "$HOOK_REPO/tool/dart_decimate_gate.py"
+cp "$GIT_ENV" "$HOOK_REPO/tool/git_env.py"
 chmod +x "$HOOK_REPO/tool/dart_decimate_pre_push.sh"
+mkdir -p "$TEST_DIR/empty-home"
 : > "$DECIMATE_LOG"
-(cd "$HOOK_REPO" && PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" ./tool/dart_decimate_pre_push.sh origin https://example.invalid/repo.git >/dev/null 2>&1)
+(cd "$HOOK_REPO" && HOME="$TEST_DIR/empty-home" PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" ./tool/dart_decimate_pre_push.sh origin https://example.invalid/repo.git >/dev/null 2>&1)
 if grep -q -- '--yes dart-decimate audit .* --base origin/main --format json --summary --gate new-only' "$DECIMATE_LOG" 2>/dev/null; then
   report pass "Git pre-push → Dart Decimate new-only audit"
 else

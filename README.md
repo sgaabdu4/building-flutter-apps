@@ -196,6 +196,8 @@ loads `hooks/hooks.copilot.json`.
 cp <plugin-cache>/skills/building-flutter-apps/references/analysis_options.yaml ./analysis_options.yaml
 mkdir -p lib/core/extensions
 cp <plugin-cache>/skills/building-flutter-apps/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
+mkdir -p tool
+cp <plugin-cache>/skills/building-flutter-apps/templates/flutter/tool/{dart_decimate_pre_push.sh,dart_decimate_gate.py,git_env.py} ./tool/
 dart pub get
 dart analyze
 npx --yes dart-decimate json .
@@ -209,9 +211,9 @@ Notes:
   overwriting them.
 - A healthy setup should prove that at least one `flutter_skill_lints`
   diagnostic and one `riverpod_lint` diagnostic can fire.
-- Install [dart_decimate_pre_push.sh](skills/building-flutter-apps/templates/flutter/tool/dart_decimate_pre_push.sh)
-  through the repository's existing pre-push hook owner; do not replace other
-  checks or override `core.hooksPath`.
+- Install the complete [Dart Decimate pre-push bundle](skills/building-flutter-apps/templates/flutter/tool/)
+  through the repository's existing pre-push hook owner; keep all three files
+  together, do not replace other checks, and do not override `core.hooksPath`.
 
 ## What's Included
 
@@ -268,6 +270,7 @@ Run the local structural checks before publishing changes:
 ```bash
 bash tool/check_drift.sh
 bash tool/smoke_test.sh
+python3 tool/dart_decimate_gate_test.py
 python3 tool/check_skill_routing.py
 ruby tool/verify_markdown_examples.rb
 ```

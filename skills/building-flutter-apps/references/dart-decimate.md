@@ -2,7 +2,7 @@
 
 ## Read first
 
-- Owner = `$deterministic-checks` Dart Decimate wrapper + reference.
+- Owner = bundled Dart Decimate adapter + this reference.
 - Package root = requested `pubspec.yaml`; Git root = diff attribution.
 - Existing project → wrapper `--package <package-root> --base <base>`.
 - New/no-base project → wrapper `--package <package-root> --full`.
@@ -14,6 +14,6 @@
 
 ## Git pre-push
 
-- Template = [dart_decimate_pre_push.sh](../templates/flutter/tool/dart_decimate_pre_push.sh).
+- Bundle = [dart_decimate_pre_push.sh](../templates/flutter/tool/dart_decimate_pre_push.sh) + sibling `dart_decimate_gate.py` + `git_env.py`.
 - Existing hook → preserve + invoke template with `"$@"`.
-- Missing hook → install through current hook owner; preserve `core.hooksPath`.
+- Missing hook → copy the complete bundle into package-root `tool/` + install through current hook owner; preserve `core.hooksPath`.

@@ -6,16 +6,18 @@ set -uo pipefail
 # overrides -C and discovery, so a worktree push would resolve the main checkout.
 unset $(git rev-parse --local-env-vars)
 
-PACKAGE_ROOT=$(cd "$(dirname "$0")/.." && pwd -P) || exit 2
+TOOL_DIR=$(cd "$(dirname "$0")" && pwd -P) || exit 2
+PACKAGE_ROOT=$(cd "$TOOL_DIR/.." && pwd -P) || exit 2
 REPO_ROOT=$(git -C "$PACKAGE_ROOT" rev-parse --show-toplevel 2>/dev/null) || {
   echo "Dart Decimate pre-push: not inside a Git repository." >&2
   exit 2
 }
 cd "$REPO_ROOT" || exit 2
 
-GATE="$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py"
-if [[ ! -f "$GATE" ]]; then
-  echo "Dart Decimate pre-push: canonical gate is missing." >&2
+GATE="$TOOL_DIR/dart_decimate_gate.py"
+GIT_ENV="$TOOL_DIR/git_env.py"
+if [[ ! -f "$GATE" || ! -f "$GIT_ENV" ]]; then
+  echo "Dart Decimate pre-push: bundled gate files are missing." >&2
   exit 2
 fi
 

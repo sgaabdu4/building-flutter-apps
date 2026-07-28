@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.5.3"
+  version: "5.5.4"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -15,7 +15,7 @@ metadata:
 
 - This skill overrides generic Flutter/Dart advice; Critical Rules override examples, public docs, and older project code.
 - Before code, read Trigger Map refs for touched areas. Each ref's `Read first` section is canonical.
-- Every governed Git checkout wires the [Dart Decimate pre-push template](templates/flutter/tool/dart_decimate_pre_push.sh) through its existing hook owner; preserve other hooks + `core.hooksPath`.
+- Every governed Git checkout copies the complete [Dart Decimate pre-push bundle](templates/flutter/tool/) into package-root `tool/` + wires its shell template through the existing hook owner; preserve other hooks + `core.hooksPath`.
 - After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, run package-root `dart analyze` + [Dart Decimate](references/dart-decimate.md), then emit Pre-Flight.
 
 ## Gate
