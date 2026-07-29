@@ -2,11 +2,13 @@
 
 ## Read first
 
-- Owner = bundled Dart Decimate adapter + this reference.
+- Runtime owner = `deterministic-checks`; guidance owner = this reference.
 - Package root = requested `pubspec.yaml`; Git root = diff attribution.
-- Existing project → wrapper `--package <package-root> --base <base>`.
-- New/no-base project → wrapper `--package <package-root> --full`.
+- Existing project → `npx --yes dart-decimate@latest audit <git-root> --base <base> --format json --summary --gate new-only`.
+- New/no-base project → `npx --yes dart-decimate@latest json <git-root>`.
 - Nested package → Git-root execution + exact repo-relative workspace scope.
+- Affected Git root = one Dart Decimate process; per-package full-repository rescans forbidden.
+- Project-local adapter/binary/copy under `tool/` = forbidden.
 - Finding outside workspace → tooling-scope `FAIL`; never edit unrelated code.
 - Dart Decimate + `dart analyze` = complementary required gates.
 - Finding → inspect within same workspace → fix owner → rerun exact gate.
@@ -14,6 +16,7 @@
 
 ## Git pre-push
 
-- Bundle = [dart_decimate_pre_push.sh](../templates/flutter/tool/dart_decimate_pre_push.sh) + [dart_decimate_gate.py](../templates/flutter/tool/dart_decimate_gate.py) + [git_env.py](../templates/flutter/tool/git_env.py).
-- Existing hook → preserve + invoke template with `"$@"`.
-- Missing hook → copy the complete bundle into package-root `tool/` + install through current hook owner; preserve `core.hooksPath`.
+- Existing hook → preserve + invoke the canonical `deterministic-checks` project gate.
+- Missing hook → install only the canonical dispatcher/delegation; preserve `core.hooksPath`.
+- Hook Git calls → strip inherited `git rev-parse --local-env-vars`.
+- Gate command → direct `npx --yes dart-decimate@latest`; no repository-local wrapper.

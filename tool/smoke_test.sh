@@ -17,19 +17,10 @@ fi
 HOOK="$PLUGIN_ROOT/hooks/scripts/dart_gate.sh"
 PREFLIGHT="$PLUGIN_ROOT/hooks/scripts/preflight_audit.sh"
 REMINDER="$PLUGIN_ROOT/hooks/scripts/skill_reminder.sh"
-GIT_PRE_PUSH="$PLUGIN_ROOT/skills/building-flutter-apps/templates/flutter/tool/dart_decimate_pre_push.sh"
-GIT_GATE="$PLUGIN_ROOT/skills/building-flutter-apps/templates/flutter/tool/dart_decimate_gate.py"
-GIT_ENV="$PLUGIN_ROOT/skills/building-flutter-apps/templates/flutter/tool/git_env.py"
 
-for f in "$HOOK" "$PREFLIGHT" "$REMINDER" "$GIT_PRE_PUSH"; do
+for f in "$HOOK" "$PREFLIGHT" "$REMINDER"; do
   if [[ ! -x "$f" ]]; then
     echo "✗ Missing or non-executable: $f" >&2
-    exit 1
-  fi
-done
-for f in "$GIT_GATE" "$GIT_ENV"; do
-  if [[ ! -f "$f" ]]; then
-    echo "✗ Missing: $f" >&2
     exit 1
   fi
 done
@@ -92,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.5.5"
+expected_version = "5.5.6"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -101,9 +92,7 @@ assert (skill / "references/setup.md").is_file()
 assert (skill / "references/dart-decimate.md").is_file()
 assert (skill / "references/analysis_options.yaml").is_file()
 assert (skill / "templates/flutter/lib/core/extensions/extensions.dart").is_file()
-assert (skill / "templates/flutter/tool/dart_decimate_pre_push.sh").is_file()
-assert (skill / "templates/flutter/tool/dart_decimate_gate.py").is_file()
-assert (skill / "templates/flutter/tool/git_env.py").is_file()
+assert not any((skill / "templates/flutter/tool").glob("*"))
 for pattern in ("*.md", "*.sh", "*.py"):
     for path in skill.rglob(pattern):
         assert ".agents/skills/deterministic-checks" not in path.read_text(), path
@@ -125,7 +114,7 @@ assert codex_marketplace.get("plugins", [])[0].get("name") == "building-flutter-
 assert codex_marketplace["plugins"][0]["source"] == {
     "source": "url",
     "url": "https://github.com/sgaabdu4/building-flutter-apps.git",
-    "ref": "master",
+    "ref": "main",
 }
 assert copilot.get("hooks") == "hooks/hooks.copilot.json"
 
@@ -162,7 +151,6 @@ echo "── 3. Shell syntax ──"
 for f in "$HOOK" "$PREFLIGHT" "$REMINDER"; do
   bash -n "$f" 2>/dev/null && report pass "$(basename "$f")" || report fail "$(basename "$f")"
 done
-bash -n "$GIT_PRE_PUSH" 2>/dev/null && report pass "$(basename "$GIT_PRE_PUSH")" || report fail "$(basename "$GIT_PRE_PUSH")"
 
 # --------- 4. Build temp Flutter project + fixtures ---------
 echo ""
@@ -475,34 +463,10 @@ if [[ -s /tmp/smoke_pf.json ]]; then
 else
   report fail "dirty Flutter project (expected block)"
 fi
-if grep -q -- '--yes dart-decimate json .' "$DECIMATE_LOG" 2>/dev/null; then
+if grep -q -- '--yes dart-decimate@latest json .' "$DECIMATE_LOG" 2>/dev/null; then
   report pass "new/no-base Flutter project → Dart Decimate full scan"
 else
   report fail "Dart Decimate full scan missing"
-fi
-
-HOOK_REPO="$TEST_DIR/git-hook-repo"
-mkdir -p "$HOOK_REPO"
-git -C "$HOOK_REPO" init -b main >/dev/null 2>&1
-git -C "$HOOK_REPO" config user.name smoke-test
-git -C "$HOOK_REPO" config user.email smoke@example.invalid
-touch "$HOOK_REPO/pubspec.yaml"
-git -C "$HOOK_REPO" add pubspec.yaml
-git -C "$HOOK_REPO" commit -m baseline >/dev/null 2>&1
-git -C "$HOOK_REPO" update-ref refs/remotes/origin/main HEAD
-git -C "$HOOK_REPO" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
-mkdir -p "$HOOK_REPO/tool"
-cp "$GIT_PRE_PUSH" "$HOOK_REPO/tool/dart_decimate_pre_push.sh"
-cp "$GIT_GATE" "$HOOK_REPO/tool/dart_decimate_gate.py"
-cp "$GIT_ENV" "$HOOK_REPO/tool/git_env.py"
-chmod +x "$HOOK_REPO/tool/dart_decimate_pre_push.sh"
-mkdir -p "$TEST_DIR/empty-home"
-: > "$DECIMATE_LOG"
-(cd "$HOOK_REPO" && HOME="$TEST_DIR/empty-home" PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" ./tool/dart_decimate_pre_push.sh origin https://example.invalid/repo.git >/dev/null 2>&1)
-if grep -q -- '--yes dart-decimate audit .* --base origin/main --format json --summary --gate new-only' "$DECIMATE_LOG" 2>/dev/null; then
-  report pass "Git pre-push → Dart Decimate new-only audit"
-else
-  report fail "Git pre-push Dart Decimate audit missing"
 fi
 
 NON_FL=$(mktemp -d)

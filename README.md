@@ -104,7 +104,7 @@ layout:
 |---|---|
 | Analyzer setup | `analysis_options.yaml` exists, strict analyzer flags stay on, generated files are excluded, and both `flutter_skill_lints` and `riverpod_lint` are proven active. |
 | Code health | Dart Decimate runs a new-only audit against a valid base for existing repositories, or a full JSON scan for new/no-base projects. |
-| Git push | The bundled pre-push template blocks pushes when Dart Decimate reports new findings or a tool/config failure. |
+| Git push | The canonical deterministic gate blocks pushes when Dart Decimate reports findings or a tool/config failure. |
 | Riverpod | Generated providers only, no legacy provider constructors, no `ref.watch` in notifier methods, no provider-derived caches in `ConsumerState`, and no standalone event/signal providers. |
 | Async lifecycle | `ref.mounted` / `context.mounted` guards after awaits, safe `finally` handling, cancelled subscriptions/timers/controllers, and stale async write protection. |
 | Widgets | Reusable presentation widgets render immutable inputs and emit typed callbacks; navigation, page stacks, selected records, workflow branching, providers, and infrastructure stay with screens/routes/notifiers. |
@@ -196,11 +196,9 @@ loads `hooks/hooks.copilot.json`.
 cp <plugin-cache>/skills/building-flutter-apps/references/analysis_options.yaml ./analysis_options.yaml
 mkdir -p lib/core/extensions
 cp <plugin-cache>/skills/building-flutter-apps/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
-mkdir -p tool
-cp <plugin-cache>/skills/building-flutter-apps/templates/flutter/tool/{dart_decimate_pre_push.sh,dart_decimate_gate.py,git_env.py} ./tool/
 dart pub get
 dart analyze
-npx --yes dart-decimate json .
+npx --yes dart-decimate@latest json .
 ```
 
 Notes:
@@ -211,9 +209,9 @@ Notes:
   overwriting them.
 - A healthy setup should prove that at least one `flutter_skill_lints`
   diagnostic and one `riverpod_lint` diagnostic can fire.
-- Install the complete [Dart Decimate pre-push bundle](skills/building-flutter-apps/templates/flutter/tool/)
-  through the repository's existing pre-push hook owner; keep all three files
-  together, do not replace other checks, and do not override `core.hooksPath`.
+- Let the canonical deterministic gate invoke `npx --yes
+  dart-decimate@latest` directly. Do not copy a runtime or adapter into the
+  project, replace other checks, or override `core.hooksPath`.
 
 ## What's Included
 

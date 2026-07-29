@@ -9,7 +9,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/sgaabdu4/building-flutter-apps.git",
-        "ref": "master"
+        "ref": "main"
       },
       "policy": {
         "installation": "AVAILABLE",

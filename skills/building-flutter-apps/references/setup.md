@@ -17,14 +17,12 @@ Copy [analysis_options.yaml](analysis_options.yaml) to the project root. It wire
 
 Do not add `flutter_skill_lints` to `pubspec.yaml`.
 
-Copy [Dart Decimate pre-push](../templates/flutter/tool/dart_decimate_pre_push.sh) + [gate adapter](../templates/flutter/tool/dart_decimate_gate.py) + [Git environment helper](../templates/flutter/tool/git_env.py) into package-root `tool/`.
-
 Run:
 
 ```bash
 dart pub get
 dart analyze
-python3 tool/dart_decimate_gate.py --package . --full
+npx --yes dart-decimate@latest json .
 ```
 
 ## Extension template
@@ -51,4 +49,4 @@ Expected lint outside `lib/core/extensions/context_extensions.dart`: `use_contex
 
 ## Git pre-push
 
-Read [dart-decimate.md](dart-decimate.md#git-pre-push) → install its project hook template without replacing an existing hook owner or changing `core.hooksPath`.
+Read [dart-decimate.md](dart-decimate.md#git-pre-push) → delegate to canonical `deterministic-checks` without replacing an existing hook owner or changing `core.hooksPath`.

@@ -361,11 +361,11 @@ if command -v npx >/dev/null 2>&1; then
   fi
 
   if [[ -n "$DECIMATE_BASE" ]] && git rev-parse --verify "$DECIMATE_BASE^{commit}" >/dev/null 2>&1; then
-    DECIMATE_OUT=$(npx --yes dart-decimate audit . --base "$DECIMATE_BASE" --format json --summary --gate new-only 2>&1)
+    DECIMATE_OUT=$(npx --yes dart-decimate@latest audit . --base "$DECIMATE_BASE" --format json --summary --gate new-only 2>&1)
     DECIMATE_EXIT=$?
     DECIMATE_SCOPE="new-only audit against $DECIMATE_BASE"
   else
-    DECIMATE_OUT=$(npx --yes dart-decimate json . 2>&1)
+    DECIMATE_OUT=$(npx --yes dart-decimate@latest json . 2>&1)
     DECIMATE_EXIT=$?
     DECIMATE_SCOPE="full JSON scan"
   fi
@@ -374,7 +374,7 @@ if command -v npx >/dev/null 2>&1; then
     add_violation "Dart Decimate failed ($DECIMATE_SCOPE). Output (first 30 lines):"$'\n'"$DECIMATE_PREVIEW"
   fi
 else
-  add_violation "Dart Decimate unavailable: install Node.js with npx, then run npx --yes dart-decimate."
+  add_violation "Dart Decimate unavailable: install Node.js with npx, then run npx --yes dart-decimate@latest."
 fi
 
 # 6. Emit result
