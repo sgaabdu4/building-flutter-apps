@@ -54,6 +54,8 @@ def main() -> int:
         "templates/flutter/tool/dart_decimate",
         "npx --yes dart-decimate audit",
         "npx --yes dart-decimate json",
+        "dart-decimate@latest audit",
+        "--gate new-only",
     )
     for marker in forbidden:
         if marker in combined:
@@ -69,6 +71,15 @@ def main() -> int:
         write(project / "lib/main.dart", "void main() {}\n")
         write(fake_bin / "dart", "#!/bin/sh\nexit 0\n")
         write(
+            fake_bin / "git",
+            "#!/bin/sh\n"
+            "case \"$*\" in\n"
+            "  'rev-parse --is-inside-work-tree') echo true ;;\n"
+            "  'symbolic-ref --quiet --short refs/remotes/origin/HEAD') echo origin/main ;;\n"
+            "  *) exit 0 ;;\n"
+            "esac\n",
+        )
+        write(
             fake_bin / "npx",
             "#!/usr/bin/env python3\n"
             "import json, os, sys\n"
@@ -76,7 +87,7 @@ def main() -> int:
             "Path(os.environ['CAPTURE']).write_text(json.dumps(sys.argv[1:]))\n"
             "print('{\"verdict\":\"pass\"}')\n",
         )
-        for executable in (fake_bin / "dart", fake_bin / "npx"):
+        for executable in (fake_bin / "dart", fake_bin / "git", fake_bin / "npx"):
             executable.chmod(0o755)
         result = subprocess.run(
             [str(ROOT / "hooks/scripts/preflight_audit.sh")],

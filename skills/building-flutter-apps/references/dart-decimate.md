@@ -3,16 +3,16 @@
 ## Read first
 
 - Runtime owner = `deterministic-checks`; guidance owner = this reference.
-- Package root = requested `pubspec.yaml`; Git root = diff attribution.
-- Existing project → `npx --yes dart-decimate@latest audit <git-root> --base <base> --format json --summary --gate new-only`.
-- New/no-base project → `npx --yes dart-decimate@latest json <git-root>`.
+- Package root = requested `pubspec.yaml`; Git root = scan owner.
+- Every project → `npx --yes dart-decimate@latest json <git-root>`.
 - Nested package → Git-root execution + exact repo-relative workspace scope.
 - Affected Git root = one Dart Decimate process; per-package full-repository rescans forbidden.
 - Project-local adapter/binary/copy under `tool/` = forbidden.
+- Changed/base/baseline/audit modes + inherited finding exceptions = forbidden.
 - Finding outside workspace → tooling-scope `FAIL`; never edit unrelated code.
 - Dart Decimate + `dart analyze` = complementary required gates.
 - Finding → inspect within same workspace → fix owner → rerun exact gate.
-- Exit `1|2|8` = `FAIL`; auto-fix = preview until mutation approval.
+- Nonzero exit or any finding = `FAIL`; auto-fix = preview until mutation approval.
 
 ## Git pre-push
 

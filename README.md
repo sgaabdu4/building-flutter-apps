@@ -103,7 +103,7 @@ layout:
 | Area | What gets enforced |
 |---|---|
 | Analyzer setup | `analysis_options.yaml` exists, strict analyzer flags stay on, generated files are excluded, and both `flutter_skill_lints` and `riverpod_lint` are proven active. |
-| Code health | Dart Decimate runs a new-only audit against a valid base for existing repositories, or a full JSON scan for new/no-base projects. |
+| Code health | Dart Decimate runs one full zero-finding JSON scan per affected Git root; changed/base/baseline/audit modes cannot hide inherited findings. |
 | Git push | The canonical deterministic gate blocks pushes when Dart Decimate reports findings or a tool/config failure. |
 | Riverpod | Generated providers only, no legacy provider constructors, no `ref.watch` in notifier methods, no provider-derived caches in `ConsumerState`, and no standalone event/signal providers. |
 | Async lifecycle | `ref.mounted` / `context.mounted` guards after awaits, safe `finally` handling, cancelled subscriptions/timers/controllers, and stale async write protection. |

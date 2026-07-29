@@ -352,26 +352,11 @@ fi
 
 # 5. Dart Decimate must exit 0
 if command -v npx >/dev/null 2>&1; then
-  DECIMATE_BASE=""
-  if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    DECIMATE_BASE=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
-    if [[ -z "$DECIMATE_BASE" ]]; then
-      DECIMATE_BASE=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
-    fi
-  fi
-
-  if [[ -n "$DECIMATE_BASE" ]] && git rev-parse --verify "$DECIMATE_BASE^{commit}" >/dev/null 2>&1; then
-    DECIMATE_OUT=$(npx --yes dart-decimate@latest audit . --base "$DECIMATE_BASE" --format json --summary --gate new-only 2>&1)
-    DECIMATE_EXIT=$?
-    DECIMATE_SCOPE="new-only audit against $DECIMATE_BASE"
-  else
-    DECIMATE_OUT=$(npx --yes dart-decimate@latest json . 2>&1)
-    DECIMATE_EXIT=$?
-    DECIMATE_SCOPE="full JSON scan"
-  fi
+  DECIMATE_OUT=$(npx --yes dart-decimate@latest json . 2>&1)
+  DECIMATE_EXIT=$?
   if [[ $DECIMATE_EXIT -ne 0 ]] || printf '%s' "$DECIMATE_OUT" | grep -qE '"verdict"[[:space:]]*:[[:space:]]*"fail"'; then
     DECIMATE_PREVIEW=$(printf '%s' "$DECIMATE_OUT" | head -n 30)
-    add_violation "Dart Decimate failed ($DECIMATE_SCOPE). Output (first 30 lines):"$'\n'"$DECIMATE_PREVIEW"
+    add_violation "Dart Decimate full JSON scan failed. Output (first 30 lines):"$'\n'"$DECIMATE_PREVIEW"
   fi
 else
   add_violation "Dart Decimate unavailable: install Node.js with npx, then run npx --yes dart-decimate@latest."
