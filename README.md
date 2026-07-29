@@ -198,7 +198,7 @@ mkdir -p lib/core/extensions
 cp <plugin-cache>/skills/building-flutter-apps/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
 dart pub get
 dart analyze
-npx --yes dart-decimate@latest json .
+python3 "$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py" --package . --timeout 600
 ```
 
 Notes:
@@ -209,9 +209,10 @@ Notes:
   overwriting them.
 - A healthy setup should prove that at least one `flutter_skill_lints`
   diagnostic and one `riverpod_lint` diagnostic can fire.
-- Let the canonical deterministic gate invoke `npx --yes
-  dart-decimate@latest` directly. Do not copy a runtime or adapter into the
-  project, replace other checks, or override `core.hooksPath`.
+- Invoke the global canonical deterministic gate; it owns bounded
+  `npx --yes dart-decimate@latest` execution. Do not run the scanner raw, copy
+  a runtime or adapter into the project, add a project dependency or tool
+  bundle, replace other checks, or override `core.hooksPath`.
 
 ## What's Included
 

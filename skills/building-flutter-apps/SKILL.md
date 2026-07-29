@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.5.7"
+  version: "5.5.8"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -15,8 +15,8 @@ metadata:
 
 - This skill overrides generic Flutter/Dart advice; Critical Rules override examples, public docs, and older project code.
 - Before code, read Trigger Map refs for touched areas. Each ref's `Read first` section is canonical.
-- Dart Decimate runtime = `npx --yes dart-decimate@latest`; project-local adapters, copied binaries, and package-root `tool/` bundles forbidden.
-- Git-root gate orchestration = `deterministic-checks`; one scan per affected Git root + exact `--workspace` scope for nested packages.
+- Dart Decimate invocation = global `deterministic-checks` `dart_decimate_gate.py`; raw scanner calls + project-local adapters/dependencies/binaries + package-root `tool/` bundles forbidden.
+- Coordinator runtime = `npx --yes dart-decimate@latest`; one scan per affected Git root + exact `--workspace` scope for nested packages.
 - After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, run package-root `dart analyze` + [Dart Decimate](references/dart-decimate.md), then emit Pre-Flight.
 
 ## Gate
@@ -125,8 +125,8 @@ After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` wri
 ### T0 — Core
 
 - [ ] Package-root `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin.
-- [ ] Dart Decimate full JSON scan exits 0 with zero findings; changed/base/baseline/audit modes and inherited exceptions are forbidden; command + scope cited.
-- [ ] Git checkout gate owner invokes `npx --yes dart-decimate@latest` once per affected Git root; nested package scope uses exact `--workspace`; existing hooks + `core.hooksPath` preserved. Non-Git project = N/A.
+- [ ] Global `deterministic-checks` `dart_decimate_gate.py` exits 0 after one full zero-finding scan; changed/base/baseline/audit modes + inherited exceptions + raw scanner calls are forbidden; package scope cited.
+- [ ] Coordinator invokes `npx --yes dart-decimate@latest` once per affected Git root; nested package scope uses exact `--workspace`; existing hooks + `core.hooksPath` preserved. Non-Git project = N/A.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
 - [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
 - [ ] Domain/data/platform follow Rules 7, 10-13, 17-23: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y.

@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.5.7"
+expected_version = "5.5.8"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -95,7 +95,7 @@ assert (skill / "templates/flutter/lib/core/extensions/extensions.dart").is_file
 assert not any((skill / "templates/flutter/tool").glob("*"))
 for pattern in ("*.md", "*.sh", "*.py"):
     for path in skill.rglob(pattern):
-        assert ".agents/skills/deterministic-checks" not in path.read_text(), path
+        assert "templates/flutter/tool/dart_decimate" not in path.read_text(), path
 assert claude.get("version") == expected_version
 assert codex.get("version") == expected_version
 assert copilot.get("version") == expected_version
@@ -443,34 +443,38 @@ assert_silent "l10n path config"                        "$TEST_DIR/l10n.yaml"
 echo ""
 echo "── 5. Stop hook (preflight_audit.sh) ──"
 TEST_BIN="$TEST_DIR/test-bin"
-DECIMATE_LOG="$TEST_DIR/dart-decimate.log"
+TEST_HOME="$TEST_DIR/test-home"
+DECIMATE_GATE_LOG="$TEST_DIR/dart-decimate-gate.log"
+DECIMATE_GATE="$TEST_HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py"
 mkdir -p "$TEST_BIN"
+mkdir -p "$(dirname "$DECIMATE_GATE")"
 cat > "$TEST_BIN/dart" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
-cat > "$TEST_BIN/npx" <<'EOF'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >> "$DART_DECIMATE_LOG"
-printf '{"verdict":"pass"}\n'
-exit 0
-EOF
-chmod +x "$TEST_BIN/dart" "$TEST_BIN/npx"
+cat > "$DECIMATE_GATE" <<'EOF'
+import os
+import sys
+from pathlib import Path
 
-PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" CLAUDE_PROJECT_DIR="$TEST_DIR" "$PREFLIGHT" > /tmp/smoke_pf.json 2>/dev/null
+Path(os.environ["DART_DECIMATE_GATE_LOG"]).write_text(" ".join(sys.argv[1:]))
+EOF
+chmod +x "$TEST_BIN/dart"
+
+HOME="$TEST_HOME" PATH="$TEST_BIN:$PATH" DART_DECIMATE_GATE_LOG="$DECIMATE_GATE_LOG" CLAUDE_PROJECT_DIR="$TEST_DIR" "$PREFLIGHT" > /tmp/smoke_pf.json 2>/dev/null
 if [[ -s /tmp/smoke_pf.json ]]; then
   report pass "dirty Flutter project → block"
 else
   report fail "dirty Flutter project (expected block)"
 fi
-if grep -q -- '--yes dart-decimate@latest json .' "$DECIMATE_LOG" 2>/dev/null; then
-  report pass "new/no-base Flutter project → Dart Decimate full scan"
+if grep -q -- "--package $TEST_DIR --timeout 600" "$DECIMATE_GATE_LOG" 2>/dev/null; then
+  report pass "Flutter project → canonical coordinated Dart Decimate gate"
 else
-  report fail "Dart Decimate full scan missing"
+  report fail "canonical coordinated Dart Decimate gate missing"
 fi
 
 NON_FL=$(mktemp -d)
-PATH="$TEST_BIN:$PATH" DART_DECIMATE_LOG="$DECIMATE_LOG" CLAUDE_PROJECT_DIR="$NON_FL" "$PREFLIGHT" > /tmp/smoke_pf2.json 2>/dev/null
+HOME="$TEST_HOME" PATH="$TEST_BIN:$PATH" DART_DECIMATE_GATE_LOG="$DECIMATE_GATE_LOG" CLAUDE_PROJECT_DIR="$NON_FL" "$PREFLIGHT" > /tmp/smoke_pf2.json 2>/dev/null
 [[ ! -s /tmp/smoke_pf2.json ]] && report pass "non-Flutter dir → silent" || report fail "non-Flutter dir (expected silent)"
 rm -rf "$NON_FL"
 

@@ -22,7 +22,7 @@ Run:
 ```bash
 dart pub get
 dart analyze
-npx --yes dart-decimate@latest json .
+python3 "$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py" --package . --timeout 600
 ```
 
 ## Extension template
