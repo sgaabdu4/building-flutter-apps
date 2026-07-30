@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "families": {
+    "targeted": ["python3", "tool/quality_gate.py"]
+  }
+}
