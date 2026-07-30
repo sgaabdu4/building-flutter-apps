@@ -170,5 +170,9 @@
   {
     "query": "I need WCAG alt text and keyboard navigation fixes in a Next.js marketing page, no Flutter or Dart involved.",
     "should_trigger": false
+  },
+  {
+    "query": "Build and debug a Flutter Riverpod Windows installer pipeline using Inno Setup or inno_bundle, including CRT staging, upgrade rollback, bounded waits, and GitHub Actions publication.",
+    "should_trigger": true
   }
 ]

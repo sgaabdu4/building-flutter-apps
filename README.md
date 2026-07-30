@@ -115,6 +115,7 @@ layout:
 | Performance and interaction | High-frequency inputs debounce/throttle/coalesce, expensive widgets are gated, repeated lookups use shared indexes/extensions, and broad collection watches are avoided. |
 | Platform APIs | Exact-alarm permission uses `flutter_local_notifications`; platform-specific plugin implementations are resolved and null-checked before use. |
 | Error reporting | When accepted or present, one provider-neutral `Crash` boundary owns Crashlytics/Sentry calls, privacy scrubbing, startup integration, and exact-release symbol proof; otherwise no provider is added. |
+| Windows delivery | One secret-free exact-SHA diagnostic precedes one publisher; clean-runner codegen, CRT staging, Inno identity, bounded install phases, bootstrap/upgrade preservation, immutable readback, and pointer-last activation are proven. |
 | Previews and E2E | Widget previews use deterministic fakes only; runtime E2E proves behavior with stable selectors, logs, cleanup, and writer-plus-observer proof for shared state. |
 | Repo drift | Drift checks keep docs/examples honest, smoke tests exercise hook fixtures, markdown examples are parsed, and eval suites cover trigger, routing, and answer policy. |
 
@@ -255,7 +256,9 @@ The hook scripts no-op outside Flutter projects by walking upward for
 | Hive CE persistence | [references/hive-persistence.md](skills/building-flutter-apps/references/hive-persistence.md) |
 | Widget previews | [references/widget-previews.md](skills/building-flutter-apps/references/widget-previews.md) |
 | Runtime E2E proof | [references/dart-mcp-e2e-testing.md](skills/building-flutter-apps/references/dart-mcp-e2e-testing.md) |
-| Clean-checkout and Windows build proof | [references/build-reproducibility.md](skills/building-flutter-apps/references/build-reproducibility.md) |
+| Clean-checkout build proof | [references/build-reproducibility.md](skills/building-flutter-apps/references/build-reproducibility.md) |
+| Windows installer and updater delivery | [references/windows-installer-pipeline.md](skills/building-flutter-apps/references/windows-installer-pipeline.md) |
+| Copyable Windows workflow topology | [windows-installer-workflow.yml](skills/building-flutter-apps/assets/windows-installer-workflow.yml) |
 
 ## Evals And Proof
 

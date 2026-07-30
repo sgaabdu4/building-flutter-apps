@@ -680,14 +680,18 @@
         "Requires generated outputs to be tracked, regenerated in the consuming job, or transferred as an explicit verified artifact",
         "Normalizes PowerShell multi-line native output to one scalar before regex and captures native process exit immediately",
         "Wraps uncertain PowerShell pipeline or cmdlet output in @() before count, indexing, or exact-one checks and covers zero, one, and many results",
-        "Resolves exact pinned tool paths instead of guessing Program Files and uses Start-Process -Wait -PassThru for GUI/bootstrap executables",
+        "Resolves exact pinned tool paths instead of guessing Program Files and gives every GUI/bootstrap/native child phase an explicit timeout, phase receipt, owned-tree termination, and cleanup",
         "Distinguishes C/C++ include order, include directories, link libraries, and runtime DLL bundling, with proof on Windows",
-        "Discovers the resolved Windows release output and asserts the exact runtime DLL set beside the EXE instead of assuming installed CRT tools stage it",
+        "Discovers the resolved Windows release output and stages msvcp140.dll, vcruntime140.dll, and vcruntime140_1.dll from the uniquely resolved x64 VCToolsRedistDir with PE architecture and source/destination hash proof",
         "Uses explicit least-privilege GitHub authentication for private-repository reads when checkout credentials are not persisted",
         "Compares the immediate before/after tracked-path delta instead of requiring a clean whole workspace after legitimate setup",
-        "Verifies the installed Inno version/directives, stable AppId, binary numeric and textual version fields, compiler exit, and upgrade/failure preservation with pre-existing user paths",
+        "Audits the installed inno_bundle output and retains custom Inno ownership when stable AppId, preservation, rollback, relaunch, identity, or publication requirements are not covered",
+        "Verifies the installed Inno version/directives, stable AppId, binary numeric and textual version fields, compiler exit, and upgrade/failure preservation with synthetic owned state",
         "Requires field-specific installer identity diagnostics and safe whitespace normalization instead of one opaque aggregate verifier exception",
-        "Runs cheap independent checks in parallel, one nonpublishing Windows diagnostic before one publisher, and cancels downstream paid work after prerequisite failure"
+        "Runs exactly one secret-free manual Windows diagnostic job before one exact-SHA publisher, keeps Linux/publication jobs skipped in verify mode, and cancels downstream paid work after prerequisite failure",
+        "Rejects unbounded Start-Process -Wait and WaitForSingleObject INFINITE even when a whole-job timeout exists",
+        "Scans the source, bundle, and extracted installer for secrets, runs Defender, and keeps publisher/signing secrets out of the verification lane",
+        "Uploads immutable installer and signed manifest objects, downloads and verifies them independently, then activates the provider-neutral update pointer last"
       ]
     },
     {
@@ -751,6 +755,22 @@
         "Treats the error-reporting rule and checklist as not applicable when no provider is accepted or present",
         "Fixes and proves the notifier lifecycle defect through the matching state-management references",
         "Does not infer telemetry consent from the existence of the building-flutter-apps skill"
+      ]
+    },
+    {
+      "id": 52,
+      "prompt": "We are preparing the first release of a Flutter Riverpod Windows installer. There is no signed manifest or retrievable previously published installer, but an old diagnostic Actions artifact has expired and someone wants to rebuild the current source as the baseline. What should the installer lifecycle proof do now and from release two onward?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Treats an authoritative prior release as a signed manifest plus immutable retrievable installer whose identity and hash can be independently verified",
+        "Rejects the expired Actions artifact, current-source rebuild, local tag rebuild, synthetic old installer, and indefinite wait as previous-release evidence",
+        "Records previous_release=skipped_no_prior_release for the first release instead of manufacturing an upgrade baseline",
+        "Requires bounded clean install, forced-failure cleanup, relaunch, uninstall, and no application or user-data deletion for the first release",
+        "Requires explicit phase receipts and timeouts for install, failure, cleanup, relaunch observation, and uninstall",
+        "Requires release two onward to download and verify the exact previous published installer and manifest before old-to-new preservation and rollback tests",
+        "Requires failed upgrade to restore prior program bytes and accepted local state, successful upgrade to preserve state and relaunch, and cleanup to touch only namespaced owned fixtures",
+        "Keeps diagnostic artifacts as short-lived evidence rather than treating them as authoritative publication storage"
       ]
     }
   ]

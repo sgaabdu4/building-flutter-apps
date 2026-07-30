@@ -363,11 +363,12 @@
     "query": "A clean Windows GitHub Actions checkout cannot find generated .g.dart files, build_runner uses an old conflict flag, and the PowerShell/Inno lane differs from the last green workflow.",
     "should_trigger": true,
     "expected_refs": [
+      "references/windows-installer-pipeline.md",
       "references/build-reproducibility.md",
       "references/core-stack.md"
     ],
     "forbidden_refs": [],
-    "max_refs": 2
+    "max_refs": 3
   },
   {
     "id": 36,
@@ -422,5 +423,29 @@
       "references/error-reporting.md"
     ],
     "max_refs": 2
+  },
+  {
+    "id": 41,
+    "query": "Design a Flutter Riverpod Windows installer and updater with Inno Setup or inno_bundle, app-local CRTs, bounded upgrade tests, and a manual verify-before-publish GitHub Actions flow.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/windows-installer-pipeline.md",
+      "references/build-reproducibility.md",
+      "references/core-stack.md"
+    ],
+    "forbidden_refs": [],
+    "max_refs": 3
+  },
+  {
+    "id": 42,
+    "query": "This is the first Flutter Windows release and no authoritative previous installer exists; the workflow currently waits for an expired Actions baseline artifact.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/windows-installer-pipeline.md",
+      "references/build-reproducibility.md",
+      "references/core-stack.md"
+    ],
+    "forbidden_refs": [],
+    "max_refs": 3
   }
 ]

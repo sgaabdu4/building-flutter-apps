@@ -1,0 +1,241 @@
+# Copy this topology, then replace repository-owned commands and resolve every
+# action/tool tag to an audited immutable pin before the first dispatch.
+name: Flutter Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Verify Windows only or publish an already verified revision
+        required: true
+        default: verify-windows
+        type: choice
+        options:
+          - verify-windows
+          - publish
+      revision:
+        description: Exact 40-character source commit
+        required: true
+        type: string
+      version:
+        description: Exact application version
+        required: true
+        type: string
+      diagnostic_run_id:
+        description: Required for publish; prior green diagnostic for revision
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: windows-installer-${{ inputs.revision }}
+  cancel-in-progress: false
+
+jobs:
+  verify_windows:
+    name: Verify Windows without publication
+    if: inputs.mode == 'verify-windows'
+    runs-on: windows-latest
+    timeout-minutes: 75
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact source and read-only remote tip
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .\.github\scripts\windows_installer.ps1 source
+          -Revision '${{ inputs.revision }}'
+          -ReadOnly
+
+      - name: Install audited toolchain
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 toolchain
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Materialize exact version delta
+        shell: pwsh
+        run: >-
+          .\.github\scripts\windows_installer.ps1 version
+          -Version '${{ inputs.version }}'
+
+      - name: Generate Dart sources in consuming job
+        run: dart run build_runner build
+
+      - name: Generate localizations when configured
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 localization
+
+      - name: Run cheap CRT timeout and installer identity sentinels
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 sentinels
+
+      - name: Analyze and test exact materialized tree
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 quality
+
+      - name: Build Flutter Windows release
+        run: flutter build windows --release
+
+      - name: Stage and verify app-local CRT
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 crt
+
+      - name: Compile and verify installer identity
+        shell: pwsh
+        run: >-
+          .\.github\scripts\windows_installer.ps1 installer
+          -Version '${{ inputs.version }}'
+
+      - name: Scan bundle and extracted installer
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 security
+
+      - name: Prove bootstrap or previous-release lifecycle with bounded phases
+        shell: pwsh
+        run: >-
+          .\.github\scripts\windows_installer.ps1 lifecycle
+          -PreviousReleaseMode Auto
+
+      - name: Write provider-neutral diagnostic receipt
+        shell: pwsh
+        run: >-
+          .\.github\scripts\windows_installer.ps1 receipt
+          -Revision '${{ inputs.revision }}'
+          -Version '${{ inputs.version }}'
+          -Publication none
+
+      - name: Upload short-lived diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-verification-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/windows-installer/installer.exe
+            ${{ runner.temp }}/windows-installer/diagnostic-receipt.json
+          if-no-files-found: error
+          retention-days: 1
+
+  quality:
+    name: Exact-revision publication gates
+    if: inputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run repository-owned publication gates
+        run: ./tool/publish-gate.sh
+
+  publish:
+    name: Publish verified Windows installer
+    if: inputs.mode == 'publish'
+    needs:
+      - quality
+    runs-on: windows-latest
+    timeout-minutes: 90
+    environment: windows-release
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify prior diagnostic run and exact revision
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .\.github\scripts\windows_installer.ps1 diagnostic
+          -RunId '${{ inputs.diagnostic_run_id }}'
+          -Revision '${{ inputs.revision }}'
+
+      - name: Install audited toolchain
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 toolchain
+
+      - name: Resolve Flutter dependencies in publisher
+        run: flutter pub get
+
+      - name: Materialize release version and tag candidate
+        shell: pwsh
+        run: >-
+          .\.github\scripts\windows_installer.ps1 version
+          -Version '${{ inputs.version }}'
+
+      - name: Generate Dart sources in publisher
+        run: dart run build_runner build
+
+      - name: Generate publisher localizations when configured
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 localization
+
+      - name: Run publisher sentinels and Windows quality
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 sentinels-and-quality
+
+      - name: Build publisher Flutter Windows release
+        run: flutter build windows --release
+
+      - name: Stage and verify publisher app-local CRT
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 crt
+
+      - name: Compile verify and sign installer and manifest
+        shell: pwsh
+        run: >-
+          .\.github\scripts\windows_installer.ps1 installer
+          -Version '${{ inputs.version }}'
+          -Sign
+
+      - name: Scan publisher bundle and extracted installer
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 security
+
+      - name: Re-prove bounded install lifecycle
+        shell: pwsh
+        run: >-
+          .\.github\scripts\windows_installer.ps1 lifecycle
+          -PreviousReleaseMode Auto
+
+      - name: Upload immutable installer and manifest
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 publish-immutable
+
+      - name: Independently download and verify immutable objects
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 verify-readback
+
+      - name: Activate publication pointer last
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 activate
+
+      - name: Verify final remote state
+        shell: pwsh
+        run: >-
+          .\.github\scripts\windows_installer.ps1 delivery
+          -Revision '${{ inputs.revision }}'
+          -Version '${{ inputs.version }}'

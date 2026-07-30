@@ -111,6 +111,18 @@ def main() -> None:
         for case in routing_eval
     ):
         fail("routing eval must prove no-provider work skips error-reporting.md")
+    if not any(
+        "inno_bundle" in case["query"]
+        and "references/windows-installer-pipeline.md" in case["expected_refs"]
+        for case in routing_eval
+    ):
+        fail("routing eval must prove Windows installer work reads its direct reference")
+    if not any(
+        "first Flutter Windows release" in case["query"]
+        and "references/windows-installer-pipeline.md" in case["expected_refs"]
+        for case in routing_eval
+    ):
+        fail("routing eval must prove bootstrap release work reads its direct reference")
     reference_names = {
         path.relative_to(SKILL_ROOT).as_posix()
         for path in (SKILL_ROOT / "references").rglob("*")
@@ -130,6 +142,12 @@ def main() -> None:
         fail("tracked/generated eval result artifacts must not be canonical package state")
     if any((ROOT / "evals").glob("*eval-decisions.md")):
         fail("historical eval decision log must not be canonical package state")
+
+    workflow_asset = SKILL_ROOT / "assets" / "windows-installer-workflow.yml"
+    if not workflow_asset.is_file():
+        fail("Windows installer workflow asset missing")
+    if "assets/windows-installer-workflow.yml" not in markdown_links(text):
+        fail("Windows installer workflow asset is not linked directly from SKILL.md")
 
     print("SKILL_ROUTING_OK")
 

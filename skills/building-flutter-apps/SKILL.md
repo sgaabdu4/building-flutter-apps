@@ -1,14 +1,14 @@
 ---
 name: building-flutter-apps
 description: >-
-  Flutter Riverpod app architecture. Use before changing a Flutter app or
-  package that uses Riverpod; skip non-Riverpod Flutter stacks and pure-Dart
-  work without Flutter/Riverpod app context.
+  Flutter Riverpod app architecture and Windows installer delivery. Use before
+  changing a Riverpod Flutter app/package or its Windows desktop
+  packaging/update pipeline; skip non-Riverpod stacks and pure-Dart work.
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.6.1"
-  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
+  version: "5.7.0"
+  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, windows, inno, installer, fire-and-forget, singletons, e2e testing
 ---
 
 ## Read first
@@ -65,6 +65,7 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 | R22 | Runtime E2E proves behavior with stable selectors, logs, source-of-truth verification, cleanup, and multi-actor proof when needed. | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 | R23 | Accessibility is UI correctness: localized tooltips/semantic labels, 48x48 targets, contrast, text scale, `Text.rich`. | [accessibility.md](references/atomic-design/accessibility.md), [flutter-optimizations.md](references/flutter-optimizations.md#semantics) |
 | R24 | If remote error reporting is accepted or already present, use one app-owned `Crash` boundary; otherwise add no provider/facade. Scrub sensitive data + reconcile ambiguous remote outcomes before telemetry. | [error-reporting.md](references/error-reporting.md), [networking.md](references/networking.md) |
+| R25 | Windows installer delivery = secret-free exact-SHA diagnostic → one publisher; regenerate in every Windows consumer, bound every child phase, preserve stable identity/data, and activate only verified immutable bytes. | [windows-installer-pipeline.md](references/windows-installer-pipeline.md), [workflow scaffold](assets/windows-installer-workflow.yml) |
 
 ## Trigger Map
 
@@ -100,7 +101,8 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | `Iterable` lookup/indexing, widget list helpers, `Debouncer`, validators, `Result`, extension types, `core/extensions/` barrel export | [collections-helpers.md](references/extensions/collections-helpers.md) |
 | Records `(x, y)`, extension type IDs, pattern matching, guard clause `case _ when ...` | [dart-patterns-records.md](references/dart-patterns-records.md) |
 | `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
-| `build_runner`, missing generated parts, clean checkout, Windows GitHub Actions, CMake/header/link failure, PowerShell/native process, Inno installer/verifier, Xcode selection, Flutter SwiftPM generated package, Apple device build, local-vs-CI mismatch | [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
+| `build_runner`, missing generated parts, clean checkout, Xcode selection, Flutter SwiftPM generated package, Apple device build, local-vs-CI mismatch | [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
+| Flutter Windows desktop packaging, GitHub Actions Windows installer, Inno Setup, `inno_bundle`, updater/auto-update, CRT DLLs, PowerShell/native installer process, installer/version/AppId failure | [windows-installer-pipeline.md](references/windows-installer-pipeline.md) + [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
 | Dart Decimate, dead code, circular dependency, duplicate code, complexity, dependency hygiene, full zero-finding scan | [dart-decimate.md](references/dart-decimate.md) |
 | Common navigation / form / list / debounce / route-param-fallback patterns | [common-patterns.md](references/common-patterns.md) |
 | Incremental remote pull, delta token, per-table sync date, merge/delete reconciliation | [delta-sync.md](references/common-patterns/delta-sync.md) |
@@ -131,7 +133,7 @@ After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` wri
 - [ ] Coordinator invokes `npx --yes dart-decimate@latest` once per affected Git root; nested package scope uses exact `--workspace`; existing hooks + `core.hooksPath` preserved. Non-Git project = N/A.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
 - [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
-- [ ] Domain/data/platform follow Rules 7, 10-13, 17-24: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y; if error reporting is accepted/present, it uses one scrubbed boundary, otherwise N/A.
+- [ ] Domain/data/platform follow Rules 7, 10-13, 17-25: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y; if error reporting is accepted/present, it uses one scrubbed boundary, otherwise N/A.
 - [ ] Any row touched in Trigger Map was read; exact lint names are cited when a scanner should enforce the rule.
 
 ### T1 — State / Notifier / Mutation

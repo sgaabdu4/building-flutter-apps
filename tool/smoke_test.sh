@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.6.1"
+expected_version = "5.7.0"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -92,6 +92,9 @@ assert (skill / "references/setup.md").is_file()
 assert (skill / "references/dart-decimate.md").is_file()
 assert (skill / "references/build-reproducibility.md").is_file()
 assert (skill / "references/error-reporting.md").is_file()
+assert (skill / "references/windows-installer-pipeline.md").is_file()
+assert (skill / "assets/windows-installer-workflow.yml").is_file()
+assert (skill / "agents/openai.yaml").is_file()
 assert not (skill / "references/crashlytics.md").exists()
 assert not (skill / "references/crash-reporting.md").exists()
 assert (skill / "references/analysis_options.yaml").is_file()
@@ -109,10 +112,41 @@ assert copilot_marketplace["metadata"]["version"] == expected_version
 assert copilot_marketplace["plugins"][0]["version"] == expected_version
 assert f'version: "{expected_version}"' in (skill / "SKILL.md").read_text()
 build_reproducibility = (skill / "references/build-reproducibility.md").read_text()
-assert "PowerShell cardinality = wrap uncertain pipeline/cmdlet output in `@(...)`" in build_reproducibility
-assert "Runtime staging = discover the resolved release output + assert exact DLL set beside the EXE" in build_reproducibility
 assert "Toolchain identity = resolved `DEVELOPER_DIR`/`xcode-select` path" in build_reproducibility
-assert "Installer verifier = field-by-field diagnostics" in build_reproducibility
+windows_installer = (skill / "references/windows-installer-pipeline.md").read_text()
+assert "Uncertain command/cmdlet/pipeline result = `@(...)`" in windows_installer
+assert "VCToolsRedistDir" in windows_installer
+assert "`msvcp140.dll` + `vcruntime140.dll` + `vcruntime140_1.dll`" in windows_installer
+assert "`inno_bundle` = candidate generator, not distribution proof" in windows_installer
+assert "previous_release=skipped_no_prior_release" in windows_installer
+assert "`Start-Process -Wait` + `WaitForSingleObject(..., INFINITE)` forbidden" in windows_installer
+assert "Pointer/index activation = last external mutation" in windows_installer
+workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
+assert "mode:" in workflow_asset
+assert "verify-windows" in workflow_asset
+assert "permissions: {}" in workflow_asset
+assert "contents: write" in workflow_asset
+assert "PreviousReleaseMode Auto" in workflow_asset
+assert "retention-days: 1" in workflow_asset
+assert "resolve every" in workflow_asset
+verify_job = workflow_asset.split("  verify_windows:", 1)[1].split("  quality:", 1)[0]
+assert "contents: read" in verify_job
+assert "actions: read" in verify_job
+assert "contents: write" not in verify_job
+assert "secrets." not in verify_job
+publish_job = workflow_asset.split("  publish:", 1)[1]
+assert publish_job.index("flutter pub get") < publish_job.index("dart run build_runner build")
+assert publish_job.index("dart run build_runner build") < publish_job.index("flutter build windows --release")
+assert publish_job.index("publish-immutable") < publish_job.index("verify-readback")
+assert publish_job.index("verify-readback") < publish_job.index("activate")
+openai_yaml = (skill / "agents/openai.yaml").read_text()
+assert 'display_name: "Building Flutter Apps"' in openai_yaml
+assert "$building-flutter-apps" in openai_yaml
+assert "allow_implicit_invocation: true" in openai_yaml
+for text in (windows_installer, workflow_asset, openai_yaml):
+    lowered = text.lower()
+    for forbidden in ("appwrite", "jabal", "emr_", "project_id", "database_id"):
+        assert forbidden not in lowered, forbidden
 error_reporting = (skill / "references/error-reporting.md").read_text()
 assert "SentryFlutter.init(..., appRunner: ...)" in error_reporting
 assert "`SENTRY_AUTH_TOKEN` = build-only secret" in error_reporting
