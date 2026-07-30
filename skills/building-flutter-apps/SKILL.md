@@ -133,7 +133,8 @@ After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` wri
 - [ ] Coordinator invokes `npx --yes dart-decimate@latest` once per affected Git root; nested package scope uses exact `--workspace`; existing hooks + `core.hooksPath` preserved. Non-Git project = N/A.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
 - [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
-- [ ] Domain/data/platform follow Rules 7, 10-13, 17-25: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y; if error reporting is accepted/present, it uses one scrubbed boundary, otherwise N/A.
+- [ ] Domain/data/platform follow Rules 7, 10-13, 17-24: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y; if error reporting is accepted/present, it uses one scrubbed boundary, otherwise N/A.
+- [ ] Rule 25 = N/A unless Windows packaging/updater delivery is touched; when applicable, its diagnostic/publisher proof is green.
 - [ ] Any row touched in Trigger Map was read; exact lint names are cited when a scanner should enforce the rule.
 
 ### T1 — State / Notifier / Mutation

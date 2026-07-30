@@ -420,7 +420,8 @@
       "references/state-management-lifecycle.md"
     ],
     "forbidden_refs": [
-      "references/error-reporting.md"
+      "references/error-reporting.md",
+      "references/windows-installer-pipeline.md"
     ],
     "max_refs": 2
   },

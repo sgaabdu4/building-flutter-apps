@@ -155,6 +155,7 @@ assert "preserve original error + stack in `Crash.error` before mapping" in erro
 skill_text = (skill / "SKILL.md").read_text()
 assert "otherwise add no provider/facade" in skill_text
 assert "otherwise N/A" in skill_text
+assert "Rule 25 = N/A unless Windows packaging/updater delivery is touched" in skill_text
 assert "and one scrubbed error-reporting boundary" not in skill_text
 assert "hooks" not in claude
 assert "skills" not in claude

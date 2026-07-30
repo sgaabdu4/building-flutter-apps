@@ -123,6 +123,12 @@ def main() -> None:
         for case in routing_eval
     ):
         fail("routing eval must prove bootstrap release work reads its direct reference")
+    if not any(
+        "notifier lifecycle" in case["query"]
+        and "references/windows-installer-pipeline.md" in case["forbidden_refs"]
+        for case in routing_eval
+    ):
+        fail("routing eval must prove non-Windows work skips the Windows reference")
     reference_names = {
         path.relative_to(SKILL_ROOT).as_posix()
         for path in (SKILL_ROOT / "references").rglob("*")
