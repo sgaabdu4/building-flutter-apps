@@ -788,6 +788,22 @@
         "Reviews numeric casts, @() cardinality, tokenized process arguments and quoting, finite waits, and uniquely resolved external-tool paths",
         "Rejects regex or substring contract tests as syntax proof and keeps remote status unproven until the corrected exact SHA is terminal green"
       ]
+    },
+    {
+      "id": 54,
+      "prompt": "The Windows timeout smoke now parses, but its generated child process-tree script never writes the readiness file. The parent creates the child source inside a double-quoted PowerShell here-string and includes `$childPidPath.tmp`. What should change before another CI retry?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Identifies outer-scope expansion of nested PowerShell source as the readiness failure boundary",
+        "Replaces the expandable generated source with literal single-quoted content and declares explicit named parameters for every dynamic path or value",
+        "Computes the atomic temporary path in one owning scope and passes it as an argument instead of embedding it into child source",
+        "Allows ${childPidPath}.tmp or $($childPidPath).tmp only when interpolation is unavoidable in the intended scope and rejects $childPidPath.tmp",
+        "Parses the exact materialized child script with compatible pwsh after generation rather than checking only the tracked generator",
+        "Executes the generated script with harmless named arguments and requires a bounded readiness receipt before CI or expensive build work",
+        "On readiness timeout, reports the phase, child exit state, generated-script parser errors, and owned process cleanup without exposing dynamic values",
+        "Keeps the Lab candidate classified as negative evidence until a later exact SHA completes the Windows-only job green"
+      ]
     }
   ]
 }

@@ -139,6 +139,15 @@ def main() -> None:
         for case in answer_eval
     ):
         fail("answer eval must reject unparsed PowerShell smoke syntax")
+    if not any(
+        "$childPidPath.tmp" in case["prompt"]
+        and any(
+            "literal single-quoted content" in expectation
+            for expectation in case["expectations"]
+        )
+        for case in answer_eval
+    ):
+        fail("answer eval must reject nested expandable PowerShell source")
     reference_names = {
         path.relative_to(SKILL_ROOT).as_posix()
         for path in (SKILL_ROOT / "references").rglob("*")

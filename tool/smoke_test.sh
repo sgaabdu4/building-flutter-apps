@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.7.1"
+expected_version = "5.7.2"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -123,6 +123,8 @@ assert "`Start-Process -Wait` + `WaitForSingleObject(..., INFINITE)` forbidden" 
 assert "same-run transport only after authoritative verification" in windows_installer
 assert "[System.Management.Automation.Language.Parser]::ParseFile(...)" in windows_installer
 assert "`[checked]` is not a PowerShell type accelerator" in windows_installer
+assert "literal single-quoted content + dynamic paths/values as named arguments" in windows_installer
+assert "never `$childPidPath.tmp`" in windows_installer
 assert "Pointer/index activation = last external mutation" in windows_installer
 workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
 assert "mode:" in workflow_asset
@@ -132,6 +134,7 @@ assert "contents: write" in workflow_asset
 assert "PreviousReleaseMode Auto" not in workflow_asset
 assert workflow_asset.count("windows_installer.ps1 baseline") == 2
 assert workflow_asset.count("windows_installer.ps1 parse-powershell") == 2
+assert workflow_asset.count("generated-script readiness") == 2
 assert workflow_asset.count("-PreviousReleaseMode $env:BASELINE_MODE") == 2
 assert workflow_asset.count("-PreviousInstaller $env:BASELINE_INSTALLER") == 2
 assert "phase=prior-release result=skipped_no_prior_release" in workflow_asset

@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 localization
 
-      - name: Run cheap CRT timeout and installer identity sentinels
+      - name: Run generated-script readiness CRT timeout and identity sentinels
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 sentinels
 
@@ -215,7 +215,7 @@ jobs:
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 localization
 
-      - name: Run publisher sentinels and Windows quality
+      - name: Run publisher generated-script readiness sentinels and quality
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 sentinels-and-quality
 

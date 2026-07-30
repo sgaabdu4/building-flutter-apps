@@ -68,6 +68,9 @@
 - Syntax gate = compatible Windows `pwsh` + `[System.Management.Automation.Language.Parser]::ParseFile(...)` over every owned `.ps1`; any parse error fails before tool install/build.
 - Syntax scope = parser owner + cheap smokes + installer harness + every called helper; regex/static intent review is not a parser.
 - Smoke integrity = syntax gate first → intentional timeout smoke second; a smoke with unparsed syntax proves nothing.
+- Generated source = literal single-quoted content + dynamic paths/values as named arguments; nested expandable PowerShell source = forbidden.
+- Generated proof = materialize → parse exact output → execute harmless readiness path under compatible `pwsh` with a bounded receipt before CI/build.
+- Filename suffix = compute in one scope + pass as an argument; if interpolation is unavoidable, use `${childPidPath}.tmp` or `$($childPidPath).tmp`, never `$childPidPath.tmp`.
 - Numeric conversion = validate range + multiply in a wide numeric type + bounds-check + explicit target cast; `[checked]` is not a PowerShell type accelerator.
 - Uncertain command/cmdlet/pipeline result = `@(...)` before `.Count`, `[0]`, exact-one, or comparison.
 - Selected scalar = explicit `[string]` conversion before string APIs.
@@ -183,6 +186,7 @@
 - [PowerShell Wait-Process](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/wait-process)
 - [PowerShell `Parser.ParseFile`](https://learn.microsoft.com/en-us/dotnet/api/system.management.automation.language.parser.parsefile?view=powershellsdk-7.6.0)
 - [PowerShell numeric literals + type accelerators](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_numeric_literals?view=powershell-7.5)
+- [PowerShell quoting + expandable strings](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.6)
 - [Visual Studio `vswhere`](https://github.com/microsoft/vswhere)
 - [Inno Setup AppId](https://jrsoftware.org/ishelp/topic_setup_appid.htm)
 - [Inno command-line compiler](https://jrsoftware.org/ishelp/topic_compilercmdline.htm)
