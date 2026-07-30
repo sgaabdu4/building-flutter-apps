@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.7.2"
+expected_version = "5.7.3"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -125,6 +125,9 @@ assert "[System.Management.Automation.Language.Parser]::ParseFile(...)" in windo
 assert "`[checked]` is not a PowerShell type accelerator" in windows_installer
 assert "literal single-quoted content + dynamic paths/values as named arguments" in windows_installer
 assert "never `$childPidPath.tmp`" in windows_installer
+assert "`PrepareToInstall` returns a non-empty diagnostic" in windows_installer
+assert "exact exit code `7`" in windows_installer
+assert "`AfterInstall` + assume `/SUPPRESSMSGBOXES`" in windows_installer
 assert "Pointer/index activation = last external mutation" in windows_installer
 workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
 assert "mode:" in workflow_asset

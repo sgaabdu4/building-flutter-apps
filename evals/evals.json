@@ -804,6 +804,22 @@
         "On readiness timeout, reports the phase, child exit state, generated-script parser errors, and owned process cleanup without exposing dynamic values",
         "Keeps the Lab candidate classified as negative evidence until a later exact SHA completes the Windows-only job green"
       ]
+    },
+    {
+      "id": 55,
+      "prompt": "A Flutter Windows installer diagnostic expected a forced upgrade failure, but the Inno script raised an exception from a `[Files] AfterInstall` hook while running silently with `/SUPPRESSMSGBOXES`. The installer returned exit code 0 even though the harness called that a rollback test. What must change before another Windows retry?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Rejects the run as a false forced-failure proof because the installer completed with exit code 0",
+        "Stops using a [Files] AfterInstall exception as the deterministic rollback trigger and does not infer fatality from /SUPPRESSMSGBOXES",
+        "Establishes the owned backup and recovery state before the test-only failure decision",
+        "Uses Inno PrepareToInstall and returns a non-empty diagnostic to stop setup through the documented preparing-stage contract",
+        "Requires exact installer exit code 7 and treats any other code, including 0, as a failed test",
+        "Uses DeinitializeSetup as the cleanup and restoration owner because it runs even when setup exits before installation",
+        "Verifies prior program bytes, accepted local state, absence of a partial new version, and owned cleanup after the forced failure",
+        "Keeps the current Windows run classified as negative evidence until a corrected exact revision completes the diagnostic green"
+      ]
     }
   ]
 }

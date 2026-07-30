@@ -148,6 +148,13 @@ def main() -> None:
         for case in answer_eval
     ):
         fail("answer eval must reject nested expandable PowerShell source")
+    if not any(
+        "[Files] AfterInstall" in case["prompt"]
+        and any("PrepareToInstall" in expectation for expectation in case["expectations"])
+        and any("exit code 7" in expectation for expectation in case["expectations"])
+        for case in answer_eval
+    ):
+        fail("answer eval must reject false AfterInstall forced-failure proof")
     reference_names = {
         path.relative_to(SKILL_ROOT).as_posix()
         for path in (SKILL_ROOT / "references").rglob("*")

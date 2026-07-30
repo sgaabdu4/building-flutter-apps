@@ -123,6 +123,15 @@
 - Harness refuses pre-existing unrelated installation; fixture data/credentials = synthetic + namespaced.
 - Cleanup = owned processes + owned install + owned registry + owned temp markers only.
 
+### Forced-failure proof
+
+- Test-only failure = establish owned backup/recovery state → `PrepareToInstall` returns a non-empty diagnostic.
+- Expected installer result = exact exit code `7`; exit `0` = false failure proof + immediate stop.
+- Cleanup/restore = `DeinitializeSetup`; it runs even when Setup exits before installation.
+- Assert = installer exit + prior program bytes + accepted local state + no partial new version + owned cleanup.
+- Forbidden = raise from `[Files]` `AfterInstall` + assume `/SUPPRESSMSGBOXES` makes the file error fatal/nonzero.
+- Different Inno version/trigger = reverify official event + exit-code contract before use.
+
 ## Bounded processes
 
 - Whole-job timeout = outer failsafe only; every child phase owns a smaller explicit deadline.
@@ -189,6 +198,9 @@
 - [PowerShell quoting + expandable strings](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.6)
 - [Visual Studio `vswhere`](https://github.com/microsoft/vswhere)
 - [Inno Setup AppId](https://jrsoftware.org/ishelp/topic_setup_appid.htm)
+- [Inno Setup event functions](https://jrsoftware.org/ishelp/topic_scriptevents.htm)
+- [Inno Setup exit codes](https://jrsoftware.org/ishelp/topic_setupexitcodes.htm)
+- [Inno Setup command-line parameters](https://jrsoftware.org/ishelp/topic_setupcmdline.htm)
 - [Inno command-line compiler](https://jrsoftware.org/ishelp/topic_compilercmdline.htm)
 - [Inno binary file version](https://jrsoftware.org/ishelp/topic_setup_versioninfoversion.htm)
 - [Inno binary product version](https://jrsoftware.org/ishelp/topic_setup_versioninfoproductversion.htm)
