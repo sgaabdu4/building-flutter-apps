@@ -11,9 +11,9 @@
 
 | File | Cases | Contract |
 |---|---:|---|
-| `evals.json` | 50 | Prompt + graded expectations. |
+| `evals.json` | 51 | Prompt + graded expectations. |
 | `trigger-eval.json` | 43 | Query + activation decision. |
-| `routing-eval.json` | 39 | Activation + exact refs + maximum read breadth. |
+| `routing-eval.json` | 40 | Activation + exact refs + maximum read breadth. |
 
 ## Add cases
 

@@ -409,5 +409,18 @@
     ],
     "forbidden_refs": [],
     "max_refs": 2
+  },
+  {
+    "id": 40,
+    "query": "A Flutter Riverpod app has no crash-reporting provider or telemetry requirement; fix only a notifier lifecycle bug after await.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/state-management/async-mutations.md",
+      "references/state-management-lifecycle.md"
+    ],
+    "forbidden_refs": [
+      "references/error-reporting.md"
+    ],
+    "max_refs": 2
   }
 ]

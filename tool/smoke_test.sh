@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.6.0"
+expected_version = "5.6.1"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -118,6 +118,10 @@ assert "SentryFlutter.init(..., appRunner: ...)" in error_reporting
 assert "`SENTRY_AUTH_TOKEN` = build-only secret" in error_reporting
 assert "Runtime issue inventory/root cause/resolve = global `sentry` skill" in error_reporting
 assert "preserve original error + stack in `Crash.error` before mapping" in error_reporting
+skill_text = (skill / "SKILL.md").read_text()
+assert "otherwise add no provider/facade" in skill_text
+assert "otherwise N/A" in skill_text
+assert "and one scrubbed error-reporting boundary" not in skill_text
 assert "hooks" not in claude
 assert "skills" not in claude
 assert "hooks" not in codex

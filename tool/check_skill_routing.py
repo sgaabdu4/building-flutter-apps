@@ -105,6 +105,12 @@ def main() -> None:
                 fail(f"conflicting widget guidance in {relative}: {phrase}")
 
     routing_eval = json.loads((ROOT / "evals" / "routing-eval.json").read_text())
+    if not any(
+        "no crash-reporting provider" in case["query"]
+        and "references/error-reporting.md" in case["forbidden_refs"]
+        for case in routing_eval
+    ):
+        fail("routing eval must prove no-provider work skips error-reporting.md")
     reference_names = {
         path.relative_to(SKILL_ROOT).as_posix()
         for path in (SKILL_ROOT / "references").rglob("*")

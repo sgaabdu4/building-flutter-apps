@@ -114,7 +114,7 @@ layout:
 | Localization and accessibility | User-facing copy, tooltips, semantic labels, image labels, and accessibility text come from l10n; app-root text-scale clamps are blocked. |
 | Performance and interaction | High-frequency inputs debounce/throttle/coalesce, expensive widgets are gated, repeated lookups use shared indexes/extensions, and broad collection watches are avoided. |
 | Platform APIs | Exact-alarm permission uses `flutter_local_notifications`; platform-specific plugin implementations are resolved and null-checked before use. |
-| Error reporting | One provider-neutral `Crash` boundary owns Crashlytics/Sentry calls, privacy scrubbing, startup integration, and exact-release symbol proof. |
+| Error reporting | When accepted or present, one provider-neutral `Crash` boundary owns Crashlytics/Sentry calls, privacy scrubbing, startup integration, and exact-release symbol proof; otherwise no provider is added. |
 | Previews and E2E | Widget previews use deterministic fakes only; runtime E2E proves behavior with stable selectors, logs, cleanup, and writer-plus-observer proof for shared state. |
 | Repo drift | Drift checks keep docs/examples honest, smoke tests exercise hook fixtures, markdown examples are parsed, and eval suites cover trigger, routing, and answer policy. |
 

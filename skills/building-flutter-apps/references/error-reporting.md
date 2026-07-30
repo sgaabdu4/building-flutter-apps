@@ -4,7 +4,7 @@
 
 1. Existing provider + accepted telemetry/privacy contract = preserve.
 2. Adding/replacing/dual-running a provider = material external-data change → explicit approval + `security-review`.
-3. `Crash` = one tiny provider-neutral facade; public API = `init`, `log`, `error`.
+3. Accepted/present provider only → `Crash` = one tiny provider-neutral facade; public API = `init`, `log`, `error`.
 4. SDK imports/calls = `crash_service.dart` only; feature code calls `Crash`.
 5. Startup = one owner; SDK-managed error integration replaces hand-wired zone/framework/dispatcher handlers.
 6. Event payloads, breadcrumbs, tags, extras, screenshots, view hierarchy, replay, request capture, and user identity = no PII by default.
@@ -89,6 +89,7 @@ Future<void> main() async {
 
 ## Checklist
 
+- [ ] No accepted/present provider → no SDK/facade/config change; remaining items = N/A
 - [ ] Accepted provider(s) + environments + data categories recorded
 - [ ] `crash_service.dart` = only SDK owner
 - [ ] Public API = `init` + `error` + `log`

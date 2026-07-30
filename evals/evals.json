@@ -739,6 +739,19 @@
         "Avoids restoring or committing generated Apple package side effects as if they were tracked project changes",
         "Runs the cheapest configuration/package-graph proof before another physical-device build"
       ]
+    },
+    {
+      "id": 51,
+      "prompt": "This Flutter Riverpod app has no Sentry, no Crashlytics, and no accepted telemetry requirement. I am only fixing a notifier lifecycle bug. Does the building-flutter-apps skill require me to add a Crash facade or choose a reporting provider?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "States that Sentry, Crashlytics, and no remote provider are all valid project-owned choices",
+        "Does not install a provider, create a Crash facade, add DSN configuration, or request a telemetry choice for this unrelated fix",
+        "Treats the error-reporting rule and checklist as not applicable when no provider is accepted or present",
+        "Fixes and proves the notifier lifecycle defect through the matching state-management references",
+        "Does not infer telemetry consent from the existence of the building-flutter-apps skill"
+      ]
     }
   ]
 }
