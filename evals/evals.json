@@ -765,12 +765,28 @@
       "expectations": [
         "Treats an authoritative prior release as a signed manifest plus immutable retrievable installer whose identity and hash can be independently verified",
         "Rejects the expired Actions artifact, current-source rebuild, local tag rebuild, synthetic old installer, and indefinite wait as previous-release evidence",
-        "Records previous_release=skipped_no_prior_release for the first release instead of manufacturing an upgrade baseline",
+        "Resolves explicit mode none, passes no old-installer path, and records phase=prior-release result=skipped_no_prior_release instead of manufacturing an upgrade baseline",
         "Requires bounded clean install, forced-failure cleanup, relaunch, uninstall, and no application or user-data deletion for the first release",
         "Requires explicit phase receipts and timeouts for install, failure, cleanup, relaunch observation, and uninstall",
         "Requires release two onward to download and verify the exact previous published installer and manifest before old-to-new preservation and rollback tests",
         "Requires failed upgrade to restore prior program bytes and accepted local state, successful upgrade to preserve state and relaunch, and cleanup to touch only namespaced owned fixtures",
-        "Keeps diagnostic artifacts as short-lived evidence rather than treating them as authoritative publication storage"
+        "Allows an Actions artifact only as short-lived evidence or same-run transport after authoritative verification, re-verifies its digest after download, and never treats it as prior-release authority"
+      ]
+    },
+    {
+      "id": 53,
+      "prompt": "Our Windows-only Flutter installer retry added a one-second timeout smoke, but the smoke failed before Flutter compile with `Unable to find type [checked]`. Local tests only searched the PowerShell files for expected strings. What canonical gate and correction are required before another paid Windows retry?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Classifies the failure as invalid PowerShell syntax in the timeout owner rather than an installer or Flutter failure",
+        "Runs System.Management.Automation.Language.Parser.ParseFile with compatible Windows pwsh over every owned .ps1 and fails with exact file, line, column, and parser message",
+        "Includes the parser owner, timeout smoke, process wrapper, installer harness, and every called PowerShell helper in syntax scope",
+        "Runs the parser gate before tool installation or expensive Flutter/Inno work and before trusting the smoke",
+        "Rejects [checked] as a PowerShell type accelerator and uses validated input bounds, wide arithmetic, an explicit bounds check, and a real numeric cast",
+        "Still executes the intentional over-deadline child smoke after syntax passes to prove named timeout receipts, descendant termination, bounded cleanup, and no leftover process",
+        "Reviews numeric casts, @() cardinality, tokenized process arguments and quoting, finite waits, and uniquely resolved external-tool paths",
+        "Rejects regex or substring contract tests as syntax proof and keeps remote status unproven until the corrected exact SHA is terminal green"
       ]
     }
   ]

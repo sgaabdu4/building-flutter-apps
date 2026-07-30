@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.7.0"
+expected_version = "5.7.1"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -118,15 +118,24 @@ assert "Uncertain command/cmdlet/pipeline result = `@(...)`" in windows_installe
 assert "VCToolsRedistDir" in windows_installer
 assert "`msvcp140.dll` + `vcruntime140.dll` + `vcruntime140_1.dll`" in windows_installer
 assert "`inno_bundle` = candidate generator, not distribution proof" in windows_installer
-assert "previous_release=skipped_no_prior_release" in windows_installer
+assert "phase=prior-release result=skipped_no_prior_release" in windows_installer
 assert "`Start-Process -Wait` + `WaitForSingleObject(..., INFINITE)` forbidden" in windows_installer
+assert "same-run transport only after authoritative verification" in windows_installer
+assert "[System.Management.Automation.Language.Parser]::ParseFile(...)" in windows_installer
+assert "`[checked]` is not a PowerShell type accelerator" in windows_installer
 assert "Pointer/index activation = last external mutation" in windows_installer
 workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
 assert "mode:" in workflow_asset
 assert "verify-windows" in workflow_asset
 assert "permissions: {}" in workflow_asset
 assert "contents: write" in workflow_asset
-assert "PreviousReleaseMode Auto" in workflow_asset
+assert "PreviousReleaseMode Auto" not in workflow_asset
+assert workflow_asset.count("windows_installer.ps1 baseline") == 2
+assert workflow_asset.count("windows_installer.ps1 parse-powershell") == 2
+assert workflow_asset.count("-PreviousReleaseMode $env:BASELINE_MODE") == 2
+assert workflow_asset.count("-PreviousInstaller $env:BASELINE_INSTALLER") == 2
+assert "phase=prior-release result=skipped_no_prior_release" in workflow_asset
+assert "group: windows-installer-release" in workflow_asset
 assert "retention-days: 1" in workflow_asset
 assert "resolve every" in workflow_asset
 verify_job = workflow_asset.split("  verify_windows:", 1)[1].split("  quality:", 1)[0]
@@ -134,7 +143,10 @@ assert "contents: read" in verify_job
 assert "actions: read" in verify_job
 assert "contents: write" not in verify_job
 assert "secrets." not in verify_job
+assert verify_job.index("parse-powershell") < verify_job.index("toolchain")
 publish_job = workflow_asset.split("  publish:", 1)[1]
+assert publish_job.index("parse-powershell") < publish_job.index("toolchain")
+assert publish_job.index("windows_installer.ps1 baseline") < publish_job.index("lifecycle")
 assert publish_job.index("flutter pub get") < publish_job.index("dart run build_runner build")
 assert publish_job.index("dart run build_runner build") < publish_job.index("flutter build windows --release")
 assert publish_job.index("publish-immutable") < publish_job.index("verify-readback")

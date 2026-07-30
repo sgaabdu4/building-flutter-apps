@@ -65,6 +65,10 @@
 
 ## PowerShell
 
+- Syntax gate = compatible Windows `pwsh` + `[System.Management.Automation.Language.Parser]::ParseFile(...)` over every owned `.ps1`; any parse error fails before tool install/build.
+- Syntax scope = parser owner + cheap smokes + installer harness + every called helper; regex/static intent review is not a parser.
+- Smoke integrity = syntax gate first → intentional timeout smoke second; a smoke with unparsed syntax proves nothing.
+- Numeric conversion = validate range + multiply in a wide numeric type + bounds-check + explicit target cast; `[checked]` is not a PowerShell type accelerator.
 - Uncertain command/cmdlet/pipeline result = `@(...)` before `.Count`, `[0]`, exact-one, or comparison.
 - Selected scalar = explicit `[string]` conversion before string APIs.
 - Cardinality fixture = zero + one + many.
@@ -101,15 +105,18 @@
 
 - Previous-release lookup = authoritative published index/pointer + immutable retrievable installer + signed manifest/hash.
 - No authoritative prior release = do not synthesize, wait, rebuild old source, or use current-source/expired Actions artifacts.
-- Receipt = `previous_release=skipped_no_prior_release`.
+- Resolver mode = `none`; old-installer path = absent.
+- Receipt = `phase=prior-release result=skipped_no_prior_release`.
 - Required proof = bounded clean install + forced-failure cleanup + relaunch + uninstall + no application/user-data deletion.
 
 ### Upgrade release
 
 - Release two onward = exact previous published installer/manifest is mandatory.
+- Resolver mode = `managed`; old-installer path = exact verified publication object.
 - Baseline identity = independently download + verify manifest signature + installer hash/signature/version before execution.
 - Required proof = old install → seed accepted local state → failed new install restores old program/data → successful new install preserves state + relaunches → uninstall removes owned program/registration only.
 - Previous artifact = immutable publication object or equivalent authoritative release asset; current build + locally rebuilt tag + expired diagnostic artifact = forbidden surrogate.
+- Actions handoff = same-run transport only after authoritative verification; verify its digest again after download.
 - Harness refuses pre-existing unrelated installation; fixture data/credentials = synthetic + namespaced.
 - Cleanup = owned processes + owned install + owned registry + owned temp markers only.
 
@@ -117,11 +124,12 @@
 
 - Whole-job timeout = outer failsafe only; every child phase owns a smaller explicit deadline.
 - Phases = baseline install + forced-failure install + rollback observation + new install + updater launch + relaunch observation + uninstall.
+- Receipt = `phase=<name> result=started|completed|timeout|cleanup-timeout` + deadline/exit details.
 - Start = emit phase + deadline + safe command identity + PID receipt.
 - Wait = finite process wait; `Start-Process -Wait` + `WaitForSingleObject(..., INFINITE)` forbidden.
 - Timeout = emit phase + elapsed + PID/alive/exit state → terminate exact owned process tree → bounded cleanup → fail immediately.
-- PowerShell owner = `Start-Process -PassThru` + finite `WaitForExit(milliseconds)`/bounded polling + exact-tree termination.
-- Native owner = `WaitForSingleObject(handle, timeout_ms)` + distinct `WAIT_TIMEOUT` exit + closed handles; installer + parent-process waits both bounded.
+- PowerShell owner = `Start-Process -PassThru` + finite `WaitForExit(milliseconds)`/bounded polling + exact-tree termination on timeout or failed installer.
+- Native owner = `WaitForSingleObject(handle, timeout_ms)` + separate parent/installer `WAIT_TIMEOUT` exits + closed handles.
 - Regression sentinel = child intentionally exceeds deadline → gate exits within bound + names phase + kills descendant + leaves no owned artifact/process.
 - Nested deadlines = child phase + cleanup headroom < job deadline.
 
@@ -154,7 +162,7 @@
 - Pointer/index activation = last external mutation after every immutable object readback passes.
 - Final readback = active pointer/index + immutable objects + exact version/tag/SHA.
 - Failure before activation = previous pointer unchanged.
-- Actions artifact = diagnostic handoff only; not independent publication/readback proof.
+- Actions artifact = short-lived evidence or same-run transport of an already verified publication object; never previous-release authority or independent publication/readback proof.
 - Provider adapter = preflight candidate write/read/delete + idempotency + permissions + atomicity/ordering contract before release.
 
 ## Proof
@@ -173,6 +181,8 @@
 - [GitHub token](https://docs.github.com/en/actions/concepts/security/github_token)
 - [PowerShell Start-Process](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process)
 - [PowerShell Wait-Process](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/wait-process)
+- [PowerShell `Parser.ParseFile`](https://learn.microsoft.com/en-us/dotnet/api/system.management.automation.language.parser.parsefile?view=powershellsdk-7.6.0)
+- [PowerShell numeric literals + type accelerators](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_numeric_literals?view=powershell-7.5)
 - [Visual Studio `vswhere`](https://github.com/microsoft/vswhere)
 - [Inno Setup AppId](https://jrsoftware.org/ishelp/topic_setup_appid.htm)
 - [Inno command-line compiler](https://jrsoftware.org/ishelp/topic_compilercmdline.htm)

@@ -129,6 +129,16 @@ def main() -> None:
         for case in routing_eval
     ):
         fail("routing eval must prove non-Windows work skips the Windows reference")
+    answer_eval = json.loads((ROOT / "evals" / "evals.json").read_text())["evals"]
+    if not any(
+        "Unable to find type [checked]" in case["prompt"]
+        and any(
+            "Parser.ParseFile" in expectation
+            for expectation in case["expectations"]
+        )
+        for case in answer_eval
+    ):
+        fail("answer eval must reject unparsed PowerShell smoke syntax")
     reference_names = {
         path.relative_to(SKILL_ROOT).as_posix()
         for path in (SKILL_ROOT / "references").rglob("*")

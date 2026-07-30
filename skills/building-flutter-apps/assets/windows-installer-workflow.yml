@@ -1,5 +1,10 @@
 # Copy this topology, then replace repository-owned commands and resolve every
 # action/tool tag to an audited immutable pin before the first dispatch.
+# The baseline phase must write BASELINE_MODE=none|managed and BASELINE_INSTALLER
+# to GITHUB_ENV. none emits phase=prior-release result=skipped_no_prior_release
+# with no installer. managed verifies an authoritative signed manifest and
+# immutable installer before writing its path; an Actions artifact is transport
+# only and must be re-hashed after download.
 name: Flutter Windows installer
 
 on:
@@ -29,7 +34,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: windows-installer-${{ inputs.revision }}
+  group: windows-installer-release
   cancel-in-progress: false
 
 jobs:
@@ -58,12 +63,20 @@ jobs:
           -Revision '${{ inputs.revision }}'
           -ReadOnly
 
+      - name: Parse every owned PowerShell script
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 parse-powershell
+
       - name: Install audited toolchain
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 toolchain
 
       - name: Resolve Flutter dependencies
         run: flutter pub get
+
+      - name: Resolve authoritative previous-release baseline
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 baseline
 
       - name: Materialize exact version delta
         shell: pwsh
@@ -107,7 +120,8 @@ jobs:
         shell: pwsh
         run: >-
           .\.github\scripts\windows_installer.ps1 lifecycle
-          -PreviousReleaseMode Auto
+          -PreviousReleaseMode $env:BASELINE_MODE
+          -PreviousInstaller $env:BASELINE_INSTALLER
 
       - name: Write provider-neutral diagnostic receipt
         shell: pwsh
@@ -173,12 +187,20 @@ jobs:
           -RunId '${{ inputs.diagnostic_run_id }}'
           -Revision '${{ inputs.revision }}'
 
+      - name: Parse every owned PowerShell script
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 parse-powershell
+
       - name: Install audited toolchain
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 toolchain
 
       - name: Resolve Flutter dependencies in publisher
         run: flutter pub get
+
+      - name: Resolve authoritative previous-release baseline in publisher
+        shell: pwsh
+        run: .\.github\scripts\windows_installer.ps1 baseline
 
       - name: Materialize release version and tag candidate
         shell: pwsh
@@ -219,7 +241,8 @@ jobs:
         shell: pwsh
         run: >-
           .\.github\scripts\windows_installer.ps1 lifecycle
-          -PreviousReleaseMode Auto
+          -PreviousReleaseMode $env:BASELINE_MODE
+          -PreviousInstaller $env:BASELINE_INSTALLER
 
       - name: Upload immutable installer and manifest
         shell: pwsh
