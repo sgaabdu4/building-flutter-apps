@@ -138,6 +138,28 @@ test_d5_inline_version() {
   fi
 }
 
+test_d7_flags() {
+  local rule_id="d7"
+  local fixture
+  for fixture in violation.md violation-short.md violation-singular.md; do
+    local output
+    output=$(run_rule_on_file "$rule_id" "$FIXTURE_DIR/$rule_id/$fixture")
+    if rule_failed_in_output "$rule_id" "$output"; then
+      pass "d7: $fixture triggers rule"
+    else
+      fail "d7: $fixture did NOT trigger rule"
+    fi
+  done
+
+  local clean_output
+  clean_output=$(run_rule_on_file "$rule_id" "$FIXTURE_DIR/$rule_id/clean.md")
+  if rule_passed_in_output "$rule_id" "$clean_output"; then
+    pass "d7: clean.md passes rule"
+  else
+    fail "d7: clean.md incorrectly triggered rule"
+  fi
+}
+
 # ── main ─────────────────────────────────────────────────────────────────────
 
 echo "TAP version 13"
@@ -160,7 +182,7 @@ test_rule "c1"
 
 # file-level + inline rules
 test_d5_inline_version
-test_rule "d7"
+test_d7_flags
 
 # widget rules
 test_rule "w1"

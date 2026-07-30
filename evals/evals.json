@@ -666,6 +666,26 @@
         "Uses typed callbacks such as onItemTap and onBack for widget dispatch",
         "Names presentation_widget_navigation_forbidden, presentation_widget_controller_state, and presentation_widget_infrastructure_dependency"
       ]
+    },
+    {
+      "id": 47,
+      "prompt": "A Flutter Windows release used to run build_runner before flutter build. We split quality onto Ubuntu, kept the Windows compile in another job, ignored generated .g.dart/.freezed.dart files, and used git diff to claim generation was committed. The new lane also guesses Inno paths, parses multi-line git output directly with PowerShell regex, and launches a GUI installer without waiting. Give the exact correction and proof plan without wasting paid Windows retries.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Identifies the job-boundary migration as the root regression and inventories the last green workflow's required step ordering before replacement",
+        "Requires flutter pub get, source-changing version materialization, and dart run build_runner build in every consuming job before analyze or native build",
+        "Rejects -d and --delete-conflicting-outputs because current build_runner deletes conflicts automatically",
+        "Rejects git diff as proof for ignored generated files and requires an ephemeral tracked-only clean-checkout generation plus analyze/build proof",
+        "Requires generated outputs to be tracked, regenerated in the consuming job, or transferred as an explicit verified artifact",
+        "Normalizes PowerShell multi-line native output to one scalar before regex and captures native process exit immediately",
+        "Resolves exact pinned tool paths instead of guessing Program Files and uses Start-Process -Wait -PassThru for GUI/bootstrap executables",
+        "Distinguishes C/C++ include order, include directories, link libraries, and runtime DLL bundling, with proof on Windows",
+        "Uses explicit least-privilege GitHub authentication for private-repository reads when checkout credentials are not persisted",
+        "Compares the immediate before/after tracked-path delta instead of requiring a clean whole workspace after legitimate setup",
+        "Verifies the installed Inno version/directives, stable AppId, numeric version fields, compiler exit, and upgrade/failure preservation with pre-existing user paths",
+        "Runs cheap independent checks in parallel, one nonpublishing Windows diagnostic before one publisher, and cancels downstream paid work after prerequisite failure"
+      ]
     }
   ]
 }

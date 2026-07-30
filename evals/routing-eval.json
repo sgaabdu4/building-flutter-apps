@@ -357,5 +357,16 @@
     ],
     "forbidden_refs": [],
     "max_refs": 3
+  },
+  {
+    "id": 35,
+    "query": "A clean Windows GitHub Actions checkout cannot find generated .g.dart files, build_runner uses an old conflict flag, and the PowerShell/Inno lane differs from the last green workflow.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/build-reproducibility.md",
+      "references/core-stack.md"
+    ],
+    "forbidden_refs": [],
+    "max_refs": 2
   }
 ]

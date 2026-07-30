@@ -3,12 +3,12 @@
 ## Supported Versions
 
 Skill tracks latest stable releases pinned in
-[README.md → What's Included](README.md#whats-included). Only `master`
+[README.md → What's Included](README.md#whats-included). Only `main`
 supported. Older snapshots not patched.
 
 | Skill snapshot | Supported |
 | ----------------------- | ----------------- |
-| `master` (latest)       | :white_check_mark: |
+| `main` (latest)         | :white_check_mark: |
 | Older tagged snapshots  | :x:                |
 
 ## Reporting a Vulnerability

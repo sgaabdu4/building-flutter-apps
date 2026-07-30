@@ -167,7 +167,7 @@ MATCHES=$(awk '
   }
 ' "$FILE_PATH" 2>/dev/null)
 add_match "use-riverpod-codegen" \
-  "Use @riverpod or @Riverpod(keepAlive: true) codegen. Run dart run build_runner watch --delete-conflicting-outputs." \
+  "Use @riverpod or @Riverpod(keepAlive: true) codegen. Run the Core Stack code-generation command before analysis." \
   "$MATCHES"
 
 # ---------- Rule 5b: ConsumerState provider-derived cache ----------

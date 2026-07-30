@@ -400,22 +400,18 @@ rule_d5() {
     "Version pins belong in skills/building-flutter-apps/references/core-stack.md only"
 }
 
-# ── Rule: D7 — build_runner -d shorthand must be accompanied by full flag ─────
+# ── Rule: D7 — deprecated build_runner conflict flags are forbidden ───────────
 rule_d7() {
-  local hits="" candidates
-  candidates=$(rg -n --no-heading \
-    'build_runner.*\s-d(\s|$)' \
+  local hits=""
+  hits=$(rg -n --no-heading \
+    'build_runner.*(--delete-conflicting-outputs?|[[:space:]]-d([[:space:]]|$))' \
     "${RG_EXCLUDE[@]}" \
     "${SCAN_PATHS[@]}" 2>/dev/null || true)
-  if [ -n "$candidates" ]; then
-    # Filter out lines that already have --delete-conflicting-outputs
-    hits=$(printf '%s\n' "$candidates" | grep -v '\-\-delete-conflicting-outputs' || true)
-  fi
 
   emit_tap "d7" \
-    "build_runner -d shorthand must be paired with --delete-conflicting-outputs" \
+    "deprecated build_runner conflict-output flag forbidden" \
     "$hits" \
-    "Always use '--delete-conflicting-outputs' not just '-d'; or add drift-ignore comment"
+    "Use the flag-free Core Stack build_runner command; current versions delete conflicts automatically"
 }
 
 # ── Rule: C1 — mounted guard missing after await before state mutation ─────────

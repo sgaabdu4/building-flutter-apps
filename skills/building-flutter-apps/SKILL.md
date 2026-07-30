@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.5.8"
+  version: "5.5.9"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
@@ -99,6 +99,7 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | `Iterable` lookup/indexing, widget list helpers, `Debouncer`, validators, `Result`, extension types, `core/extensions/` barrel export | [collections-helpers.md](references/extensions/collections-helpers.md) |
 | Records `(x, y)`, extension type IDs, pattern matching, guard clause `case _ when ...` | [dart-patterns-records.md](references/dart-patterns-records.md) |
 | `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
+| `build_runner`, missing generated parts, clean checkout, Windows GitHub Actions, CMake/header/link failure, PowerShell/native process, Inno installer, local-vs-CI mismatch | [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
 | Dart Decimate, dead code, circular dependency, duplicate code, complexity, dependency hygiene, full zero-finding scan | [dart-decimate.md](references/dart-decimate.md) |
 | Common navigation / form / list / debounce / route-param-fallback patterns | [common-patterns.md](references/common-patterns.md) |
 | Incremental remote pull, delta token, per-table sync date, merge/delete reconciliation | [delta-sync.md](references/common-patterns/delta-sync.md) |

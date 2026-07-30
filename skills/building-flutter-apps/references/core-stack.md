@@ -4,7 +4,7 @@
 
 1. Package constraints = this file only.
 2. Constraint change → real project `dart pub get` → `dart pub deps -s compact` → `dart analyze`.
-3. Code generation = long conflict-resolution flag; clean only after a failed normal build.
+3. Code generation = current flag-free command; clean only after a failed normal build.
 
 | Package | Constraint | Purpose |
 |---|---:|---|
@@ -30,7 +30,11 @@
 ## Code generation
 
 ```bash
-dart run build_runner watch --delete-conflicting-outputs
-dart run build_runner build --delete-conflicting-outputs
-dart run build_runner clean && dart run build_runner build --delete-conflicting-outputs
+dart run build_runner watch
+dart run build_runner build
+dart run build_runner clean && dart run build_runner build
 ```
+
+- `build_runner >=2.7.0` = conflicting outputs deleted automatically + legacy `-d` ignored. <!-- drift-ignore: d7 -->
+- Deprecated conflicting-output flags = forbidden.
+- Version change → installed command help + [official changelog](https://pub.dev/packages/build_runner/changelog).

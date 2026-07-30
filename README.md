@@ -172,7 +172,7 @@ Claude may also select it automatically from its description.
 ### Codex CLI
 
 ```bash
-codex plugin marketplace add sgaabdu4/building-flutter-apps --ref master
+codex plugin marketplace add sgaabdu4/building-flutter-apps --ref main
 codex plugin add building-flutter-apps@building-flutter-apps
 ```
 
@@ -253,6 +253,7 @@ The hook scripts no-op outside Flutter projects by walking upward for
 | Hive CE persistence | [references/hive-persistence.md](skills/building-flutter-apps/references/hive-persistence.md) |
 | Widget previews | [references/widget-previews.md](skills/building-flutter-apps/references/widget-previews.md) |
 | Runtime E2E proof | [references/dart-mcp-e2e-testing.md](skills/building-flutter-apps/references/dart-mcp-e2e-testing.md) |
+| Clean-checkout and Windows build proof | [references/build-reproducibility.md](skills/building-flutter-apps/references/build-reproducibility.md) |
 
 ## Evals And Proof
 
