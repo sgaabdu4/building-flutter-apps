@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.7.4"
+expected_version = "5.7.5"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -94,6 +94,8 @@ assert (skill / "references/build-reproducibility.md").is_file()
 assert (skill / "references/error-reporting.md").is_file()
 assert (skill / "references/windows-installer-pipeline.md").is_file()
 assert (skill / "assets/windows-installer-workflow.yml").is_file()
+assert (skill / "assets/inno-uninstall-settlement-sentinel.ps1").is_file()
+assert (root / ".github/workflows/windows-installer-sentinel.yml").is_file()
 assert (skill / "agents/openai.yaml").is_file()
 assert not (skill / "references/crashlytics.md").exists()
 assert not (skill / "references/crash-reporting.md").exists()
@@ -134,6 +136,8 @@ assert "both exact install directory + exact AppId uninstall registry key are ab
 assert "Tiny lifecycle sentinel = unique temp root + synthetic stable test AppId" in windows_installer
 assert "Pointer/index activation = last external mutation" in windows_installer
 workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
+settlement_sentinel = (skill / "assets/inno-uninstall-settlement-sentinel.ps1").read_text()
+settlement_ci = (root / ".github/workflows/windows-installer-sentinel.yml").read_text()
 assert "mode:" in workflow_asset
 assert "verify-windows" in workflow_asset
 assert "permissions: {}" in workflow_asset
@@ -142,7 +146,7 @@ assert "PreviousReleaseMode Auto" not in workflow_asset
 assert workflow_asset.count("windows_installer.ps1 baseline") == 2
 assert workflow_asset.count("windows_installer.ps1 parse-powershell") == 2
 assert workflow_asset.count("generated-script readiness") == 2
-assert workflow_asset.count("install/uninstall settlement sentinels") == 2
+assert workflow_asset.count("inno-uninstall-settlement-sentinel.ps1") == 3
 assert workflow_asset.count("-PreviousReleaseMode $env:BASELINE_MODE") == 2
 assert workflow_asset.count("-PreviousInstaller $env:BASELINE_INSTALLER") == 2
 assert "phase=prior-release result=skipped_no_prior_release" in workflow_asset
@@ -155,11 +159,11 @@ assert "actions: read" in verify_job
 assert "contents: write" not in verify_job
 assert "secrets." not in verify_job
 assert verify_job.index("parse-powershell") < verify_job.index("toolchain")
-assert verify_job.index("install/uninstall settlement sentinels") < verify_job.index("flutter build windows --release")
+assert verify_job.index("inno-uninstall-settlement-sentinel.ps1") < verify_job.index("flutter build windows --release")
 publish_job = workflow_asset.split("  publish:", 1)[1]
 assert publish_job.index("parse-powershell") < publish_job.index("toolchain")
 assert publish_job.index("windows_installer.ps1 baseline") < publish_job.index("lifecycle")
-assert publish_job.index("install/uninstall settlement sentinels") < publish_job.index("flutter build windows --release")
+assert publish_job.index("inno-uninstall-settlement-sentinel.ps1") < publish_job.index("flutter build windows --release")
 assert publish_job.index("flutter pub get") < publish_job.index("dart run build_runner build")
 assert publish_job.index("dart run build_runner build") < publish_job.index("flutter build windows --release")
 assert publish_job.index("publish-immutable") < publish_job.index("verify-readback")
@@ -168,7 +172,19 @@ openai_yaml = (skill / "agents/openai.yaml").read_text()
 assert 'display_name: "Building Flutter Apps"' in openai_yaml
 assert "$building-flutter-apps" in openai_yaml
 assert "allow_implicit_invocation: true" in openai_yaml
-for text in (windows_installer, workflow_asset, openai_yaml):
+assert settlement_sentinel.count("-Phase 'sentinel-uninstall-process'") == 1
+assert "Wait-UninstallSettlement" in settlement_sentinel
+assert "directory=absent registry=absent" in settlement_sentinel
+assert "Get-PresentUninstallRegistryViews" in settlement_sentinel
+assert "Start-Process -Wait" not in settlement_sentinel
+assert "WaitForExit([int] $timeoutMilliseconds)" in settlement_sentinel
+assert "runs-on: windows-latest" in settlement_ci
+assert "timeout-minutes: 10" in settlement_ci
+assert "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" in settlement_ci
+assert "5ad54ca3def786f8f4212552e54cc6d8d61329e2d24a1cfee0571d42c2684ff1" in settlement_ci
+assert "ParseFile(" in settlement_ci
+assert "inno-uninstall-settlement-sentinel.ps1" in settlement_ci
+for text in (windows_installer, workflow_asset, settlement_sentinel, openai_yaml):
     lowered = text.lower()
     for forbidden in ("appwrite", "jabal", "emr_", "project_id", "database_id"):
         assert forbidden not in lowered, forbidden

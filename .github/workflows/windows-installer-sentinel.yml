@@ -1,0 +1,107 @@
+name: Windows installer settlement sentinel
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/windows-installer-sentinel.yml
+      - skills/building-flutter-apps/assets/inno-uninstall-settlement-sentinel.ps1
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/windows-installer-sentinel.yml
+      - skills/building-flutter-apps/assets/inno-uninstall-settlement-sentinel.ps1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-sentinel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  settlement:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact tree
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Install authenticated Inno Setup 7.0.2
+        shell: pwsh
+        env:
+          INNO_URL: https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe
+          INNO_SHA256: 5ad54ca3def786f8f4212552e54cc6d8d61329e2d24a1cfee0571d42c2684ff1
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installerPath = Join-Path $env:RUNNER_TEMP 'innosetup-7.0.2-x64.exe'
+          $installDirectory = Join-Path $env:RUNNER_TEMP 'inno-setup-7.0.2'
+          Invoke-WebRequest -Uri $env:INNO_URL -OutFile $installerPath
+          $actualHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash
+          if ($actualHash -ne $env:INNO_SHA256) {
+            throw "Inno Setup hash mismatch: $actualHash"
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installerPath
+          if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+            throw "Inno Setup Authenticode status: $($signature.Status)"
+          }
+          if ($signature.SignerCertificate.Subject -notmatch 'CN=Pyrsys B\.V\.') {
+            throw "Unexpected Inno Setup signer: $($signature.SignerCertificate.Subject)"
+          }
+
+          $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+          $startInfo.FileName = $installerPath
+          $startInfo.UseShellExecute = $false
+          foreach ($argument in @(
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART',
+            '/SP-',
+            '/CURRENTUSER',
+            "/DIR=$installDirectory"
+          )) {
+            $startInfo.ArgumentList.Add($argument)
+          }
+          $process = [System.Diagnostics.Process]::new()
+          $process.StartInfo = $startInfo
+          try {
+            if (-not $process.Start()) {
+              throw 'Inno Setup tool installation did not start.'
+            }
+            if (-not $process.WaitForExit(120000)) {
+              $process.Kill($true)
+              [void] $process.WaitForExit(5000)
+              throw 'Inno Setup tool installation timed out.'
+            }
+            if ($process.ExitCode -ne 0) {
+              throw "Inno Setup tool installation failed: $($process.ExitCode)"
+            }
+          } finally {
+            $process.Dispose()
+          }
+          "ISCC_PATH=$(Join-Path $installDirectory 'ISCC.exe')" >> $env:GITHUB_ENV
+
+      - name: Parse the exact PowerShell sentinel
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void] [System.Management.Automation.Language.Parser]::ParseFile(
+            '${{ github.workspace }}\skills\building-flutter-apps\assets\inno-uninstall-settlement-sentinel.ps1',
+            [ref] $tokens,
+            [ref] $errors
+          )
+          if (@($errors).Count -ne 0) {
+            $errors | ForEach-Object {
+              Write-Error "$($_.Extent.File):$($_.Extent.StartLineNumber):$($_.Extent.StartColumnNumber): $($_.Message)"
+            }
+            throw 'PowerShell sentinel syntax failed.'
+          }
+
+      - name: Run real Inno install and bounded uninstall settlement
+        shell: pwsh
+        run: >-
+          .\skills\building-flutter-apps\assets\inno-uninstall-settlement-sentinel.ps1
+          -IsccPath $env:ISCC_PATH
+          -PhaseTimeoutSeconds 30

@@ -5,7 +5,7 @@
 1. Scope = Flutter Windows EXE + Inno Setup/`inno_bundle` + updater + GitHub Actions delivery.
 2. Current contract = installed package/tool/action + primary docs/changelog + resolved runner paths; memory + cached/local success = no proof.
 3. Entry = secret-free manual Windows diagnostic for one exact SHA; publish only that proven SHA with one release actor.
-4. Copy scaffold = [windows-installer-workflow.yml](../assets/windows-installer-workflow.yml); replace repository-owned commands + audit every action/tool pin before first run.
+4. Copy scaffold = [windows-installer-workflow.yml](../assets/windows-installer-workflow.yml) + [Inno settlement sentinel](../assets/inno-uninstall-settlement-sentinel.ps1); replace repository-owned commands + audit every action/tool pin before first run.
 5. Provider boundary = artifact store/index/pointer are interfaces; keep provider names, endpoints, project IDs, PII, and credentials outside this skill/package.
 
 ## Contents

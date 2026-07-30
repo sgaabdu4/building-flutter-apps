@@ -834,7 +834,7 @@
         "Reports the unresolved directory or registry condition, elapsed deadline, and safe process state on timeout without deleting unrelated paths or keys",
         "Keeps accepted application and user data outside uninstall settlement targets and verifies it was not deleted",
         "Adds a cheap real tiny-Inno install/uninstall settlement sentinel with a unique temporary root and synthetic stable test AppId before Flutter compilation",
-        "Keeps run 30573789878 classified as negative evidence until a corrected exact revision completes the Windows diagnostic green"
+        "Keeps the failed run classified as negative evidence until a corrected exact revision completes the Windows diagnostic green"
       ]
     }
   ]

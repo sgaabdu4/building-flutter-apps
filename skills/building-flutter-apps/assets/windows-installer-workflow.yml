@@ -1,5 +1,6 @@
 # Copy this topology, then replace repository-owned commands and resolve every
-# action/tool tag to an audited immutable pin before the first dispatch.
+# action/tool tag to an audited immutable pin before the first dispatch. Copy
+# inno-uninstall-settlement-sentinel.ps1 to .github/scripts/ with this file.
 # The baseline phase must write BASELINE_MODE=none|managed and BASELINE_INSTALLER
 # to GITHUB_ENV. none emits phase=prior-release result=skipped_no_prior_release
 # with no installer. managed verifies an authoritative signed manifest and
@@ -91,9 +92,15 @@ jobs:
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 localization
 
-      - name: Run generated-script readiness CRT timeout identity and install/uninstall settlement sentinels
+      - name: Run generated-script readiness CRT timeout and identity sentinels
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 sentinels
+
+      - name: Run real Inno install/uninstall settlement sentinel
+        shell: pwsh
+        run: >-
+          .\.github\scripts\inno-uninstall-settlement-sentinel.ps1
+          -IsccPath $env:ISCC_PATH
 
       - name: Analyze and test exact materialized tree
         shell: pwsh
@@ -215,9 +222,15 @@ jobs:
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 localization
 
-      - name: Run publisher generated-script readiness and install/uninstall settlement sentinels and quality
+      - name: Run publisher generated-script readiness sentinels and quality
         shell: pwsh
         run: .\.github\scripts\windows_installer.ps1 sentinels-and-quality
+
+      - name: Re-run real Inno install/uninstall settlement sentinel
+        shell: pwsh
+        run: >-
+          .\.github\scripts\inno-uninstall-settlement-sentinel.ps1
+          -IsccPath $env:ISCC_PATH
 
       - name: Build publisher Flutter Windows release
         run: flutter build windows --release
