@@ -836,6 +836,40 @@
         "Adds a cheap real tiny-Inno install/uninstall settlement sentinel with a unique temporary root and invocation-namespaced synthetic AppId that stays stable through that sentinel before Flutter compilation",
         "Keeps the failed run classified as negative evidence until a corrected exact revision completes the Windows diagnostic green"
       ]
+    },
+    {
+      "id": 57,
+      "prompt": "We compacted a Flutter Windows publisher from many GitHub Actions steps into one PowerShell orchestration step so CI stays small. The workflow still builds once, but the old PowerShell parser, process-timeout, CRT, and Inno identity sentinels now only exist as files and are never called. Keep the YAML compact and correct this regression.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Keeps the same Actions step count, job topology, cached setup, and single Windows build",
+        "Restores every required cheap guard as an internal orchestration call rather than re-expanding the workflow YAML",
+        "Runs the real PowerShell parser before tool setup and runs timeout, CRT, Inno identity, and install/uninstall settlement sentinels before the single Flutter build",
+        "Adds contract tests that assert each guard call exists and precedes the expensive build owner",
+        "Rejects tests that merely inspect unused guard-file contents as proof that CI executes them",
+        "Keeps phase-specific receipts so compact logs retain exact failure ownership",
+        "Preserves verification permissions and secret-free behavior while keeping publisher external writes sequential",
+        "Treats a terminal-green full build as insufficient to prove the removed fail-fast invariant until the execution wiring is restored"
+      ]
+    },
+    {
+      "id": 58,
+      "prompt": "Set up inno_bundle for a Flutter Riverpod Windows app, including the pubspec.yaml settings and a minimal GitHub Actions flow that produces a versioned installer EXE without compiling Flutter twice. The app has no accepted publication provider yet.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Researches the current stable inno_bundle package, installed CLI help, changelog, and generated script before selecting commands or fields",
+        "Runs dart pub add --dev inno_bundle and adds one stable committed AppId plus name, description, publisher, accepted admin mode, architecture, vc_redist, and files settings under pubspec.yaml",
+        "Generates the AppId once and rejects changing or auto-regenerating it after first release",
+        "Treats admin and install location as an accepted product choice rather than silently forcing elevation",
+        "Uses vc_redist false with independent VCToolsRedistDir CRT staging, PE architecture checks, and source/destination hash equality",
+        "Runs flutter pub get, version materialization, build_runner, and flutter build windows --release exactly once in the consuming Windows job",
+        "Runs dart run inno_bundle --no-app after the proven Windows bundle exists and rejects deprecated dart run inno_bundle:build",
+        "Audits the generated .iss, AppId, version resources, file layout, CRT behavior, upgrade semantics, and produced EXE instead of treating inno_bundle as proof",
+        "Produces <app>-windows-installer-v<version>.exe and uploads it only after identity, lifecycle, secret, and Defender checks pass",
+        "Keeps the diagnostic workflow manual, Windows-only, minimal-step, read-only, secret-free, and provider-agnostic; publication remains unimplemented until a provider contract is accepted"
+      ]
     }
   ]
 }

@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Flutter architecture, enforcement, and Windows installer delivery skill.",
-    "version": "5.7.7"
+    "version": "5.7.8"
   },
   "plugins": [
     {
       "name": "building-flutter-apps",
       "description": "Flutter app architecture and Windows installer delivery skill with Riverpod codegen, analyzer/code-health gates, privacy-safe error reporting, and verify-before-publish Inno proof.",
-      "version": "5.7.7",
+      "version": "5.7.8",
       "source": "."
     }
   ]

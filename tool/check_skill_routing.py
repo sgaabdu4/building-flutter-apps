@@ -188,6 +188,11 @@ def main() -> None:
         fail("Windows installer workflow asset missing")
     if "assets/windows-installer-workflow.yml" not in markdown_links(text):
         fail("Windows installer workflow asset is not linked directly from SKILL.md")
+    inno_bundle_asset = SKILL_ROOT / "assets" / "inno-bundle-pubspec.yaml"
+    if not inno_bundle_asset.is_file():
+        fail("inno_bundle pubspec asset missing")
+    if "assets/inno-bundle-pubspec.yaml" not in markdown_links(text):
+        fail("inno_bundle pubspec asset is not linked directly from SKILL.md")
 
     print("SKILL_ROUTING_OK")
 

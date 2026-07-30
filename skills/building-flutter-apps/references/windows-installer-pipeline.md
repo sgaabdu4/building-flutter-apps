@@ -5,7 +5,7 @@
 1. Scope = Flutter Windows EXE + Inno Setup/`inno_bundle` + updater + GitHub Actions delivery.
 2. Current contract = installed package/tool/action + primary docs/changelog + resolved runner paths; memory + cached/local success = no proof.
 3. Entry = secret-free manual Windows diagnostic for one exact SHA; publish only that proven SHA with one release actor.
-4. Copy scaffold = [windows-installer-workflow.yml](../assets/windows-installer-workflow.yml) + [Inno settlement sentinel](../assets/inno-uninstall-settlement-sentinel.ps1); replace repository-owned commands + audit every action/tool pin before first run.
+4. Copy scaffold = [windows-installer-workflow.yml](../assets/windows-installer-workflow.yml) + [`inno_bundle` pubspec fragment](../assets/inno-bundle-pubspec.yaml) + [Inno settlement sentinel](../assets/inno-uninstall-settlement-sentinel.ps1); replace repository-owned commands + audit every action/tool pin before first run.
 5. Provider boundary = artifact store/index/pointer are interfaces; keep provider names, endpoints, project IDs, PII, and credentials outside this skill/package.
 
 ## Contents
@@ -13,6 +13,7 @@
 - [Flow](#flow)
 - [Clean runner](#clean-runner)
 - [Windows native bundle](#windows-native-bundle)
+- [`inno_bundle` setup](#inno_bundle-setup)
 - [Inno ownership](#inno-ownership)
 - [Installer identity](#installer-identity)
 - [Install lifecycle](#install-lifecycle)
@@ -33,6 +34,11 @@
 6. Publisher = one full run for diagnostic-proven SHA; quality/preparation may parallelize, native/external mutations remain sequential.
 7. Delivery = immutable installer/manifest upload → independent download/readback → pointer/index update last → final remote receipt.
 
+- YAML surface = minimum runner + permission + cache + handoff + artifact + external-write boundaries.
+- Ordered internal phases = repository-owned orchestration script + phase receipts; avoid one YAML step per command.
+- Compacting = move calls, never remove guards; contract-test each required guard call + its order before the single expensive build.
+- Publisher minimum = read-only Linux admission + one Windows build/publisher; diagnostic remains one Windows-only job.
+- Duplicate Windows build, repeated tool setup, and visible step count without a permission/runner/artifact boundary = `FAIL`.
 - Verification permissions = `contents: read` + `actions: read` only when run/readback needs it.
 - Verification exclusions = tags + releases + deployments + pointer/index writes + machine installation + signing/publisher secrets.
 - Verification mode = skip Linux quality/preparation/publication jobs.
@@ -62,6 +68,23 @@
 - Forbidden CRT proof = opportunistic System32 copy + optional/missing-tolerated file + compiler presence alone.
 - Native API = include `<windows.h>` before `<shellapi.h>` for `CommandLineToArgvW`; link `Shell32.lib`.
 - Native diagnosis = declaration/header order + include directories + link libraries + runtime bundle; one layer cannot prove another.
+
+## `inno_bundle` setup
+
+1. Resolve current stable package + installed help + primary changelog; then run `dart pub add --dev inno_bundle`.
+2. Merge [inno-bundle-pubspec.yaml](../assets/inno-bundle-pubspec.yaml) into `pubspec.yaml`.
+3. Generate the AppId once with `dart run inno_bundle:id` or an accepted GUID owner → commit the stable value before first release.
+4. Choose `admin` + `arch` from accepted install scope; do not silently change elevation/install-location behavior.
+5. Keep `vc_redist: false` in this proven flow → stage app-local CRTs from `VCToolsRedistDir` + verify PE/hash independently.
+6. Build once = `flutter build windows --release` → stage/prove CRT → `dart run inno_bundle --no-app`.
+7. Inspect generated `build\windows\x64\installer\Release\*.iss` + resulting EXE before accepting package ownership.
+
+- Current CLI = `dart run inno_bundle`; `dart run inno_bundle:build` is deprecated.
+- Existing release output reuse = `dart run inno_bundle --no-app`; no second Flutter compile.
+- Config owner = `pubspec.yaml` `inno_bundle:` or explicit audited config path; `dlls` is deprecated → use `files`.
+- Required fields = stable `id`; name/description/version/publisher may inherit pubspec values, but release proof resolves their exact outputs.
+- Output = locate produced installer from resolved CLI output/build tree → rename/copy only after identity proof to `<app>-windows-installer-v<version>.exe`.
+- Package-generated `.iss` = candidate artifact; AppId + CRT source + version resources + file layout + upgrade semantics remain explicit gates.
 
 ## PowerShell
 

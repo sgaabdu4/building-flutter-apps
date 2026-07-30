@@ -259,6 +259,7 @@ The hook scripts no-op outside Flutter projects by walking upward for
 | Clean-checkout build proof | [references/build-reproducibility.md](skills/building-flutter-apps/references/build-reproducibility.md) |
 | Windows installer and updater delivery | [references/windows-installer-pipeline.md](skills/building-flutter-apps/references/windows-installer-pipeline.md) |
 | Copyable Windows workflow topology | [windows-installer-workflow.yml](skills/building-flutter-apps/assets/windows-installer-workflow.yml) |
+| Copyable `inno_bundle` pubspec settings | [inno-bundle-pubspec.yaml](skills/building-flutter-apps/assets/inno-bundle-pubspec.yaml) |
 
 ## Evals And Proof
 

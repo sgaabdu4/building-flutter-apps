@@ -1,18 +1,26 @@
 # Copy this topology, then replace repository-owned commands and resolve every
-# action/tool tag to an audited immutable pin before the first dispatch. Copy
-# inno-uninstall-settlement-sentinel.ps1 to .github/scripts/ with this file.
-# The baseline phase must write BASELINE_MODE=none|managed and BASELINE_INSTALLER
-# to GITHUB_ENV. none emits phase=prior-release result=skipped_no_prior_release
-# with no installer. managed verifies an authoritative signed manifest and
-# immutable installer before writing its path; an Actions artifact is transport
-# only and must be re-hashed after download.
+# action/tool tag to an audited immutable pin before the first dispatch.
+#
+# Keep YAML limited to runner, permission, cache, artifact, and external-write
+# boundaries. The orchestration scripts own named internal phases. Compacting
+# YAML must never remove these pre-build calls:
+#   parse-powershell -> timeout smoke -> CRT smoke -> Inno identity smoke ->
+#   Inno install/uninstall settlement smoke -> Flutter build exactly once.
+# Contract-test call presence and order inside each orchestration script.
+# The same script then stages/proves CRT, runs `dart run inno_bundle --no-app`
+# or the accepted custom Inno owner, verifies/scans/lifecycle-tests the EXE,
+# and—only in publish mode—uploads immutable bytes, verifies readback, pushes
+# the exact release identity, and activates the provider-neutral pointer last.
+#
+# Verification writes no tag, release, deployment, publication object, pointer,
+# or machine install. Publication consumes one exact diagnostic-proven revision.
 name: Flutter Windows installer
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Verify Windows only or publish an already verified revision
+        description: Verify Windows or publish a diagnostic-proven revision
         required: true
         default: verify-windows
         type: choice
@@ -28,7 +36,7 @@ on:
         required: true
         type: string
       diagnostic_run_id:
-        description: Required for publish; prior green diagnostic for revision
+        description: Required only for publish
         required: false
         type: string
 
@@ -55,85 +63,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify exact source and read-only remote tip
+      - name: Set up cached release toolchain
+        uses: ./.github/actions/setup-release-toolchain
+
+      - name: Build once and prove the complete diagnostic contract
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          .\.github\scripts\windows_installer.ps1 source
-          -Revision '${{ inputs.revision }}'
-          -ReadOnly
-
-      - name: Parse every owned PowerShell script
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 parse-powershell
-
-      - name: Install audited toolchain
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 toolchain
-
-      - name: Resolve Flutter dependencies
-        run: flutter pub get
-
-      - name: Resolve authoritative previous-release baseline
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 baseline
-
-      - name: Materialize exact version delta
-        shell: pwsh
-        run: >-
-          .\.github\scripts\windows_installer.ps1 version
-          -Version '${{ inputs.version }}'
-
-      - name: Generate Dart sources in consuming job
-        run: dart run build_runner build
-
-      - name: Generate localizations when configured
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 localization
-
-      - name: Run generated-script readiness CRT timeout and identity sentinels
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 sentinels
-
-      - name: Run real Inno install/uninstall settlement sentinel
-        shell: pwsh
-        run: >-
-          .\.github\scripts\inno-uninstall-settlement-sentinel.ps1
-          -IsccPath $env:ISCC_PATH
-
-      - name: Analyze and test exact materialized tree
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 quality
-
-      - name: Build Flutter Windows release
-        run: flutter build windows --release
-
-      - name: Stage and verify app-local CRT
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 crt
-
-      - name: Compile and verify installer identity
-        shell: pwsh
-        run: >-
-          .\.github\scripts\windows_installer.ps1 installer
-          -Version '${{ inputs.version }}'
-
-      - name: Scan bundle and extracted installer
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 security
-
-      - name: Prove bootstrap or previous-release lifecycle with bounded phases
-        shell: pwsh
-        run: >-
-          .\.github\scripts\windows_installer.ps1 lifecycle
-          -PreviousReleaseMode $env:BASELINE_MODE
-          -PreviousInstaller $env:BASELINE_INSTALLER
-
-      - name: Write provider-neutral diagnostic receipt
-        shell: pwsh
-        run: >-
-          .\.github\scripts\windows_installer.ps1 receipt
+          .\.github\scripts\windows_installer.ps1 verify
           -Revision '${{ inputs.revision }}'
           -Version '${{ inputs.version }}'
           -Publication none
@@ -148,8 +86,8 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  quality:
-    name: Exact-revision publication gates
+  admission:
+    name: Admit exact publication revision
     if: inputs.mode == 'publish'
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -163,14 +101,29 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Run repository-owned publication gates
-        run: ./tool/publish-gate.sh
+      - name: Set up cached release toolchain
+        uses: ./.github/actions/setup-release-toolchain
+
+      - name: Test, scan, and prepare an exact-revision handoff
+        run: >-
+          ./.github/scripts/run_linux_release_admission.sh
+          '${{ inputs.revision }}'
+          '${{ inputs.version }}'
+          '${{ inputs.diagnostic_run_id }}'
+
+      - name: Upload verified admission handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-admission-${{ github.run_id }}
+          path: ${{ runner.temp }}/windows-installer/admission
+          if-no-files-found: error
+          retention-days: 1
 
   publish:
-    name: Publish verified Windows installer
+    name: Build once and publish verified Windows installer
     if: inputs.mode == 'publish'
     needs:
-      - quality
+      - admission
     runs-on: windows-latest
     timeout-minutes: 90
     environment: windows-release
@@ -178,100 +131,39 @@ jobs:
       actions: read
       contents: write
     steps:
-      - name: Check out exact revision
+      - name: Check out exact admitted revision
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.revision }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify prior diagnostic run and exact revision
+      - name: Set up cached release toolchain
+        uses: ./.github/actions/setup-release-toolchain
+
+      - name: Download exact-revision admission handoff
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer-admission-${{ github.run_id }}
+          path: ${{ runner.temp }}/windows-installer/admission
+
+      - name: Build once, verify, publish immutable bytes, and activate last
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          PUBLISHER_TOKEN: ${{ secrets.WINDOWS_PUBLISHER_TOKEN }}
+          MANIFEST_SIGNING_KEY: ${{ secrets.WINDOWS_MANIFEST_SIGNING_KEY }}
         run: >-
-          .\.github\scripts\windows_installer.ps1 diagnostic
-          -RunId '${{ inputs.diagnostic_run_id }}'
-          -Revision '${{ inputs.revision }}'
-
-      - name: Parse every owned PowerShell script
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 parse-powershell
-
-      - name: Install audited toolchain
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 toolchain
-
-      - name: Resolve Flutter dependencies in publisher
-        run: flutter pub get
-
-      - name: Resolve authoritative previous-release baseline in publisher
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 baseline
-
-      - name: Materialize release version and tag candidate
-        shell: pwsh
-        run: >-
-          .\.github\scripts\windows_installer.ps1 version
-          -Version '${{ inputs.version }}'
-
-      - name: Generate Dart sources in publisher
-        run: dart run build_runner build
-
-      - name: Generate publisher localizations when configured
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 localization
-
-      - name: Run publisher generated-script readiness sentinels and quality
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 sentinels-and-quality
-
-      - name: Re-run real Inno install/uninstall settlement sentinel
-        shell: pwsh
-        run: >-
-          .\.github\scripts\inno-uninstall-settlement-sentinel.ps1
-          -IsccPath $env:ISCC_PATH
-
-      - name: Build publisher Flutter Windows release
-        run: flutter build windows --release
-
-      - name: Stage and verify publisher app-local CRT
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 crt
-
-      - name: Compile verify and sign installer and manifest
-        shell: pwsh
-        run: >-
-          .\.github\scripts\windows_installer.ps1 installer
-          -Version '${{ inputs.version }}'
-          -Sign
-
-      - name: Scan publisher bundle and extracted installer
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 security
-
-      - name: Re-prove bounded install lifecycle
-        shell: pwsh
-        run: >-
-          .\.github\scripts\windows_installer.ps1 lifecycle
-          -PreviousReleaseMode $env:BASELINE_MODE
-          -PreviousInstaller $env:BASELINE_INSTALLER
-
-      - name: Upload immutable installer and manifest
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 publish-immutable
-
-      - name: Independently download and verify immutable objects
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 verify-readback
-
-      - name: Activate publication pointer last
-        shell: pwsh
-        run: .\.github\scripts\windows_installer.ps1 activate
-
-      - name: Verify final remote state
-        shell: pwsh
-        run: >-
-          .\.github\scripts\windows_installer.ps1 delivery
+          .\.github\scripts\windows_installer.ps1 publish
           -Revision '${{ inputs.revision }}'
           -Version '${{ inputs.version }}'
+          -DiagnosticRunId '${{ inputs.diagnostic_run_id }}'
+          -AdmissionRoot '${{ runner.temp }}\windows-installer\admission'
+
+      - name: Upload final installer evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-windows-installer-v${{ inputs.version }}
+          path: ${{ runner.temp }}/windows-installer/app-windows-installer-v${{ inputs.version }}.exe
+          if-no-files-found: error
+          retention-days: 7

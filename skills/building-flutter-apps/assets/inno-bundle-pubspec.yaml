@@ -1,0 +1,15 @@
+# Run `dart pub add --dev inno_bundle` first, then merge this section into
+# pubspec.yaml. Replace every REPLACE_* value before generating an installer.
+inno_bundle:
+  # Generate once, commit it, and never change it after the first release.
+  id: REPLACE_WITH_STABLE_GUID
+  name: REPLACE_WITH_PRODUCT_NAME
+  description: REPLACE_WITH_PRODUCT_DESCRIPTION
+  publisher: REPLACE_WITH_PUBLISHER
+  # Change only after accepting the installation/elevation UX.
+  admin: false
+  arch: x64
+  # The canonical flow stages and proves app-local CRT DLLs itself.
+  vc_redist: false
+  # Add only required, project-owned files. `dlls` is deprecated.
+  files: []

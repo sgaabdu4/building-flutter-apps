@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "building-flutter-apps"
 REFERENCE = SKILL / "references" / "windows-installer-pipeline.md"
 WORKFLOW = SKILL / "assets" / "windows-installer-workflow.yml"
+INNO_BUNDLE = SKILL / "assets" / "inno-bundle-pubspec.yaml"
 SENTINEL = SKILL / "assets" / "inno-uninstall-settlement-sentinel.ps1"
 CI = ROOT / ".github" / "workflows" / "windows-installer-sentinel.yml"
 
@@ -23,6 +24,7 @@ def require(condition: bool, message: str) -> None:
 skill_text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
 reference_text = REFERENCE.read_text(encoding="utf-8")
 workflow_text = WORKFLOW.read_text(encoding="utf-8")
+inno_bundle_text = INNO_BUNDLE.read_text(encoding="utf-8")
 sentinel_text = SENTINEL.read_text(encoding="utf-8")
 ci_text = CI.read_text(encoding="utf-8")
 answer_evals = json.loads(
@@ -38,18 +40,77 @@ require(
     "Windows reference must link the copyable sentinel",
 )
 require(
-    workflow_text.count(r".\.github\scripts\inno-uninstall-settlement-sentinel.ps1") == 2,
-    "diagnostic and publisher must each execute the settlement sentinel",
+    "assets/inno-bundle-pubspec.yaml" in skill_text
+    and "../assets/inno-bundle-pubspec.yaml" in reference_text,
+    "skill and Windows reference must link the inno_bundle pubspec scaffold",
 )
 
-verify_job = workflow_text.split("  verify_windows:", 1)[1].split("  quality:", 1)[0]
+verify_job = workflow_text.split("  verify_windows:", 1)[1].split("  admission:", 1)[0]
 publish_job = workflow_text.split("  publish:", 1)[1]
-for name, job in (("diagnostic", verify_job), ("publisher", publish_job)):
+for name, job, command, max_steps in (
+    ("diagnostic", verify_job, "windows_installer.ps1 verify", 4),
+    ("publisher", publish_job, "windows_installer.ps1 publish", 5),
+):
     require(
-        job.index("inno-uninstall-settlement-sentinel.ps1")
-        < job.index("flutter build windows --release"),
-        f"{name} settlement sentinel must run before Flutter compilation",
+        command in job,
+        f"{name} must delegate complete execution to one orchestration command",
     )
+    require(
+        job.count("- name:") <= max_steps,
+        f"{name} YAML must retain only boundary steps",
+    )
+require(
+    "parse-powershell -> timeout smoke -> CRT smoke -> Inno identity smoke ->"
+    in workflow_text
+    and "Contract-test call presence and order" in workflow_text,
+    "compact workflow must preserve and order internal pre-build guards",
+)
+require(
+    "windows_installer.ps1 parse-powershell" not in workflow_text,
+    "PowerShell parsing must stay inside compact orchestration, not a YAML step",
+)
+require(
+    "dart run inno_bundle --no-app" in workflow_text
+    and "activates the provider-neutral pointer last" in workflow_text,
+    "compact scaffold must retain the full build-once and publication contract",
+)
+require(
+    "flutter build windows --release" not in workflow_text,
+    "Flutter compilation belongs inside the single orchestration command",
+)
+require(
+    "secrets." not in verify_job and "contents: write" not in verify_job,
+    "diagnostic job must remain secret-free and read-only",
+)
+require(
+    "needs:" in publish_job
+    and "- admission" in publish_job
+    and "contents: write" in publish_job,
+    "publisher must consume read-only admission before write authority",
+)
+
+for phrase in (
+    "id: REPLACE_WITH_STABLE_GUID",
+    "name: REPLACE_WITH_PRODUCT_NAME",
+    "publisher: REPLACE_WITH_PUBLISHER",
+    "admin: false",
+    "arch: x64",
+    "vc_redist: false",
+    "files: []",
+):
+    require(phrase in inno_bundle_text, f"inno_bundle pubspec scaffold missing: {phrase}")
+for forbidden in ("dlls:", "token", "secret", "project_id", "database_id"):
+    require(
+        forbidden not in inno_bundle_text.lower(),
+        f"inno_bundle pubspec scaffold contains forbidden field: {forbidden}",
+    )
+for phrase in (
+    "dart pub add --dev inno_bundle",
+    "dart run inno_bundle --no-app",
+    "dlls` is deprecated",
+    "no second Flutter compile",
+):
+    require(phrase in reference_text, f"Windows reference missing inno_bundle flow: {phrase}")
 
 require(
     '$appId = "{$appGuid}"' in sentinel_text,
@@ -84,6 +145,7 @@ for path in (
     ".github/workflows/windows-installer-sentinel.yml",
     "evals/evals.json",
     "skills/building-flutter-apps/SKILL.md",
+    "skills/building-flutter-apps/assets/inno-bundle-pubspec.yaml",
     "skills/building-flutter-apps/assets/inno-uninstall-settlement-sentinel.ps1",
     "skills/building-flutter-apps/assets/windows-installer-workflow.yml",
     "skills/building-flutter-apps/references/windows-installer-pipeline.md",
@@ -103,8 +165,26 @@ require(
     ),
     "answer eval must be durable and exclude a transient run ID",
 )
+require(
+    any(
+        "compacted a Flutter Windows publisher" in case["prompt"]
+        and any("same Actions step count" in item for item in case["expectations"])
+        and any("before the single Flutter build" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must reject dead internal guards after YAML compaction",
+)
+require(
+    any(
+        "set up inno_bundle" in case["prompt"].lower()
+        and any("pubspec.yaml" in item for item in case["expectations"])
+        and any("--no-app" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must cover complete inno_bundle setup and build-once flow",
+)
 
-for text in (reference_text, workflow_text, sentinel_text, ci_text):
+for text in (reference_text, workflow_text, inno_bundle_text, sentinel_text, ci_text):
     lowered = text.lower()
     for forbidden in ("appwrite", "jabal", "emr_", "project_id", "database_id"):
         require(forbidden not in lowered, f"provider/project data leaked: {forbidden}")
