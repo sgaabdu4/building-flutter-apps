@@ -27,7 +27,7 @@
 
 1. Research = resolve Flutter/Dart/Node/actions/Inno/`inno_bundle` versions + official source + hashes/signatures where supplied.
 2. Contract = inventory last green step order + generated outputs + runtime DLLs + installer identity + data-preservation policy + publication interfaces.
-3. Cheap proof = YAML/shell/PowerShell syntax + tool identity + CRT sentinel + tiny Inno identity sentinel + timeout regression fixtures.
+3. Cheap proof = YAML/shell/PowerShell syntax + tool identity + CRT sentinel + tiny Inno identity/install/uninstall settlement sentinels + timeout regression fixtures.
 4. Diagnostic = one `workflow_dispatch` + one `windows-latest` job + exact SHA + no publisher secrets/writes.
 5. Diagnostic artifact = upload installer + machine receipt only after every check passes; short retention; publication = `none`.
 6. Publisher = one full run for diagnostic-proven SHA; quality/preparation may parallelize, native/external mutations remain sequential.
@@ -89,7 +89,8 @@
 - Stable AppId = immutable across releases + in-place install directory.
 - Update = never delete application data, sibling user paths, credentials, or unknown files.
 - Inno compiler = audited exact version + resolved `ISCC.exe` + cheap distinct-version sentinel + compile exit `0`.
-- Tiny sentinel = distinct numeric version + textual version; compile/read fields before expensive Flutter build.
+- Tiny identity sentinel = distinct numeric version + textual version; compile/read fields before expensive Flutter build.
+- Tiny lifecycle sentinel = unique temp root + synthetic stable test AppId → install → invoke uninstaller once → bounded settlement of exact install directory + AppId uninstall key; run before expensive Flutter build.
 
 ## Installer identity
 
@@ -132,10 +133,19 @@
 - Forbidden = raise from `[Files]` `AfterInstall` + assume `/SUPPRESSMSGBOXES` makes the file error fatal/nonzero.
 - Different Inno version/trigger = reverify official event + exit-code contract before use.
 
+### Uninstall settlement
+
+- Exit `0` = original uninstaller completed; its temporary cleanup clone may still be running.
+- Invocation = launch the exact owned uninstaller once; after exit `0`, never invoke its vanishing path again.
+- Settlement = bounded poll until both exact install directory + exact AppId uninstall registry key are absent in every declared root/view.
+- Ownership = retain installation/cleanup state until settlement passes or times out; no second uninstaller fallback.
+- Timeout receipt = unresolved directory/key condition + elapsed/deadline + safe process state; bounded owned cleanup only.
+- Data contract = settlement targets installed program/registration only; accepted application/user data remains preserved.
+
 ## Bounded processes
 
 - Whole-job timeout = outer failsafe only; every child phase owns a smaller explicit deadline.
-- Phases = baseline install + forced-failure install + rollback observation + new install + updater launch + relaunch observation + uninstall.
+- Phases = baseline install + forced-failure install + rollback observation + new install + updater launch + relaunch observation + uninstall process + uninstall settlement.
 - Receipt = `phase=<name> result=started|completed|timeout|cleanup-timeout` + deadline/exit details.
 - Start = emit phase + deadline + safe command identity + PID receipt.
 - Wait = finite process wait; `Start-Process -Wait` + `WaitForSingleObject(..., INFINITE)` forbidden.
@@ -198,6 +208,7 @@
 - [PowerShell quoting + expandable strings](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.6)
 - [Visual Studio `vswhere`](https://github.com/microsoft/vswhere)
 - [Inno Setup AppId](https://jrsoftware.org/ishelp/topic_setup_appid.htm)
+- [Inno Setup uninstaller exit codes](https://jrsoftware.org/ishelp/topic_uninstexitcodes.htm)
 - [Inno Setup event functions](https://jrsoftware.org/ishelp/topic_scriptevents.htm)
 - [Inno Setup exit codes](https://jrsoftware.org/ishelp/topic_setupexitcodes.htm)
 - [Inno Setup command-line parameters](https://jrsoftware.org/ishelp/topic_setupcmdline.htm)

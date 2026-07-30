@@ -820,6 +820,22 @@
         "Verifies prior program bytes, accepted local state, absence of a partial new version, and owned cleanup after the forced failure",
         "Keeps the current Windows run classified as negative evidence until a corrected exact revision completes the diagnostic green"
       ]
+    },
+    {
+      "id": 56,
+      "prompt": "A first-release Flutter Windows harness invoked its Inno uninstaller once. The uninstaller returned exit code 0, but the install directory and exact AppId uninstall registry key still existed momentarily, so the harness tried to launch the disappearing uninstaller again. What must change before another paid Windows retry?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Explains from Inno's documented cleanup-clone lifecycle that exit code 0 means the original uninstaller completed, not that all cleanup has settled",
+        "Invokes the exact owned uninstaller only once and forbids retrying its vanishing path after exit 0",
+        "Retains owned installation and cleanup state until settlement is proven or the settlement deadline expires",
+        "Uses a small explicit bounded poll that completes only when both the exact install directory and exact AppId uninstall registry key are absent in every declared registry root and view",
+        "Reports the unresolved directory or registry condition, elapsed deadline, and safe process state on timeout without deleting unrelated paths or keys",
+        "Keeps accepted application and user data outside uninstall settlement targets and verifies it was not deleted",
+        "Adds a cheap real tiny-Inno install/uninstall settlement sentinel with a unique temporary root and synthetic stable test AppId before Flutter compilation",
+        "Keeps run 30573789878 classified as negative evidence until a corrected exact revision completes the Windows diagnostic green"
+      ]
     }
   ]
 }

@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.7.3"
+expected_version = "5.7.4"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -128,6 +128,10 @@ assert "never `$childPidPath.tmp`" in windows_installer
 assert "`PrepareToInstall` returns a non-empty diagnostic" in windows_installer
 assert "exact exit code `7`" in windows_installer
 assert "`AfterInstall` + assume `/SUPPRESSMSGBOXES`" in windows_installer
+assert "Exit `0` = original uninstaller completed; its temporary cleanup clone may still be running" in windows_installer
+assert "never invoke its vanishing path again" in windows_installer
+assert "both exact install directory + exact AppId uninstall registry key are absent" in windows_installer
+assert "Tiny lifecycle sentinel = unique temp root + synthetic stable test AppId" in windows_installer
 assert "Pointer/index activation = last external mutation" in windows_installer
 workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
 assert "mode:" in workflow_asset
@@ -138,6 +142,7 @@ assert "PreviousReleaseMode Auto" not in workflow_asset
 assert workflow_asset.count("windows_installer.ps1 baseline") == 2
 assert workflow_asset.count("windows_installer.ps1 parse-powershell") == 2
 assert workflow_asset.count("generated-script readiness") == 2
+assert workflow_asset.count("install/uninstall settlement sentinels") == 2
 assert workflow_asset.count("-PreviousReleaseMode $env:BASELINE_MODE") == 2
 assert workflow_asset.count("-PreviousInstaller $env:BASELINE_INSTALLER") == 2
 assert "phase=prior-release result=skipped_no_prior_release" in workflow_asset
@@ -150,9 +155,11 @@ assert "actions: read" in verify_job
 assert "contents: write" not in verify_job
 assert "secrets." not in verify_job
 assert verify_job.index("parse-powershell") < verify_job.index("toolchain")
+assert verify_job.index("install/uninstall settlement sentinels") < verify_job.index("flutter build windows --release")
 publish_job = workflow_asset.split("  publish:", 1)[1]
 assert publish_job.index("parse-powershell") < publish_job.index("toolchain")
 assert publish_job.index("windows_installer.ps1 baseline") < publish_job.index("lifecycle")
+assert publish_job.index("install/uninstall settlement sentinels") < publish_job.index("flutter build windows --release")
 assert publish_job.index("flutter pub get") < publish_job.index("dart run build_runner build")
 assert publish_job.index("dart run build_runner build") < publish_job.index("flutter build windows --release")
 assert publish_job.index("publish-immutable") < publish_job.index("verify-readback")

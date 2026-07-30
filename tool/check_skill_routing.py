@@ -155,6 +155,14 @@ def main() -> None:
         for case in answer_eval
     ):
         fail("answer eval must reject false AfterInstall forced-failure proof")
+    if not any(
+        "disappearing uninstaller again" in case["prompt"]
+        and any("cleanup-clone lifecycle" in expectation for expectation in case["expectations"])
+        and any("both the exact install directory" in expectation for expectation in case["expectations"])
+        and any("before Flutter compilation" in expectation for expectation in case["expectations"])
+        for case in answer_eval
+    ):
+        fail("answer eval must require bounded Inno uninstall settlement")
     reference_names = {
         path.relative_to(SKILL_ROOT).as_posix()
         for path in (SKILL_ROOT / "references").rglob("*")
