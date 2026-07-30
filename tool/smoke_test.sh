@@ -83,13 +83,14 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.5.9"
+expected_version = "5.5.10"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
 assert (skill / "SKILL.md").is_file()
 assert (skill / "references/setup.md").is_file()
 assert (skill / "references/dart-decimate.md").is_file()
+assert (skill / "references/build-reproducibility.md").is_file()
 assert (skill / "references/analysis_options.yaml").is_file()
 assert (skill / "templates/flutter/lib/core/extensions/extensions.dart").is_file()
 assert not any((skill / "templates/flutter/tool").glob("*"))
@@ -104,6 +105,9 @@ assert claude_marketplace["plugins"][0]["version"] == expected_version
 assert copilot_marketplace["metadata"]["version"] == expected_version
 assert copilot_marketplace["plugins"][0]["version"] == expected_version
 assert f'version: "{expected_version}"' in (skill / "SKILL.md").read_text()
+build_reproducibility = (skill / "references/build-reproducibility.md").read_text()
+assert "PowerShell cardinality = wrap uncertain pipeline/cmdlet output in `@(...)`" in build_reproducibility
+assert "Runtime staging = discover the resolved release output + assert exact DLL set beside the EXE" in build_reproducibility
 assert "hooks" not in claude
 assert "skills" not in claude
 assert "hooks" not in codex

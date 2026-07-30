@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.5.9"
+  version: "5.5.10"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 

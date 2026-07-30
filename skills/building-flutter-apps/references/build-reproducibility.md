@@ -40,6 +40,7 @@
 - PowerShell native command = executable + token array; capture immediate exit.
 - GUI/bootstrap process = `Start-Process -Wait -PassThru`; gate `ExitCode`.
 - Native output used as text = normalize first, for example `($lines -join "`n")`; array regex truthiness = forbidden.
+- PowerShell cardinality = wrap uncertain pipeline/cmdlet output in `@(...)` before `.Count`, indexing, or exact-one checks; zero/one/many fixtures required.
 - Private-repository read = job-scoped `github.token`/`GITHUB_TOKEN` + least `contents: read`; `persist-credentials: false` means later Git network reads need explicit authentication.
 - Workspace invariant = compare immediate before/after tracked-path delta for the operation; post-setup whole-workspace-clean assertion = forbidden.
 
@@ -48,6 +49,7 @@
 - C/C++ diagnosis = header declaration + include order + `target_include_directories` + `target_link_libraries` + runtime DLL bundle; one layer cannot prove another.
 - Windows-native compile = required for runner/FFI/plugin changes; macOS/Linux analysis cannot replace it.
 - Flutter release bundle = EXE + adjacent plugin/runtime DLLs + `data/` + chosen Visual C++ runtime strategy.
+- Runtime staging = discover the resolved release output + assert exact DLL set beside the EXE; a compiler/runtime install does not prove packaged CRT availability.
 - Inno compiler = exact version + official directive set + `ISCC.exe` exit `0` + expected output identity.
 - Installer continuity = stable `AppId` + numeric executable version fields + display version kept separate.
 - Upgrade/preservation fixture = pre-existing user paths allowed + namespaced owned markers + preimage hashes + cleanup only owned markers.

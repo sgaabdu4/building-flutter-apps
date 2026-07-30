@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Flutter clean-architecture skill with auto-enforcement hooks (Riverpod 3 codegen, Freezed 3 sealed, GoRouter typed-route SSOT, Hive CE).",
-    "version": "5.5.9"
+    "version": "5.5.10"
   },
   "plugins": [
     {
       "name": "building-flutter-apps",
       "description": "Flutter app architecture skill: Riverpod 3 codegen, Freezed 3 sealed, GoRouter typed-route SSOT, Hive CE persistence, Crashlytics, gen-l10n. Runs write-time grep checks after Dart edits and dart analyze + Dart Decimate gates at turn-end.",
-      "version": "5.5.9",
+      "version": "5.5.10",
       "source": "."
     }
   ]
