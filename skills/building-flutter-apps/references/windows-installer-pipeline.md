@@ -90,7 +90,7 @@
 - Update = never delete application data, sibling user paths, credentials, or unknown files.
 - Inno compiler = audited exact version + resolved `ISCC.exe` + cheap distinct-version sentinel + compile exit `0`.
 - Tiny identity sentinel = distinct numeric version + textual version; compile/read fields before expensive Flutter build.
-- Tiny lifecycle sentinel = unique temp root + synthetic stable test AppId → install → invoke uninstaller once → bounded settlement of exact install directory + AppId uninstall key; run before expensive Flutter build.
+- Tiny lifecycle sentinel = unique temp root + invocation-namespaced synthetic AppId stable through compile/install/uninstall → invoke uninstaller once → bounded settlement of exact install directory + AppId uninstall key; run before expensive Flutter build.
 
 ## Installer identity
 

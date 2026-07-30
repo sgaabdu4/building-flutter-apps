@@ -17,7 +17,8 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 }
 
 $resolvedIsccPath = (Resolve-Path -LiteralPath $IsccPath).Path
-$appId = 'BuildingFlutterApps.UninstallSettlementSentinel'
+$invocationId = [Guid]::NewGuid().ToString('N')
+$appId = "BuildingFlutterApps.UninstallSettlementSentinel.$invocationId"
 $uninstallSubKey = "Software\Microsoft\Windows\CurrentVersion\Uninstall\${appId}_is1"
 $registryViews = @(
   [Microsoft.Win32.RegistryView]::Registry32,
@@ -122,13 +123,17 @@ function Wait-UninstallSettlement {
     [int] $TimeoutSeconds
   )
 
-  $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
-  Write-Host "phase=uninstall-settlement result=started timeout_seconds=$TimeoutSeconds"
+  $startedAt = [DateTimeOffset]::UtcNow
+  $deadline = $startedAt.AddSeconds($TimeoutSeconds)
+  Write-Host "phase=uninstall-settlement result=started timeout_seconds=$TimeoutSeconds deadline_utc=$($deadline.ToString('o'))"
   do {
     $directoryPresent = Test-Path -LiteralPath $InstallDirectory
     $presentViews = @(Get-PresentUninstallRegistryViews -SubKey $SubKey)
     if (-not $directoryPresent -and $presentViews.Count -eq 0) {
-      Write-Host 'phase=uninstall-settlement result=completed directory=absent registry=absent'
+      $elapsedMilliseconds = [int64] (
+        ([DateTimeOffset]::UtcNow - $startedAt).TotalMilliseconds
+      )
+      Write-Host "phase=uninstall-settlement result=completed directory=absent registry=absent elapsed_ms=$elapsedMilliseconds"
       return
     }
     Start-Sleep -Milliseconds 100
@@ -137,7 +142,10 @@ function Wait-UninstallSettlement {
   $directoryState = if (Test-Path -LiteralPath $InstallDirectory) { 'present' } else { 'absent' }
   $presentViews = @(Get-PresentUninstallRegistryViews -SubKey $SubKey)
   $registryState = if ($presentViews.Count -eq 0) { 'absent' } else { $presentViews -join ',' }
-  throw "phase=uninstall-settlement result=timeout directory=$directoryState registry=$registryState timeout_seconds=$TimeoutSeconds"
+  $elapsedMilliseconds = [int64] (
+    ([DateTimeOffset]::UtcNow - $startedAt).TotalMilliseconds
+  )
+  throw "phase=uninstall-settlement result=timeout directory=$directoryState registry=$registryState elapsed_ms=$elapsedMilliseconds deadline_utc=$($deadline.ToString('o')) original_process=completed cleanup_clone=unknown"
 }
 
 function Remove-OwnedRegistryState {
@@ -182,6 +190,12 @@ $previousInstallDirectory = [Environment]::GetEnvironmentVariable(
   'BFA_SENTINEL_INSTALL_DIR',
   [EnvironmentVariableTarget]::Process
 )
+$previousAppId = [Environment]::GetEnvironmentVariable(
+  'BFA_SENTINEL_APP_ID',
+  [EnvironmentVariableTarget]::Process
+)
+$uninstallProcessCompleted = $false
+$settlementCompleted = $false
 
 try {
   [void] (New-Item -ItemType Directory -Path $sourceDirectory)
@@ -189,12 +203,16 @@ try {
   Set-Content -LiteralPath $payloadPath -Value 'sentinel' -NoNewline
   Set-Content -LiteralPath $issPath -Value @'
 #define SentinelInstallDir GetEnv("BFA_SENTINEL_INSTALL_DIR")
+#define SentinelAppId GetEnv("BFA_SENTINEL_APP_ID")
 #if SentinelInstallDir == ""
   #error BFA_SENTINEL_INSTALL_DIR is required
 #endif
+#if SentinelAppId == ""
+  #error BFA_SENTINEL_APP_ID is required
+#endif
 
 [Setup]
-AppId=BuildingFlutterApps.UninstallSettlementSentinel
+AppId={#SentinelAppId}
 AppName=Building Flutter Apps Uninstall Settlement Sentinel
 AppVersion=1.0.0
 DefaultDirName={#SentinelInstallDir}
@@ -211,6 +229,11 @@ Source: "payload.txt"; DestDir: "{app}"; Flags: ignoreversion
   [Environment]::SetEnvironmentVariable(
     'BFA_SENTINEL_INSTALL_DIR',
     $installDirectory,
+    [EnvironmentVariableTarget]::Process
+  )
+  [Environment]::SetEnvironmentVariable(
+    'BFA_SENTINEL_APP_ID',
+    $appId,
     [EnvironmentVariableTarget]::Process
   )
 
@@ -231,12 +254,12 @@ Source: "payload.txt"; DestDir: "{app}"; Flags: ignoreversion
     -Phase 'sentinel-install' `
     -TimeoutSeconds $PhaseTimeoutSeconds
 
-  if (-not (Test-Path -LiteralPath (Join-Path $installDirectory 'payload.txt') -PathType Leaf)) {
-    throw 'Sentinel payload was not installed.'
-  }
   $installedRegistryViews = @(Get-PresentUninstallRegistryViews -SubKey $uninstallSubKey)
   if ($installedRegistryViews.Count -eq 0) {
     throw 'Sentinel AppId uninstall registry key was not created.'
+  }
+  if (-not (Test-Path -LiteralPath (Join-Path $installDirectory 'payload.txt') -PathType Leaf)) {
+    throw 'Sentinel payload was not installed.'
   }
 
   $uninstallers = @(Get-ChildItem -LiteralPath $installDirectory -Filter 'unins*.exe' -File)
@@ -249,11 +272,13 @@ Source: "payload.txt"; DestDir: "{app}"; Flags: ignoreversion
     -Arguments @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') `
     -Phase 'sentinel-uninstall-process' `
     -TimeoutSeconds $PhaseTimeoutSeconds
+  $uninstallProcessCompleted = $true
 
   Wait-UninstallSettlement `
     -InstallDirectory $installDirectory `
     -SubKey $uninstallSubKey `
     -TimeoutSeconds $PhaseTimeoutSeconds
+  $settlementCompleted = $true
 
   Write-Host 'INNO_UNINSTALL_SETTLEMENT_OK'
 } finally {
@@ -262,11 +287,41 @@ Source: "payload.txt"; DestDir: "{app}"; Flags: ignoreversion
     $previousInstallDirectory,
     [EnvironmentVariableTarget]::Process
   )
-  Remove-OwnedRegistryState -SubKey $uninstallSubKey
-  if (
-    (Test-Path -LiteralPath $ownerMarker -PathType Leaf) -and
-    (Test-Path -LiteralPath $sentinelRoot)
-  ) {
-    Remove-Item -LiteralPath $sentinelRoot -Recurse -Force -ErrorAction SilentlyContinue
+  [Environment]::SetEnvironmentVariable(
+    'BFA_SENTINEL_APP_ID',
+    $previousAppId,
+    [EnvironmentVariableTarget]::Process
+  )
+
+  $knownProcessState = if ($uninstallProcessCompleted) {
+    'original_process=completed cleanup_clone=unknown'
+  } else {
+    'original_process=not-completed cleanup_clone=unknown'
+  }
+  if (-not $settlementCompleted) {
+    Write-Warning "phase=sentinel-owned-cleanup result=started $knownProcessState app_id=$appId"
+  }
+
+  $presentOwnedViews = @(Get-PresentUninstallRegistryViews -SubKey $uninstallSubKey)
+  if ($presentOwnedViews.Count -gt 0) {
+    Remove-OwnedRegistryState -SubKey $uninstallSubKey
+    $remainingOwnedViews = @(Get-PresentUninstallRegistryViews -SubKey $uninstallSubKey)
+    if ($remainingOwnedViews.Count -eq 0) {
+      Write-Host 'phase=sentinel-owned-cleanup registry=absent'
+    } else {
+      Write-Warning "phase=sentinel-owned-cleanup registry=$($remainingOwnedViews -join ',')"
+    }
+  }
+
+  $rootOwned = $false
+  if (Test-Path -LiteralPath $ownerMarker -PathType Leaf) {
+    $rootOwned = (Get-Content -LiteralPath $ownerMarker -Raw) -eq $appId
+  }
+  if ($rootOwned -and (Test-Path -LiteralPath $sentinelRoot)) {
+    Remove-Item -LiteralPath $sentinelRoot -Recurse -Force -ErrorAction Continue
+    $rootState = if (Test-Path -LiteralPath $sentinelRoot) { 'present' } else { 'absent' }
+    Write-Host "phase=sentinel-owned-cleanup root=$rootState"
+  } elseif (Test-Path -LiteralPath $sentinelRoot) {
+    Write-Warning 'phase=sentinel-owned-cleanup root=retained reason=owner-marker-mismatch'
   }
 }

@@ -5,13 +5,23 @@ on:
   pull_request:
     paths:
       - .github/workflows/windows-installer-sentinel.yml
+      - evals/evals.json
+      - skills/building-flutter-apps/SKILL.md
       - skills/building-flutter-apps/assets/inno-uninstall-settlement-sentinel.ps1
+      - skills/building-flutter-apps/assets/windows-installer-workflow.yml
+      - skills/building-flutter-apps/references/windows-installer-pipeline.md
+      - tool/check_windows_installer_assets.py
   push:
     branches:
       - main
     paths:
       - .github/workflows/windows-installer-sentinel.yml
+      - evals/evals.json
+      - skills/building-flutter-apps/SKILL.md
       - skills/building-flutter-apps/assets/inno-uninstall-settlement-sentinel.ps1
+      - skills/building-flutter-apps/assets/windows-installer-workflow.yml
+      - skills/building-flutter-apps/references/windows-installer-pipeline.md
+      - tool/check_windows_installer_assets.py
 
 permissions:
   contents: read
@@ -27,6 +37,10 @@ jobs:
     steps:
       - name: Check out exact tree
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Verify scaffold integration and order
+        shell: pwsh
+        run: python tool/check_windows_installer_assets.py
 
       - name: Install authenticated Inno Setup 7.0.2
         shell: pwsh

@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.7.5"
+expected_version = "5.7.6"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -133,7 +133,7 @@ assert "`AfterInstall` + assume `/SUPPRESSMSGBOXES`" in windows_installer
 assert "Exit `0` = original uninstaller completed; its temporary cleanup clone may still be running" in windows_installer
 assert "never invoke its vanishing path again" in windows_installer
 assert "both exact install directory + exact AppId uninstall registry key are absent" in windows_installer
-assert "Tiny lifecycle sentinel = unique temp root + synthetic stable test AppId" in windows_installer
+assert "Tiny lifecycle sentinel = unique temp root + invocation-namespaced synthetic AppId" in windows_installer
 assert "Pointer/index activation = last external mutation" in windows_installer
 workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
 settlement_sentinel = (skill / "assets/inno-uninstall-settlement-sentinel.ps1").read_text()
