@@ -52,13 +52,13 @@ for name, job in (("diagnostic", verify_job), ("publisher", publish_job)):
     )
 
 require(
-    "$appId = \"BuildingFlutterApps.UninstallSettlementSentinel.$invocationId\""
-    in sentinel_text,
-    "sentinel AppId must be namespaced per invocation",
+    '$appId = "{$appGuid}"' in sentinel_text,
+    "sentinel AppId must be a conventional invocation GUID",
 )
 require(
-    "AppId={#SentinelAppId}" in sentinel_text,
-    "compiled Inno fixture must consume the invocation AppId",
+    "AppId={{SENTINEL_APP_ID}" in sentinel_text
+    and ".Replace('SENTINEL_APP_ID', $appGuid)" in sentinel_text,
+    "compiled Inno fixture must consume the invocation GUID through a literal template",
 )
 require(
     sentinel_text.count("-Phase 'sentinel-uninstall-process'") == 1,
@@ -76,7 +76,7 @@ for phrase in (
 for forbidden in (
     "Start-Process -Wait",
     "WaitForSingleObject(",
-    "AppId=BuildingFlutterApps.UninstallSettlementSentinel\n",
+    "AppId=BuildingFlutterApps.UninstallSettlementSentinel",
 ):
     require(forbidden not in sentinel_text, f"sentinel contains forbidden contract: {forbidden}")
 

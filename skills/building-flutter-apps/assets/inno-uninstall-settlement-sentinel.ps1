@@ -17,8 +17,8 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 }
 
 $resolvedIsccPath = (Resolve-Path -LiteralPath $IsccPath).Path
-$invocationId = [Guid]::NewGuid().ToString('N')
-$appId = "BuildingFlutterApps.UninstallSettlementSentinel.$invocationId"
+$appGuid = [Guid]::NewGuid().ToString('D')
+$appId = "{$appGuid}"
 $uninstallSubKey = "Software\Microsoft\Windows\CurrentVersion\Uninstall\${appId}_is1"
 $registryViews = @(
   [Microsoft.Win32.RegistryView]::Registry32,
@@ -190,10 +190,6 @@ $previousInstallDirectory = [Environment]::GetEnvironmentVariable(
   'BFA_SENTINEL_INSTALL_DIR',
   [EnvironmentVariableTarget]::Process
 )
-$previousAppId = [Environment]::GetEnvironmentVariable(
-  'BFA_SENTINEL_APP_ID',
-  [EnvironmentVariableTarget]::Process
-)
 $uninstallProcessCompleted = $false
 $settlementCompleted = $false
 
@@ -201,18 +197,14 @@ try {
   [void] (New-Item -ItemType Directory -Path $sourceDirectory)
   Set-Content -LiteralPath $ownerMarker -Value $appId -NoNewline
   Set-Content -LiteralPath $payloadPath -Value 'sentinel' -NoNewline
-  Set-Content -LiteralPath $issPath -Value @'
+  $issTemplate = @'
 #define SentinelInstallDir GetEnv("BFA_SENTINEL_INSTALL_DIR")
-#define SentinelAppId GetEnv("BFA_SENTINEL_APP_ID")
 #if SentinelInstallDir == ""
   #error BFA_SENTINEL_INSTALL_DIR is required
 #endif
-#if SentinelAppId == ""
-  #error BFA_SENTINEL_APP_ID is required
-#endif
 
 [Setup]
-AppId={#SentinelAppId}
+AppId={{SENTINEL_APP_ID}
 AppName=Building Flutter Apps Uninstall Settlement Sentinel
 AppVersion=1.0.0
 DefaultDirName={#SentinelInstallDir}
@@ -225,18 +217,14 @@ Uninstallable=yes
 [Files]
 Source: "payload.txt"; DestDir: "{app}"; Flags: ignoreversion
 '@
+  $issContent = $issTemplate.Replace('SENTINEL_APP_ID', $appGuid)
+  Set-Content -LiteralPath $issPath -Value $issContent
 
   [Environment]::SetEnvironmentVariable(
     'BFA_SENTINEL_INSTALL_DIR',
     $installDirectory,
     [EnvironmentVariableTarget]::Process
   )
-  [Environment]::SetEnvironmentVariable(
-    'BFA_SENTINEL_APP_ID',
-    $appId,
-    [EnvironmentVariableTarget]::Process
-  )
-
   Invoke-OwnedProcess `
     -FilePath $resolvedIsccPath `
     -Arguments @($issPath) `
@@ -287,12 +275,6 @@ Source: "payload.txt"; DestDir: "{app}"; Flags: ignoreversion
     $previousInstallDirectory,
     [EnvironmentVariableTarget]::Process
   )
-  [Environment]::SetEnvironmentVariable(
-    'BFA_SENTINEL_APP_ID',
-    $previousAppId,
-    [EnvironmentVariableTarget]::Process
-  )
-
   $knownProcessState = if ($uninstallProcessCompleted) {
     'original_process=completed cleanup_clone=unknown'
   } else {
