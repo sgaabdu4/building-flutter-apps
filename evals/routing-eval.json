@@ -249,7 +249,7 @@
     "query": "Crashlytics is being called directly from notifiers and main.dart wraps runApp in guarded zones.",
     "should_trigger": true,
     "expected_refs": [
-      "references/crashlytics.md"
+      "references/error-reporting.md"
     ],
     "forbidden_refs": [],
     "max_refs": 4
@@ -361,6 +361,47 @@
   {
     "id": 35,
     "query": "A clean Windows GitHub Actions checkout cannot find generated .g.dart files, build_runner uses an old conflict flag, and the PowerShell/Inno lane differs from the last green workflow.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/build-reproducibility.md",
+      "references/core-stack.md"
+    ],
+    "forbidden_refs": [],
+    "max_refs": 2
+  },
+  {
+    "id": 36,
+    "query": "Add Sentry to a Flutter Riverpod app without leaking PII, duplicating Crashlytics events, exposing the upload token, or shipping unsymbolicated releases.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/error-reporting.md"
+    ],
+    "forbidden_refs": [],
+    "max_refs": 2
+  },
+  {
+    "id": 37,
+    "query": "Inspect and resolve unresolved Sentry issue IDs in a deployed non-Flutter service; no Flutter or Riverpod code changes are requested.",
+    "should_trigger": false,
+    "expected_refs": [],
+    "forbidden_refs": [],
+    "max_refs": 0
+  },
+  {
+    "id": 38,
+    "query": "A Sentry event shows a disposed-ref failure after await in a Flutter Riverpod notifier; use the runtime evidence and fix the local lifecycle bug without changing telemetry scope.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/error-reporting.md",
+      "references/state-management/async-mutations.md",
+      "references/state-management-lifecycle.md"
+    ],
+    "forbidden_refs": [],
+    "max_refs": 3
+  },
+  {
+    "id": 39,
+    "query": "A Flutter Riverpod iOS device build loses its generated Swift package after another Flutter command runs under a different selected Xcode environment.",
     "should_trigger": true,
     "expected_refs": [
       "references/build-reproducibility.md",

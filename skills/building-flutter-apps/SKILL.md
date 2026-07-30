@@ -7,8 +7,8 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.5.10"
-  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
+  version: "5.6.0"
+  tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, fire-and-forget, singletons, e2e testing
 ---
 
 ## Read first
@@ -64,6 +64,7 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 | R21 | Widget previews are preview-only with deterministic fakes; no real HTTP/Firebase/Hive/native plugins. | [widget-previews.md](references/widget-previews.md) |
 | R22 | Runtime E2E proves behavior with stable selectors, logs, source-of-truth verification, cleanup, and multi-actor proof when needed. | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 | R23 | Accessibility is UI correctness: localized tooltips/semantic labels, 48x48 targets, contrast, text scale, `Text.rich`. | [accessibility.md](references/atomic-design/accessibility.md), [flutter-optimizations.md](references/flutter-optimizations.md#semantics) |
+| R24 | Error reporting crosses one app-owned `Crash` boundary; feature code never imports provider SDKs; scrub sensitive data + reconcile ambiguous remote outcomes before telemetry. | [error-reporting.md](references/error-reporting.md), [networking.md](references/networking.md) |
 
 ## Trigger Map
 
@@ -86,7 +87,7 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | Widget test, `ProviderContainer.test()`, `UncontrolledProviderScope`, fakes, mocks, `AppWidgetKeys`, event-contract tests | [testing.md](references/testing.md) |
 | `flutter_driver`, Dart MCP, E2E, `integration_test`, semantic selectors, log capture | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 | Hive, `TypeAdapter`, TypeId, box, persistence migration, retired field accounting | [hive-persistence.md](references/hive-persistence.md) |
-| Crashlytics, FirebaseCrashlytics, error reporting, `Crash.init`, `Crash.error`, `Crash.log`, symbol upload | [crashlytics.md](references/crashlytics.md) |
+| Crashlytics, FirebaseCrashlytics, Sentry, `sentry_flutter`, DSN, error reporting, `Crash.init`, `Crash.error`, `Crash.log`, symbol upload | [error-reporting.md](references/error-reporting.md) |
 | Mixin, capability vs interface, retry helper, RNG, bulk operation | [mixins.md](references/mixins.md) |
 | Service, singleton, fire-and-forget, `abstract final class`, `unawaited()`, `Future<void>` signature | [services-and-singletons.md](references/services-and-singletons.md) |
 | `@Preview`, `widget_previews.dart`, preview fakes, deterministic preview data | [widget-previews.md](references/widget-previews.md) |
@@ -99,7 +100,7 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | `Iterable` lookup/indexing, widget list helpers, `Debouncer`, validators, `Result`, extension types, `core/extensions/` barrel export | [collections-helpers.md](references/extensions/collections-helpers.md) |
 | Records `(x, y)`, extension type IDs, pattern matching, guard clause `case _ when ...` | [dart-patterns-records.md](references/dart-patterns-records.md) |
 | `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
-| `build_runner`, missing generated parts, clean checkout, Windows GitHub Actions, CMake/header/link failure, PowerShell/native process, Inno installer, local-vs-CI mismatch | [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
+| `build_runner`, missing generated parts, clean checkout, Windows GitHub Actions, CMake/header/link failure, PowerShell/native process, Inno installer/verifier, Xcode selection, Flutter SwiftPM generated package, Apple device build, local-vs-CI mismatch | [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
 | Dart Decimate, dead code, circular dependency, duplicate code, complexity, dependency hygiene, full zero-finding scan | [dart-decimate.md](references/dart-decimate.md) |
 | Common navigation / form / list / debounce / route-param-fallback patterns | [common-patterns.md](references/common-patterns.md) |
 | Incremental remote pull, delta token, per-table sync date, merge/delete reconciliation | [delta-sync.md](references/common-patterns/delta-sync.md) |
@@ -130,7 +131,7 @@ After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` wri
 - [ ] Coordinator invokes `npx --yes dart-decimate@latest` once per affected Git root; nested package scope uses exact `--workspace`; existing hooks + `core.hooksPath` preserved. Non-Git project = N/A.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
 - [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
-- [ ] Domain/data/platform follow Rules 7, 10-13, 17-23: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y.
+- [ ] Domain/data/platform follow Rules 7, 10-13, 17-24: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, a11y, and one scrubbed error-reporting boundary.
 - [ ] Any row touched in Trigger Map was read; exact lint names are cited when a scanner should enforce the rule.
 
 ### T1 — State / Notifier / Mutation

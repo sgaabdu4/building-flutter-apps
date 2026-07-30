@@ -44,6 +44,14 @@
 - Private-repository read = job-scoped `github.token`/`GITHUB_TOKEN` + least `contents: read`; `persist-credentials: false` means later Git network reads need explicit authentication.
 - Workspace invariant = compare immediate before/after tracked-path delta for the operation; post-setup whole-workspace-clean assertion = forbidden.
 
+## Apple boundary
+
+- Toolchain identity = resolved `DEVELOPER_DIR`/`xcode-select` path + Xcode build + Flutter/Dart version before any native generation/build command.
+- Flutter SwiftPM integration = generated package target + `Run Prepare Flutter Framework Script` pre-action + exact flavor scheme; project migration bytes are tracked, `ios/Flutter/ephemeral/` bytes are generated.
+- Command that rewrites generated Apple package metadata = isolate + verify post-command package products; regenerate immediately before device build/run under the same resolved Xcode environment.
+- Device proof = same flavor/entrypoint/toolchain that produced the native package graph; a prior IDE cache or different Xcode selection = no proof.
+- Tracked Xcode project change vs generated build side effect = classify before restore; never restore/commit one as the other.
+
 ## Native + installer
 
 - C/C++ diagnosis = header declaration + include order + `target_include_directories` + `target_link_libraries` + runtime DLL bundle; one layer cannot prove another.
@@ -52,6 +60,8 @@
 - Runtime staging = discover the resolved release output + assert exact DLL set beside the EXE; a compiler/runtime install does not prove packaged CRT availability.
 - Inno compiler = exact version + official directive set + `ISCC.exe` exit `0` + expected output identity.
 - Installer continuity = stable `AppId` + numeric executable version fields + display version kept separate.
+- Installer verifier = field-by-field diagnostics; compare binary numeric versions separately from textual version fields; normalize documented/observed boundary whitespace before text equality.
+- Opaque aggregate identity exception = forbidden; failure names exact field + expected identity + safe observed length/hash so the next retry has one proven cause.
 - Upgrade/preservation fixture = pre-existing user paths allowed + namespaced owned markers + preimage hashes + cleanup only owned markers.
 - Forced-failure proof = old install/data remains intact; normal upgrade + relaunch + uninstall behavior pass.
 
@@ -67,8 +77,13 @@
 - [Dart build_runner](https://dart.dev/tools/build_runner)
 - [build_runner changelog](https://pub.dev/packages/build_runner/changelog)
 - [Flutter Windows distribution](https://docs.flutter.dev/platform-integration/windows/building)
+- [Flutter Swift Package Manager](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers)
+- [Flutter iOS toolchain setup](https://docs.flutter.dev/platform-integration/ios/setup)
 - [PowerShell Start-Process](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process)
 - [GitHub GITHUB_TOKEN](https://docs.github.com/en/actions/concepts/security/github_token)
 - [actions/checkout](https://github.com/actions/checkout)
 - [Inno command-line compiler](https://jrsoftware.org/ishelp/topic_compilercmdline.htm)
+- [Inno binary file version](https://jrsoftware.org/ishelp/topic_setup_versioninfoversion.htm)
+- [Inno binary product version](https://jrsoftware.org/ishelp/topic_setup_versioninfoproductversion.htm)
+- [Inno textual product version](https://jrsoftware.org/ishelp/topic_setup_versioninfoproducttextversion.htm)
 - [Win32 CommandLineToArgvW](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw)

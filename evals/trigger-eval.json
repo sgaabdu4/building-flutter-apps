@@ -100,6 +100,22 @@
     "should_trigger": true
   },
   {
+    "query": "I need Sentry in a Flutter Riverpod app with privacy-safe events, runtime DSN config, exact release symbols, and no duplicate Crashlytics reports.",
+    "should_trigger": true
+  },
+  {
+    "query": "Please inspect unresolved Sentry issue IDs for my deployed Node service using the Sentry CLI. No Flutter or Riverpod code is involved.",
+    "should_trigger": false
+  },
+  {
+    "query": "Add Sentry to a native Flutter app that uses Bloc only; there is no Riverpod package or Riverpod app architecture.",
+    "should_trigger": false
+  },
+  {
+    "query": "A Flutter Riverpod iOS app's FlutterGeneratedPluginSwiftPackage becomes empty between tests and a device run when the selected Xcode environment changes.",
+    "should_trigger": true
+  },
+  {
     "query": "My Flutter confirmation dialog watches a Riverpod provider, mutates the same provider, then pops and clears state. Can you review the modal ownership pattern?",
     "should_trigger": true
   },

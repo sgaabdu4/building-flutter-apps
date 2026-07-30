@@ -685,8 +685,59 @@
         "Discovers the resolved Windows release output and asserts the exact runtime DLL set beside the EXE instead of assuming installed CRT tools stage it",
         "Uses explicit least-privilege GitHub authentication for private-repository reads when checkout credentials are not persisted",
         "Compares the immediate before/after tracked-path delta instead of requiring a clean whole workspace after legitimate setup",
-        "Verifies the installed Inno version/directives, stable AppId, numeric version fields, compiler exit, and upgrade/failure preservation with pre-existing user paths",
+        "Verifies the installed Inno version/directives, stable AppId, binary numeric and textual version fields, compiler exit, and upgrade/failure preservation with pre-existing user paths",
+        "Requires field-specific installer identity diagnostics and safe whitespace normalization instead of one opaque aggregate verifier exception",
         "Runs cheap independent checks in parallel, one nonpublishing Windows diagnostic before one publisher, and cancels downstream paid work after prerequisite failure"
+      ]
+    },
+    {
+      "id": 48,
+      "prompt": "Add Sentry to an existing Flutter Riverpod app that already uses the skill's Crash facade and Firebase Crashlytics. The DSN was supplied, CI has an upload token, release builds are obfuscated, and we need enough evidence to diagnose a real device failure without leaking identity or duplicating reports. What exact design and proof should the skill require?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Treats adding Sentry or dual reporting as a material telemetry/privacy decision and preserves the accepted provider scope",
+        "Keeps all Firebase and Sentry SDK calls inside the provider-neutral Crash facade with public init, log, and error only",
+        "Uses SentryFlutter.init with appRunner as the single SDK-managed startup/error integration instead of adding manual global handlers",
+        "Treats the DSN as a public client destination in one environment-aware config owner while keeping SENTRY_AUTH_TOKEN build-only and out of source, runtime config, arguments, and output",
+        "Disables default PII and unapproved screenshots, view hierarchy, replay, user identity, request capture, tracing, and profiling, plus scrubs app-owned event context",
+        "Ensures manual events reach each explicitly accepted provider once without duplicate calls",
+        "Proves no-DSN and init-failure startup, once-only sends, and PII scrubber fixtures",
+        "Matches build revision, Sentry release/dist, artifact, and retained obfuscation debug output",
+        "Requires an approved controlled event on the installed artifact and Sentry readback showing the exact release and symbolicated in-app frame",
+        "Routes Sentry issue investigation and resolution to the global sentry skill rather than duplicating its CLI workflow"
+      ]
+    },
+    {
+      "id": 49,
+      "prompt": "A verified Sentry issue from a Flutter Riverpod app points to a notifier writing state after an await when its provider was disposed. Use the event as evidence, fix the local lifecycle defect, and explain which skill owns each part without changing telemetry scope.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Uses the global sentry skill only for scoped runtime issue evidence and deployed verification",
+        "Routes reproducible local root-cause work through diagnosing-bugs rather than treating Sentry or Seer output as proof by itself",
+        "Reads the error-reporting and async-mutation/lifecycle references for the Flutter change",
+        "Guards post-await state writes with ref.mounted and makes finally cleanup conditional on ref.mounted",
+        "Preserves the accepted provider, privacy, sampling, and release configuration because the telemetry scope did not change",
+        "Keeps provider SDK calls outside the notifier and reports caught errors through the Crash facade",
+        "Proves the regression locally and verifies the exact deployed revision against the scoped Sentry issue before resolving it",
+        "Does not duplicate Sentry CLI commands or issue-resolution policy inside the Flutter skill"
+      ]
+    },
+    {
+      "id": 50,
+      "prompt": "A Flutter Riverpod iOS app works from one Xcode launch, but a later test/build command rewrites FlutterGeneratedPluginSwiftPackage to an empty graph and the physical-device launch fails. The machine has multiple Xcode installations. What should the skill require before another device retry?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Records the resolved DEVELOPER_DIR or xcode-select path, Xcode build, and Flutter/Dart version before native generation",
+        "Verifies the Flutter SwiftPM generated-package target and Run Prepare Flutter Framework Script pre-action for the exact flavor scheme",
+        "Separates tracked Xcode migration bytes from ios/Flutter/ephemeral generated package bytes",
+        "Identifies which command rewrites the generated package graph and verifies the post-command package products",
+        "Regenerates immediately before the device build or run under the same resolved Xcode environment",
+        "Rejects a prior IDE cache or a different Xcode selection as device-build proof",
+        "Avoids restoring or committing generated Apple package side effects as if they were tracked project changes",
+        "Runs the cheapest configuration/package-graph proof before another physical-device build"
       ]
     }
   ]

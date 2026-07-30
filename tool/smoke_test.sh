@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.5.10"
+expected_version = "5.6.0"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -91,6 +91,9 @@ assert (skill / "SKILL.md").is_file()
 assert (skill / "references/setup.md").is_file()
 assert (skill / "references/dart-decimate.md").is_file()
 assert (skill / "references/build-reproducibility.md").is_file()
+assert (skill / "references/error-reporting.md").is_file()
+assert not (skill / "references/crashlytics.md").exists()
+assert not (skill / "references/crash-reporting.md").exists()
 assert (skill / "references/analysis_options.yaml").is_file()
 assert (skill / "templates/flutter/lib/core/extensions/extensions.dart").is_file()
 assert not any((skill / "templates/flutter/tool").glob("*"))
@@ -108,6 +111,13 @@ assert f'version: "{expected_version}"' in (skill / "SKILL.md").read_text()
 build_reproducibility = (skill / "references/build-reproducibility.md").read_text()
 assert "PowerShell cardinality = wrap uncertain pipeline/cmdlet output in `@(...)`" in build_reproducibility
 assert "Runtime staging = discover the resolved release output + assert exact DLL set beside the EXE" in build_reproducibility
+assert "Toolchain identity = resolved `DEVELOPER_DIR`/`xcode-select` path" in build_reproducibility
+assert "Installer verifier = field-by-field diagnostics" in build_reproducibility
+error_reporting = (skill / "references/error-reporting.md").read_text()
+assert "SentryFlutter.init(..., appRunner: ...)" in error_reporting
+assert "`SENTRY_AUTH_TOKEN` = build-only secret" in error_reporting
+assert "Runtime issue inventory/root cause/resolve = global `sentry` skill" in error_reporting
+assert "preserve original error + stack in `Crash.error` before mapping" in error_reporting
 assert "hooks" not in claude
 assert "skills" not in claude
 assert "hooks" not in codex

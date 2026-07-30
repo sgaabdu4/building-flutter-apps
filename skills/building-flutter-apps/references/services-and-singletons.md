@@ -63,7 +63,7 @@ abstract final class AnalyticsLog {
 ```
 
 `Crash` exposes only `init`, `error`, and `log`; see
-[crashlytics.md](crashlytics.md).
+[error-reporting.md](error-reporting.md).
 
 ### Do not add
 

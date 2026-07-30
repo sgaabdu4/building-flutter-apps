@@ -15,6 +15,8 @@ SKILL = SKILL_ROOT / "SKILL.md"
 MAX_SKILL_LINES = 260
 MAX_SKILL_CHARS = 24_000
 LEGACY_REFERENCE_FILES = {
+    "references/crashlytics.md",
+    "references/crash-reporting.md",
     "references/state-management.md",
     "references/extensions-utilities.md",
 }
@@ -56,6 +58,12 @@ def main() -> None:
         fail(f"SKILL.md has {len(text)} chars; limit is {MAX_SKILL_CHARS}")
     if "Progressive Disclosure Gate" not in text:
         fail("SKILL.md missing Progressive Disclosure Gate")
+    if (
+        "| Crashlytics, FirebaseCrashlytics, Sentry,"
+        not in text
+        or "[error-reporting.md](references/error-reporting.md)" not in text
+    ):
+        fail("generic error-reporting trigger must route directly to error-reporting.md")
 
     for legacy in LEGACY_REFERENCE_FILES:
         if (SKILL_ROOT / legacy).exists():
