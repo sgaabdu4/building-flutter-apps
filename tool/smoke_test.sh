@@ -83,7 +83,7 @@ codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.7.8"
+expected_version = "5.7.9"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -117,7 +117,6 @@ assert f'version: "{expected_version}"' in (skill / "SKILL.md").read_text()
 build_reproducibility = (skill / "references/build-reproducibility.md").read_text()
 assert "Toolchain identity = resolved `DEVELOPER_DIR`/`xcode-select` path" in build_reproducibility
 windows_installer = (skill / "references/windows-installer-pipeline.md").read_text()
-assert "Uncertain command/cmdlet/pipeline result = `@(...)`" in windows_installer
 assert "VCToolsRedistDir" in windows_installer
 assert "`msvcp140.dll` + `vcruntime140.dll` + `vcruntime140_1.dll`" in windows_installer
 assert "`inno_bundle` = candidate generator, not distribution proof" in windows_installer
@@ -133,12 +132,25 @@ assert "exact exit code `7`" in windows_installer
 assert "`AfterInstall` + assume `/SUPPRESSMSGBOXES`" in windows_installer
 assert "Exit `0` = original uninstaller completed; its temporary cleanup clone may still be running" in windows_installer
 assert "never invoke its vanishing path again" in windows_installer
-assert "both exact install directory + exact AppId uninstall registry key are absent" in windows_installer
+assert "exact install directory + exact AppId uninstall registry key + owned TEMP-clone process/file state are absent" in windows_installer
 assert "Tiny lifecycle sentinel = unique temp root + invocation-namespaced synthetic AppId" in windows_installer
 assert "Pointer/index activation = last external mutation" in windows_installer
 assert "dart pub add --dev inno_bundle" in windows_installer
 assert "dart run inno_bundle --no-app" in windows_installer
 assert "no second Flutter compile" in windows_installer
+assert "`GITHUB_ENV` write = subsequent workflow steps only" in windows_installer
+assert "set `$env:ISCC_PATH` in the current PowerShell process" in windows_installer
+assert "tiny credential/API probes prove none of the release upload path" in windows_installer
+assert "candidate-size/type object + same chunking/protocol" in windows_installer
+assert "partial/incomplete object → delete + verify absent before retry" in windows_installer
+assert "native build/installer proof and downstream storage publication are separate phases/receipts" in windows_installer
+assert "old Visual Studio paths/generators are not current-run proof" in windows_installer
+assert "`$matches` in every casing aliases automatic `$Matches`" in windows_installer
+assert "scalar `-match`/`-notmatch` can overwrite or retain `$Matches`" in windows_installer
+assert "Command/pipeline/filter result read with `.Count`/index/exact-one = explicit `@(...)`" in windows_installer
+assert "Inno 6.7.3 `InstallLocation` includes `AddBackslash(...)`" in windows_installer
+assert "cleanup never masks root cause" in windows_installer
+assert "Cold Flutter build ceiling = `900s`" in windows_installer
 workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
 inno_bundle_pubspec = (skill / "assets/inno-bundle-pubspec.yaml").read_text()
 settlement_sentinel = (skill / "assets/inno-uninstall-settlement-sentinel.ps1").read_text()
@@ -154,6 +166,15 @@ assert "parse-powershell -> timeout smoke -> CRT smoke -> Inno identity smoke ->
 assert "Contract-test call presence and order" in workflow_asset
 assert "windows_installer.ps1 parse-powershell" not in workflow_asset
 assert "dart run inno_bundle --no-app" in workflow_asset
+assert "Writing `GITHUB_ENV`" in workflow_asset
+assert "alone is only a handoff to a later workflow step" in workflow_asset
+assert "exercise candidate size/type, protocol/chunking, and security policy" in workflow_asset
+assert "Reconcile/delete that exact ID before any retry" in workflow_asset
+assert "native verification and downstream storage as separate phase receipts" in workflow_asset
+assert "reject every casing of `$matches`" in workflow_asset
+assert "require `@(...)` before `.Count`/index/exact-one consumption" in workflow_asset
+assert "same-job codegen vs" in workflow_asset
+assert "verified transfer and first-release vs upgrade" in workflow_asset
 assert "flutter build windows --release" not in workflow_asset
 assert "group: windows-installer-release" in workflow_asset
 assert "retention-days: 1" in workflow_asset

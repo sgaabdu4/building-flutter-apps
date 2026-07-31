@@ -109,8 +109,28 @@ for phrase in (
     "dart run inno_bundle --no-app",
     "dlls` is deprecated",
     "no second Flutter compile",
+    "`GITHUB_ENV` write = subsequent workflow steps only",
+    "set `$env:ISCC_PATH` in the current PowerShell process",
+    "Consumption contract = installer result",
+    "tiny credential/API probes prove none of the release upload path",
+    "candidate-size/type object + same chunking/protocol",
+    "partial/incomplete object → delete + verify absent before retry",
+    "native build/installer proof and downstream storage publication are separate phases/receipts",
+    "old Visual Studio paths/generators are not current-run proof",
+    "`$matches` in every casing aliases automatic `$Matches`",
+    "scalar `-match`/`-notmatch` can overwrite or retain `$Matches`",
+    "Command/pipeline/filter result read with `.Count`/index/exact-one = explicit `@(...)`",
+    "Inno 6.7.3 `InstallLocation` includes `AddBackslash(...)`",
+    "cleanup never masks root cause",
+    "Cold Flutter build ceiling = `900s`",
 ):
     require(phrase in reference_text, f"Windows reference missing inno_bundle flow: {phrase}")
+require(
+    "Writing `GITHUB_ENV`" in workflow_text
+    and "alone is only a handoff to a later workflow step" in workflow_text
+    and "return/set `ISCC_PATH` in the current" in workflow_text,
+    "compact workflow must distinguish current-process tool paths from next-step handoff",
+)
 
 require(
     '$appId = "{$appGuid}"' in sentinel_text,
@@ -182,6 +202,51 @@ require(
         for case in answer_evals
     ),
     "answer eval must cover complete inno_bundle setup and build-once flow",
+)
+require(
+    any(
+        "appends `ISCC_PATH=...`" in case["prompt"]
+        and any("subsequent workflow steps" in item for item in case["expectations"])
+        and any("current PowerShell process" in item for item in case["expectations"])
+        and any("GITHUB_ENV-only" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must reject GITHUB_ENV-only same-step tool propagation",
+)
+require(
+    any(
+        "chunksUploaded=3/chunksTotal=4" in case["prompt"]
+        and any("official server-SDK compatibility table" in item for item in case["expectations"])
+        and any("same-size/type object" in item for item in case["expectations"])
+        and any("deletes it, and verifies absence" in item for item in case["expectations"])
+        and any("Rejects raw REST" in item for item in case["expectations"])
+        and any("explicit external-write and security/risk approval boundary" in item for item in case["expectations"])
+        and any("flutter doctor -v" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must cover downstream chunked-storage and runner-image regressions",
+)
+require(
+    any(
+        "assigns filtered source paths to `$matches`" in case["prompt"]
+        and any("case-insensitive" in item for item in case["expectations"])
+        and any("zero, one, and many" in item for item in case["expectations"])
+        and any("strict-mode red fixture" in item for item in case["expectations"])
+        and any("explicit array normalization" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must cover Matches collision and cardinality fixtures",
+)
+require(
+    any(
+        "InstallLocation ending in a backslash" in case["prompt"]
+        and any("AddBackslash" in item for item in case["expectations"])
+        and any("rethrows the primary error" in item for item in case["expectations"])
+        and any("same-job codegen and verified-transfer" in item for item in case["expectations"])
+        and any("900-second" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must cover Inno path, settlement, branch, and timeout contracts",
 )
 
 for text in (reference_text, workflow_text, inno_bundle_text, sentinel_text, ci_text):

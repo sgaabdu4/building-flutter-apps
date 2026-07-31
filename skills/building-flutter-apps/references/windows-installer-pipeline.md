@@ -37,6 +37,8 @@
 - YAML surface = minimum runner + permission + cache + handoff + artifact + external-write boundaries.
 - Ordered internal phases = repository-owned orchestration script + phase receipts; avoid one YAML step per command.
 - Compacting = move calls, never remove guards; contract-test each required guard call + its order before the single expensive build.
+- Shared YAML = boundary topology only; orchestration branches own same-job codegen vs verified transfer + first-release vs upgrade lifecycle.
+- Branch contract = every accepted internal branch retains common syntax/timeout/CRT/Inno guards + one native build + identity/security/lifecycle proof + publication ordering.
 - Publisher minimum = read-only Linux admission + one Windows build/publisher; diagnostic remains one Windows-only job.
 - Duplicate Windows build, repeated tool setup, and visible step count without a permission/runner/artifact boundary = `FAIL`.
 - Verification permissions = `contents: read` + `actions: read` only when run/readback needs it.
@@ -68,6 +70,8 @@
 - Forbidden CRT proof = opportunistic System32 copy + optional/missing-tolerated file + compiler presence alone.
 - Native API = include `<windows.h>` before `<shellapi.h>` for `CommandLineToArgvW`; link `Shell32.lib`.
 - Native diagnosis = declaration/header order + include directories + link libraries + runtime bundle; one layer cannot prove another.
+- Floating runner label = record resolved image OS/version + `flutter doctor -v` + `vswhere` result + actual native build; old Visual Studio paths/generators are not current-run proof.
+- Runner migration = research the current image manifest/announcement before pinning or retrying; choose an explicit older image only for a proven compatibility need + accepted support tradeoff.
 
 ## `inno_bundle` setup
 
@@ -94,13 +98,20 @@
 - Generated source = literal single-quoted content + dynamic paths/values as named arguments; nested expandable PowerShell source = forbidden.
 - Generated proof = materialize → parse exact output → execute harmless readiness path under compatible `pwsh` with a bounded receipt before CI/build.
 - Filename suffix = compute in one scope + pass as an argument; if interpolation is unavoidable, use `${childPidPath}.tmp` or `$($childPidPath).tmp`, never `$childPidPath.tmp`.
+- Variable names = case-insensitive; `$matches` in every casing aliases automatic `$Matches` → never use it for owned paths/results/arrays.
+- Regex state = scalar `-match`/`-notmatch` can overwrite or retain `$Matches`; consume captures inside the matching branch + copy only required values to descriptive variables.
+- `$Matches` regression = strict-mode red fixture stores source results in forbidden casing → scalar regex validation → source consumption fails; green fixture keeps named `@(...)` source intact.
 - Numeric conversion = validate range + multiply in a wide numeric type + bounds-check + explicit target cast; `[checked]` is not a PowerShell type accelerator.
-- Uncertain command/cmdlet/pipeline result = `@(...)` before `.Count`, `[0]`, exact-one, or comparison.
+- Command/pipeline/filter result read with `.Count`/index/exact-one = explicit `@(...)` at assignment; singleton object properties are not collection cardinality.
 - Selected scalar = explicit `[string]` conversion before string APIs.
-- Cardinality fixture = zero + one + many.
+- Cardinality fixture = strict mode + zero/one/many; static contract rejects command/pipeline/filter owners read with `.Count` before array normalization.
 - Native output = capture array + immediate `$LASTEXITCODE` + normalize to one string before regex.
 - Process arguments = executable + token array; shell-concatenated command string = avoid.
 - Tool path = uniquely resolved absolute path; Program Files guess = forbidden.
+- `GITHUB_ENV` write = subsequent workflow steps only; the writing step/current process cannot consume the new value.
+- Same-step installer = return the resolved path or set `$env:ISCC_PATH` in the current PowerShell process + validate absolute existing `ISCC.exe`.
+- Future-step handoff, when needed = also append `ISCC_PATH=<path>` to `$env:GITHUB_ENV`; this never substitutes for current-process assignment.
+- Consumption contract = installer result → current `$env:ISCC_PATH`/typed parameter → identity/lifecycle guard; assert non-empty/existing path + call order before build.
 - Ephemeral root = unique `RUNNER_TEMP` child + owner marker + exact-root cleanup guard.
 
 ## Inno ownership
@@ -120,10 +131,11 @@
 - Filename = `<app>-windows-installer-v<version>.exe`.
 - File = exact expected name + accepted size bounds + `MZ` + SHA-256.
 - Product identity = ProductName + FileDescription + stable AppId.
+- Install path = Inno 6.7.3 `InstallLocation` includes `AddBackslash(...)`; canonicalize trailing separators on expected/actual paths before equality only.
 - Numeric fields = `VersionInfoVersion` + `VersionInfoProductVersion`; compare four integer parts independently.
 - Text field = `VersionInfoProductTextVersion`; trim only observed textual boundary padding before equality.
 - Diagnostic = exact failed field + expected value + safe observed value/length/hash.
-- Opaque aggregate identity exception = forbidden.
+- Path canonicalization never weakens AppId/name/version/hash/signature assertions; opaque aggregate identity exception = forbidden.
 - Signature required by accepted delivery policy = verify chain + subject/thumbprint policy + timestamp before publication.
 
 ## Install lifecycle
@@ -160,9 +172,11 @@
 
 - Exit `0` = original uninstaller completed; its temporary cleanup clone may still be running.
 - Invocation = launch the exact owned uninstaller once; after exit `0`, never invoke its vanishing path again.
-- Settlement = bounded poll until both exact install directory + exact AppId uninstall registry key are absent in every declared root/view.
+- Settlement = bounded poll until exact install directory + exact AppId uninstall registry key + owned TEMP-clone process/file state are absent.
 - Ownership = retain installation/cleanup state until settlement passes or times out; no second uninstaller fallback.
 - Timeout receipt = unresolved directory/key condition + elapsed/deadline + safe process state; bounded owned cleanup only.
+- Relaunch cleanup = stop only the exact process proven to be the newly relaunched app; name-wide/process-wide termination = forbidden.
+- Error precedence = capture primary phase exception + stack → attempt bounded cleanup → attach cleanup failure → rethrow primary; cleanup never masks root cause.
 - Data contract = settlement targets installed program/registration only; accepted application/user data remains preserved.
 
 ## Bounded processes
@@ -177,6 +191,8 @@
 - Native owner = `WaitForSingleObject(handle, timeout_ms)` + separate parent/installer `WAIT_TIMEOUT` exits + closed handles.
 - Regression sentinel = child intentionally exceeds deadline → gate exits within bound + names phase + kills descendant + leaves no owned artifact/process.
 - Nested deadlines = child phase + cleanup headroom < job deadline.
+- Cold Flutter build ceiling = `900s` default inner deadline from observed clean-run range `~161–555s`; evidence bound, not vendor SLA.
+- Duration tuning = record image/toolchain + phase duration; tighter repo-owned evidence may reduce the ceiling, relaxation requires new receipts.
 
 ## Updater behavior
 
@@ -208,6 +224,12 @@
 - Final readback = active pointer/index + immutable objects + exact version/tag/SHA.
 - Failure before activation = previous pointer unchanged.
 - Actions artifact = short-lived evidence or same-run transport of an already verified publication object; never previous-release authority or independent publication/readback proof.
+- Provider binding = deployed server/version + official SDK compatibility pin + endpoint/mode + storage security policy; tiny credential/API probes prove none of the release upload path.
+- Provider preflight = official SDK + candidate-size/type object + same chunking/protocol + same bucket/security policy → upload + metadata/hash/readback + bounded delete settlement before release activation.
+- Object identity = allocate one deterministic release object ID before upload + reuse it across attempts.
+- Failed upload = reconcile that exact ID; partial/incomplete object → delete + verify absent before retry. Fresh ID, orphaned chunks, or raw REST fallback = `FAIL`.
+- Failure ownership = native build/installer proof and downstream storage publication are separate phases/receipts; a storage failure never invalidates passed native proof or authorizes rebuilding it.
+- Security-policy workaround = disabling scan/security, changing bucket/provider, server upgrade/custom image, or alternate protocol → explicit external-write + security/risk approval boundary.
 - Provider adapter = preflight candidate write/read/delete + idempotency + permissions + atomicity/ordering contract before release.
 
 ## Proof
@@ -223,7 +245,13 @@
 - [build_runner changelog](https://pub.dev/packages/build_runner/changelog)
 - [Flutter Windows distribution](https://docs.flutter.dev/platform-integration/windows/building)
 - [GitHub workflow syntax and permissions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
+- [GitHub `windows-latest` Server 2025 + Visual Studio 2026 migration](https://github.com/actions/runner-images/issues/14017)
+- [GitHub Actions environment files](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-environment-variable)
 - [GitHub token](https://docs.github.com/en/actions/concepts/security/github_token)
+- [PowerShell case sensitivity](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_case-sensitivity)
+- [PowerShell automatic `$Matches`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_automatic_variables)
+- [PowerShell `-match`/`-notmatch`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_comparison_operators)
+- [PowerShell arrays + `@(...)`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_arrays)
 - [PowerShell Start-Process](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process)
 - [PowerShell Wait-Process](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/wait-process)
 - [PowerShell `Parser.ParseFile`](https://learn.microsoft.com/en-us/dotnet/api/system.management.automation.language.parser.parsefile?view=powershellsdk-7.6.0)
@@ -232,6 +260,7 @@
 - [Visual Studio `vswhere`](https://github.com/microsoft/vswhere)
 - [Inno Setup AppId](https://jrsoftware.org/ishelp/topic_setup_appid.htm)
 - [Inno Setup uninstaller exit codes](https://jrsoftware.org/ishelp/topic_uninstexitcodes.htm)
+- [Inno Setup 6.7.3 `InstallLocation` source](https://github.com/jrsoftware/issrc/blob/is-6_7_3/Projects/Src/Setup.Install.pas#L270-L275)
 - [Inno Setup event functions](https://jrsoftware.org/ishelp/topic_scriptevents.htm)
 - [Inno Setup exit codes](https://jrsoftware.org/ishelp/topic_setupexitcodes.htm)
 - [Inno Setup command-line parameters](https://jrsoftware.org/ishelp/topic_setupcmdline.htm)

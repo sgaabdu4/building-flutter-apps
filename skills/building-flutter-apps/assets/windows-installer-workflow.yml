@@ -7,10 +7,22 @@
 #   parse-powershell -> timeout smoke -> CRT smoke -> Inno identity smoke ->
 #   Inno install/uninstall settlement smoke -> Flutter build exactly once.
 # Contract-test call presence and order inside each orchestration script.
+# Same-step tool installers must return/set `ISCC_PATH` in the current
+# PowerShell process before internal guards consume it. Writing `GITHUB_ENV`
+# alone is only a handoff to a later workflow step.
+# Internal PowerShell contracts reject every casing of `$matches` as an owned
+# variable and require `@(...)` before `.Count`/index/exact-one consumption.
+# Exercise zero/one/many plus regex-validation-then-source-consumption fixtures.
 # The same script then stages/proves CRT, runs `dart run inno_bundle --no-app`
 # or the accepted custom Inno owner, verifies/scans/lifecycle-tests the EXE,
 # and—only in publish mode—uploads immutable bytes, verifies readback, pushes
 # the exact release identity, and activates the provider-neutral pointer last.
+# Before release upload, bind the deployed service version to its official SDK,
+# then exercise candidate size/type, protocol/chunking, and security policy in
+# an owned temporary object. Reconcile/delete that exact ID before any retry.
+# Keep native verification and downstream storage as separate phase receipts.
+# Shared YAML does not collapse internal branches: contract same-job codegen vs
+# verified transfer and first-release vs upgrade against the same core guards.
 #
 # Verification writes no tag, release, deployment, publication object, pointer,
 # or machine install. Publication consumes one exact diagnostic-proven revision.

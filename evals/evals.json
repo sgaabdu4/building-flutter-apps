@@ -870,6 +870,80 @@
         "Produces <app>-windows-installer-v<version>.exe and uploads it only after identity, lifecycle, secret, and Defender checks pass",
         "Keeps the diagnostic workflow manual, Windows-only, minimal-step, read-only, secret-free, and provider-agnostic; publication remains unimplemented until a provider contract is accepted"
       ]
+    },
+    {
+      "id": 59,
+      "prompt": "A compact Flutter Windows workflow runs tool installation and all native guards inside one PowerShell orchestration step. The installer appends `ISCC_PATH=...` to `$env:GITHUB_ENV`, then the same step invokes the Inno identity guard through `$env:ISCC_PATH`, which is empty. What is the root cause and smallest durable correction?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Explains that GITHUB_ENV updates become available only to subsequent workflow steps and not to later commands in the writing step",
+        "Keeps the compact single orchestration step rather than adding a YAML step merely to obtain environment propagation",
+        "Makes the installer return the uniquely resolved ISCC.exe path or set $env:ISCC_PATH in the current PowerShell process",
+        "Validates that the current-process value is non-empty, absolute, uniquely resolved, and an existing file before any guard consumes it",
+        "Passes the validated path directly as a typed guard parameter or reads the current-process environment value",
+        "Writes the same value to GITHUB_ENV only when a later workflow step also requires it",
+        "Adds a contract test proving installer invocation precedes current-process assignment and the Inno identity/lifecycle guard consumes that exact value before Flutter build",
+        "Rejects a GITHUB_ENV-only installer fixture and accepts return-plus-current-process or direct-current-process assignment fixtures",
+        "Classifies the failed run as cheap pre-build negative evidence and requires the focused same-process sentinel before another paid retry"
+      ]
+    },
+    {
+      "id": 60,
+      "prompt": "A Flutter Windows release job has already passed source generation, CRT staging, native build, Inno compile, installer identity, lifecycle, Defender, and secret scans. Publication to self-hosted Appwrite 1.9.6 then uploads a 15 MB EXE through node-appwrite to an antivirus-enabled bucket: the final chunk returns 403 storage_invalid_file and the deterministic file record remains chunksUploaded=3/chunksTotal=4. A tiny text-file credential probe passed earlier. The same run reports windows-latest with a newer Visual Studio image than the old scripts assumed. What is proven, what failed, and what must happen before retry?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Keeps the native Windows installer phases classified as passed and classifies publication as a downstream storage capability failure instead of rebuilding the installer",
+        "Binds the live Appwrite server version to the official server-SDK compatibility table and the repository's exact node-appwrite pin before changing the publisher",
+        "Uses Appwrite issue 13001, pull request 13010, current stable release notes, and official SDK compatibility documentation to determine whether a released fix exists",
+        "Explains that a tiny credential/API probe does not exercise release-candidate size, SDK chunking, finalization, file type, antivirus, or bucket policy",
+        "Requires an official-SDK preflight using the candidate or a harmless same-size/type object through the same endpoint, bucket, chunking protocol, permissions, and security policy, followed by metadata, full hash/download readback, and bounded cleanup",
+        "Reuses the deterministic release object ID, reconciles the exact incomplete record, deletes it, and verifies absence before retrying; it does not create a fresh ID or leave orphaned partial chunks",
+        "Rejects raw REST or custom chunk transport as a fallback when the official SDK path exposes a server defect",
+        "Leaves the active pointer/index unchanged until immutable upload and independent readback pass",
+        "Treats disabling antivirus, weakening bucket policy, changing provider, upgrading or patching the server, or using a custom image as an explicit external-write and security/risk approval boundary",
+        "Records the resolved GitHub runner image, runs flutter doctor -v, resolves Visual Studio through vswhere, and proves compatibility with the actual native build rather than assuming Visual Studio 2022 paths",
+        "Researches the current runner-image manifest/announcement before choosing windows-latest or an explicit older label and does not pin an old image without a proven compatibility reason",
+        "Adds regression coverage for same-size chunked security-policy preflight, partial-object reconciliation, pointer immutability on failure, failure-phase classification, and runner-toolchain discovery"
+      ]
+    },
+    {
+      "id": 61,
+      "prompt": "A compact Windows orchestration script assigns filtered source paths to `$matches`, validates a version string with scalar `-match`, then reads `$Matches.Count` and `$matches[0]`. It worked with several files but failed on a clean runner with one file. Add a red-capable contract without expanding the GitHub Actions YAML.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Explains that PowerShell variable names are case-insensitive, so $matches aliases the automatic $Matches variable in every casing",
+        "Explains that scalar -match or -notmatch can overwrite $Matches on a match and can leave stale captures when no new match occurs",
+        "Renames owned path/result variables and confines $Matches capture consumption to the matching branch before copying required scalar captures",
+        "Wraps every command, pipeline, or filter result later read with .Count, indexing, or exact-one logic in @() at assignment",
+        "Adds a strict-mode red fixture that stores source paths in a forbidden $matches casing, performs scalar regex validation, then proves source consumption was corrupted",
+        "Adds a strict-mode green fixture proving the renamed @() source survives regex validation and consumes the intended path",
+        "Runs zero, one, and many cardinality cases and verifies both collection count and selected source identity",
+        "Adds a static contract that rejects unsafe $matches declarations/usages and command, pipeline, or filter owners read through .Count without explicit array normalization",
+        "Keeps parser and fixture calls inside the single orchestration step before tool setup or Flutter compilation",
+        "Rejects a content-only check of an uncalled fixture as execution proof"
+      ]
+    },
+    {
+      "id": 62,
+      "prompt": "A clean Windows installer run reports an InstallLocation ending in a backslash while the expected app path has none. Later, uninstaller exit 0 is followed by a lingering TEMP clone; cleanup kills every process with the app name, fails, and replaces the earlier lifecycle exception. The compact YAML is shared by apps that either transfer codegen or generate it in the Windows job, and this is a first release. What should the canonical flow require?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Uses the pinned Inno 6.7.3 source to explain that InstallLocation is written with AddBackslash and canonicalizes trailing separators on expected and actual paths before path equality",
+        "Keeps AppId, product name, numeric and textual versions, hash, signature, and every non-path identity assertion strict",
+        "Treats uninstaller exit as original-process completion and waits within a named bound for exact AppId registry keys, install files, and owned TEMP-clone process/file settlement",
+        "Invokes the exact uninstaller once and never retries its disappearing path",
+        "Stops only the exact PID and executable identity proven to be the newly relaunched app before owned cleanup",
+        "Preserves the primary phase exception and stack, records cleanup failure separately, and rethrows the primary error",
+        "Keeps the shared YAML boundary topology compact while contract-testing both same-job codegen and verified-transfer orchestration branches against common pre-build guards",
+        "Selects first-release skipped_no_prior_release lifecycle rather than requiring an old installer; upgrade branches retain their separate previous-release contract",
+        "Uses a 900-second cold Flutter build inner deadline as an evidence-backed default from an observed roughly 161-to-555-second range, not as a vendor SLA",
+        "Records runner image, toolchain, and phase duration; permits a tighter repository bound from evidence and requires new receipts before relaxing the ceiling",
+        "Adds red fixtures for raw path comparison, immediate post-exit settlement, broad process kill, cleanup-error masking, missing common branch guards, and an unbounded build phase"
+      ]
     }
   ]
 }
