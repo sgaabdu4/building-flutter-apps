@@ -20,9 +20,37 @@
 # Before release upload, bind the deployed service version to its official SDK,
 # then exercise candidate size/type, protocol/chunking, and security policy in
 # an owned temporary object. Reconcile/delete that exact ID before any retry.
+# Build its manifest with the publication schema owner (including `platform`)
+# and round-trip the payload through the real signer and verifier; a reduced
+# ad hoc preflight map or weaker validator is not publication-contract proof.
 # Keep native verification and downstream storage as separate phase receipts.
 # Shared YAML does not collapse internal branches: contract same-job codegen vs
 # verified transfer and first-release vs upgrade against the same core guards.
+# Reuse one semantic release stage DAG across apps. App identity/provider values
+# are validated typed configuration or adapters; never fork a copied publisher
+# or import another app's IDs. Before a second app publishes, map every stage,
+# branch, input/output, order, timeout, failure, and cleanup invariant to the
+# proven reference and execute the real adapted branches with controlled stubs.
+# Run portable local checks first, then the exact-format Linux provider
+# create/public-read/delete preflight. Run this same orchestration on a clean,
+# private-repository, repository-scoped ephemeral/JIT self-hosted Windows
+# runner (or directly on a dedicated disposable Windows VM) before paying for
+# the sole GitHub-hosted Windows publisher. Never attach a public/shared/
+# persistent runner or a clinic PC holding patient data or live credentials.
+# `act` is wiring-only: its images are incomplete and do not provide Windows
+# target-native proof from macOS/Linux.
+# The orchestration calls `defender-installer-scan.ps1` after installer/lifecycle
+# proof. It uses official `-ReturnHR`, fails detections/unknown HRESULTs closed,
+# and retries only exact sharing violation `0x80070020` once within its bound.
+# Keep scanner parsing + red/green self-tests inside the existing orchestration
+# contract; never add YAML steps merely to expose this internal phase.
+# After immutable create returns, poll the unauthenticated consumer read for the
+# same ID/bytes. Retry only typed `storage_file_not_found`, 429, or 5xx within
+# one bound; fail 401/403/mismatch immediately. Recovery never rebuilds,
+# version-bumps, deletes, overwrites, or duplicates the immutable release.
+# Every Bash entrypoint sets strict mode, resolves its own canonical directory
+# from BASH_SOURCE before path use, and is exercised through real provider/helper
+# branches with controlled stubs. Static source presence is not execution proof.
 #
 # Verification writes no tag, release, deployment, publication object, pointer,
 # or machine install. Publication consumes one exact diagnostic-proven revision.
@@ -62,7 +90,7 @@ jobs:
   verify_windows:
     name: Verify Windows without publication
     if: inputs.mode == 'verify-windows'
-    runs-on: windows-latest
+    runs-on: [self-hosted, windows, x64, windows-installer-proof]
     timeout-minutes: 75
     permissions:
       actions: read

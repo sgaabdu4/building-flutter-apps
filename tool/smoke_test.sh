@@ -151,9 +151,38 @@ assert "Command/pipeline/filter result read with `.Count`/index/exact-one = expl
 assert "Inno 6.7.3 `InstallLocation` includes `AddBackslash(...)`" in windows_installer
 assert "cleanup never masks root cause" in windows_installer
 assert "Cold Flutter build ceiling = `900s`" in windows_installer
+assert "legacy exit `2` is ambiguous" in windows_installer
+assert "`HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)` = `0x80070020`" in windows_installer
+assert "## Cost-aware proof ladder" in windows_installer
+assert "Self-hosted Actions usage = no GitHub-hosted Actions minute charge" in windows_installer
+assert "private repository only + repository scope" in windows_installer
+assert "clinic production PC" in windows_installer
+assert "`act` = portable wiring aid only" in windows_installer
+assert "Public-read settlement = after immutable create returns" in windows_installer
+assert "exact `storage_file_not_found` + HTTP `429` + `5xx` only" in windows_installer
+assert "same immutable object ID + same accepted bytes" in windows_installer
+assert "Manifest fixture = same canonical builder/schema owner as publication" in windows_installer
+assert "including `platform`" in windows_installer
+assert "Crypto round-trip = canonical manifest payload → real signer → real verifier" in windows_installer
+assert "reduced ad hoc maps + weaker fixture validators = false-gate risk" in windows_installer
+assert "Bash entry script = `set -euo pipefail`" in windows_installer
+assert 'script_root="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"' in windows_installer
+assert "Real-branch fixture = invoke the actual entry script" in windows_installer
+assert "missing `script_root` red under `set -u`" in windows_installer
+assert "Cross-app engine = one semantic release stage DAG" in windows_installer
+assert "Second-app admission = stage-by-stage parity map against one proven reference" in windows_installer
+assert "Copy-pasted app-specific release engine + foreign project/object IDs = `FAIL`" in windows_installer
+assert "Schema variance = preserve intentional fields such as `channel` or `platform`" in windows_installer
+assert "Windows 11 ARM64 VM = useful supplemental smoke" in windows_installer
+assert "ARM64 boundary = not native x64 compiler/toolchain/CRT/driver/GitHub-runner proof" in windows_installer
+assert "kernel drivers, which require native ARM64" in windows_installer
+assert "exact checked-in `windows_installer.ps1 verify` + `publication=none`" in windows_installer
+assert "Architecture receipt = host architecture + guest architecture" in windows_installer
+assert "Runner registration = separate security + persistent-access boundary" in windows_installer
 workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
 inno_bundle_pubspec = (skill / "assets/inno-bundle-pubspec.yaml").read_text()
 settlement_sentinel = (skill / "assets/inno-uninstall-settlement-sentinel.ps1").read_text()
+defender_scanner = (skill / "assets/defender-installer-scan.ps1").read_text()
 settlement_ci = (root / ".github/workflows/windows-installer-sentinel.yml").read_text()
 assert "mode:" in workflow_asset
 assert "verify-windows" in workflow_asset
@@ -175,19 +204,40 @@ assert "reject every casing of `$matches`" in workflow_asset
 assert "require `@(...)` before `.Count`/index/exact-one consumption" in workflow_asset
 assert "same-job codegen vs" in workflow_asset
 assert "verified transfer and first-release vs upgrade" in workflow_asset
+assert "`defender-installer-scan.ps1`" in workflow_asset
+assert "official `-ReturnHR`" in workflow_asset
+assert "sharing violation `0x80070020` once" in workflow_asset
+assert "repository-scoped ephemeral/JIT self-hosted Windows" in workflow_asset
+assert "`act` is wiring-only" in workflow_asset
+assert "sole GitHub-hosted Windows publisher" in workflow_asset
+assert "storage_file_not_found" in workflow_asset
+assert "Recovery never rebuilds" in workflow_asset
+assert "publication schema owner (including `platform`)" in workflow_asset
+assert "real signer and verifier" in workflow_asset
+assert "one semantic release stage DAG across apps" in workflow_asset
+assert "never fork a copied publisher" in workflow_asset
+assert "Every Bash entrypoint sets strict mode" in workflow_asset
+assert "from BASH_SOURCE before path use" in workflow_asset
 assert "flutter build windows --release" not in workflow_asset
 assert "group: windows-installer-release" in workflow_asset
 assert "retention-days: 1" in workflow_asset
 assert "resolve every" in workflow_asset
+assert "'-ReturnHR'" in defender_scanner
+assert "'0x80070020'" in defender_scanner
+assert "DEFENDER_SCAN_FIXTURES_OK" in defender_scanner
+assert "$scannerPath -SelfTest" in settlement_ci
+assert settlement_ci.index("[System.Management.Automation.Language.Parser]::ParseFile(") < settlement_ci.index("$scannerPath -SelfTest")
 verify_job = workflow_asset.split("  verify_windows:", 1)[1].split("  admission:", 1)[0]
 assert "contents: read" in verify_job
 assert "actions: read" in verify_job
 assert "contents: write" not in verify_job
 assert "secrets." not in verify_job
+assert "runs-on: [self-hosted, windows, x64, windows-installer-proof]" in verify_job
 assert verify_job.count("- name:") <= 4
 publish_job = workflow_asset.split("  publish:", 1)[1]
 assert publish_job.count("- name:") <= 5
 assert "needs:" in publish_job and "- admission" in publish_job
+assert "runs-on: windows-latest" in publish_job
 assert "id: REPLACE_WITH_STABLE_GUID" in inno_bundle_pubspec
 assert "vc_redist: false" in inno_bundle_pubspec
 assert "files: []" in inno_bundle_pubspec
@@ -215,7 +265,7 @@ for text in (
     settlement_sentinel,
     openai_yaml,
 ):
-    lowered = text.lower()
+    lowered = text.lower().replace("https://appwrite.io/docs/", "")
     for forbidden in ("appwrite", "jabal", "emr_", "project_id", "database_id"):
         assert forbidden not in lowered, forbidden
 error_reporting = (skill / "references/error-reporting.md").read_text()

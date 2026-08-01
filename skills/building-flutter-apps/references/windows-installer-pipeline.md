@@ -5,12 +5,13 @@
 1. Scope = Flutter Windows EXE + Inno Setup/`inno_bundle` + updater + GitHub Actions delivery.
 2. Current contract = installed package/tool/action + primary docs/changelog + resolved runner paths; memory + cached/local success = no proof.
 3. Entry = secret-free manual Windows diagnostic for one exact SHA; publish only that proven SHA with one release actor.
-4. Copy scaffold = [windows-installer-workflow.yml](../assets/windows-installer-workflow.yml) + [`inno_bundle` pubspec fragment](../assets/inno-bundle-pubspec.yaml) + [Inno settlement sentinel](../assets/inno-uninstall-settlement-sentinel.ps1); replace repository-owned commands + audit every action/tool pin before first run.
+4. Copy scaffold = [windows-installer-workflow.yml](../assets/windows-installer-workflow.yml) + [`inno_bundle` pubspec fragment](../assets/inno-bundle-pubspec.yaml) + [Inno settlement sentinel](../assets/inno-uninstall-settlement-sentinel.ps1) + [Defender scanner](../assets/defender-installer-scan.ps1); replace repository-owned commands + audit every action/tool pin before first run.
 5. Provider boundary = artifact store/index/pointer are interfaces; keep provider names, endpoints, project IDs, PII, and credentials outside this skill/package.
 
 ## Contents
 
 - [Flow](#flow)
+- [Cost-aware proof ladder](#cost-aware-proof-ladder)
 - [Clean runner](#clean-runner)
 - [Windows native bundle](#windows-native-bundle)
 - [`inno_bundle` setup](#inno_bundle-setup)
@@ -28,10 +29,10 @@
 
 1. Research = resolve Flutter/Dart/Node/actions/Inno/`inno_bundle` versions + official source + hashes/signatures where supplied.
 2. Contract = inventory last green step order + generated outputs + runtime DLLs + installer identity + data-preservation policy + publication interfaces.
-3. Cheap proof = YAML/shell/PowerShell syntax + tool identity + CRT sentinel + tiny Inno identity/install/uninstall settlement sentinels + timeout regression fixtures.
-4. Diagnostic = one `workflow_dispatch` + one `windows-latest` job + exact SHA + no publisher secrets/writes.
+3. Cheap proof = local portable syntax/unit/static/crypto tests + one Linux provider preflight.
+4. Diagnostic = exact SHA + same repository-owned Windows orchestration on a clean native x64 Windows VM or repository-scoped ephemeral/JIT x64 runner + no publisher secrets/writes.
 5. Diagnostic artifact = upload installer + machine receipt only after every check passes; short retention; publication = `none`.
-6. Publisher = one full run for diagnostic-proven SHA; quality/preparation may parallelize, native/external mutations remain sequential.
+6. Publisher = one GitHub-hosted Windows run for diagnostic-proven SHA; quality/preparation may parallelize, native/external mutations remain sequential.
 7. Delivery = immutable installer/manifest upload → independent download/readback → pointer/index update last → final remote receipt.
 
 - YAML surface = minimum runner + permission + cache + handoff + artifact + external-write boundaries.
@@ -39,7 +40,10 @@
 - Compacting = move calls, never remove guards; contract-test each required guard call + its order before the single expensive build.
 - Shared YAML = boundary topology only; orchestration branches own same-job codegen vs verified transfer + first-release vs upgrade lifecycle.
 - Branch contract = every accepted internal branch retains common syntax/timeout/CRT/Inno guards + one native build + identity/security/lifecycle proof + publication ordering.
-- Publisher minimum = read-only Linux admission + one Windows build/publisher; diagnostic remains one Windows-only job.
+- Cross-app engine = one semantic release stage DAG; app identity + provider values = validated typed configuration/adapters.
+- Second-app admission = stage-by-stage parity map against one proven reference + real execution of every adapted branch before publish.
+- Copy-pasted app-specific release engine + foreign project/object IDs = `FAIL`; justified schema differences stay explicit at typed adapter boundaries.
+- Publisher minimum = read-only Linux admission + one GitHub-hosted Windows build/publisher; target-native diagnostic runs locally or on repository-scoped ephemeral/JIT self-hosted Windows.
 - Duplicate Windows build, repeated tool setup, and visible step count without a permission/runner/artifact boundary = `FAIL`.
 - Verification permissions = `contents: read` + `actions: read` only when run/readback needs it.
 - Verification exclusions = tags + releases + deployments + pointer/index writes + machine installation + signing/publisher secrets.
@@ -47,8 +51,34 @@
 - Release actor = one per repository + target + environment + revision; concurrency cancels no in-flight publisher.
 - Cache = acceleration only; delete/disable cache and retain correctness.
 
+## Cost-aware proof ladder
+
+1. Portable local = macOS/Linux syntax + unit + static contracts + deterministic crypto/signature fixtures; no Windows-native or live-provider claim.
+2. Provider preflight = cheap Linux + official SDK + harmless exact-candidate format/size/protocol/security policy → owned temporary create + public read/hash + bounded delete settlement.
+3. Target-native = same checked-in `windows_installer.ps1 verify` on a clean native x64 Windows VM OR repository-scoped ephemeral/JIT x64 Windows runner → one native build + complete installer/lifecycle/security receipt.
+4. Hosted release = only after step 3 passes for the exact SHA → one GitHub-hosted Windows publisher + one native build inside that run + immutable activation proof.
+
+- Failure cancels later paid work; retry only the smallest failed rung after root-cause + adjacent-assumption proof.
+- `act` = portable wiring aid only; its container images are Linux-oriented + intentionally incomplete, and Windows/macOS labels require opting out to an actual matching host. `act` on macOS/Linux is not Windows target-native proof.
+- Self-hosted Actions usage = no GitHub-hosted Actions minute charge; machine + image + updates + isolation + cleanup + logs remain operator-owned.
+- Self-hosted security = private repository only + repository scope + one exact revision/job + ephemeral/JIT clean environment + teardown after receipt. Persistent runners can retain compromise or secrets across jobs.
+- Forbidden runner = public repository + organization-wide shared runner + persistent developer workstation + clinic production PC + any machine holding patient data, live credentials, signing keys, or access to sensitive services.
+- Local Windows VM = dedicated disposable proof environment; never reinterpret a normal production workstation as clean.
+- Windows 11 ARM64 VM = useful supplemental smoke for PowerShell + Inno compile/install/uninstall/lifecycle + x86/x64 user-mode EXE emulation.
+- ARM64 boundary = not native x64 compiler/toolchain/CRT/driver/GitHub-runner proof; Windows emulation does not cover kernel drivers, which require native ARM64.
+- Local entrypoint = exact checked-in `windows_installer.ps1 verify` + `publication=none`; no tag/release/pointer/provider mutation.
+- Architecture receipt = host architecture + guest architecture + process/EXE architecture + emulation state + Windows build + resolved toolchain paths/versions.
+- Runner registration = separate security + persistent-access boundary; direct local execution never authorizes persistent self-hosted registration.
+- Compact contract = local VM + self-hosted verify + hosted publish call the same repository-owned orchestration; YAML owns boundaries only.
+- Build count = exactly one Flutter/native compile per target-native orchestration invocation; setup, guards, Inno, Defender, lifecycle, readback, and publication never trigger a second compile in that invocation.
+
 ## Clean runner
 
+- Bash entry script = `set -euo pipefail` + `script_root="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"` + separate `readonly script_root` before first path use.
+- Entry ownership = each executable resolves its own directory; inherited caller CWD + undeclared/shared `script_root` = `FAIL`.
+- Real-branch fixture = invoke the actual entry script under identical strict-mode flags + controlled command/PATH stubs → traverse each live branch into every delegated helper.
+- Adjacent audit = definition-before-use for variables crossing branch/setup/helper boundaries; static YAML/text/source presence proves wiring only.
+- Regression = missing `script_root` red under `set -u` + initialized real-helper branch green; testing a helper directly is insufficient.
 - Every Windows consumer = `flutter pub get` → source-changing version materialization → `dart run build_runner build` → `flutter gen-l10n` when configured → analyze/test → `flutter build windows --release`.
 - Generated output = tracked OR generated in consumer OR transferred as explicit hash/provenance-verified artifact.
 - Ubuntu-generated ignored output without transfer = absent on Windows.
@@ -209,7 +239,11 @@
 - Bundle/log/artifact = no embedded API keys, credentials, private signing keys, publisher tokens, or PII.
 - Client-visible telemetry destination, when accepted, follows [error-reporting.md](error-reporting.md); upload tokens remain build-only.
 - Scan = current tracked tree + built bundle + extracted installer.
-- Defender = scan final installer + fail on matching detections.
+- Defender invocation = official `MpCmdRun.exe -Scan -ScanType 3 -File <installer> -DisableRemediation -ReturnHR`; legacy exit `2` is ambiguous detection/action/error evidence and cannot prove a clean scan.
+- Defender success = exact HRESULT `0x00000000`; detection/action-required HRESULT + unknown HRESULT + timeout = fail closed.
+- Defender retry = only exact `HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)` = `0x80070020` + at most one bounded retry; every other nonzero result fails immediately.
+- Defender diagnostics = named phase + attempt + HRESULT + bounded redacted output + full stdout/stderr hashes; raw unbounded scanner logs/path output = forbidden.
+- Defender fixture = [copyable scanner](../assets/defender-installer-scan.ps1) self-test proves clean green + detection red + unknown red + one sharing-violation retry green without adding a workflow step.
 - Credential-store behavior, when used = synthetic round-trip + unsupported-platform fail-closed proof.
 - Verification lane = no signing/publisher secret environment or arguments.
 - Logs/receipts = hashes + versions + safe field diagnostics; never secret values.
@@ -226,11 +260,23 @@
 - Actions artifact = short-lived evidence or same-run transport of an already verified publication object; never previous-release authority or independent publication/readback proof.
 - Provider binding = deployed server/version + official SDK compatibility pin + endpoint/mode + storage security policy; tiny credential/API probes prove none of the release upload path.
 - Provider preflight = official SDK + candidate-size/type object + same chunking/protocol + same bucket/security policy → upload + metadata/hash/readback + bounded delete settlement before release activation.
+- Manifest fixture = same canonical builder/schema owner as publication; otherwise contract-test parity for every required identity field, including `platform`.
+- Crypto round-trip = canonical manifest payload → real signer → real verifier; reduced ad hoc maps + weaker fixture validators = false-gate risk.
+- Public-read settlement = after immutable create returns, use the unauthenticated/public consumer path + bounded typed polling until exact bytes/hash/signature/payload are readable.
+- Retryable read = exact `storage_file_not_found` + HTTP `429` + `5xx` only → bounded exponential backoff + attempt/deadline/type/code receipt.
+- Immediate failure = `401` + `403` + unexpected `4xx` + hash/signature/payload/size/identity mismatch.
+- Ambiguous create/read recovery = same immutable object ID + same accepted bytes; reconcile/read only. Rebuild + version bump + delete + overwrite + duplicate ID/object = `FAIL`.
+- Preflight cleanup and release recovery differ: delete the owned temporary preflight object after proof; never delete or replace an immutable release object while availability is settling.
 - Object identity = allocate one deterministic release object ID before upload + reuse it across attempts.
 - Failed upload = reconcile that exact ID; partial/incomplete object → delete + verify absent before retry. Fresh ID, orphaned chunks, or raw REST fallback = `FAIL`.
 - Failure ownership = native build/installer proof and downstream storage publication are separate phases/receipts; a storage failure never invalidates passed native proof or authorizes rebuilding it.
 - Security-policy workaround = disabling scan/security, changing bucket/provider, server upgrade/custom image, or alternate protocol → explicit external-write + security/risk approval boundary.
 - Provider adapter = preflight candidate write/read/delete + idempotency + permissions + atomicity/ordering contract before release.
+- Release engine stages = admit exact revision/config → prepare → build once → verify → publish immutable objects → settle readback → activate pointer last.
+- Cross-app parity map = stage + branch + input/config + output/receipt + ordering + timeout/failure/cleanup invariant; omitted or reordered stage blocks adaptation.
+- Typed app config = product identity + stable AppId + artifact names + schema-required manifest fields + provider adapter inputs; validate before mutation.
+- Schema variance = preserve intentional fields such as `channel` or `platform` through typed config/adapter contracts; never flatten them or copy another app's IDs.
+- Real parity proof = execute actual first-release + upgrade + provider branches with controlled adapters; copied text/static call presence alone = insufficient.
 
 ## Proof
 
@@ -248,6 +294,15 @@
 - [GitHub `windows-latest` Server 2025 + Visual Studio 2026 migration](https://github.com/actions/runner-images/issues/14017)
 - [GitHub Actions environment files](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-environment-variable)
 - [GitHub token](https://docs.github.com/en/actions/concepts/security/github_token)
+- [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
+- [GitHub self-hosted runners](https://docs.github.com/en/actions/reference/runners/self-hosted-runners)
+- [GitHub secure use](https://docs.github.com/en/actions/reference/security/secure-use)
+- [GitHub private-repository runner recommendation](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners)
+- [`act` runner images](https://nektosact.com/usage/runners.html)
+- [`act` unsupported functionality](https://nektosact.com/not_supported.html)
+- [Windows on Arm FAQ](https://learn.microsoft.com/en-us/windows/arm/faq)
+- [Add Arm support to Windows apps](https://learn.microsoft.com/en-us/windows/arm/add-arm-support)
+- [How x86 and x64 emulation works on Arm](https://learn.microsoft.com/en-us/windows/arm/apps-on-arm-x86-emulation)
 - [PowerShell case sensitivity](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_case-sensitivity)
 - [PowerShell automatic `$Matches`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_automatic_variables)
 - [PowerShell `-match`/`-notmatch`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_comparison_operators)
@@ -271,3 +326,10 @@
 - [`inno_bundle`](https://pub.dev/packages/inno_bundle)
 - [Win32 `CommandLineToArgvW`](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw)
 - [Win32 `WaitForSingleObject`](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject)
+- [Microsoft Defender `MpCmdRun` + `-ReturnHR`](https://learn.microsoft.com/en-us/defender-endpoint/command-line-arguments-microsoft-defender-antivirus)
+- [Microsoft Defender HRESULTs](https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus)
+- [Win32 `ERROR_SHARING_VIOLATION`](https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-)
+- [Win32 `HRESULT_FROM_WIN32`](https://learn.microsoft.com/en-us/windows/win32/api/winerror/nf-winerror-hresult_from_win32)
+- [Storage permissions](https://appwrite.io/docs/products/storage/permissions)
+- [Storage response codes](https://appwrite.io/docs/apis/response-codes)
+- [Storage create/download API](https://appwrite.io/docs/references/cloud/server-rest/storage)

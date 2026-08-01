@@ -7,6 +7,7 @@ on:
       - .github/workflows/windows-installer-sentinel.yml
       - evals/evals.json
       - skills/building-flutter-apps/SKILL.md
+      - skills/building-flutter-apps/assets/defender-installer-scan.ps1
       - skills/building-flutter-apps/assets/inno-bundle-pubspec.yaml
       - skills/building-flutter-apps/assets/inno-uninstall-settlement-sentinel.ps1
       - skills/building-flutter-apps/assets/windows-installer-workflow.yml
@@ -19,6 +20,7 @@ on:
       - .github/workflows/windows-installer-sentinel.yml
       - evals/evals.json
       - skills/building-flutter-apps/SKILL.md
+      - skills/building-flutter-apps/assets/defender-installer-scan.ps1
       - skills/building-flutter-apps/assets/inno-bundle-pubspec.yaml
       - skills/building-flutter-apps/assets/inno-uninstall-settlement-sentinel.ps1
       - skills/building-flutter-apps/assets/windows-installer-workflow.yml
@@ -42,7 +44,23 @@ jobs:
 
       - name: Verify scaffold integration and order
         shell: pwsh
-        run: python tool/check_windows_installer_assets.py
+        run: |
+          $scannerPath = '${{ github.workspace }}\skills\building-flutter-apps\assets\defender-installer-scan.ps1'
+          $tokens = $null
+          $errors = $null
+          [void] [System.Management.Automation.Language.Parser]::ParseFile(
+            $scannerPath,
+            [ref] $tokens,
+            [ref] $errors
+          )
+          if (@($errors).Count -ne 0) {
+            $errors | ForEach-Object {
+              Write-Error "$($_.Extent.File):$($_.Extent.StartLineNumber):$($_.Extent.StartColumnNumber): $($_.Message)"
+            }
+            throw 'Defender scanner syntax failed before its fixtures.'
+          }
+          python tool/check_windows_installer_assets.py
+          & $scannerPath -SelfTest
 
       - name: Install authenticated Inno Setup 7.0.2
         shell: pwsh

@@ -944,6 +944,112 @@
         "Records runner image, toolchain, and phase duration; permits a tighter repository bound from evidence and requires new receipts before relaxing the ceiling",
         "Adds red fixtures for raw path comparison, immediate post-exit settlement, broad process kill, cleanup-error masking, missing common branch guards, and an unbounded build phase"
       ]
+    },
+    {
+      "id": 63,
+      "prompt": "A compact Flutter Windows installer run passes lifecycle proof, then MpCmdRun returns legacy exit 2 while scanning the final EXE. The log might indicate a detection requiring action or a scanner error; a previous retry simply reran the whole job. Harden the canonical flow without adding GitHub Actions steps.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Explains from current Microsoft documentation that legacy MpCmdRun exit 2 conflates unremediated or action-required detections with scanning errors and is not clean-scan proof",
+        "Invokes the custom final-installer scan with official -ReturnHR and captures the exact HRESULT immediately",
+        "Accepts only exact HRESULT 0x00000000 as scan success",
+        "Fails closed without retry for known detection or action-required HRESULTs, timeouts, and every unknown HRESULT",
+        "Maps Win32 ERROR_SHARING_VIOLATION 32 through HRESULT_FROM_WIN32 to exact 0x80070020 and permits at most one bounded retry only for that value",
+        "Retains named phase, attempt, HRESULT, bounded redacted diagnostic output, and full output hashes without leaking unbounded scanner logs or target paths",
+        "Uses finite process and diagnostic-drain deadlines and terminates only the owned scanner process tree on timeout",
+        "Adds executable fixtures proving clean success, detection failure, unknown-HRESULT failure, and exactly one sharing-violation retry followed by success",
+        "Parses and executes the scanner fixtures with real PowerShell on a compatible Windows runner",
+        "Keeps the fixtures and scanner call inside the existing orchestration and sentinel steps so compact workflow topology and the one-build contract do not change",
+        "Retries the focused scanner phase only after its sharing-violation receipt; it does not blindly rerun the full publisher"
+      ]
+    },
+    {
+      "id": 64,
+      "prompt": "A private Flutter Windows repository is burning paid windows-latest minutes. The team wants to use act on a Mac, then attach a persistent clinic reception PC as a self-hosted runner. Separately, the Linux storage preflight creates an exact-format object successfully, but the public consumer read initially returns storage_file_not_found; someone proposes rebuilding with a bumped version and uploading a second object. Design the cheapest safe proof ladder without expanding the compact workflow or compiling Flutter twice inside a run.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Runs macOS or Linux portable syntax, unit, static, and deterministic crypto tests first without claiming Windows-native or live-provider proof",
+        "Runs a cheap Linux official-SDK live preflight with a harmless exact-candidate format, size, protocol, and security policy, then proves owned create, unauthenticated public read and hash, and bounded delete settlement",
+        "Runs the same checked-in repository-owned Windows orchestration locally on a clean dedicated disposable Windows VM or a repository-scoped ephemeral or JIT self-hosted Windows runner",
+        "Explains that self-hosted runner execution does not consume GitHub-hosted Actions minutes but the operator owns machine cost, image, updates, isolation, cleanup, and retained diagnostics",
+        "Uses self-hosted runners only for a private repository and rejects public, organization-shared, persistent developer, and clinic production machines containing patient data, live credentials, signing keys, or sensitive-service access",
+        "Explains GitHub's ephemeral recommendation and persistent-runner compromise or cross-job secret exposure risk, and requires one exact job followed by teardown",
+        "Explains that act on macOS or Linux is wiring-only because its normal images are Linux-oriented and intentionally incomplete; Windows or macOS labels require an actual matching host and are not Windows target-native proof",
+        "Runs only one GitHub-hosted Windows publisher after exact-SHA target-native proof and compiles Flutter or native code exactly once within each orchestration invocation",
+        "Polls the unauthenticated public consumer path with typed bounded backoff only for exact storage_file_not_found, HTTP 429, or 5xx and records attempt, deadline, type, and code",
+        "Fails immediately on 401, 403, unexpected 4xx, or any size, hash, signature, payload, or identity mismatch",
+        "Recovers an ambiguous create or delayed read through the same immutable object ID and identical accepted bytes without rebuilding, version-bumping, deleting, overwriting, or duplicating the release object",
+        "Distinguishes temporary preflight cleanup from immutable release recovery: the owned preflight object is deleted after proof, while the release object is never deleted during availability settlement",
+        "Keeps the compact YAML boundary steps unchanged and cancels downstream paid work when an earlier rung fails"
+      ]
+    },
+    {
+      "id": 65,
+      "prompt": "We proved our x64 Flutter installer runs in a local Windows 11 ARM64 VMware Fusion VM. Can that replace native x64 GitHub runner proof, and should we register the VM as a persistent self-hosted runner? Give the cheapest safe diagnostic contract without changing the compact YAML.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Uses the Windows 11 ARM64 VM for PowerShell, Inno compile/install/uninstall/lifecycle, and x86 or x64 user-mode EXE emulation smokes",
+        "Explains that Windows 11 on Arm emulates x86 and x64 user-mode applications but does not emulate kernel drivers, which must be native ARM64",
+        "Rejects treating the ARM64 VM as native x64 compiler, toolchain, CRT, driver, or GitHub-hosted runner proof",
+        "Requires native x64 proof on a clean dedicated x64 VM or repository-scoped ephemeral or JIT x64 runner before the single hosted publisher",
+        "Runs the exact same checked-in repository-owned windows_installer.ps1 verify orchestration locally with publication=none and no tag, release, pointer, provider, or signing mutation",
+        "Records host architecture, guest architecture, process or EXE architecture, emulation state, Windows build, and resolved toolchain paths and versions",
+        "Treats persistent self-hosted runner registration as a separate security and persistent-access boundary rather than an implication of successful direct local execution",
+        "Keeps any self-hosted runner private-repository-only, repository-scoped, ephemeral or JIT, one-job, and torn down after its receipt",
+        "Rejects clinic production PCs and machines holding patient data, live credentials, signing keys, or sensitive-service access",
+        "Keeps compact YAML boundary steps and the one-native-build-per-orchestration contract unchanged"
+      ]
+    },
+    {
+      "id": 66,
+      "prompt": "Our live Windows release-storage sentinel hand-builds a smaller manifest map than the publisher and omits platform. Upload and readback succeed, but the real manifest verifier rejects it. What narrow canonical prevention should we add without changing workflow topology?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Classifies the reduced hand-built preflight payload as false-gate risk even though provider upload and readback pass",
+        "Makes the publication manifest builder or schema owner the preferred single owner for provider and live-preflight payloads",
+        "If reuse is impossible, contract-tests exact parity for every required identity field, including platform, version, source revision, installer identity, hash, size, URL or object identity, and release classification",
+        "Round-trips the canonical payload through the real signer and the real production verifier",
+        "Rejects ad hoc maps, duplicated reduced schemas, signature-only checks, and weaker fixture validators as publication-contract proof",
+        "Adds a red fixture omitting platform that the real verifier rejects and a green fixture produced by the canonical builder that signer and verifier accept",
+        "Keeps storage capability settlement distinct from manifest schema and cryptographic contract proof",
+        "Keeps the existing compact YAML topology and one-native-build contract unchanged"
+      ]
+    },
+    {
+      "id": 67,
+      "prompt": "Our compact Linux admission entrypoint runs with `set -euo pipefail`. Its R2 branch calls helpers using `$script_root`, but that variable is never initialized; static YAML and helper-presence tests passed. Add the narrow canonical regression without adding workflow steps.",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Requires every Bash entry script to enable strict mode and resolve its own canonical directory from BASH_SOURCE before the first path use",
+        "Uses a shell-safe two-step assignment and readonly declaration so directory-resolution failure is not hidden by a declaration builtin",
+        "Rejects inherited caller working directory, an undeclared shared script_root, and helper-only direct tests as entrypoint proof",
+        "Executes the actual admission entry script under the same set -euo pipefail flags with controlled command or PATH stubs",
+        "Traverses the real R2 branch into every delegated helper rather than asserting source, YAML, or call text presence",
+        "Audits definition-before-use for variables crossing branch, setup, and helper boundaries",
+        "Adds a red fixture where missing script_root fails under set -u and a green fixture proving the initialized real branch reaches the intended helper",
+        "Keeps the checks inside existing orchestration or sentinel boundaries so compact YAML and the one-build contract remain unchanged"
+      ]
+    },
+    {
+      "id": 68,
+      "prompt": "A second Flutter Windows app copied another app's publisher and replaced values ad hoc. Its provider schema requires platform while the reference app uses channel, and a foreign object ID survived the copy. What should the canonical compact flow require before this app can publish?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Requires one shared semantic release engine and stage DAG rather than copy-pasted app-specific publisher implementations",
+        "Treats app identity, stable AppId, artifact naming, manifest identity, and provider values as validated typed configuration or adapters",
+        "Builds a stage-by-stage parity map against one proven reference covering branches, inputs, outputs, ordering, receipts, timeouts, failure, cleanup, and activation",
+        "Blocks publication when any reference stage or invariant is omitted, reordered, or only represented by static call-presence text",
+        "Preserves justified schema differences such as channel versus platform at typed configuration or adapter boundaries",
+        "Rejects flattening schema differences and rejects every copied foreign project, bucket, object, database, or application ID",
+        "Executes the real first-release, upgrade, and provider branches with controlled adapters before publication",
+        "Keeps compact two-job YAML and exactly one native build while sharing the underlying release engine"
+      ]
     }
   ]
 }
