@@ -802,7 +802,7 @@
         "Parses the exact materialized child script with compatible pwsh after generation rather than checking only the tracked generator",
         "Executes the generated script with harmless named arguments and requires a bounded readiness receipt before CI or expensive build work",
         "On readiness timeout, reports the phase, child exit state, generated-script parser errors, and owned process cleanup without exposing dynamic values",
-        "Keeps the Lab candidate classified as negative evidence until a later exact SHA completes the Windows-only job green"
+        "Keeps the failed candidate classified as negative evidence until a later exact SHA completes the Windows-only job green"
       ]
     },
     {
@@ -932,7 +932,7 @@
       "expected_output": "See expectations.",
       "files": [],
       "expectations": [
-        "Uses the pinned Inno 6.7.3 source to explain that InstallLocation is written with AddBackslash and canonicalizes trailing separators on expected and actual paths before path equality",
+        "Uses the pinned Inno 7.0.2 source to explain that InstallLocation is written with AddBackslash and canonicalizes trailing separators on expected and actual paths before path equality",
         "Keeps AppId, product name, numeric and textual versions, hash, signature, and every non-path identity assertion strict",
         "Treats uninstaller exit as original-process completion and waits within a named bound for exact AppId registry keys, install files, and owned TEMP-clone process/file settlement",
         "Invokes the exact uninstaller once and never retries its disappearing path",
@@ -1042,13 +1042,158 @@
       "files": [],
       "expectations": [
         "Requires one shared semantic release engine and stage DAG rather than copy-pasted app-specific publisher implementations",
+        "Classifies files as universal byte-identical engine, typed app config, explicit capability adapter, or app-owned product and preservation code instead of demanding repository-wide byte equality",
         "Treats app identity, stable AppId, artifact naming, manifest identity, and provider values as validated typed configuration or adapters",
         "Builds a stage-by-stage parity map against one proven reference covering branches, inputs, outputs, ordering, receipts, timeouts, failure, cleanup, and activation",
         "Blocks publication when any reference stage or invariant is omitted, reordered, or only represented by static call-presence text",
         "Preserves justified schema differences such as channel versus platform at typed configuration or adapter boundaries",
         "Rejects flattening schema differences and rejects every copied foreign project, bucket, object, database, or application ID",
+        "Builds a clean-target inventory that rejects copied test paths, helper files, and native targets absent from the adapted repository",
+        "Requires every optional app-specific guard or target to be an explicit required or unsupported capability rather than a universal copied call",
+        "Derives cleanup markers, fixture roots, and diagnostics from typed app identity and rejects reference-app literals outside controlled fixtures",
         "Executes the real first-release, upgrade, and provider branches with controlled adapters before publication",
         "Keeps compact two-job YAML and exactly one native build while sharing the underlying release engine"
+      ]
+    },
+    {
+      "id": 69,
+      "prompt": "A manual Flutter Windows publisher is ready for an exact commit. `gh workflow run publish-windows.yml --ref <40-character-SHA>` fails before creating a run, even though actions/checkout can check out that SHA. What is the canonical dispatch and admission contract?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Distinguishes the workflow-dispatch selector from the candidate revision: workflow dispatch ref is a branch or tag, while actions/checkout ref may be a commit SHA",
+        "Dispatches the workflow from a branch or tag containing the intended workflow definition and passes the exact 40-character candidate SHA as a separate required input",
+        "Requires admission to prove the workflow event SHA equals the candidate input and that a remote branch or tag readback resolves to the same candidate before paid, native, or external work",
+        "Uses the admitted SHA for every checkout, generated-source handoff, diagnostic, tag, manifest, artifact, and publication receipt",
+        "Rejects falling back to the moving branch tip after admission or treating a failed dispatch request as a hosted Windows attempt",
+        "Adds a contract fixture that rejects raw-SHA --ref usage and mismatched event/input SHAs while accepting branch-or-tag dispatch plus exact-SHA input",
+        "Keeps the compact workflow topology and one-build contract unchanged"
+      ]
+    },
+    {
+      "id": 70,
+      "prompt": "A Windows release helper receives alternating raw arguments, including a path under Program Files. The caller uses Start-Process -ArgumentList with a string array; the helper sees split tokens and exits 1. Cleanup then reports a copied marker from another app and replaces the primary failure. What is the smallest canonical correction?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Explains that PowerShell Start-Process joins its ArgumentList array into one command-line string and therefore does not preserve structured token boundaries",
+        "Uses .NET ProcessStartInfo.ArgumentList or an equivalent structured API and adds each trusted argument as one token",
+        "Adds a real round-trip fixture with spaced, empty, and quote-bearing values and asserts exact token count, order, and value in the actual helper parser",
+        "Keeps finite waits, exact process-tree cleanup, and the existing compact orchestration owner",
+        "Derives cleanup marker and diagnostic identity from typed app configuration rather than copied text",
+        "Captures and rethrows the primary phase exception and stack even when bounded cleanup also fails",
+        "Audits sibling helper and installer launches for the same flattening mechanism before another native or paid attempt"
+      ]
+    },
+    {
+      "id": 71,
+      "prompt": "A first-release Windows installer lifecycle test launches the production Flutter EXE in a hidden storage-probe mode. The whole production provider and encrypted-vault graph times out, while two reference apps use isolated synthetic local-state fixtures. Someone proposes moving the same probe to a local VM. What should the canonical flow do?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Removes the production executable, main entrypoint probe mode, provider graph, and real storage stack from the installer lifecycle harness",
+        "Seeds invocation-namespaced synthetic AppData plus registry or credential-manager fixtures directly through the harness or a tiny fixture-only helper",
+        "Explains that first-release skipped_no_prior_release skips only the old-installer branch and still proves clean install, forced-failure cleanup, relaunch, uninstall, and synthetic state preservation",
+        "Uses no real user data, production account, live credential, or broad machine cleanup",
+        "Adds a red contract forbidding production executable or provider wiring and a green isolated seed-read-preserve-cleanup fixture",
+        "Rechecks the original production-probe requirement and deletes it when isolated state proves the accepted preservation outcome",
+        "Does not move the same failed mechanism to a VM; VM use remains an explicit accepted proof rung and a user-excluded VM stays excluded",
+        "Keeps one native build and does not add workflow steps"
+      ]
+    },
+    {
+      "id": 72,
+      "prompt": "A release gateway route contains a version with `+`. The publisher encodes it as `%2B`, but the gateway regex matches only literal `+`, so the request returns 404 before authentication. The preflight discards the status and proposes creating a temporary CI user to obtain a runtime JWT. What is the canonical prevention?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Uses one shared component encoder and gateway decoder and contract-tests literal plus, uppercase and lowercase percent-encoded plus, and rejection of double or ambiguous encoding",
+        "Normalizes and validates the route before authentication, then authenticates before object lookup so missing and existing object identity produce the same anonymous response",
+        "Keeps 404 as a route-contract failure rather than accepting it as authentication proof",
+        "Runs non-redirecting HEAD and range-limited GET and records only safe method, status, transport exit, redirect count, and authentication-challenge presence",
+        "Does not log the URL, object identity, body, token, arbitrary headers, or response payload",
+        "Uses an anonymous authentication-challenge probe when that proves the CI boundary and leaves runtime JWT creation to an existing signed-in app user",
+        "Rejects a temporary CI user, password, session, or JWT unless an accepted contract specifically requires authenticated end-to-end gateway proof",
+        "Adds red fixtures for encoded 404, double encoding, object-existence leakage, redirect following, and discarded status diagnostics"
+      ]
+    },
+    {
+      "id": 73,
+      "prompt": "A Windows publisher has already built and verified the installer, uploaded and read back immutable installer and signed-manifest bytes, created the exact tag, and uploaded the Actions artifact. The final pointer activation fails because that step omitted one required non-secret endpoint variable. Should the retry rebuild the app?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Keeps separate passed receipts for native installer, isolated lifecycle preservation, and immutable publication while classifying pointer activation as the only failed phase",
+        "Inventories and validates every activation-step environment input at the activation owner and rejects relying on values present only in an earlier step",
+        "Implements an explicit activation-only recovery mode bound to the same version, tag, source revision, immutable object IDs, hashes, and publication target",
+        "Re-downloads and verifies the existing installer and signed manifest before activating and reading back the pointer",
+        "Skips code generation, Flutter build, Inno compile, installer upload, manifest creation, tag creation, and Actions artifact creation in recovery",
+        "Leaves the previous pointer unchanged until recovery verification passes and never deletes or replaces the immutable candidate",
+        "Rejects a correction-only classifier no-op as completion and requires terminal activation readback",
+        "Adds workflow contracts for required activation environment mapping and zero build, upload, tag, or artifact calls in recovery mode"
+      ]
+    },
+    {
+      "id": 74,
+      "prompt": "A Riverpod sync notifier starts `_load()` from `Future.microtask` in `build()`. The route that listens for the result is covered during startup, and the first successful update is never handled when the route resumes. What should the canonical fix and proof require?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Uses AsyncNotifier.build when the provider's primary state is asynchronous, or keeps a direct sync seed with an explicit idempotent startup owner",
+        "Places durable startup in a root or bootstrap owner whose watch/listen path exists before the operation starts",
+        "Does not rely on Future.microtask ordering to beat route pause or listener attachment",
+        "Represents one-shot navigation, snackbar, or status as durable identified state with acknowledgement when it must survive pause",
+        "Adds a red-capable test that covers the route, emits the first update, resumes it, and proves the current state or pending event appears exactly once"
+      ]
+    },
+    {
+      "id": 75,
+      "prompt": "A pause-sensitive navigation value is exposed by one computed Riverpod provider watching another computed provider. The first base-state update is visible only after another change. How should the skill prevent this?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Flattens pause-sensitive projections so they watch and select from the base provider directly",
+        "Keeps a computed-provider chain only with explicit proof that pause and resume cannot miss its first update",
+        "Adds a regression test that emits the first base update while the listener is covered or paused and asserts the resumed value immediately",
+        "Keeps durable workflow state in the provider owner rather than widget-local caches"
+      ]
+    },
+    {
+      "id": 76,
+      "prompt": "A failed login leaves a server error in shared auth form state. The user switches to sign-up and sees the stale login error and pending flag. What is the canonical state rule?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Treats validation errors, server errors, and pending state as owned by the active auth or form mode",
+        "Clears mode-owned transient error and pending state before showing login, sign-up, or reset mode",
+        "Preserves an external persistent failure across modes only when accepted product behavior explicitly requires it",
+        "Adds a notifier or widget regression test that seeds a failure, switches mode, and proves stale state is absent"
+      ]
+    },
+    {
+      "id": 77,
+      "prompt": "An iOS Live Activity emits `repem://workout/open?id=1`, but the iOS URL registration and Flutter router use different hosts. A router unit test passes, while tapping the live activity never reaches the workout screen. What proof is required?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Defines one URI contract for scheme, host, path, parameter names, and encoding across native producer, platform registration, Flutter ingress, and typed router",
+        "Adds Android and iOS contract fixtures that build the producer URI and parse it through the real Flutter typed-route ingress",
+        "Proves actual-device or simulator delivery for cold and warm app states plus signed-out and signed-in gates",
+        "Rejects a platform launch without an asserted Flutter target screen and rejects router-only unit proof as native delivery proof",
+        "Keeps one link ingress and avoids a second ad hoc parser"
+      ]
+    },
+    {
+      "id": 78,
+      "prompt": "A Flutter E2E runner silently maps an unknown scenario to the default happy path. It exits 0 after a critical log error and captures a screenshot after the app has closed. What must change before its results can be trusted?",
+      "expected_output": "See expectations.",
+      "files": [],
+      "expectations": [
+        "Adds a sensitivity probe proving an unknown scenario fails before any valid journey runs",
+        "Parses asserted Flutter, native, and backend logs and fails the run on critical errors even when the process exits 0",
+        "Asserts selector state before and after a gesture rather than treating a completed tap command as success",
+        "Captures evidence while the app is running on the exact asserted screen and rejects blank, home-screen, post-exit, or wrong-screen media",
+        "Opens and checks every delivered screenshot or recording against the claimed journey and state"
       ]
     }
   ]

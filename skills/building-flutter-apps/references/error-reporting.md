@@ -58,6 +58,8 @@ Future<void> main() async {
 - Send failure = contained fire-and-forget diagnostic; never recurse into `Crash.error`.
 - Unexpected provider/transport failure = preserve original error + stack in `Crash.error` before mapping to a user-safe/domain error; never report only the sanitized replacement.
 - Expected cancellation/auth/input outcome = typed local state + no remote noise; classification must be explicit and tested.
+- One failed operation = one manual incident owner. Lower layers may return/rethrow typed context, but parent wrappers/partial-sync aggregators must not report the same cause again.
+- Operation identity = stable local token attached to propagation/aggregation only; never a user ID, request body, credential, or remote secret.
 - Do not add backend interfaces + runtime backend setters + fake/debug implementations + feature constants to the facade.
 
 ## Sentry contract
@@ -83,6 +85,7 @@ Future<void> main() async {
 - Init → app runner exactly once on provider success/failure.
 - `log`/`error` → no throw; selected provider receives each manual event once.
 - Error translation fixture → unexpected raw cause + original stack reported before safe UI error; expected outcomes remain unreported.
+- Propagation fixture → datasource failure + repository rethrow + notifier/partial-sync handling produces one manual incident, not one per layer.
 - Scrubber fixtures → identity + auth + request-body/header values removed; allowed diagnostics preserved.
 - Dual branch → no duplicate call within either provider.
 - Approved live proof → controlled event + exact release + symbolicated frame read back through `sentry`.
@@ -97,6 +100,7 @@ Future<void> main() async {
 - [ ] DSN/config centralized + auth token build-only
 - [ ] PII and opt-in capture surfaces disabled/scrubbed
 - [ ] Tests prove no-DSN + init failure + once-only send + scrubber
+- [ ] One operation reported at most once across rethrow, retry wrapper, and aggregate/partial-sync handling
 - [ ] Release/symbol identity proven when production reporting is required
 
 ## Sources

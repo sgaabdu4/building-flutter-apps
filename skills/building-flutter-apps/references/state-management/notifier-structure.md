@@ -3,7 +3,7 @@
 ## Read first
 
 1. Use `@riverpod` / `@Riverpod` codegen for every provider and notifier.
-2. Sync `Notifier.build()` must not read `state` before the first assignment; seed with a direct value or defer work with `Future.microtask`.
+2. Sync `Notifier.build()` must not read `state` before the first assignment; seed directly. Use `AsyncNotifier.build()` for primary async state.
 3. Keep generated notifier shape conventional: `class FooNotifier extends _$FooNotifier`.
 
 ## Trigger
@@ -19,9 +19,9 @@ part 'cart_notifier.g.dart';
 @Riverpod(keepAlive: true)
 class CartNotifier extends _$CartNotifier {
   @override
-  CartState build() {
-    Future.microtask(_load);
-    return const CartState(items: [], isLoading: true);
+  Future<CartState> build() async {
+    final items = await ref.read(cartRepositoryProvider).load();
+    return CartState(items: items);
   }
 }
 ```
@@ -47,10 +47,9 @@ CounterState build() {
 ```
 
 ```dart
-// RIGHT: direct seed, async work deferred.
+// RIGHT: direct seed. An explicit durable owner starts later work.
 @override
 CounterState build() {
-  Future.microtask(_load);
   return const CounterState(isLoading: true);
 }
 ```
@@ -70,7 +69,15 @@ class ProfileNotifier extends _$ProfileNotifier {
 }
 ```
 
-For durable app state with explicit flags, prefer a Freezed state object behind a sync notifier plus deferred load.
+For durable app state with explicit flags, keep a Freezed state object behind a sync notifier. Start loading from an explicit app/bootstrap owner after its watch/listen path exists, or expose an idempotent `load()` that the durable owner calls. Do not rely on `Future.microtask` ordering to beat route pause or listener attachment.
+
+## Pause-sensitive startup
+
+- Route widgets may stop listening while covered or offstage; route-local listeners cannot own durable startup or one-shot delivery.
+- Root/bootstrap owner = eagerly watch durable state + register the listener before calling idempotent startup.
+- One-shot navigation/snackbar/status = durable state with an identity/sequence + explicit acknowledgement; never an unbuffered callback.
+- Provider projection = watch the base state directly; avoid computed-provider → computed-provider chains for pause-sensitive values.
+- Regression proof = start covered/paused → emit first update → resume → exact current state or pending event appears once.
 
 ## Loading and progress
 

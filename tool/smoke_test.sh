@@ -82,8 +82,9 @@ codex = json.loads((root / ".codex-plugin/plugin.json").read_text())
 codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_text())
 copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
+eval_cases = json.loads((root / "evals/evals.json").read_text())["evals"]
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.7.9"
+expected_version = "5.8.1"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -114,9 +115,38 @@ assert claude_marketplace["plugins"][0]["version"] == expected_version
 assert copilot_marketplace["metadata"]["version"] == expected_version
 assert copilot_marketplace["plugins"][0]["version"] == expected_version
 assert f'version: "{expected_version}"' in (skill / "SKILL.md").read_text()
+skill_text = (skill / "SKILL.md").read_text()
+notifier_structure = (skill / "references/state-management/notifier-structure.md").read_text()
+state_lifecycle = (skill / "references/state-management-lifecycle.md").read_text()
+deep_linking = (skill / "references/deep-linking.md").read_text()
+e2e_testing = (skill / "references/dart-mcp-e2e-testing.md").read_text()
+testing = (skill / "references/testing.md").read_text()
+error_reporting = (skill / "references/error-reporting.md").read_text()
+assert "R26" in skill_text and "Pause-sensitive Riverpod state" in skill_text
+assert "R27" in skill_text and "Native/custom links use one URI contract" in skill_text
+assert "Do not rely on `Future.microtask` ordering" in notifier_structure
+assert "Computed provider → computed provider chains" in state_lifecycle
+assert "A platform launch with no asserted Flutter route = failure" in deep_linking
+assert "unknown scenario before executing any valid journey" in e2e_testing
+assert "E2E harness false positive" in testing
+assert "One failed operation = one manual incident owner" in error_reporting
+eval_ids = [case["id"] for case in eval_cases]
+assert len(eval_ids) == len(set(eval_ids))
+for eval_id, prompt_fragment in {
+    74: "Future.microtask",
+    75: "computed Riverpod provider",
+    76: "stale login error",
+    77: "iOS Live Activity",
+    78: "unknown scenario",
+}.items():
+    assert any(
+        case["id"] == eval_id and prompt_fragment in case["prompt"]
+        for case in eval_cases
+    ), (eval_id, prompt_fragment)
 build_reproducibility = (skill / "references/build-reproducibility.md").read_text()
 assert "Toolchain identity = resolved `DEVELOPER_DIR`/`xcode-select` path" in build_reproducibility
 windows_installer = (skill / "references/windows-installer-pipeline.md").read_text()
+assert "Audited scaffold baseline (2026-08-01) = `inno_bundle 0.11.2` + Inno Setup `7.0.2` + `actions/checkout 7.0.1` + `actions/upload-artifact 7.0.1` + `actions/download-artifact 8.0.1`" in windows_installer
 assert "VCToolsRedistDir" in windows_installer
 assert "`msvcp140.dll` + `vcruntime140.dll` + `vcruntime140_1.dll`" in windows_installer
 assert "`inno_bundle` = candidate generator, not distribution proof" in windows_installer
@@ -148,7 +178,7 @@ assert "old Visual Studio paths/generators are not current-run proof" in windows
 assert "`$matches` in every casing aliases automatic `$Matches`" in windows_installer
 assert "scalar `-match`/`-notmatch` can overwrite or retain `$Matches`" in windows_installer
 assert "Command/pipeline/filter result read with `.Count`/index/exact-one = explicit `@(...)`" in windows_installer
-assert "Inno 6.7.3 `InstallLocation` includes `AddBackslash(...)`" in windows_installer
+assert "audited 7.0.2 includes `AddBackslash(...)`" in windows_installer
 assert "cleanup never masks root cause" in windows_installer
 assert "Cold Flutter build ceiling = `900s`" in windows_installer
 assert "legacy exit `2` is ambiguous" in windows_installer
@@ -179,6 +209,17 @@ assert "kernel drivers, which require native ARM64" in windows_installer
 assert "exact checked-in `windows_installer.ps1 verify` + `publication=none`" in windows_installer
 assert "Architecture receipt = host architecture + guest architecture" in windows_installer
 assert "Runner registration = separate security + persistent-access boundary" in windows_installer
+assert "Dispatch selector = branch/tag containing the workflow" in windows_installer
+assert "`gh workflow run --ref <sha>` = `FAIL`" in windows_installer
+assert "Ownership classes = universal engine bytes | validated typed app config" in windows_installer
+assert "Blind repository-wide byte equality = `FAIL`" in windows_installer
+assert "Capability matrix = each optional guard/target/path is `required | unsupported`" in windows_installer
+assert "VM use = an explicit accepted proof rung only" in windows_installer
+assert "Native child launch = `.NET ProcessStartInfo.ArgumentList`" in windows_installer
+assert "Forbidden fixture = production app EXE/`main.dart` probe mode" in windows_installer
+assert "Gateway authorization = normalize/validate route → authenticate → object lookup" in windows_installer
+assert "Activation-only recovery = when immutable installer/manifest/tag already verify" in windows_installer
+assert "Independent receipts = native build/installer | isolated lifecycle/state preservation" in windows_installer
 workflow_asset = (skill / "assets/windows-installer-workflow.yml").read_text()
 inno_bundle_pubspec = (skill / "assets/inno-bundle-pubspec.yaml").read_text()
 settlement_sentinel = (skill / "assets/inno-uninstall-settlement-sentinel.ps1").read_text()
@@ -218,6 +259,12 @@ assert "one semantic release stage DAG across apps" in workflow_asset
 assert "never fork a copied publisher" in workflow_asset
 assert "Every Bash entrypoint sets strict mode" in workflow_asset
 assert "from BASH_SOURCE before path use" in workflow_asset
+assert "--ref <branch-or-tag>" in workflow_asset
+assert "github.sha == revision" in workflow_asset
+assert workflow_asset.count("-DispatchRevision '${{ github.sha }}'") == 2
+assert workflow_asset.count("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1") == 3
+assert workflow_asset.count("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1") == 3
+assert workflow_asset.count("actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1") == 1
 assert "flutter build windows --release" not in workflow_asset
 assert "group: windows-installer-release" in workflow_asset
 assert "retention-days: 1" in workflow_asset
@@ -254,7 +301,7 @@ assert "Start-Process -Wait" not in settlement_sentinel
 assert "WaitForExit([int] $timeoutMilliseconds)" in settlement_sentinel
 assert "runs-on: windows-latest" in settlement_ci
 assert "timeout-minutes: 10" in settlement_ci
-assert "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" in settlement_ci
+assert "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1" in settlement_ci
 assert "5ad54ca3def786f8f4212552e54cc6d8d61329e2d24a1cfee0571d42c2684ff1" in settlement_ci
 assert "ParseFile(" in settlement_ci
 assert "inno-uninstall-settlement-sentinel.ps1" in settlement_ci
@@ -266,7 +313,7 @@ for text in (
     openai_yaml,
 ):
     lowered = text.lower().replace("https://appwrite.io/docs/", "")
-    for forbidden in ("appwrite", "jabal", "emr_", "project_id", "database_id"):
+    for forbidden in ("appwrite", "emr_", "project_id", "database_id"):
         assert forbidden not in lowered, forbidden
 error_reporting = (skill / "references/error-reporting.md").read_text()
 assert "SentryFlutter.init(..., appRunner: ...)" in error_reporting

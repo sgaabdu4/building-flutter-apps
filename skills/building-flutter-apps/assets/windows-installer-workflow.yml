@@ -1,5 +1,10 @@
 # Copy this topology, then replace repository-owned commands and resolve every
 # action/tool tag to an audited immutable pin before the first dispatch.
+# Dispatch the workflow definition from a branch/tag, never a raw SHA:
+#   gh workflow run <workflow> --ref <branch-or-tag> -f revision=<40-char-sha>
+# The admission owner must prove `github.sha == revision` and remote ref
+# readback before paid/native/external work. `actions/checkout` may then use the
+# admitted SHA directly.
 #
 # Keep YAML limited to runner, permission, cache, artifact, and external-write
 # boundaries. The orchestration scripts own named internal phases. Compacting
@@ -31,6 +36,16 @@
 # or import another app's IDs. Before a second app publishes, map every stage,
 # branch, input/output, order, timeout, failure, and cleanup invariant to the
 # proven reference and execute the real adapted branches with controlled stubs.
+# Declare universal byte-identical engine files separately from typed config,
+# capability adapters, and app-owned product/preservation files. A clean-target
+# inventory must prove every configured file, test, helper, and native target;
+# never copy reference-only paths/targets or production runtime probes.
+# First-release mode skips only the old installer. It still seeds and preserves
+# namespaced synthetic AppData/registry/credential fixtures; it never invokes
+# the production app executable, provider/storage graph, or real user data.
+# Owned child processes use .NET ProcessStartInfo.ArgumentList token by token;
+# PowerShell Start-Process -ArgumentList array flattening is not structured argv.
+# Prove spaced/empty/quote-bearing arguments through the real helper parser.
 # Run portable local checks first, then the exact-format Linux provider
 # create/public-read/delete preflight. Run this same orchestration on a clean,
 # private-repository, repository-scoped ephemeral/JIT self-hosted Windows
@@ -51,6 +66,13 @@
 # Every Bash entrypoint sets strict mode, resolves its own canonical directory
 # from BASH_SOURCE before path use, and is exercised through real provider/helper
 # branches with controlled stubs. Static source presence is not execution proof.
+# Gateway/download adapters contract literal and one percent-encoded reserved
+# form, reject double encoding, authenticate before object lookup, and retain
+# safe status/method/redirect/auth-challenge diagnostics. CI must not create a
+# temporary runtime user/JWT when an anonymous auth-challenge probe is enough.
+# If immutable bytes/tag/manifest exist and activation alone fails, use an
+# explicit activation-only recovery that re-verifies and activates them; never
+# rebuild, re-upload, retag, or recreate the artifact/manifest.
 #
 # Verification writes no tag, release, deployment, publication object, pointer,
 # or machine install. Publication consumes one exact diagnostic-proven revision.
@@ -68,7 +90,7 @@ on:
           - verify-windows
           - publish
       revision:
-        description: Exact 40-character source commit
+        description: Exact 40-character source commit; must equal the dispatch event SHA
         required: true
         type: string
       version:
@@ -97,7 +119,7 @@ jobs:
       contents: read
     steps:
       - name: Check out exact revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.revision }}
           fetch-depth: 0
@@ -113,11 +135,12 @@ jobs:
         run: >-
           .\.github\scripts\windows_installer.ps1 verify
           -Revision '${{ inputs.revision }}'
+          -DispatchRevision '${{ github.sha }}'
           -Version '${{ inputs.version }}'
           -Publication none
 
       - name: Upload short-lived diagnostic evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-installer-verification-${{ github.run_id }}
           path: |
@@ -135,7 +158,7 @@ jobs:
       contents: read
     steps:
       - name: Check out exact revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.revision }}
           fetch-depth: 0
@@ -145,14 +168,17 @@ jobs:
         uses: ./.github/actions/setup-release-toolchain
 
       - name: Test, scan, and prepare an exact-revision handoff
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: >-
           ./.github/scripts/run_linux_release_admission.sh
           '${{ inputs.revision }}'
+          '${{ github.sha }}'
           '${{ inputs.version }}'
           '${{ inputs.diagnostic_run_id }}'
 
       - name: Upload verified admission handoff
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-installer-admission-${{ github.run_id }}
           path: ${{ runner.temp }}/windows-installer/admission
@@ -172,7 +198,7 @@ jobs:
       contents: write
     steps:
       - name: Check out exact admitted revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.revision }}
           fetch-depth: 0
@@ -182,7 +208,7 @@ jobs:
         uses: ./.github/actions/setup-release-toolchain
 
       - name: Download exact-revision admission handoff
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: windows-installer-admission-${{ github.run_id }}
           path: ${{ runner.temp }}/windows-installer/admission
@@ -196,12 +222,13 @@ jobs:
         run: >-
           .\.github\scripts\windows_installer.ps1 publish
           -Revision '${{ inputs.revision }}'
+          -DispatchRevision '${{ github.sha }}'
           -Version '${{ inputs.version }}'
           -DiagnosticRunId '${{ inputs.diagnostic_run_id }}'
           -AdmissionRoot '${{ runner.temp }}\windows-installer\admission'
 
       - name: Upload final installer evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: app-windows-installer-v${{ inputs.version }}
           path: ${{ runner.temp }}/windows-installer/app-windows-installer-v${{ inputs.version }}.exe

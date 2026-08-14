@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -53,6 +54,7 @@ require(
 )
 
 verify_job = workflow_text.split("  verify_windows:", 1)[1].split("  admission:", 1)[0]
+admission_job = workflow_text.split("  admission:", 1)[1].split("  publish:", 1)[0]
 publish_job = workflow_text.split("  publish:", 1)[1]
 for name, job, command, max_steps in (
     ("diagnostic", verify_job, "windows_installer.ps1 verify", 4),
@@ -86,6 +88,26 @@ require(
     "Flutter compilation belongs inside the single orchestration command",
 )
 require(
+    "--ref <branch-or-tag>" in workflow_text
+    and "github.sha == revision" in workflow_text
+    and workflow_text.count("-DispatchRevision '${{ github.sha }}'") == 2
+    and "'${{ github.sha }}'" in admission_job,
+    "workflow must separate branch/tag dispatch selection from exact-SHA admission",
+)
+require(
+    "GH_TOKEN: ${{ github.token }}" in admission_job,
+    "private exact-tip admission must receive the job-scoped GitHub token",
+)
+for action_pin, expected_count in (
+    ("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", 3),
+    ("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1", 3),
+    ("actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1", 1),
+):
+    require(
+        workflow_text.count(action_pin) == expected_count,
+        f"workflow action pin drifted: {action_pin}",
+    )
+require(
     "secrets." not in verify_job and "contents: write" not in verify_job,
     "diagnostic job must remain secret-free and read-only",
 )
@@ -117,6 +139,7 @@ for forbidden in ("dlls:", "token", "secret", "project_id", "database_id"):
         f"inno_bundle pubspec scaffold contains forbidden field: {forbidden}",
     )
 for phrase in (
+    "Audited scaffold baseline (2026-08-01) = `inno_bundle 0.11.2` + Inno Setup `7.0.2` + `actions/checkout 7.0.1` + `actions/upload-artifact 7.0.1` + `actions/download-artifact 8.0.1`",
     "dart pub add --dev inno_bundle",
     "dart run inno_bundle --no-app",
     "dlls` is deprecated",
@@ -132,7 +155,7 @@ for phrase in (
     "`$matches` in every casing aliases automatic `$Matches`",
     "scalar `-match`/`-notmatch` can overwrite or retain `$Matches`",
     "Command/pipeline/filter result read with `.Count`/index/exact-one = explicit `@(...)`",
-    "Inno 6.7.3 `InstallLocation` includes `AddBackslash(...)`",
+    "audited 7.0.2 includes `AddBackslash(...)`",
     "cleanup never masks root cause",
     "Cold Flutter build ceiling = `900s`",
     "official `MpCmdRun.exe -Scan -ScanType 3 -File <installer> -DisableRemediation -ReturnHR`",
@@ -171,6 +194,25 @@ for phrase in (
     "exact checked-in `windows_installer.ps1 verify` + `publication=none`",
     "Architecture receipt = host architecture + guest architecture",
     "Runner registration = separate security + persistent-access boundary",
+    "Dispatch selector = branch/tag containing the workflow",
+    "`gh workflow run --ref <sha>` = `FAIL`",
+    "Ownership classes = universal engine bytes | validated typed app config",
+    "Blind repository-wide byte equality = `FAIL`",
+    "Capability matrix = each optional guard/target/path is `required | unsupported`",
+    "Clean-target inventory = every configured script/test/file/native target exists",
+    "VM use = an explicit accepted proof rung only",
+    "Private Git order = `github.token` → `GH_TOKEN` → `gh auth setup-git`",
+    "Transferred generation = create destination parent",
+    "Native child launch = `.NET ProcessStartInfo.ArgumentList`",
+    "`Start-Process -ArgumentList <array>` joins the array into one command-line string",
+    "Preservation fixture = invocation-namespaced synthetic AppData",
+    "Forbidden fixture = production app EXE/`main.dart` probe mode",
+    "Gateway path contract = producer + consumer share one canonical component encoder/decoder",
+    "Gateway authorization = normalize/validate route → authenticate → object lookup",
+    "CI creates no temporary user/password/session/JWT",
+    "Activation input inventory = exact endpoint/project/index/pointer/object/version/SHA/key names",
+    "Activation-only recovery = when immutable installer/manifest/tag already verify",
+    "Independent receipts = native build/installer | isolated lifecycle/state preservation",
 ):
     require(phrase in reference_text, f"Windows reference missing inno_bundle flow: {phrase}")
 require(
@@ -206,6 +248,31 @@ require(
     and "never fork a copied publisher" in workflow_text
     and "execute the real adapted branches" in workflow_text,
     "compact workflow must retain shared cross-app release-engine parity",
+)
+require(
+    "Declare universal byte-identical engine files separately" in workflow_text
+    and "clean-target" in workflow_text
+    and "production runtime probes" in workflow_text,
+    "compact workflow must retain typed cross-app ownership and capability admission",
+)
+require(
+    "ProcessStartInfo.ArgumentList" in workflow_text
+    and "Start-Process -ArgumentList array flattening" in workflow_text
+    and "spaced/empty/quote-bearing" in workflow_text,
+    "compact workflow must retain structured argv proof",
+)
+require(
+    "First-release mode skips only the old installer" in workflow_text
+    and "namespaced synthetic AppData" in workflow_text
+    and "production app executable" in workflow_text,
+    "compact workflow must retain isolated first-release preservation proof",
+)
+require(
+    "percent-encoded reserved" in workflow_text
+    and "authenticate before object lookup" in workflow_text
+    and "temporary runtime user/JWT" in workflow_text
+    and "activation-only recovery" in workflow_text,
+    "compact workflow must retain gateway and activation-recovery contracts",
 )
 require(
     "Every Bash entrypoint sets strict mode" in workflow_text
@@ -297,6 +364,11 @@ require("runs-on: windows-latest" in ci_text, "Windows CI must use a compatible 
 require("timeout-minutes: 10" in ci_text, "Windows CI must remain tightly bounded")
 require("ParseFile(" in ci_text, "Windows CI must parse the exact PowerShell sentinel")
 require(
+    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1"
+    in ci_text,
+    "Windows CI must pin current audited checkout v7.0.1",
+)
+require(
     "'${{ github.workspace }}\\skills\\building-flutter-apps\\assets\\defender-installer-scan.ps1'"
     in ci_text,
     "Windows CI must parse the exact Defender scanner",
@@ -305,7 +377,10 @@ require(
 require(
     any(
         "disappearing uninstaller again" in case["prompt"]
-        and all("30573789878" not in item for item in case["expectations"])
+        and all(
+            re.search(r"\b[0-9]{10,}\b", item) is None
+            for item in case["expectations"]
+        )
         for case in answer_evals
     ),
     "answer eval must be durable and exclude a transient run ID",
@@ -442,15 +517,119 @@ require(
     any(
         "copied another app's publisher" in case["prompt"]
         and any("one shared semantic release engine" in item for item in case["expectations"])
+        and any("universal byte-identical engine" in item for item in case["expectations"])
         and any("stage-by-stage parity map" in item for item in case["expectations"])
         and any("channel versus platform" in item for item in case["expectations"])
         and any("foreign project" in item for item in case["expectations"])
+        and any("clean-target inventory" in item for item in case["expectations"])
+        and any("required or unsupported capability" in item for item in case["expectations"])
         and any("real first-release, upgrade, and provider branches" in item for item in case["expectations"])
         and any("compact two-job YAML" in item for item in case["expectations"])
         for case in answer_evals
     ),
     "answer eval must cover one cross-app release engine, typed variance, and real-branch parity",
 )
+require(
+    any(
+        "--ref <40-character-SHA>" in case["prompt"]
+        and any("workflow dispatch ref is a branch or tag" in item for item in case["expectations"])
+        and any("event SHA equals the candidate input" in item for item in case["expectations"])
+        and any("raw-SHA --ref" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must separate workflow-dispatch ref from exact candidate SHA",
+)
+require(
+    any(
+        "path under Program Files" in case["prompt"]
+        and any("joins its ArgumentList array" in item for item in case["expectations"])
+        and any("ProcessStartInfo.ArgumentList" in item for item in case["expectations"])
+        and any("spaced, empty, and quote-bearing" in item for item in case["expectations"])
+        and any("primary phase exception" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must cover structured Windows argv and primary-error preservation",
+)
+require(
+    any(
+        "hidden storage-probe mode" in case["prompt"]
+        and any("production executable" in item for item in case["expectations"])
+        and any("invocation-namespaced synthetic AppData" in item for item in case["expectations"])
+        and any("skips only the old-installer branch" in item for item in case["expectations"])
+        and any("user-excluded VM stays excluded" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must reject production storage probes in lifecycle proof",
+)
+require(
+    any(
+        "gateway route contains a version with `+`" in case["prompt"]
+        and any("uppercase and lowercase percent-encoded plus" in item for item in case["expectations"])
+        and any("authenticates before object lookup" in item for item in case["expectations"])
+        and any("anonymous authentication-challenge probe" in item for item in case["expectations"])
+        and any("temporary CI user" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must cover gateway encoding, auth order, and runtime-token ownership",
+)
+require(
+    any(
+        "final pointer activation fails" in case["prompt"]
+        and any("separate passed receipts" in item for item in case["expectations"])
+        and any("activation-only recovery mode" in item for item in case["expectations"])
+        and any("Skips code generation" in item for item in case["expectations"])
+        and any("terminal activation readback" in item for item in case["expectations"])
+        for case in answer_evals
+    ),
+    "answer eval must preserve immutable receipts and use activation-only recovery",
+)
+
+privacy_surfaces = {
+    "skill": skill_text,
+    "reference": reference_text,
+    "workflow": workflow_text,
+    "inno scaffold": inno_bundle_text,
+    "Inno sentinel": sentinel_text,
+    "Defender scanner": defender_scanner_text,
+    "Windows evals": json.dumps(
+        [case for case in answer_evals if case.get("id", 0) >= 52],
+        sort_keys=True,
+    ),
+}
+for name, text in privacy_surfaces.items():
+    lowered = text.lower()
+    require(
+        re.search(r"\bsource_[a-z]+_id\b", lowered) is None,
+        f"thread/source metadata leaked in {name}",
+    )
+    require(
+        re.search(
+            r"\b(?:clinic|hospital|patient|sample|medical|laboratory)[_-](?:id|name|queue|candidate)\b",
+            lowered,
+        )
+        is None,
+        f"domain-specific project/PII field leaked in {name}",
+    )
+    require(
+        re.search(r"\b[a-z0-9-]+\.tail[a-z0-9]+\.ts\.net\b", lowered) is None,
+        f"private network origin leaked in {name}",
+    )
+    require(
+        re.search(
+            r"https://[0-9a-f]{20,}@[a-z0-9.-]*ingest(?:\.[a-z]{2})?\.sentry\.io/\d+",
+            lowered,
+        )
+        is None,
+        f"error-reporting DSN leaked in {name}",
+    )
+    require(
+        re.search(r"\b019f[0-9a-f-]{20,}\b", lowered) is None,
+        f"thread identifier leaked in {name}",
+    )
+    require(
+        re.search(r"\b[0-9]{10,}\b", lowered) is None,
+        f"workflow/run identifier leaked in {name}",
+    )
 
 for text in (
     reference_text,
@@ -461,7 +640,7 @@ for text in (
     ci_text,
 ):
     lowered = text.lower().replace("https://appwrite.io/docs/", "")
-    for forbidden in ("appwrite", "jabal", "emr_", "project_id", "database_id"):
+    for forbidden in ("appwrite", "emr_", "project_id", "database_id"):
         require(forbidden not in lowered, f"provider/project data leaked: {forbidden}")
 
 print("WINDOWS_INSTALLER_ASSETS_OK")

@@ -27,6 +27,7 @@ Before code: output `Reading: testing.md`
 7. **MUST** add event-contract tests for streams/realtime/push/sync/shared remote state: exact subscriptions/listeners, every event family, notifier reaction, stale-source refresh, and removal/delete behavior.
 8. **MUST** keep shared fakes, mocks, provider-container factories, platform stubs, and async wait helpers in a test helper SSOT.
 9. **MUST** add contract drift tests when constants/schema/field IDs are copied across Flutter/backend/functions/native runtimes.
+10. **MUST** regression-test pause-sensitive provider startup/projections, transient mode-error clearing, and native-link contracts when those paths exist.
 
 ## Setup
 
@@ -366,6 +367,17 @@ Generated values and read-your-writes:
 - If create/update/delete can return stale, partial, or derived values, assert the notifier refreshes from the source of truth before success UI/navigation.
 - If a code/token/link/slug/order/index is generated remotely, mutate it in the fake source first, then assert UI/notifier state eventually shows that exact generated value.
 - If a selected item is deleted or the actor loses access, assert selected state clears and the list/detail route falls back without throwing.
+
+## Lifecycle regression matrix
+
+| Risk | Required red-capable proof |
+|---|---|
+| Async startup before listener ownership | Register durable owner/listener, start once, and assert the first result appears once |
+| Route covered or provider listener paused | Emit the first update while covered, resume, and assert current state/pending event is not lost |
+| Computed-provider chain | Compare direct base-provider projection and fail if pause/resume misses the first update |
+| Login/signup/reset mode change | Seed a server/validation error, switch mode, and assert error + pending state clear |
+| Native/custom link drift | Build URI from producer contract and parse through the Flutter typed-route ingress for Android + iOS fixtures |
+| E2E harness false positive | Unknown scenario fails; critical log fails; screenshot is taken only after asserted target state |
 
 ## Testing Repository Layer
 

@@ -181,3 +181,14 @@ class OrderNotifier extends _$OrderNotifier {
   }
 }
 ```
+
+## Pause, projection, and mode boundaries
+
+- Durable work = root/bootstrap provider owner, not a route that may pause or leave the tree.
+- Pause-sensitive projection = watch the base provider directly and select the needed field there.
+- Computed provider → computed provider chains require proof that pause/resume cannot miss the first update; otherwise flatten the projection.
+- Listener startup = listener/watch exists before the idempotent operation starts.
+- One-shot state = event identity/sequence + acknowledgement; resume must not drop or replay it.
+- Login/signup/reset or form-mode switch = clear mode-owned validation/server error + pending flag before showing the new mode.
+- Persistent external failure crosses modes only when product behavior explicitly requires it.
+- Tests = covered route at startup + first update while paused + resume + mode switch after failure.

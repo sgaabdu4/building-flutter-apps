@@ -33,6 +33,9 @@ Runtime E2E means real app behavior on a real simulator/device. Static review, s
 10. MUST stop app processes and clean test data at end.
 11. MUST verify a central widget key registry exists before adding E2E selectors. Default: `lib/core/testing/app_widget_keys.dart` or existing project equivalent.
 12. MUST use a deterministic E2E entrypoint when the app needs runtime overrides or Flutter Driver/MCP connectivity. Default: `lib/main_dev.dart` or existing project equivalent.
+13. MUST reject an unknown scenario before executing any valid journey; silent fallback to a default scenario is forbidden.
+14. MUST fail the run when asserted logs contain a critical error, even if the driver/process exits 0.
+15. MUST capture evidence while the app is running on the asserted screen; a screenshot after exit, crash, or navigation away proves nothing.
 
 ## Tool Map
 
@@ -168,6 +171,10 @@ Verify:
 - Record screenshots only as evidence after behavior checks; screenshots are not the test by themselves.
 - Logs are part of assertions: check for critical errors even when UI looks correct.
 - Test data names include a run id/timestamp so cleanup is safe.
+- Sensitivity probe = run one invalid scenario and prove a non-zero/test failure before trusting valid cases.
+- Selector proof = assert the selected element/state before and after the gesture; a completed tap command alone is insufficient.
+- Screenshot subject = exact tested screen + expected state + current app process; wrong/blank/home-screen media = `FAIL`.
+- Runner success + critical Flutter/native/backend log = `FAIL`; parse and assert logs before final exit.
 
 ## Failure Triage
 
@@ -189,3 +196,5 @@ Verify:
 6. Relevant tests pass after final runtime fix pass.
 7. Test data cleaned.
 8. All app processes stopped.
+9. Invalid-scenario sensitivity probe failed as expected.
+10. Every delivered screenshot/recording was opened and matched to the asserted screen and state.

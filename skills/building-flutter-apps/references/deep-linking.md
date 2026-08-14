@@ -6,12 +6,12 @@
 1. Typed routes + generated helpers for every in-app nav call.
 2. Redirect policy lives in a pure resolver; matrix-test auth/setup/location states.
 3. Validate params at route boundary; missing/stale resources render fallback/typed redirect, never throw in `build()`.
-4. App Links/Universal Links require hosted association files + cold/warm signed-state E2E.
+4. App Links/Universal Links and custom schemes require platform registration + Flutter delivery + cold/warm signed-state E2E.
 5. Deep links still pass auth/setup/update gates.
 
 ## Trigger
 
-Signals: deep linking, Universal Links, App Links, GoRouter redirect, assetlinks.json, apple-app-site-association
+Signals: deep linking, Universal Links, App Links, custom URI scheme, native extension/activity link, GoRouter redirect, assetlinks.json, apple-app-site-association
 Before code: output `Reading: deep-linking.md`
 
 
@@ -24,6 +24,7 @@ Before code: output `Reading: deep-linking.md`
 5. **MUST** test cold-start, warm-start, signed-out, signed-in, setup-incomplete, and stale-link paths.
 6. **MUST** navigate with generated route helpers such as `SomeRoute(...).go(context)` / `.push<T>(context)`.
 7. **MUST NOT** assume deep links bypass auth/setup/update gates. The resolver owns that policy.
+8. **MUST** keep scheme, host, path, and parameter names identical across link producer, Android/iOS registration, Flutter delivery, and typed router parsing.
 
 ## Web URL Strategy
 
@@ -181,6 +182,16 @@ Validation:
 xcrun simctl openurl booted https://example.com/products/123
 ```
 
+## Custom schemes and native producers
+
+- URI contract SSOT = scheme + host + path + required parameters + encoding rules.
+- Native producer = share extension, Live Activity, widget, notification, shortcut, or platform intent that emits the URI.
+- Android = matching intent filter; iOS = matching `CFBundleURLTypes` or accepted native delivery owner.
+- Flutter = platform event reaches one link ingress, then typed router parsing; no second ad hoc parser.
+- Contract fixture = producer URI parses to the same typed route on Android and iOS.
+- Device proof = cold app + warm app + signed out + signed in + stale/invalid parameter.
+- A platform launch with no asserted Flutter route = failure; a router unit test alone proves no native delivery.
+
 ## E2E Matrix
 
 | Case | Expected proof |
@@ -197,6 +208,8 @@ xcrun simctl openurl booted https://example.com/products/123
 - [ ] Typed routes exist for link targets and call sites use generated route helpers.
 - [ ] Redirect resolver is pure and matrix-tested.
 - [ ] Android App Links or iOS Universal Links are configured when required.
+- [ ] Custom/native URI scheme, host, path, parameters, and encoding match producer + platform registration + Flutter ingress + typed route.
 - [ ] Hosted association files match app IDs, bundle IDs, package names, and SHA fingerprints.
 - [ ] Cold/warm, signed-in/signed-out, setup, stale, and permission-denied paths are E2E tested.
 - [ ] Missing route params or missing resources do not throw from widget `build()`.
+- [ ] Cold/warm native delivery reaches the asserted Flutter screen on the target device; signed-state gates still apply.

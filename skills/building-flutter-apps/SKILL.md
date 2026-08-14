@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.7.9"
+  version: "5.8.1"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, windows, inno, installer, fire-and-forget, singletons, e2e testing
 ---
 
@@ -62,10 +62,12 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 | R19 | Android exact alarms use `flutter_local_notifications` permission APIs, not manual settings intents. | Lint: `use_local_notifications_exact_alarm_permission_api` |
 | R20 | Resolve nullable platform-specific plugin implementations before calling platform members. | Lint: `resolve_platform_specific_implementation_before_use` |
 | R21 | Widget previews are preview-only with deterministic fakes; no real HTTP/Firebase/Hive/native plugins. | [widget-previews.md](references/widget-previews.md) |
-| R22 | Runtime E2E proves behavior with stable selectors, logs, source-of-truth verification, cleanup, and multi-actor proof when needed. | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
+| R22 | Runtime E2E proves behavior with stable selectors, failure-sensitive scenarios/logs, subject-matched evidence, source-of-truth verification, cleanup, and multi-actor proof when needed. | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 | R23 | Accessibility is UI correctness: localized tooltips/semantic labels, 48x48 targets, contrast, text scale, `Text.rich`. | [accessibility.md](references/atomic-design/accessibility.md), [flutter-optimizations.md](references/flutter-optimizations.md#semantics) |
-| R24 | If remote error reporting is accepted or already present, use one app-owned `Crash` boundary; otherwise add no provider/facade. Scrub sensitive data + reconcile ambiguous remote outcomes before telemetry. | [error-reporting.md](references/error-reporting.md), [networking.md](references/networking.md) |
-| R25 | Windows installer delivery = minimal-step secret-free exact-SHA diagnostic → one publisher; keep cheap internal guards before one Windows build, preserve stable identity/data, and activate only verified immutable bytes. | [windows-installer-pipeline.md](references/windows-installer-pipeline.md), [workflow scaffold](assets/windows-installer-workflow.yml), [`inno_bundle` pubspec scaffold](assets/inno-bundle-pubspec.yaml), [Inno settlement sentinel](assets/inno-uninstall-settlement-sentinel.ps1), [Defender scanner](assets/defender-installer-scan.ps1) |
+| R24 | If remote error reporting is accepted or already present, use one app-owned `Crash` boundary and one reporting owner per operation; otherwise add no provider/facade. Scrub sensitive data + reconcile ambiguous remote outcomes before telemetry. | [error-reporting.md](references/error-reporting.md), [networking.md](references/networking.md) |
+| R25 | Windows installer delivery = one semantic engine + typed app config/capabilities + minimal-step exact-SHA diagnostic → one publisher; keep cheap guards before one build, isolate synthetic preservation proof, and activate only verified immutable bytes. | [windows-installer-pipeline.md](references/windows-installer-pipeline.md), [workflow scaffold](assets/windows-installer-workflow.yml), [`inno_bundle` pubspec scaffold](assets/inno-bundle-pubspec.yaml), [Inno settlement sentinel](assets/inno-uninstall-settlement-sentinel.ps1), [Defender scanner](assets/defender-installer-scan.ps1) |
+| R26 | Pause-sensitive Riverpod state starts only after its durable owner/listener exists; projections watch base state directly; switching auth/form modes clears transient errors. | [notifier-structure.md](references/state-management/notifier-structure.md), [state-management-lifecycle.md](references/state-management-lifecycle.md), [testing.md](references/testing.md) |
+| R27 | Native/custom links use one URI contract across producer, platform registration, Flutter delivery, and typed router; prove cold/warm + signed-state delivery on the target device. | [deep-linking.md](references/deep-linking.md), [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 
 ## Trigger Map
 
@@ -74,19 +76,19 @@ Before writing code in any row below, output `Reading: <ref-name>` and read the 
 | Touching | Read |
 |---|---|
 | New app/project scaffolding with incidental stack/package mentions, `main.dart`, `ProviderScope`, `MaterialApp.router`, app startup shell | [setup.md](references/setup.md) + [architecture.md](references/architecture.md) + [routing-app-shell.md](references/common-patterns/routing-app-shell.md) |
-| Notifier/AsyncNotifier shape, sync `Notifier.build()` init, loading/progress, `AsyncValue`, cleanup | [notifier-structure.md](references/state-management/notifier-structure.md) + [state-management-lifecycle.md](references/state-management-lifecycle.md) |
+| Notifier/AsyncNotifier shape, sync `Notifier.build()` init, paused route/listener startup, provider projection, auth/form mode error reset, loading/progress, `AsyncValue`, cleanup | [notifier-structure.md](references/state-management/notifier-structure.md) + [state-management-lifecycle.md](references/state-management-lifecycle.md) + [testing.md](references/testing.md) |
 | Mutation method, `ref.read` / `ref.watch` / `ref.listen`, `_ensureRepository`, async cancellation, `ref.mounted`, optimistic update, duplicate fetch | [async-mutations.md](references/state-management/async-mutations.md) + [state-management-lifecycle.md](references/state-management-lifecycle.md) |
 | Freezed entity, sealed union, `fromJson` / `toJson`, `copyWith`, model vs entity, `build.yaml` for `explicit_to_json` | [freezed-sealed.md](references/freezed-sealed.md) |
 | Provider declaration, `@riverpod`, family, `keepAlive`, codegen, `Mutation<T>` (experimental) | [riverpod-codegen.md](references/riverpod-codegen.md) |
 | Repository, datasource, domain entity, layered architecture, `IHttpService`, mapping models to entities | [architecture.md](references/architecture.md) |
 | Value Object, primitive obsession, `Distance`/`Money`/`Email`/`Slug`, unit conversion in domain, cross-entity primitive, `double distanceMeters`/`int amountCents`/`String email` smell, `arch_domain_import` error | [value-objects.md](references/value-objects.md) |
-| GoRouter, typed route, redirect, auth-protected route, router provider, `context.go`, deep link, cold-start, navigation gate | [routing-app-shell.md](references/common-patterns/routing-app-shell.md) + [deep-linking.md](references/deep-linking.md) |
+| GoRouter, typed route, redirect, auth-protected route, router provider, `context.go`, deep link, custom URI scheme, native extension/activity link, cold-start, navigation gate | [routing-app-shell.md](references/common-patterns/routing-app-shell.md) + [deep-linking.md](references/deep-linking.md) |
 | HTTP, network, REST, source-of-truth fetch after mutation, long-running remote function, async-start + reconcile, transport id vs domain id | [networking.md](references/networking.md) + [debounce-gate-batch.md](references/common-patterns/debounce-gate-batch.md) |
 | Atom, molecule, organism, design tokens, atomic widgets, `core/widgets/` promotion | [atomic-design.md](references/atomic-design.md) |
 | Reusable `presentation/widgets/`, widget-owned navigation/page stack/selected entity/workflow state, direct repository/service/provider access | [presentation-widgets.md](references/presentation-widgets.md) |
 | Accessibility, semantics, tooltip, semanticLabel, image alt text, tap target, contrast, text scaling | [accessibility.md](references/atomic-design/accessibility.md) + [flutter-optimizations.md](references/flutter-optimizations.md#semantics) |
 | Widget test, `ProviderContainer.test()`, `UncontrolledProviderScope`, fakes, mocks, `AppWidgetKeys`, event-contract tests | [testing.md](references/testing.md) |
-| `flutter_driver`, Dart MCP, E2E, `integration_test`, semantic selectors, log capture | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
+| `flutter_driver`, Dart MCP, E2E, `integration_test`, semantic selectors, scenario validation, screenshot/media proof, log capture | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 | Hive, `TypeAdapter`, TypeId, box, persistence migration, retired field accounting | [hive-persistence.md](references/hive-persistence.md) |
 | Crashlytics, FirebaseCrashlytics, Sentry, `sentry_flutter`, DSN, error reporting, `Crash.init`, `Crash.error`, `Crash.log`, symbol upload | [error-reporting.md](references/error-reporting.md) |
 | Mixin, capability vs interface, retry helper, RNG, bulk operation | [mixins.md](references/mixins.md) |
@@ -133,22 +135,24 @@ After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` wri
 - [ ] Coordinator invokes `npx --yes dart-decimate@latest` once per affected Git root; nested package scope uses exact `--workspace`; existing hooks + `core.hooksPath` preserved. Non-Git project = N/A.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
 - [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
-- [ ] Domain/data/platform follow Rules 7, 10-13, 17-24: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, and a11y; if error reporting is accepted/present, it uses one scrubbed boundary, otherwise N/A.
+- [ ] Domain/data/platform follow Rules 7, 10-13, 17-24, 26-27: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, pause-safe state, native links, and a11y; if error reporting is accepted/present, it uses one scrubbed once-only boundary, otherwise N/A.
 - [ ] Rule 25 = N/A unless Windows packaging/updater delivery is touched; when applicable, its diagnostic/publisher proof is green.
 - [ ] Any row touched in Trigger Map was read; exact lint names are cited when a scanner should enforce the rule.
 
 ### T1 — State / Notifier / Mutation
 
 - [ ] Mutation deps resolve lazily via stateless helper/mixin; no notifier-local repo/service cache except disposable lifecycle owners.
-- [ ] Sync `Notifier.build()` avoids pre-return `state` reads; async defers with `Future.microtask`.
+- [ ] Sync `Notifier.build()` avoids pre-return `state` reads; async primary state uses `AsyncNotifier.build`; durable sync startup does not depend on microtask timing before its owner/listener exists.
 - [ ] `ref.onDispose()` cancels subscriptions/controllers/timers; durable status/snackbar/teardown belongs to notifier state.
 - [ ] Long-running sync/auth/import guards stale writes; no `ref.watch` inside notifier methods.
+- [ ] Pause-sensitive projections watch base state directly; route pause/resume keeps the first update; auth/form mode changes clear transient errors.
 
 ### T2 — Network / E2E / Stream / Route
 
 - [ ] Source-of-truth fetch/reconcile after generated, normalized, reordered, destructive, or remote-function mutations.
 - [ ] Shared/realtime state has writer + observer E2E proof without manual refresh.
 - [ ] Selectors use stable text/semantics/tooltips or central `AppWidgetKeys`; no inline string keys or coordinate primary taps.
-- [ ] E2E entrypoint is deterministic and isolated from production `main.dart`; logs and cleanup are captured.
+- [ ] E2E entrypoint is deterministic and isolated from production `main.dart`; unknown scenarios fail; critical logs fail the run; evidence shows the asserted screen before app exit; cleanup is verified.
 - [ ] GoRouter redirects use pure matrix-tested resolver, nullable by-id providers/fallback UI, and generated typed route helpers.
+- [ ] Native/custom URI producer, Android/iOS registration, Flutter delivery, and typed router share one tested scheme/host/path contract; cold/warm + signed-state device paths pass.
 - [ ] Cross-runtime constants, schemas, and function contracts have drift tests; no app-root text-scale clamp.
