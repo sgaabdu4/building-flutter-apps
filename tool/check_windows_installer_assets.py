@@ -332,6 +332,7 @@ for forbidden in (
     "Start-Process -Wait",
     "WaitForSingleObject(",
     "AllowedSharingViolationRetries = 2",
+    ".GetNewClosure()",
 ):
     require(
         forbidden not in defender_scanner_text,

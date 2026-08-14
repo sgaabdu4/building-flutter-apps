@@ -184,6 +184,9 @@ function Invoke-DefenderScanContract {
     [Parameter(Mandatory)]
     [scriptblock] $Runner,
 
+    [AllowNull()]
+    [object] $RunnerContext = $null,
+
     [ValidateRange(0, 1)]
     [int] $AllowedSharingViolationRetries = 1,
 
@@ -204,7 +207,7 @@ function Invoke-DefenderScanContract {
   )
   $maximumAttempts = 1 + $AllowedSharingViolationRetries
   for ($attempt = 1; $attempt -le $maximumAttempts; $attempt += 1) {
-    $result = & $Runner $attempt $ScanTarget
+    $result = & $Runner $attempt $ScanTarget $RunnerContext
     if ($result.TimedOut) {
       throw "phase=defender-scan result=timeout attempt=$attempt"
     }
@@ -282,7 +285,7 @@ function Invoke-DefenderScanFixtures {
   $fixtureTarget = 'C:\private\candidate.exe'
 
   $cleanRunner = {
-    param($Attempt, $ScanTarget)
+    param($Attempt, $ScanTarget, $Context)
     return [pscustomobject] @{
       ExitCode = 0
       StdOut = "clean $ScanTarget"
@@ -298,10 +301,13 @@ function Invoke-DefenderScanFixtures {
     throw 'Clean fixture did not complete on its first attempt.'
   }
 
+  $detectionContext = [pscustomobject] @{
+    ExitCode = ConvertTo-SignedExitCode -HResult '0x80508025'
+  }
   $detectionRunner = {
-    param($Attempt, $ScanTarget)
+    param($Attempt, $ScanTarget, $Context)
     return [pscustomobject] @{
-      ExitCode = ConvertTo-SignedExitCode -HResult '0x80508025'
+      ExitCode = $Context.ExitCode
       StdOut = "Threat requires manual action: $ScanTarget"
       StdErr = ''
       TimedOut = $false
@@ -312,6 +318,7 @@ function Invoke-DefenderScanFixtures {
       Invoke-DefenderScanContract `
         -ScanTarget $fixtureTarget `
         -Runner $detectionRunner `
+        -RunnerContext $detectionContext `
         -AllowedSharingViolationRetries 1
     } `
     -ExpectedFragments @(
@@ -321,10 +328,13 @@ function Invoke-DefenderScanFixtures {
     ) `
     -ForbiddenText $fixtureTarget
 
+  $unknownContext = [pscustomobject] @{
+    ExitCode = ConvertTo-SignedExitCode -HResult '0x81234567'
+  }
   $unknownRunner = {
-    param($Attempt, $ScanTarget)
+    param($Attempt, $ScanTarget, $Context)
     return [pscustomobject] @{
-      ExitCode = ConvertTo-SignedExitCode -HResult '0x81234567'
+      ExitCode = $Context.ExitCode
       StdOut = ''
       StdErr = "Unexpected scanner failure for $ScanTarget"
       TimedOut = $false
@@ -335,6 +345,7 @@ function Invoke-DefenderScanFixtures {
       Invoke-DefenderScanContract `
         -ScanTarget $fixtureTarget `
         -Runner $unknownRunner `
+        -RunnerContext $unknownContext `
         -AllowedSharingViolationRetries 1
     } `
     -ExpectedFragments @(
@@ -344,12 +355,15 @@ function Invoke-DefenderScanFixtures {
     ) `
     -ForbiddenText $fixtureTarget
 
-  $sharingState = [pscustomobject] @{ CallCount = 0 }
+  $sharingContext = [pscustomobject] @{
+    CallCount = 0
+    SharingViolationExitCode = ConvertTo-SignedExitCode -HResult '0x80070020'
+  }
   $sharingRunner = {
-    param($Attempt, $ScanTarget)
-    $sharingState.CallCount += 1
-    $exitCode = if ($sharingState.CallCount -eq 1) {
-      ConvertTo-SignedExitCode -HResult '0x80070020'
+    param($Attempt, $ScanTarget, $Context)
+    $Context.CallCount += 1
+    $exitCode = if ($Context.CallCount -eq 1) {
+      $Context.SharingViolationExitCode
     } else {
       0
     }
@@ -359,12 +373,13 @@ function Invoke-DefenderScanFixtures {
       StdErr = "Transient sharing state for $ScanTarget"
       TimedOut = $false
     }
-  }.GetNewClosure()
+  }
   $sharing = Invoke-DefenderScanContract `
     -ScanTarget $fixtureTarget `
     -Runner $sharingRunner `
+    -RunnerContext $sharingContext `
     -AllowedSharingViolationRetries 1
-  if ($sharing.AttemptCount -ne 2 -or $sharingState.CallCount -ne 2) {
+  if ($sharing.AttemptCount -ne 2 -or $sharingContext.CallCount -ne 2) {
     throw 'Sharing-violation fixture did not retry exactly once.'
   }
 
@@ -388,16 +403,21 @@ if (-not (Test-Path -LiteralPath $TargetPath -PathType Leaf)) {
 
 $resolvedScanner = [IO.Path]::GetFullPath($MpCmdRunPath)
 $resolvedTarget = [IO.Path]::GetFullPath($TargetPath)
+$processContext = [pscustomobject] @{
+  ExecutablePath = $resolvedScanner
+  TimeoutSeconds = $TimeoutSeconds
+}
 $processRunner = {
-  param($Attempt, $ScanTarget)
+  param($Attempt, $ScanTarget, $Context)
   return Invoke-MpCmdRunProcess `
-    -ExecutablePath $resolvedScanner `
+    -ExecutablePath $Context.ExecutablePath `
     -ScanTarget $ScanTarget `
-    -ProcessTimeoutSeconds $TimeoutSeconds
-}.GetNewClosure()
+    -ProcessTimeoutSeconds $Context.TimeoutSeconds
+}
 
 Invoke-DefenderScanContract `
   -ScanTarget $resolvedTarget `
   -Runner $processRunner `
+  -RunnerContext $processContext `
   -AllowedSharingViolationRetries $SharingViolationRetries `
   -DelaySeconds $RetryDelaySeconds
