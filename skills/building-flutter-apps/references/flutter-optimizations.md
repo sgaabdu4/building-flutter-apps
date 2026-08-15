@@ -12,7 +12,6 @@
 ## Trigger
 
 Signals: shrinkWrap, FadeTransition, Sliver, RepaintBoundary, Impeller, Isolate.run, AnimationController
-Before code: output `Reading: flutter-optimizations.md`
 
 
 ## Keys

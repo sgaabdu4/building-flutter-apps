@@ -10,7 +10,6 @@
 ## Trigger
 
 Signals: pagination, infinite scroll, cursor loading, search debounce, form validation, batch processing, pull-to-refresh.
-Before code: output `Reading: lists-forms-workflows.md`.
 
 ## Pagination
 

@@ -1,0 +1,43 @@
+{
+ "applicable": [
+  "targeted"
+ ],
+ "artifact": "sha256:88fc58e4cd087bb13391af6f3b933195685450c9df071dcc76fa51da2678643d",
+ "behavior": "host-driver and device-test guidance records state, native boundaries, receipts, and accepted network outcomes",
+ "changed_paths": [
+  "evals/evals.json",
+  "skills/building-flutter-apps/references/analysis-options.md",
+  "skills/building-flutter-apps/references/analysis_options.yaml",
+  "skills/building-flutter-apps/references/build-reproducibility.md",
+  "skills/building-flutter-apps/references/core-stack.md",
+  "skills/building-flutter-apps/references/dart-mcp-e2e-testing.md",
+  "skills/building-flutter-apps/references/freezed-sealed.md",
+  "skills/building-flutter-apps/references/hive-persistence.md",
+  "skills/building-flutter-apps/references/networking.md",
+  "skills/building-flutter-apps/references/testing.md",
+  "tool/check_drift.sh",
+  "tool/check_drift_test.sh",
+  "tool/run_compatibility_fixture.py",
+  "tool/upstream/flutter_skills.lock.json"
+ ],
+ "checks": [
+  {
+   "command": [
+    "python3",
+    "tool/quality_gate.py"
+   ],
+   "exit": 0,
+   "family": "targeted"
+  }
+ ],
+ "e2e": "not-applicable: no visual surface changes",
+ "e2e_sha256": "none",
+ "head": "4df0d8da9c6d6c8f0b495b91ac604dec13ce3bcf",
+ "integrity": "sha256:ac370e536ccd96b553c55b11b0980b79dcc8c8da1ab60517cd6ec4d5a8b40cde",
+ "kind": "slice",
+ "plan_id": "canonical-flutter-guidance-and-lints-review-69a82d79",
+ "receipt_version": 2,
+ "review": "focused review of host-driver, restart, native-prompt, receipt, logging, gesture, modal, and networking guidance completed",
+ "security": "no live data, secrets, external writes, or UI changes; device guidance changes are documentation and local checks",
+ "slice": "S-3"
+}

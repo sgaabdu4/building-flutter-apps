@@ -9,7 +9,6 @@
 ## Trigger
 
 Signals: `BuildContext`, `ModalRoute`, `SnackBarUtils`, dialog helpers, route-current guards, snackbar from notifier.
-Before code: output `Reading: context-ui.md`.
 
 ## Context extensions
 

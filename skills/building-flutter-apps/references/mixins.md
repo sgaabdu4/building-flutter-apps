@@ -12,7 +12,6 @@
 ## Trigger
 
 Signals: mixin, ConnectivityMixin, RetryMixin, on ConsumerState, abstract interface class
-Before code: output `Reading: mixins.md`
 
 
 ## Rules — NEVER Violate

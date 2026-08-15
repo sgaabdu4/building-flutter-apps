@@ -10,7 +10,6 @@
 ## Trigger
 
 Signals: mutation method, `ref.read`, `ref.watch`, `ref.listen`, `_ensureRepository`, async cancellation, optimistic update, duplicate fetch.
-Before code: output `Reading: async-mutations.md`.
 
 ## Mounted guards
 

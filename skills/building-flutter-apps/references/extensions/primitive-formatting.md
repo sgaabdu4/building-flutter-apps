@@ -9,7 +9,6 @@
 ## Trigger
 
 Signals: `DateTime`, `String`, `int`, `double`, `num`, `Duration`, `NumberFormat`, `DateFormat`, `intl`, capitalization, currency, percent, clamp.
-Before code: output `Reading: primitive-formatting.md`.
 
 ## DateTime
 

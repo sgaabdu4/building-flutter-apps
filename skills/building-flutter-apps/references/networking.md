@@ -9,11 +9,12 @@
 4. Failures throw typed errors. Never return `null`/empty fallback for failed network ops.
 5. Mutations refresh source of truth when backend can generate/normalize/reorder/derive.
 6. Long remote work async-starts, then reconciles with bounded polling/realtime/fetch.
+7. Every datasource operation declares which response statuses are accepted,
+   retryable, absent, or terminal.
 
 ## Trigger
 
 Signals: IHttpService, datasource, HTTP, auth token, background parsing, Isolate.run
-Before code: output `Reading: networking.md`
 
 
 ## Rules
@@ -26,6 +27,20 @@ Before code: output `Reading: networking.md`
 6. **MUST** move large JSON parsing off the UI isolate when it can exceed a frame budget.
 7. **MUST NOT** put auth tokens, base URLs, or secrets in widget code.
 8. **MUST** async-start long-running remote work (delete/sync/import/export/migrate/generate), then reconcile source-of-truth state with bounded polling, realtime, or a canonical fetch. Do not block the client request waiting for backend completion.
+9. **MUST** classify response status once at the infrastructure boundary. Keep
+   accepted, retryable, absent, and terminal status sets in one shared HTTP
+   classifier instead of repeating them in widgets or notifiers.
+10. **MUST** treat expected absence as a typed result, not a generic error. An
+    expected `401` without a session or expected `404` for a missing record must
+    return an explicit absent or signed-out result and must not create a Sentry
+    event. An unexpected response is a typed failure and is reported once by
+    the owning layer after any required reconcile.
+11. **MUST** retry only bounded, safe cases such as `429`, selected `5xx`, and
+    transport failures. Do not retry a non-idempotent write unless the API has
+    an idempotency key or the operation is otherwise proven safe.
+12. **MUST NOT** catch raw HTTP failures in widgets or notifiers. They render
+    typed results; the datasource or repository owns classification and the
+    single incident report.
 
 ## Platform Setup
 
@@ -181,6 +196,8 @@ List<ProductModel> parseProducts(String responseBody) {
 ## Tests
 
 - Unit-test `HttpService` status-code and malformed-body handling.
+- Unit-test the shared status classifier for every operation: accepted success, expected
+  `401` or `404` absence, bounded `429` or `5xx` retry, and terminal failure.
 - Unit-test every datasource success and failure payload shape.
 - Repository tests mock datasource interfaces and verify model-to-entity mapping.
 - Notifier tests mock repositories, not HTTP.
@@ -195,6 +212,8 @@ List<ProductModel> parseProducts(String responseBody) {
 - [ ] Failures throw typed errors; no silent `null` or empty fallback.
 - [ ] Mutations refresh source-of-truth when backend values can differ.
 - [ ] Long-running remote functions async-start, then reconcile with bounded polling/realtime/fetch.
+- [ ] Each datasource operation has an accepted-status and retry-status policy.
+- [ ] Expected absent or signed-out responses do not create error reports.
 - [ ] Destructive catch blocks reconcile before Crash/Sentry/Firebase reporting.
 - [ ] Large payload parsing uses isolate/compute path when needed.
 - [ ] Datasource, repository, notifier, and E2E coverage match the risk.

@@ -12,7 +12,6 @@
 ## Trigger
 
 Signals: deep linking, Universal Links, App Links, custom URI scheme, native extension/activity link, GoRouter redirect, assetlinks.json, apple-app-site-association
-Before code: output `Reading: deep-linking.md`
 
 
 ## Rules

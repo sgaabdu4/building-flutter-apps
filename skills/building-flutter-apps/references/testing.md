@@ -9,11 +9,12 @@
 4. Prefer explicit `pump()`; `pumpAndSettle` only for finite anim/async.
 5. Selectors use central deterministic `AppWidgetKeys`; no inline keys, `tapAt`, first icon, case-sensitive labels.
 6. Add contract drift tests for copied constants/schema/field IDs across runtimes.
+7. Treat clean-install and preserved-restart tests as separate cases, with the
+   state recorded in the test receipt.
 
 ## Trigger
 
 Signals: ProviderContainer.test, UncontrolledProviderScope, mocktail, widget tests, event contract
-Before code: output `Reading: testing.md`
 
 
 ## Rules — NEVER Violate
@@ -28,6 +29,11 @@ Before code: output `Reading: testing.md`
 8. **MUST** keep shared fakes, mocks, provider-container factories, platform stubs, and async wait helpers in a test helper SSOT.
 9. **MUST** add contract drift tests when constants/schema/field IDs are copied across Flutter/backend/functions/native runtimes.
 10. **MUST** regression-test pause-sensitive provider startup/projections, transient mode-error clearing, and native-link contracts when those paths exist.
+11. **MUST** wait for the old modal key to be absent before reusing that key for
+    a new modal.
+12. **MUST** test native/plugin boundaries with the real platform wrapper when
+    the behavior depends on a file picker, permission prompt, keyboard, share
+    sheet, or platform channel. A widget mock proves only the Flutter side.
 
 ## Setup
 
@@ -378,6 +384,8 @@ Generated values and read-your-writes:
 | Login/signup/reset mode change | Seed a server/validation error, switch mode, and assert error + pending state clear |
 | Native/custom link drift | Build URI from producer contract and parse through the Flutter typed-route ingress for Android + iOS fixtures |
 | E2E harness false positive | Unknown scenario fails; critical log fails; screenshot is taken only after asserted target state |
+| Modal key reuse | Close the old modal, wait for its key to be absent, open the new modal, and assert the new route state |
+| Native prompt boundary | Complete the platform prompt and assert the returned app state, not only a widget-tree change |
 
 ## Testing Repository Layer
 

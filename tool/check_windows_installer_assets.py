@@ -165,7 +165,7 @@ for phrase in (
     "## Cost-aware proof ladder",
     "Self-hosted Actions usage = no GitHub-hosted Actions minute charge",
     "private repository only + repository scope",
-    "clinic production PC",
+    "production machine holding sensitive user data",
     "`act` = portable wiring aid only",
     "intentionally incomplete",
     "same checked-in `windows_installer.ps1 verify`",
@@ -465,7 +465,7 @@ require(
     any(
         "burning paid windows-latest minutes" in case["prompt"]
         and any("ephemeral or JIT self-hosted Windows runner" in item for item in case["expectations"])
-        and any("clinic production machines" in item for item in case["expectations"])
+        and any("production machines containing sensitive user data" in item for item in case["expectations"])
         and any("wiring-only" in item for item in case["expectations"])
         and any("storage_file_not_found" in item for item in case["expectations"])
         and any("same immutable object ID" in item for item in case["expectations"])

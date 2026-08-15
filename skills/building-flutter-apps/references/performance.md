@@ -17,7 +17,6 @@
 ## Trigger
 
 Signals: ref.watch, Consumer boundary, .select(), ListView.builder, computed provider, ref.onDispose
-Before code: output `Reading: performance.md`
 
 
 Flutter rendering/animations/slivers/isolates/app-size → see [flutter-optimizations.md](flutter-optimizations.md).

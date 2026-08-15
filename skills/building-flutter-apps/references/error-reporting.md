@@ -14,7 +14,6 @@
 
 Signals = Crashlytics + FirebaseCrashlytics + Sentry + sentry_flutter + DSN + `Crash.error` + symbolication + crash reporting.
 
-Before code = output `Reading: error-reporting.md`.
 
 ## Provider branch
 

@@ -76,12 +76,12 @@
     },
     {
       "id": 6,
-      "prompt": "I'm starting a new Flutter project for a small clinic. It needs: patient list, patient detail, and an 'add patient' form. I'm using Riverpod, Freezed, GoRouter, and Hive. Can you set up the project architecture \u2014 folder structure, entities, routing \u2014 just the scaffolding, no actual API calls yet.",
+      "prompt": "I'm starting a new Flutter project for a small service. It needs: record list, record detail, and an 'add record' form. I'm using Riverpod, Freezed, GoRouter, and Hive. Can you set up the project architecture \u2014 folder structure, entities, routing \u2014 just the scaffolding, no actual API calls yet.",
       "expected_output": "See expectations.",
       "files": [],
       "expectations": [
-        "Creates lib/features/patients/ with data/, domain/, repositories/, presentation/ subdirectories",
-        "Patient entity is a Freezed sealed class with const constructor",
+        "Creates lib/features/records/ with data/, domain/, repositories/, presentation/ subdirectories",
+        "Record entity is a Freezed sealed class with const constructor",
         "GoRouter uses typed routes (go_router_builder), not string paths",
         "main.dart wraps app in ProviderScope",
         "Uses MaterialApp.router with routerConfig",
@@ -455,7 +455,7 @@
     },
     {
       "id": 32,
-      "prompt": "I have domain entities `Clinic`, `Patient`, and `Appointment` that all store raw `String id`, `String phoneNumber`, and `double distanceMeters`. Some constructors use empty string defaults for missing values. Should I keep primitives or create something else?",
+      "prompt": "I have domain entities `Account`, `Contact`, and `Booking` that all store raw `String id`, `String phoneNumber`, and `double distanceMeters`. Some constructors use empty string defaults for missing values. Should I keep primitives or create something else?",
       "expected_output": "See expectations.",
       "files": [],
       "expectations": [
@@ -966,7 +966,7 @@
     },
     {
       "id": 64,
-      "prompt": "A private Flutter Windows repository is burning paid windows-latest minutes. The team wants to use act on a Mac, then attach a persistent clinic reception PC as a self-hosted runner. Separately, the Linux storage preflight creates an exact-format object successfully, but the public consumer read initially returns storage_file_not_found; someone proposes rebuilding with a bumped version and uploading a second object. Design the cheapest safe proof ladder without expanding the compact workflow or compiling Flutter twice inside a run.",
+      "prompt": "A private Flutter Windows repository is burning paid windows-latest minutes. The team wants to use act on a Mac, then attach a persistent office PC as a self-hosted runner. Separately, the Linux storage preflight creates an exact-format object successfully, but the public consumer read initially returns storage_file_not_found; someone proposes rebuilding with a bumped version and uploading a second object. Design the cheapest safe proof ladder without expanding the compact workflow or compiling Flutter twice inside a run.",
       "expected_output": "See expectations.",
       "files": [],
       "expectations": [
@@ -974,7 +974,7 @@
         "Runs a cheap Linux official-SDK live preflight with a harmless exact-candidate format, size, protocol, and security policy, then proves owned create, unauthenticated public read and hash, and bounded delete settlement",
         "Runs the same checked-in repository-owned Windows orchestration locally on a clean dedicated disposable Windows VM or a repository-scoped ephemeral or JIT self-hosted Windows runner",
         "Explains that self-hosted runner execution does not consume GitHub-hosted Actions minutes but the operator owns machine cost, image, updates, isolation, cleanup, and retained diagnostics",
-        "Uses self-hosted runners only for a private repository and rejects public, organization-shared, persistent developer, and clinic production machines containing patient data, live credentials, signing keys, or sensitive-service access",
+        "Uses self-hosted runners only for a private repository and rejects public, organization-shared, persistent developer, and production machines containing sensitive user data, live credentials, signing keys, or sensitive-service access",
         "Explains GitHub's ephemeral recommendation and persistent-runner compromise or cross-job secret exposure risk, and requires one exact job followed by teardown",
         "Explains that act on macOS or Linux is wiring-only because its normal images are Linux-oriented and intentionally incomplete; Windows or macOS labels require an actual matching host and are not Windows target-native proof",
         "Runs only one GitHub-hosted Windows publisher after exact-SHA target-native proof and compiles Flutter or native code exactly once within each orchestration invocation",
@@ -999,7 +999,7 @@
         "Records host architecture, guest architecture, process or EXE architecture, emulation state, Windows build, and resolved toolchain paths and versions",
         "Treats persistent self-hosted runner registration as a separate security and persistent-access boundary rather than an implication of successful direct local execution",
         "Keeps any self-hosted runner private-repository-only, repository-scoped, ephemeral or JIT, one-job, and torn down after its receipt",
-        "Rejects clinic production PCs and machines holding patient data, live credentials, signing keys, or sensitive-service access",
+        "Rejects production PCs and machines holding sensitive user data, live credentials, signing keys, or sensitive-service access",
         "Keeps compact YAML boundary steps and the one-native-build-per-orchestration contract unchanged"
       ]
     },
@@ -1172,7 +1172,7 @@
     },
     {
       "id": 77,
-      "prompt": "An iOS Live Activity emits `repem://workout/open?id=1`, but the iOS URL registration and Flutter router use different hosts. A router unit test passes, while tapping the live activity never reaches the workout screen. What proof is required?",
+      "prompt": "An iOS Live Activity emits `app-scheme://resource/open?id=1`, but the iOS URL registration and Flutter router use different hosts. A router unit test passes, while tapping the live activity never reaches the resource screen. What proof is required?",
       "expected_output": "See expectations.",
       "files": [],
       "expectations": [

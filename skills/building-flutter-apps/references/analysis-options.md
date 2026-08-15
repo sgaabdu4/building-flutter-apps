@@ -11,7 +11,6 @@
 ## Trigger
 
 Signals: analysis_options, dart analyze, flutter_skill_lints, riverpod_lint
-Before code: output `Reading: analysis-options.md`
 
 
 Copy `references/analysis_options.yaml` to every Flutter project root. For new Flutter apps,
@@ -51,7 +50,7 @@ feature code needs them.
 - Do not enable `use_setters_to_change_properties` for async persistence APIs:
   Dart setters cannot be `async`, and these mutation methods must remain
   awaitable.
-- Codegen: `invalid_annotation_target: ignore`
+- Codegen warnings stay visible. Fix an annotation package or generator constraint when generated annotations are incompatible. Do not silence annotation diagnostics with an analyzer error override.
 - Exclude: `*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`
 
 ## Install
@@ -65,7 +64,7 @@ Plugin block:
 ```yaml
 plugins:
   # Stable Riverpod lint pin verified for Riverpod 3.3-era lint coverage.
-  riverpod_lint: 3.1.4
+  riverpod_lint: 3.1.8
   flutter_skill_lints:
 ```
 

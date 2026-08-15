@@ -9,7 +9,6 @@
 ## Trigger
 
 Signals: new Flutter app, `analysis_options.yaml`, `pubspec.yaml`, `dart analyze`, missing lint diagnostics.
-Before code: output `Reading: setup.md`.
 
 ## Lint wiring
 

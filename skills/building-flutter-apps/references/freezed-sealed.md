@@ -14,7 +14,6 @@
 ## Trigger
 
 Signals: Freezed, sealed class, @freezed, build.yaml, explicit_to_json, copyWith, union types
-Before code: output `Reading: freezed-sealed.md`
 
 
 ## Rules — NEVER Violate
@@ -361,7 +360,7 @@ targets:
 
 ## Linting
 
-Use the canonical analyzer config from [analysis_options.yaml](analysis_options.yaml). It already sets `invalid_annotation_target: ignore` for Freezed and enables the Dart analyzer plugin system used by this skill.
+Use the canonical analyzer config from [analysis_options.yaml](analysis_options.yaml). Annotation diagnostics stay enabled, so a generator mismatch is fixed through the verified package matrix rather than hidden by an analyzer ignore.
 
 ## Rich Models
 

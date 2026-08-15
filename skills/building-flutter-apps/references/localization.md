@@ -12,7 +12,6 @@
 ## Trigger
 
 Signals: gen-l10n, ARB, AppLocalizations, plural, select, l10n.yaml
-Before code: output `Reading: localization.md`
 
 
 ## Rules

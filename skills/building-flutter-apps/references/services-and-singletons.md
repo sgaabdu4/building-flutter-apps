@@ -16,7 +16,6 @@
 ## Trigger
 
 Signals: abstract final class, singleton, unawaited, fire-and-forget, static facade
-Before code: output `Reading: services-and-singletons.md`
 
 ## Decision
 

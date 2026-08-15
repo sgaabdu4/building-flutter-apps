@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.8.2"
+  version: "5.9.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, windows, inno, installer, fire-and-forget, singletons, e2e testing
 ---
 
@@ -18,20 +18,8 @@ metadata:
 - Dart Decimate invocation = global `deterministic-checks` `dart_decimate_gate.py`; raw scanner calls + project-local adapters/dependencies/binaries + package-root `tool/` bundles forbidden.
 - Coordinator runtime = `npx --yes dart-decimate@latest`; one scan per affected Git root + exact `--workspace` scope for nested packages.
 - After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, run package-root `dart analyze` + [Dart Decimate](references/dart-decimate.md), then emit Pre-Flight.
-
-## Gate
-
-On skill activation, emit verbatim once:
-
-> building-flutter-apps active. Pre-flight required.
-
-Before writing any `.dart` code, emit verbatim:
-
-> Reading building-flutter-apps gate.
-
-After every code change to a `.dart` file (or to `pubspec.yaml` / `build.yaml` / `analysis_options.yaml`):
-
-Run package-root `dart analyze` + [Dart Decimate](references/dart-decimate.md), block on either gate's findings/errors, emit Pre-Flight, and read [setup.md](references/setup.md) first if `flutter_skill_lints` is not wired.
+- Block on analyzer or Decimate findings, and read [setup.md](references/setup.md) first if
+  `flutter_skill_lints` is not wired.
 
 ## Progressive Disclosure Gate
 
@@ -71,7 +59,7 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 
 ## Trigger Map
 
-Before writing code in any row below, output `Reading: <ref-name>` and read the listed reference(s). Prefer the narrowest matching row. Read the large parent refs only when no scenario row fits.
+Before writing code in any row below, read the listed reference(s). Prefer the narrowest matching row. Read the large parent refs only when no scenario row fits.
 
 | Touching | Read |
 |---|---|

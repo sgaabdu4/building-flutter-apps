@@ -8,11 +8,12 @@
 3. Select by semantics/text/tooltips/central `ValueKey`; no coordinate-tap primary selectors.
 4. Wait on observable UI/backend state, never blind sleep.
 5. Verify source-of-truth via admin/API/CLI/read model for remote/shared state.
+6. Keep the target app and host driver separate. The target may use Flutter and app code. The host driver must stay in its host-side API and Dart code.
+7. Label every run `clean` or `preserved` and record that state in its receipt.
 
 ## Trigger
 
 Signals: E2E testing, Dart MCP, flutter_driver, integration_test, source-of-truth verification
-Before code: output `Reading: dart-mcp-e2e-testing.md`
 
 
 https://docs.flutter.dev/ai/mcp-server
@@ -36,6 +37,10 @@ Runtime E2E means real app behavior on a real simulator/device. Static review, s
 13. MUST reject an unknown scenario before executing any valid journey; silent fallback to a default scenario is forbidden.
 14. MUST fail the run when asserted logs contain a critical error, even if the driver/process exits 0.
 15. MUST capture evidence while the app is running on the asserted screen; a screenshot after exit, crash, or navigation away proves nothing.
+16. MUST prove the host driver separately with analysis and a host-side compile check before the full target run.
+17. MUST wait for a closed modal's old key to be absent before opening another modal that reuses that key.
+18. MUST treat native prompts as platform UI. Flutter widget-tree state alone cannot prove a file picker, permission prompt, keyboard, or share sheet completed.
+19. MUST write one terminal receipt per scenario. A timeout, lost process, missing receipt, pending timer, pending future, subscription, or callback is a failed or incomplete run.
 
 ## Tool Map
 
@@ -109,6 +114,117 @@ Rules:
 - Prefer `--dart-define` flags for known app states: signed out, onboarding incomplete, update required, disabled notifications.
 - Do not mock the feature under test in the E2E entrypoint.
 - Launch the target file explicitly: `flutter run -t lib/main_dev.dart`.
+
+Flutter's current integration-test documentation keeps the app test under
+`integration_test/`. When `flutter drive` is used, the host adapter belongs in
+`test_driver/`, and the target and host files are separate processes. See the
+[integration test guide](https://docs.flutter.dev/testing/integration-tests) and
+the [Flutter drive command source](https://github.com/flutter/flutter/blob/master/packages/flutter_tools/lib/src/commands/drive.dart).
+
+## App and host-driver boundary
+
+The app target may import `dart:ui`, Flutter widgets, rendering, material, the
+app package, and feature code. The host driver may import `dart:async`,
+`dart:io`, `package:test`, `package:flutter_driver` host APIs, or the official
+`integration_test_driver` adapter. Its own code and helper closure MUST NOT
+import `dart:ui`, `package:flutter/rendering.dart`,
+`package:flutter/widgets.dart`, `package:flutter/material.dart`, or the app
+package. Do not place app widgets, providers, repositories, or platform plugin
+code in `test_driver/`.
+
+Prove the boundary before running the device flow:
+
+```text
+dart analyze test_driver
+dart compile exe test_driver/<scenario>_test.dart
+flutter drive --driver=test_driver/<scenario>_test.dart \
+  --target=integration_test/<scenario>_test.dart
+```
+
+The compile step must use the project's resolved package configuration. If a
+driver needs a Flutter-only helper, move that helper into the target
+`integration_test/` file and send only serializable results to the host.
+
+## Clean and preserved restart states
+
+These are different tests and must never be inferred from a screenshot.
+
+`clean` means the exact app installation and its local data were removed by the
+platform tool before launch. Verify the app process is gone, the app container
+or data directory is gone, and no old test record is present before launch. A
+new install must create the container again. Record the platform command and
+the verification result. Do not use a generic cache clear when the requirement
+is a clean install.
+
+`preserved` means the same installation and local data remain. Do not uninstall,
+clear storage, reset the simulator, or recreate the test account between the
+write and relaunch phases. Assert the saved record before and after relaunch,
+and record an app/data identity at both points.
+
+The current `flutter drive` contract includes `--keep-app-running` and
+`--use-existing-app`. The first controls whether Flutter stops the app after
+the driver finishes. The second connects to an already running VM service. They
+do not, by themselves, prove that app data was preserved. The current command
+does not expose `--no-uninstall-first`, so do not add that flag to a command.
+Use the platform's documented uninstall or data-reset command only for the
+explicit `clean` phase. Capture the exact Flutter tool version and command in
+the receipt.
+
+## Gestures, modals, and native prompts
+
+- Scroll a keyed or semantically named scrollable. Wait until the target item is
+  visible before the gesture, and assert the target text or state after it.
+- Dismiss the keyboard, snackbar, sheet, and old dialog before the next phase.
+  After closing a dialog, issue `waitForAbsent(oldDialogKey)` before reusing its
+  key for a new dialog. This prevents a stale route from satisfying the next
+  `waitFor`.
+- Use the current driver or Dart MCP gesture API with an explicit duration and
+  pointer update frequency when it supports them. For an API that exposes a
+  frequency for a stationary long press or drag, use about 60 Hz. The official
+  [`FlutterDriver.scroll`](https://api.flutter.dev/flutter/flutter_driver/FlutterDriver/scroll.html)
+  API defaults to 60 Hz, while `FlutterDriver` does not expose a long-press
+  frequency argument. Do not invent an unsupported flag or make a coordinate
+  and timing guess the primary proof.
+- A file chooser, permission prompt, keyboard, share sheet, or other native
+  surface is outside the Flutter widget tree. Use the platform automation path,
+  then assert the returned file or permission state in the app. File filters
+  must contain a real extension, MIME type, or platform UTI. An empty filter
+  group is not an accepted file type.
+
+## Scenario receipts and cleanup
+
+Keep one machine-readable manifest for the run. Give each scenario a stable id,
+a unique run id, and an explicit parent or child link. Store the requested
+state, expected outcome, direct assertion, actual outcome, source-of-truth
+check, cleanup result, and terminal status. Compute totals from the manifest and
+terminal child receipts, not from handwritten totals. Write a child receipt only
+after its direct assertion passes. Aggregate only after every child scenario has
+a terminal receipt. Unknown scenario ids fail before execution.
+
+```json
+{
+  "runId": "run-<unique-id>",
+  "scenario": "shared-item",
+  "restartState": "preserved",
+  "steps": [
+    {"id": "create-parent", "parentId": null, "status": "passed"},
+    {"id": "create-child", "parentId": "create-parent", "status": "passed"}
+  ],
+  "totals": {"expected": 2, "completed": 2},
+  "status": "passed",
+  "cleanup": "passed"
+}
+```
+
+Validate unique ids, parent-child links, computed totals, and terminal status
+before writing the receipt. A UI counter, a screenshot, or a wrapper exit code
+of zero is not enough to prove a scenario completed. Keep complete app, native,
+driver, and backend logs for the run. A process exit without a terminal receipt,
+a lost receipt, an incomplete log, or an unexplained pending async handle is
+`incomplete` and fails the run. Critical Flutter, Dart, native, backend,
+plugin, Riverpod, and driver errors fail the run even when the process exits
+successfully. Cancel or await timers, futures, stream subscriptions, and
+callbacks that belong to the scenario before cleanup.
 
 ## Journey Checklist Template
 

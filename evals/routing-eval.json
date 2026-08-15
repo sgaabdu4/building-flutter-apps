@@ -34,7 +34,7 @@
   },
   {
     "id": 4,
-    "query": "We're starting a new Flutter clinic app with ProviderScope, MaterialApp.router, typed routes, patients feature folders, Riverpod, Freezed, and Hive.",
+    "query": "We're starting a new Flutter service app with ProviderScope, MaterialApp.router, typed routes, records feature folders, Riverpod, Freezed, and Hive.",
     "should_trigger": true,
     "expected_refs": [
       "references/setup.md",

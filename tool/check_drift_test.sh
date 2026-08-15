@@ -23,24 +23,12 @@ FAIL=0
 pass() { echo "ok - $1"; PASS=$(( PASS + 1 )); }
 fail() { echo "not ok - $1"; FAIL=$(( FAIL + 1 )); }
 
-# Run checker against a single file path, keeping only the specified rule.
-# Returns the TAP output for that rule only.
+# Run only one checker rule against a single file path.
+# This selects the test subject. It does not suppress findings.
 run_rule_on_file() {
   local rule_id="$1"
   local filepath="$2"
-  # Build the --ignore list: all rules except the one we're testing
-  local all_rules="b3 b7 a4-raw v7 b4 a1 a4-freezed v6 v11 d5 d7 c1 w1"
-  local ignore_list=""
-  for r in $all_rules; do
-    if [ "$r" != "$rule_id" ]; then
-      if [ -z "$ignore_list" ]; then
-        ignore_list="$r"
-      else
-        ignore_list="${ignore_list},${r}"
-      fi
-    fi
-  done
-  bash "$CHECKER" --ignore "$ignore_list" "$filepath" 2>&1 || true
+  bash "$CHECKER" --only "$rule_id" "$filepath" 2>&1 || true
 }
 
 # Check whether a specific rule id appears as "not ok" in TAP output
@@ -115,12 +103,8 @@ test_d5_inline_version() {
 
   # For d5, the inline version sub-check runs on the scanned path.
   # Pass it via the positional path arg, ignore all other rules.
-  local all_rules="b3 b7 a4-raw v7 b4 a1 a4-freezed v6 v11 d7 c1 w1"
-  local ignore_list
-  ignore_list=$(echo "$all_rules" | tr ' ' ',')
-
   local pos_output
-  pos_output=$(bash "$CHECKER" --ignore "$ignore_list" "$violation_file" 2>&1 || true)
+  pos_output=$(bash "$CHECKER" --only d5 "$violation_file" 2>&1 || true)
   if rule_failed_in_output "d5" "$pos_output"; then
     pass "d5: violation.md (inline version pin) triggers rule"
   else
@@ -129,7 +113,7 @@ test_d5_inline_version() {
   fi
 
   local neg_output
-  neg_output=$(bash "$CHECKER" --ignore "$ignore_list" "$clean_file" 2>&1 || true)
+  neg_output=$(bash "$CHECKER" --only d5 "$clean_file" 2>&1 || true)
   if rule_passed_in_output "d5" "$neg_output"; then
     pass "d5: clean.md (no inline version pin) passes rule"
   else

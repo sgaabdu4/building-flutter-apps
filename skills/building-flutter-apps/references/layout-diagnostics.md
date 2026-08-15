@@ -12,7 +12,6 @@
 ## Trigger
 
 Signals: layout exception, unbounded height, viewport, LayoutBuilder, Expanded, Flexible
-Before code: output `Reading: layout-diagnostics.md`
 
 
 ## Core Rule

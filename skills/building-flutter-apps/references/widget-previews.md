@@ -12,7 +12,6 @@
 ## Trigger
 
 Signals: @Preview, AppPreviewShell, widget_previews, provider overrides, preview fakes
-Before code: output `Reading: widget-previews.md`
 
 
 ## Rules

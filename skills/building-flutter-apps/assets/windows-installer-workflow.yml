@@ -51,7 +51,7 @@
 # private-repository, repository-scoped ephemeral/JIT self-hosted Windows
 # runner (or directly on a dedicated disposable Windows VM) before paying for
 # the sole GitHub-hosted Windows publisher. Never attach a public/shared/
-# persistent runner or a clinic PC holding patient data or live credentials.
+# persistent runner or a production machine holding sensitive user data or live credentials.
 # `act` is wiring-only: its images are incomplete and do not provide Windows
 # target-native proof from macOS/Linux.
 # The orchestration calls `defender-installer-scan.ps1` after installer/lifecycle

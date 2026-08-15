@@ -16,7 +16,6 @@
 ## Trigger
 
 Signals: pagination, search debounce, form validation, GoRouter redirect, typed routes
-Before code: output `Reading: common-patterns.md`
 
 
 ## Rules — NEVER Violate

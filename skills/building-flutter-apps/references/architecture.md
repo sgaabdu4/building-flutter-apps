@@ -12,7 +12,6 @@
 ## Trigger
 
 Signals: clean architecture, four layers, dependency inversion, domain entity, repository interface
-Before code: output `Reading: architecture.md`
 
 
 ## Scope

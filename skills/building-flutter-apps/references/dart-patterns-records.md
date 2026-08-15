@@ -26,7 +26,6 @@ Contract = `abstract interface class`; Freezed union = `sealed class`; helper na
 ## Trigger
 
 Signals: Records, pattern matching, extension types, destructuring, sealed class switch
-Before code: output `Reading: dart-patterns-records.md`
 
 ## Records (Dart 3.0)
 

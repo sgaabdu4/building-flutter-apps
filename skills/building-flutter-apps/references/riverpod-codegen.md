@@ -12,7 +12,6 @@
 ## Trigger
 
 Signals: @riverpod, @Riverpod(keepAlive), Notifier, AsyncNotifier, riverpod_annotation, riverpod_generator
-Before code: output `Reading: riverpod-codegen.md`
 
 
 Generate all providers with annotations. Never write providers manually. Never import `package:riverpod/legacy.dart`.

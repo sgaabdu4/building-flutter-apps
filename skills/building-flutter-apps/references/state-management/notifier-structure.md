@@ -9,7 +9,6 @@
 ## Trigger
 
 Signals: `Notifier`, `AsyncNotifier`, `build()`, loading state, `AsyncValue`, cleanup, progress state.
-Before code: output `Reading: notifier-structure.md`.
 
 ## Notifier shape
 

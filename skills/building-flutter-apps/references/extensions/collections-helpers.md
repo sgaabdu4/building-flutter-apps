@@ -9,7 +9,6 @@
 ## Trigger
 
 Signals: `Iterable`, lookup by id, indexing, widget list spacing helpers, `Debouncer`, validators, `Result`, extension types, `extensions.dart` export.
-Before code: output `Reading: collections-helpers.md`.
 
 ## Iterable lookup
 

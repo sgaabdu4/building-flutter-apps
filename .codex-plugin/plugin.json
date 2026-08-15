@@ -1,6 +1,6 @@
 {
   "name": "building-flutter-apps",
-  "version": "5.8.2",
+  "version": "5.9.0",
   "description": "Flutter app architecture and Windows installer delivery skill: Riverpod 3 codegen, Freezed 3 sealed, GoRouter typed-route SSOT, Hive CE persistence, privacy-safe Crashlytics/Sentry reporting, gen-l10n, and verify-before-publish Inno pipelines. Pairs flutter_skill_lints analyzer enforcement with Dart Decimate code-health and pre-push gates. Bundles PostToolUse, Stop, and UserPromptSubmit hooks that auto-fire only inside Flutter projects.",
   "author": {
     "name": "sgaabdu4"

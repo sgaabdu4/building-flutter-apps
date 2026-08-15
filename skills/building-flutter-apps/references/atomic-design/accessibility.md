@@ -9,7 +9,6 @@
 ## Trigger
 
 Signals: semantics, tooltip, semanticLabel, image alt text, tap target, contrast, text scaling, icon-only button.
-Before code: output `Reading: accessibility.md`.
 
 ## Controls
 

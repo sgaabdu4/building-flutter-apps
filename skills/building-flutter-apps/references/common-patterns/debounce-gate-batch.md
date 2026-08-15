@@ -10,7 +10,6 @@
 ## Trigger
 
 Signals: TextField per-keystroke side effects, Slider/scroll throttling, full-collection rewrite, persistence debounce, long-running remote function, destructive reconcile-before-log, reset/clear markers, WebView/VideoPlayer gate, storage-read memoization.
-Before code: output `Reading: debounce-gate-batch.md`.
 
 ## Debounce, Gate, and Batch
 

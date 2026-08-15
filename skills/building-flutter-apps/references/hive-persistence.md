@@ -8,11 +8,14 @@
 3. Changing field type is unsupported. Retire old field, add new field.
 4. Domain is Hive-free. Hive models stay in data layer with primitives; mapper bridges VOs/entities.
 5. Never change ctor param order/types for shipped `@GenerateAdapters` models.
+6. Storage calls stay in local datasources behind repositories. Production Flutter
+   code imports Hive through `hive_ce_flutter`.
+7. Persisted maps are checked for map shape and string keys, copied into a typed
+   map, and rejected safely when corrupt. JSON decoding stays separate.
 
 ## Trigger
 
 Signals: hive_ce, hive_ce_flutter, TypeAdapter, @GenerateAdapters, IsolatedHive, HiveField
-Before code: output `Reading: hive-persistence.md`
 
 
 ## Core Stack
@@ -38,14 +41,67 @@ dev_dependencies:
   hive_ce_generator: <version>
 ```
 
-## TypeAdapter Storage vs JSON
+## Validate persisted maps
 
-| Mode | Reads | Writes | Size |
-|------|-------|--------|------|
-| Binary (TypeAdapter) | ~10x faster | ~5x faster | ~60% smaller |
-| JSON (no adapter) | Baseline | Baseline | Baseline |
+Hive values are runtime data. Never cast a stored value directly to
+`Map<String, dynamic>`. A corrupt box, an old adapter, or a non-string key
+must be rejected at the datasource boundary.
 
-Use TypeAdapters for hot-path entities.
+```dart
+Map<String, dynamic> normalizePersistedMap(Object? raw) {
+  if (raw is! Map) {
+    throw const FormatException('Expected a persisted map');
+  }
+
+  final normalized = <String, dynamic>{};
+  for (final entry in raw.entries) {
+    final key = entry.key;
+    if (key is! String) {
+      throw const FormatException('Expected persisted map keys to be strings');
+    }
+    normalized[key] = entry.value;
+  }
+  return normalized;
+}
+```
+
+Keep JSON decoding separate. A JSON decoder owns its JSON boundary and its
+schema checks. Do not reuse a persistence normalizer to make an unchecked JSON
+cast look safe.
+
+When normalization fails, catch the typed format error in the local datasource,
+record a safe diagnostic without user data, and return the datasource's defined
+empty or recovery state. Remove only the corrupt cache entry or box after the
+failure is understood. Preserve migration markers and unrelated boxes. Do not
+purge all local data as a generic startup fix.
+
+The regression test must use a real temporary Hive directory and the real box
+lifecycle:
+
+```dart
+test('restores valid nested data after close and reopen', () async {
+  final directory = await HiveTestHelper.initialize('persisted_map');
+  try {
+    final box = await Hive.openBox<Object?>('settings');
+    await box.put('settings', <Object?, Object?>{
+      'profile': <Object?, Object?>{'theme': 'dark'},
+    });
+    await Hive.close();
+
+    Hive.init(directory.path);
+    final reopened = await Hive.openBox<Object?>('settings');
+    final value = normalizePersistedMap(reopened.get('settings'));
+    expect(value['profile'], <Object?, Object?>{'theme': 'dark'});
+    expect(() => normalizePersistedMap(<Object?, Object?>{1: 'bad'}), throwsFormatException);
+  } finally {
+    await HiveTestHelper.cleanup(directory);
+  }
+});
+```
+
+The test proves write, close, reopen, nested-value restoration, malformed-key
+rejection, and cleanup. Add a separate corrupt-box recovery test when startup
+has a repair path.
 
 ## @GenerateAdapters Pattern
 
@@ -312,19 +368,6 @@ await Hive.initFlutter('my_app');
 final path = (await getApplicationSupportDirectory()).path;
 Hive.init(path);
 ```
-
-## Critical Rules
-
-1. **TypeIds permanent** — Never change, rename, reuse TypeId post-release
-2. **HiveField indices permanent** — Never reuse retired index. Append at `nextIndex`
-3. **Field types permanent** — Never flip type (`String`↔`List`, enum↔int) at same index
-4. **Box names permanent** — Rename loses data
-5. **Reserve TypeId 0** — Use `reservedTypeIds: {0}` if @HiveType classes exist
-6. **Gen after changes** — Run build_runner when add/modify entities
-7. **Idempotent registration** — Check `isAdapterRegistered` in tests
-8. **Store entities, not JSON** — TypeAdapters for direct object storage
-9. **Close boxes** — Call `Hive.close()` in tearDown
-10. **Hive lives in `Local<X>Datasource` ONLY** — Notifiers and widgets NEVER import `package:hive_ce` / `package:hive_ce_flutter` and NEVER call `Hive.openBox` / `Hive.box` / `box.get` / `box.put` / `box.delete`. Production Flutter `lib/` files that do use Hive import `package:hive_ce_flutter/hive_ce_flutter.dart`, not `package:hive_ce/hive_ce.dart`. Datasource implements interface; repository exposes domain entities; notifier depends on repository provider. The hook blocks Hive imports outside `data/datasources/` and `*_datasource.dart` files.
 
 ## VO Interop
 

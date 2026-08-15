@@ -84,7 +84,7 @@ copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 eval_cases = json.loads((root / "evals/evals.json").read_text())["evals"]
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.8.2"
+expected_version = "5.9.0"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -186,7 +186,7 @@ assert "`HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION)` = `0x80070020`" in windows
 assert "## Cost-aware proof ladder" in windows_installer
 assert "Self-hosted Actions usage = no GitHub-hosted Actions minute charge" in windows_installer
 assert "private repository only + repository scope" in windows_installer
-assert "clinic production PC" in windows_installer
+assert "production machine holding sensitive user data" in windows_installer
 assert "`act` = portable wiring aid only" in windows_installer
 assert "Public-read settlement = after immutable create returns" in windows_installer
 assert "exact `storage_file_not_found` + HTTP `429` + `5xx` only" in windows_installer

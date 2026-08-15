@@ -19,7 +19,7 @@
   4. `flutter gen-l10n` when configured;
   5. package-root analyze/test;
   6. target-native build.
-- Current command SSOT = [Core Stack](core-stack.md); `-d` + `--delete-conflicting-output` + `--delete-conflicting-outputs` forbidden.
+- Current command SSOT = [Core Stack](core-stack.md); active `-d` + `--delete-conflicting-output` + `--delete-conflicting-outputs` commands are forbidden.
 - Codegen in another job = unavailable unless outputs are tracked or transferred as an explicit verified artifact.
 - Regression proof = clean checkout starts without ignored outputs → generation materializes expected owners → analyze + target build pass.
 

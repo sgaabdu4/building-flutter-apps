@@ -2,13 +2,9 @@
 # check_drift.sh — Drift regression checker for building-flutter-apps skill
 #
 # Usage:
-#   bash tool/check_drift.sh [--ignore <rule-id>[,<rule-id>...]] [<path>...]
+#   bash tool/check_drift.sh [--only <rule-id>[,<rule-id>...]] [<path>...]
 #
 # Exit: 0 = all clean, 1 = violations found, 2 = usage error
-#
-# Per-line escape hatch:
-#   Add "# drift-ignore: <rule-id>" on the same line (or next line for multi-line hits)
-#   to suppress a specific rule for that location.
 #
 # Default scan paths: skill package + README.md + CONTRIBUTING.md
 # Always excluded: AUDIT_REPORT.md tool/
@@ -24,7 +20,7 @@ SKILL_ROOT="$REPO_ROOT/skills/building-flutter-apps"
 # TAP counters
 _TAP_INDEX=0
 _TAP_FAILS=0
-_TAP_IGNORES=""
+_TAP_ONLY=""
 
 tap_plan_header() {
   # Called at end once we know total count — use deferred mode instead:
@@ -42,36 +38,31 @@ emit_tap() {
 
   _TAP_INDEX=$(( _TAP_INDEX + 1 ))
 
-  # Check if rule is ignored via --ignore flag
-  if _rule_ignored "$rule_id"; then
-    echo "ok $_TAP_INDEX - ${rule_id}: SKIPPED (--ignore)"
+  if ! _rule_selected "$rule_id"; then
+    _TAP_INDEX=$(( _TAP_INDEX - 1 ))
     return 0
   fi
 
-  # Filter drift-ignore escape hatches from hits
-  local filtered_hits=""
-  if [ -n "$hits" ]; then
-    filtered_hits=$(printf '%s\n' "$hits" | grep -v "drift-ignore: ${rule_id}" || true)
-  fi
-
-  if [ -z "$filtered_hits" ]; then
+  if [ -z "$hits" ]; then
     echo "ok $_TAP_INDEX - ${rule_id}: ${description}"
   else
     echo "not ok $_TAP_INDEX - ${rule_id}: ${description}"
     echo "  # Hint: ${hint}"
     while IFS= read -r line; do
       [ -n "$line" ] && echo "  # ${line}"
-    done <<< "$filtered_hits"
+    done <<< "$hits"
     _TAP_FAILS=$(( _TAP_FAILS + 1 ))
   fi
 }
 
-_rule_ignored() {
+_rule_selected() {
   local rule_id="$1"
-  # Check comma-separated ignore list
+  if [ -z "$_TAP_ONLY" ]; then
+    return 0
+  fi
   local IFS=','
-  for ignored in $_TAP_IGNORES; do
-    if [ "$ignored" = "$rule_id" ]; then
+  for selected in $_TAP_ONLY; do
+    if [ "$selected" = "$rule_id" ]; then
       return 0
     fi
   done
@@ -84,13 +75,13 @@ SCAN_PATHS=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --ignore)
+    --only)
       shift
-      _TAP_IGNORES="$1"
+      _TAP_ONLY="$1"
       shift
       ;;
-    --ignore=*)
-      _TAP_IGNORES="${1#--ignore=}"
+    --only=*)
+      _TAP_ONLY="${1#--only=}"
       shift
       ;;
     -*)

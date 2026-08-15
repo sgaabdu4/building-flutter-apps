@@ -11,7 +11,6 @@
 ## Trigger
 
 Signals: atomic design, atoms, molecules, organisms, design tokens, widget hierarchy
-Before code: output `Reading: atomic-design.md`
 
 
 ## Rules — NEVER Violate

@@ -10,7 +10,6 @@
 ## Trigger
 
 Signals: typed route, GoRouter redirect, auth-protected route, router provider, app shell, `MaterialApp.router`, `ProviderScope`, startup bootstrap.
-Before code: output `Reading: routing-app-shell.md`.
 
 ## Typed GoRouter Route SSOT
 
