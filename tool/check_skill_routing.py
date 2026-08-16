@@ -58,6 +58,13 @@ def main() -> None:
         fail(f"SKILL.md has {len(text)} chars; limit is {MAX_SKILL_CHARS}")
     if "Progressive Disclosure Gate" not in text:
         fail("SKILL.md missing Progressive Disclosure Gate")
+    metadata = (SKILL_ROOT / "agents/openai.yaml").read_text(encoding="utf-8")
+    prompt = re.search(r'^  default_prompt: "([^"]+)"$', metadata, re.M)
+    if prompt is None or re.search(
+        r"(?<![A-Za-z0-9$-])building-flutter-apps(?![A-Za-z0-9-])",
+        prompt.group(1),
+    ) is None:
+        fail("default_prompt must mention building-flutter-apps without a runtime sigil")
     if (
         "| Crashlytics, FirebaseCrashlytics, Sentry,"
         not in text

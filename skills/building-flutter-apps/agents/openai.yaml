@@ -1,7 +1,7 @@
 interface:
   display_name: "Building Flutter Apps"
   short_description: "Riverpod architecture and Windows delivery"
-  default_prompt: "Use $building-flutter-apps to design and prove this Flutter app or Windows installer change."
+  default_prompt: "Use building-flutter-apps to design and prove this Flutter app or Windows installer change."
 
 policy:
   allow_implicit_invocation: true

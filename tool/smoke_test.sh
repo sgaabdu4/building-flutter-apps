@@ -297,7 +297,8 @@ assert "files: []" in inno_bundle_pubspec
 assert "dlls:" not in inno_bundle_pubspec
 openai_yaml = (skill / "agents/openai.yaml").read_text()
 assert 'display_name: "Building Flutter Apps"' in openai_yaml
-assert "$building-flutter-apps" in openai_yaml
+assert 'default_prompt: "Use building-flutter-apps ' in openai_yaml
+assert "$building-flutter-apps" not in openai_yaml
 assert "allow_implicit_invocation: true" in openai_yaml
 assert settlement_sentinel.count("-Phase 'sentinel-uninstall-process'") == 1
 assert "Wait-UninstallSettlement" in settlement_sentinel
