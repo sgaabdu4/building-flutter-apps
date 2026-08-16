@@ -7,6 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 COMMANDS = (
     ("python3", "tool/check_skill_routing.py"),
     ("python3", "tool/check_windows_installer_assets.py"),
+    ("python3", "tool/check_windows_installer_inputs.py"),
     ("bash", "tool/check_drift_test.sh"),
     ("bash", "tool/check_drift.sh"),
     ("ruby", "tool/verify_markdown_examples.rb"),

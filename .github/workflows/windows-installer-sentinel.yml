@@ -13,6 +13,7 @@ on:
       - skills/building-flutter-apps/assets/windows-installer-workflow.yml
       - skills/building-flutter-apps/references/windows-installer-pipeline.md
       - tool/check_windows_installer_assets.py
+      - tool/check_windows_installer_inputs.py
   push:
     branches:
       - main
@@ -26,6 +27,7 @@ on:
       - skills/building-flutter-apps/assets/windows-installer-workflow.yml
       - skills/building-flutter-apps/references/windows-installer-pipeline.md
       - tool/check_windows_installer_assets.py
+      - tool/check_windows_installer_inputs.py
 
 permissions:
   contents: read
@@ -60,6 +62,7 @@ jobs:
             throw 'Defender scanner syntax failed before its fixtures.'
           }
           python tool/check_windows_installer_assets.py
+          python tool/check_windows_installer_inputs.py
           & $scannerPath -SelfTest
 
       - name: Install authenticated Inno Setup 7.0.2

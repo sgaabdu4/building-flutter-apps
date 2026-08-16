@@ -97,6 +97,7 @@ assert (skill / "references/windows-installer-pipeline.md").is_file()
 assert (skill / "assets/windows-installer-workflow.yml").is_file()
 assert (skill / "assets/inno-bundle-pubspec.yaml").is_file()
 assert (skill / "assets/inno-uninstall-settlement-sentinel.ps1").is_file()
+assert (root / "tool/check_windows_installer_inputs.py").is_file()
 assert (root / ".github/workflows/windows-installer-sentinel.yml").is_file()
 assert (skill / "agents/openai.yaml").is_file()
 assert not (skill / "references/crashlytics.md").exists()
@@ -261,7 +262,12 @@ assert "Every Bash entrypoint sets strict mode" in workflow_asset
 assert "from BASH_SOURCE before path use" in workflow_asset
 assert "--ref <branch-or-tag>" in workflow_asset
 assert "github.sha == revision" in workflow_asset
-assert workflow_asset.count("-DispatchRevision '${{ github.sha }}'") == 2
+assert workflow_asset.count("DISPATCH_EVENT_SHA: ${{ github.sha }}") == 1
+assert "validate_inputs:" in workflow_asset
+assert "before checkout" in workflow_asset
+assert "[0-9a-f]{40}" in workflow_asset
+assert "[0-9]{1,20}" in workflow_asset
+assert "[0-9]{0,8}" in workflow_asset
 assert workflow_asset.count("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1") == 3
 assert workflow_asset.count("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1") == 3
 assert workflow_asset.count("actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1") == 1

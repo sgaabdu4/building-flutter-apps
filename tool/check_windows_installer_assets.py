@@ -90,8 +90,8 @@ require(
 require(
     "--ref <branch-or-tag>" in workflow_text
     and "github.sha == revision" in workflow_text
-    and workflow_text.count("-DispatchRevision '${{ github.sha }}'") == 2
-    and "'${{ github.sha }}'" in admission_job,
+    and workflow_text.count("DISPATCH_EVENT_SHA: ${{ github.sha }}") == 1
+    and "needs.validate_inputs.outputs.event_sha" in admission_job,
     "workflow must separate branch/tag dispatch selection from exact-SHA admission",
 )
 require(
@@ -349,9 +349,11 @@ for path in (
     "skills/building-flutter-apps/assets/windows-installer-workflow.yml",
     "skills/building-flutter-apps/references/windows-installer-pipeline.md",
     "tool/check_windows_installer_assets.py",
+    "tool/check_windows_installer_inputs.py",
 ):
     require(path in ci_text, f"Windows CI path filter missing: {path}")
 require("python tool/check_windows_installer_assets.py" in ci_text, "Windows CI must run integration checker")
+require("python tool/check_windows_installer_inputs.py" in ci_text, "Windows CI must run input-boundary fixtures")
 require(
     "$scannerPath -SelfTest" in ci_text,
     "Windows CI must execute Defender red/green fixtures",

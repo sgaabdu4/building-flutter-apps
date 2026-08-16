@@ -38,6 +38,8 @@
 7. Delivery = immutable installer/manifest upload → independent download/readback → pointer/index update last → final remote receipt.
 
 - Dispatch selector = branch/tag containing the workflow; exact 40-character candidate SHA = separate input.
+- Dispatch input validation = a no-checkout job receives raw values only through environment variables, then rejects everything outside the typed grammar before any checkout-local action or release script: `mode` is `verify-windows | publish`; `revision` is exactly 40 lowercase hexadecimal characters and equals `github.sha`; `version` is `MAJOR.MINOR.PATCH` with each component `0` or a non-zero decimal integer of at most nine digits; `diagnostic_run_id` is empty for verification or 1-20 decimal digits for publication.
+- Release command boundary = validated outputs enter Bash and PowerShell through environment variables; no workflow-dispatch input is interpolated into command source. Artifact names and paths use only the validated version or provider run ID.
 - Dispatch admission = event SHA equals candidate SHA + remote tip/tag readback equals candidate SHA before any paid/native/external phase.
 - `gh workflow run --ref <sha>` = `FAIL`; workflow-dispatch `ref` selects a branch/tag, while `actions/checkout` `ref` may consume the admitted SHA.
 - YAML surface = minimum runner + permission + cache + handoff + artifact + external-write boundaries.

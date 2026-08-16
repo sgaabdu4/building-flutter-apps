@@ -76,6 +76,13 @@
 #
 # Verification writes no tag, release, deployment, publication object, pointer,
 # or machine install. Publication consumes one exact diagnostic-proven revision.
+# Dispatch input contract is checked before any checkout-local action runs:
+#   mode = verify-windows | publish
+#   revision = 40 lowercase hexadecimal characters, equal to github.sha
+#   version = MAJOR.MINOR.PATCH, each component 0 or a non-zero decimal integer
+#   diagnostic_run_id = 1-20 decimal digits for publish, empty for verify-windows
+# Raw values enter only as environment data. Release commands consume validated
+# job outputs through environment variables, never interpolated command source.
 name: Flutter Windows installer
 
 on:
@@ -109,9 +116,77 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate_inputs:
+    name: Validate dispatch inputs before checkout
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      mode: ${{ steps.validate.outputs.mode }}
+      revision: ${{ steps.validate.outputs.revision }}
+      event_sha: ${{ steps.validate.outputs.event_sha }}
+      version: ${{ steps.validate.outputs.version }}
+      diagnostic_run_id: ${{ steps.validate.outputs.diagnostic_run_id }}
+    steps:
+      - name: Validate exact input grammar
+        id: validate
+        shell: bash
+        env:
+          DISPATCH_MODE: ${{ inputs.mode }}
+          DISPATCH_REVISION: ${{ inputs.revision }}
+          DISPATCH_EVENT_SHA: ${{ github.sha }}
+          DISPATCH_VERSION: ${{ inputs.version }}
+          DISPATCH_RUN_ID: ${{ inputs.diagnostic_run_id }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          mode = os.environ.get("DISPATCH_MODE", "")
+          revision = os.environ.get("DISPATCH_REVISION", "")
+          event_sha = os.environ.get("DISPATCH_EVENT_SHA", "")
+          version = os.environ.get("DISPATCH_VERSION", "")
+          run_id = os.environ.get("DISPATCH_RUN_ID", "")
+
+          def fail(field: str, value: str) -> None:
+              raise SystemExit(f"invalid {field}: length={len(value)}")
+
+          if mode not in {"verify-windows", "publish"}:
+              fail("mode", mode)
+          if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+              fail("revision", revision)
+          if re.fullmatch(r"[0-9a-f]{40}", event_sha) is None:
+              fail("event_sha", event_sha)
+          if revision != event_sha:
+              fail("revision", revision)
+          if re.fullmatch(
+              r"(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})",
+              version,
+          ) is None:
+              fail("version", version)
+          if run_id and re.fullmatch(r"[0-9]{1,20}", run_id) is None:
+              fail("diagnostic_run_id", run_id)
+          if mode == "publish" and not run_id:
+              fail("diagnostic_run_id", run_id)
+
+          output_path = os.environ["GITHUB_OUTPUT"]
+          with open(output_path, "a", encoding="utf-8", newline="\n") as output:
+              for name, value in (
+                  ("mode", mode),
+                  ("revision", revision),
+                  ("event_sha", event_sha),
+                  ("version", version),
+                  ("diagnostic_run_id", run_id),
+              ):
+                  output.write(f"{name}={value}\n")
+          PY
+
   verify_windows:
     name: Verify Windows without publication
-    if: inputs.mode == 'verify-windows'
+    needs:
+      - validate_inputs
+    if: needs.validate_inputs.outputs.mode == 'verify-windows'
     runs-on: [self-hosted, windows, x64, windows-installer-proof]
     timeout-minutes: 75
     permissions:
@@ -121,7 +196,7 @@ jobs:
       - name: Check out exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.revision }}
+          ref: ${{ needs.validate_inputs.outputs.revision }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -132,12 +207,21 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          .\.github\scripts\windows_installer.ps1 verify
-          -Revision '${{ inputs.revision }}'
-          -DispatchRevision '${{ github.sha }}'
-          -Version '${{ inputs.version }}'
-          -Publication none
+          DISPATCH_MODE: ${{ needs.validate_inputs.outputs.mode }}
+          DISPATCH_REVISION: ${{ needs.validate_inputs.outputs.revision }}
+          DISPATCH_EVENT_SHA: ${{ needs.validate_inputs.outputs.event_sha }}
+          DISPATCH_VERSION: ${{ needs.validate_inputs.outputs.version }}
+          DISPATCH_RUN_ID: ${{ needs.validate_inputs.outputs.diagnostic_run_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:DISPATCH_MODE -ne 'verify-windows') {
+            throw 'Validated dispatch mode is not verify-windows.'
+          }
+          & .\.github\scripts\windows_installer.ps1 verify `
+            -Revision $env:DISPATCH_REVISION `
+            -DispatchRevision $env:DISPATCH_EVENT_SHA `
+            -Version $env:DISPATCH_VERSION `
+            -Publication none
 
       - name: Upload short-lived diagnostic evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -151,7 +235,9 @@ jobs:
 
   admission:
     name: Admit exact publication revision
-    if: inputs.mode == 'publish'
+    needs:
+      - validate_inputs
+    if: needs.validate_inputs.outputs.mode == 'publish'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -160,7 +246,7 @@ jobs:
       - name: Check out exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.revision }}
+          ref: ${{ needs.validate_inputs.outputs.revision }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -170,26 +256,34 @@ jobs:
       - name: Test, scan, and prepare an exact-revision handoff
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          ./.github/scripts/run_linux_release_admission.sh
-          '${{ inputs.revision }}'
-          '${{ github.sha }}'
-          '${{ inputs.version }}'
-          '${{ inputs.diagnostic_run_id }}'
+          DISPATCH_MODE: ${{ needs.validate_inputs.outputs.mode }}
+          DISPATCH_REVISION: ${{ needs.validate_inputs.outputs.revision }}
+          DISPATCH_EVENT_SHA: ${{ needs.validate_inputs.outputs.event_sha }}
+          DISPATCH_VERSION: ${{ needs.validate_inputs.outputs.version }}
+          DISPATCH_RUN_ID: ${{ needs.validate_inputs.outputs.diagnostic_run_id }}
+        run: |
+          set -euo pipefail
+          test "$DISPATCH_MODE" = publish
+          ./.github/scripts/run_linux_release_admission.sh \
+            "$DISPATCH_REVISION" \
+            "$DISPATCH_EVENT_SHA" \
+            "$DISPATCH_VERSION" \
+            "$DISPATCH_RUN_ID"
 
       - name: Upload verified admission handoff
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: windows-installer-admission-${{ github.run_id }}
+          name: windows-installer-admission-${{ needs.validate_inputs.outputs.diagnostic_run_id }}
           path: ${{ runner.temp }}/windows-installer/admission
           if-no-files-found: error
           retention-days: 1
 
   publish:
     name: Build once and publish verified Windows installer
-    if: inputs.mode == 'publish'
     needs:
+      - validate_inputs
       - admission
+    if: needs.validate_inputs.outputs.mode == 'publish'
     runs-on: windows-latest
     timeout-minutes: 90
     environment: windows-release
@@ -200,7 +294,7 @@ jobs:
       - name: Check out exact admitted revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.revision }}
+          ref: ${{ needs.validate_inputs.outputs.revision }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -210,7 +304,7 @@ jobs:
       - name: Download exact-revision admission handoff
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: windows-installer-admission-${{ github.run_id }}
+          name: windows-installer-admission-${{ needs.validate_inputs.outputs.diagnostic_run_id }}
           path: ${{ runner.temp }}/windows-installer/admission
 
       - name: Build once, verify, publish immutable bytes, and activate last
@@ -219,18 +313,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PUBLISHER_TOKEN: ${{ secrets.WINDOWS_PUBLISHER_TOKEN }}
           MANIFEST_SIGNING_KEY: ${{ secrets.WINDOWS_MANIFEST_SIGNING_KEY }}
-        run: >-
-          .\.github\scripts\windows_installer.ps1 publish
-          -Revision '${{ inputs.revision }}'
-          -DispatchRevision '${{ github.sha }}'
-          -Version '${{ inputs.version }}'
-          -DiagnosticRunId '${{ inputs.diagnostic_run_id }}'
-          -AdmissionRoot '${{ runner.temp }}\windows-installer\admission'
+          DISPATCH_MODE: ${{ needs.validate_inputs.outputs.mode }}
+          DISPATCH_REVISION: ${{ needs.validate_inputs.outputs.revision }}
+          DISPATCH_EVENT_SHA: ${{ needs.validate_inputs.outputs.event_sha }}
+          DISPATCH_VERSION: ${{ needs.validate_inputs.outputs.version }}
+          DISPATCH_RUN_ID: ${{ needs.validate_inputs.outputs.diagnostic_run_id }}
+          ADMISSION_ROOT: ${{ runner.temp }}\windows-installer\admission
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:DISPATCH_MODE -ne 'publish') {
+            throw 'Validated dispatch mode is not publish.'
+          }
+          & .\.github\scripts\windows_installer.ps1 publish `
+            -Revision $env:DISPATCH_REVISION `
+            -DispatchRevision $env:DISPATCH_EVENT_SHA `
+            -Version $env:DISPATCH_VERSION `
+            -DiagnosticRunId $env:DISPATCH_RUN_ID `
+            -AdmissionRoot $env:ADMISSION_ROOT
 
       - name: Upload final installer evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: app-windows-installer-v${{ inputs.version }}
-          path: ${{ runner.temp }}/windows-installer/app-windows-installer-v${{ inputs.version }}.exe
+          name: app-windows-installer-v${{ needs.validate_inputs.outputs.version }}
+          path: ${{ runner.temp }}/windows-installer/app-windows-installer-v${{ needs.validate_inputs.outputs.version }}.exe
           if-no-files-found: error
           retention-days: 7
