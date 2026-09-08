@@ -2,14 +2,14 @@
 # Stop hook for compatible plugin runtimes.
 # Runs a full pre-flight audit on the active Flutter project before the agent ends the turn.
 # Always exits 0. Emits JSON {"decision":"block","reason":"..."} on stdout to keep the agent going if violations remain.
-# No-ops outside Flutter projects.
+# No-ops outside Flutter or Riverpod packages.
 
 set -uo pipefail
 
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 
-# Walk up from PROJECT_ROOT to find pubspec.yaml
-find_flutter_root() {
+# Walk up from PROJECT_ROOT to find pubspec.yaml.
+find_package_root() {
   local d="$1"
   while [[ "$d" != "/" && -n "$d" ]]; do
     if [[ -f "$d/pubspec.yaml" ]]; then
@@ -21,29 +21,127 @@ find_flutter_root() {
   return 1
 }
 
-FLUTTER_ROOT=$(find_flutter_root "$PROJECT_ROOT") || exit 0
+package_profile() {
+  ruby -ryaml - "$1" <<'RUBY'
+begin
+  pubspec = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: false)
+rescue Psych::Exception => error
+  puts "invalid YAML: #{error.message.lines.first.to_s.strip}"
+  exit 2
+end
+
+unless pubspec.is_a?(Hash)
+  puts "pubspec.yaml must contain a YAML map"
+  exit 2
+end
+
+dependency_sections = %w[dependencies dev_dependencies dependency_overrides]
+dependency_names = dependency_sections.flat_map do |section_name|
+  section = pubspec[section_name]
+  next [] if section.nil?
+  unless section.is_a?(Hash)
+    puts "#{section_name} must contain a YAML map"
+    exit 2
+  end
+  section.keys.map(&:to_s)
+end
+
+flutter_or_riverpod = %w[
+  flutter
+  flutter_riverpod
+  hooks_riverpod
+  riverpod
+  riverpod_annotation
+  riverpod_generator
+  riverpod_lint
+]
+analyzer_plugins = %w[flutter_skill_lints riverpod_lint]
+kind = (dependency_names & flutter_or_riverpod).empty? ? "pure_dart" : "flutter_or_riverpod"
+puts "#{kind}\t#{(dependency_names & analyzer_plugins).sort.join(',')}"
+RUBY
+}
+
+plugin_configuration() {
+  ruby -ryaml - "$1" <<'RUBY'
+begin
+  options = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: false)
+rescue Psych::Exception => error
+  puts "invalid YAML: #{error.message.lines.first.to_s.strip}"
+  exit 2
+end
+
+unless options.is_a?(Hash)
+  puts "analysis_options.yaml must contain a YAML map"
+  exit 2
+end
+
+plugins = options["plugins"]
+unless plugins.is_a?(Hash)
+  puts "plugins"
+  exit 1
+end
+
+missing = %w[flutter_skill_lints riverpod_lint].reject { |name| plugins.key?(name) }
+unless missing.empty?
+  puts missing.join(",")
+  exit 1
+end
+
+invalid = plugins.select do |name, value|
+  %w[flutter_skill_lints riverpod_lint].include?(name) &&
+    !((value.is_a?(String) && !value.empty?) || (value.is_a?(Hash) && !value.empty?))
+end
+unless invalid.empty?
+  puts invalid.keys.join(",")
+  exit 2
+end
+RUBY
+}
+
+FLUTTER_ROOT=$(find_package_root "$PROJECT_ROOT") || exit 0
 [[ -z "$FLUTTER_ROOT" ]] && exit 0
+
+PACKAGE_PROFILE=$(package_profile "$FLUTTER_ROOT/pubspec.yaml")
+PACKAGE_PROFILE_STATUS=$?
 
 cd "$FLUTTER_ROOT" || exit 0
 
 VIOLATIONS=()
 add_violation() { VIOLATIONS+=("$1"); }
 
+if [[ $PACKAGE_PROFILE_STATUS -ne 0 ]]; then
+  add_violation "Cannot validate pubspec.yaml package profile: $PACKAGE_PROFILE"
+else
+  IFS=$'\t' read -r PACKAGE_KIND PUBSPEC_PLUGIN_ENTRIES <<<"$PACKAGE_PROFILE"
+  if [[ -n "$PUBSPEC_PLUGIN_ENTRIES" ]]; then
+    add_violation "Analyzer plugins must be declared only in top-level analysis_options.yaml plugins:, not pubspec.yaml: $PUBSPEC_PLUGIN_ENTRIES."
+  fi
+  if [[ "$PACKAGE_KIND" == "pure_dart" && -z "$PUBSPEC_PLUGIN_ENTRIES" ]]; then
+    exit 0
+  fi
+fi
+
 # 1. analysis_options.yaml must exist at project root
 if [[ ! -f "$FLUTTER_ROOT/analysis_options.yaml" ]]; then
   add_violation "Missing $FLUTTER_ROOT/analysis_options.yaml. Copy skills/building-flutter-apps/references/analysis_options.yaml from the plugin to the project root."
 fi
 
-# 2. flutter_skill_lints wired in analysis_options.yaml plugins
+# 2. Analyzer plugins use the top-level analysis_options.yaml plugins map.
 if [[ -f "$FLUTTER_ROOT/analysis_options.yaml" ]]; then
-  if ! grep -qE '^\s*flutter_skill_lints\s*:' "$FLUTTER_ROOT/analysis_options.yaml" 2>/dev/null; then
-    add_violation "flutter_skill_lints not wired under plugins: in analysis_options.yaml. Add it under analyzer.plugins."
-  fi
-  # Plugin must NOT be in pubspec.yaml (wrong location)
-  if [[ -f "$FLUTTER_ROOT/pubspec.yaml" ]] && grep -qE '^\s*(flutter_skill_lints|riverpod_lint)\s*:' "$FLUTTER_ROOT/pubspec.yaml" 2>/dev/null; then
-    # That's fine in dev_dependencies; the bad pattern is `analyzer.plugins:` block IN pubspec.yaml itself
-    # We can't easily disambiguate without a YAML parser; skip the warning here.
-    :
+  if ! command -v ruby >/dev/null 2>&1; then
+    add_violation "Cannot validate analysis_options.yaml plugins because the required Ruby YAML parser is unavailable."
+  else
+    PLUGIN_CONFIGURATION=$(plugin_configuration "$FLUTTER_ROOT/analysis_options.yaml")
+    PLUGIN_CONFIGURATION_STATUS=$?
+    case "$PLUGIN_CONFIGURATION_STATUS" in
+      0) ;;
+      1)
+        add_violation "Analyzer plugins must use a top-level plugins: map in analysis_options.yaml. Add missing plugin(s): $PLUGIN_CONFIGURATION; do not use analyzer.plugins or pubspec.yaml."
+        ;;
+      *)
+        add_violation "Invalid analysis_options.yaml plugin configuration: $PLUGIN_CONFIGURATION"
+        ;;
+    esac
   fi
 fi
 

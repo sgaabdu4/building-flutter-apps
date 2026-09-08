@@ -78,8 +78,22 @@ def main() -> int:
             fake_home
             / ".agents/skills/deterministic-checks/scripts/dart_decimate_gate.py"
         )
-        write(project / "pubspec.yaml", "name: fixture\n")
-        write(project / "analysis_options.yaml", "plugins:\n  flutter_skill_lints:\n")
+        flutter_pubspec = (
+            "name: fixture\n"
+            "environment:\n"
+            "  sdk: ^3.13.0\n"
+            "dependencies:\n"
+            "  flutter:\n"
+            "    sdk: flutter\n"
+            "  flutter_riverpod: ^3.4.3\n"
+        )
+        valid_analysis_options = (
+            "plugins:\n"
+            "  riverpod_lint: ^3.1.9\n"
+            "  flutter_skill_lints: ^0.10.0\n"
+        )
+        write(project / "pubspec.yaml", flutter_pubspec)
+        write(project / "analysis_options.yaml", valid_analysis_options)
         write(project / "lib/main.dart", "void main() {}\n")
         write(fake_bin / "dart", "#!/bin/sh\nexit 0\n")
         write(
@@ -113,6 +127,106 @@ def main() -> int:
         ]:
             fail("preflight did not invoke canonical coordination with exact package scope")
 
+        write(
+            project / "analysis_options.yaml",
+            "analyzer:\n"
+            "  plugins:\n"
+            "    riverpod_lint: ^3.1.9\n"
+            "    flutter_skill_lints: ^0.10.0\n",
+        )
+        nested = subprocess.run(
+            [str(preflight)],
+            cwd=project,
+            env={
+                **os.environ,
+                "HOME": str(fake_home),
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "CLAUDE_PROJECT_DIR": str(project),
+                "CAPTURE": str(capture),
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if nested.returncode:
+            fail(nested.stderr.strip() or "preflight rejected nested plugin fixture")
+        if "top-level plugins: map" not in nested.stdout:
+            fail("nested analyzer.plugins configuration was accepted")
+        if "Add it under analyzer.plugins" in nested.stdout:
+            fail("preflight still recommends the legacy analyzer.plugins configuration")
+
+        write(
+            project / "analysis_options.yaml",
+            "plugins:\n"
+            "  riverpod_lint: ^3.1.9\n"
+            "  flutter_skill_lints:\n",
+        )
+        empty_plugin = subprocess.run(
+            [str(preflight)],
+            cwd=project,
+            env={
+                **os.environ,
+                "HOME": str(fake_home),
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "CLAUDE_PROJECT_DIR": str(project),
+                "CAPTURE": str(capture),
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if "Invalid analysis_options.yaml plugin configuration: flutter_skill_lints" not in empty_plugin.stdout:
+            fail("preflight accepted an unpinned analyzer plugin")
+
+        write(project / "analysis_options.yaml", valid_analysis_options)
+        write(
+            project / "pubspec.yaml",
+            flutter_pubspec
+            + "dev_dependencies:\n"
+            + "  flutter_skill_lints: ^0.10.0\n",
+        )
+        pubspec_plugin = subprocess.run(
+            [str(preflight)],
+            cwd=project,
+            env={
+                **os.environ,
+                "HOME": str(fake_home),
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "CLAUDE_PROJECT_DIR": str(project),
+                "CAPTURE": str(capture),
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if "not pubspec.yaml: flutter_skill_lints" not in pubspec_plugin.stdout:
+            fail("preflight accepted an analyzer plugin declared in pubspec.yaml")
+        write(project / "pubspec.yaml", flutter_pubspec)
+
+        write(
+            project / "analysis_options.yaml",
+            "plugins:\n"
+            "  flutter_skill_lints: ^0.10.0\n",
+        )
+        missing_riverpod = subprocess.run(
+            [str(preflight)],
+            cwd=project,
+            env={
+                **os.environ,
+                "HOME": str(fake_home),
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "CLAUDE_PROJECT_DIR": str(project),
+                "CAPTURE": str(capture),
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if "missing plugin(s): riverpod_lint" not in missing_riverpod.stdout:
+            fail("preflight accepted a Flutter/Riverpod package without riverpod_lint")
+
+        write(project / "analysis_options.yaml", valid_analysis_options)
+
         gate.unlink()
         missing = subprocess.run(
             [str(preflight)],
@@ -129,6 +243,30 @@ def main() -> int:
         )
         if "Canonical Dart Decimate gate unavailable" not in missing.stdout:
             fail("missing canonical coordinator did not fail closed")
+
+        pure_dart = root / "pure_dart"
+        write(
+            pure_dart / "pubspec.yaml",
+            "name: pure_dart_fixture\n"
+            "tooling:\n"
+            "  flutter: metadata only\n",
+        )
+        write(pure_dart / "lib/main.dart", "void main() {}\n")
+        pure_result = subprocess.run(
+            [str(preflight)],
+            cwd=pure_dart,
+            env={
+                **os.environ,
+                "HOME": str(fake_home),
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "CLAUDE_PROJECT_DIR": str(pure_dart),
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if pure_result.returncode or pure_result.stdout.strip():
+            fail("pure-Dart CLI fixture did not bypass the Flutter/Riverpod preflight")
 
     print("dart-decimate-runtime-regressions: PASS")
     return 0

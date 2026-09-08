@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.9.0"
+  version: "5.9.1"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, windows, inno, installer, fire-and-forget, singletons, e2e testing
 ---
 
@@ -17,9 +17,9 @@ metadata:
 - Before code, read Trigger Map refs for touched areas. Each ref's `Read first` section is canonical.
 - Dart Decimate invocation = global `deterministic-checks` `dart_decimate_gate.py`; raw scanner calls + project-local adapters/dependencies/binaries + package-root `tool/` bundles forbidden.
 - Coordinator runtime = `npx --yes dart-decimate@latest`; one scan per affected Git root + exact `--workspace` scope for nested packages.
-- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, run package-root `dart analyze` + [Dart Decimate](references/dart-decimate.md), then emit Pre-Flight.
-- Block on analyzer or Decimate findings, and read [setup.md](references/setup.md) first if
-  `flutter_skill_lints` is not wired.
+- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, wire required analyzer plugins before package-root `dart analyze` + [Dart Decimate](references/dart-decimate.md), then emit Pre-Flight.
+- Flutter/Riverpod package = top-level `plugins:` wires `flutter_skill_lints` + `riverpod_lint`; pure-Dart CLI = native Dart analysis profile with neither plugin.
+- Block on analyzer or Decimate findings, and read [setup.md](references/setup.md) first if a Flutter/Riverpod package has not wired both plugins.
 
 ## Progressive Disclosure Gate
 
@@ -29,7 +29,7 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 
 | ID | Rule | Detail refs |
 |---|---|---|
-| R1 | Run package-root `dart analyze` + Git-root Dart Decimate through `deterministic-checks`; wire `flutter_skill_lints` + `riverpod_lint`. | [analysis-options.md](references/analysis-options.md), [dart-decimate.md](references/dart-decimate.md), [setup.md](references/setup.md) |
+| R1 | Flutter/Riverpod package = first wire `flutter_skill_lints` + `riverpod_lint`, then run package-root `dart analyze` + Git-root Dart Decimate through `deterministic-checks`; pure-Dart CLI = native Dart analysis profile with neither plugin. | [analysis-options.md](references/analysis-options.md), [dart-decimate.md](references/dart-decimate.md), [setup.md](references/setup.md) |
 | R2 | Every provider uses `@riverpod` / `@Riverpod` codegen; no manual provider classes or legacy provider families. | [riverpod-codegen.md](references/riverpod-codegen.md) |
 | R3 | Guard async gaps with `ref.mounted` / `context.mounted`; `finally` uses `if (ref.mounted) { ... }`. | [async-mutations.md](references/state-management/async-mutations.md) |
 | R4 | Widgets are public classes; no `_buildXxx()`, widget top-level helpers, or private widget classes except `State`. | [atomic-design.md](references/atomic-design.md), [performance.md](references/performance.md) |
@@ -90,7 +90,7 @@ Before writing code in any row below, read the listed reference(s). Prefer the n
 | `DateTime` format/diff/timeAgo/startOfDay, `String` capitalize/truncate/titleCase/initials/format, `int` / `double` / `num` clamp/pluralized/asCurrency/percent/toFixed, `Duration` format, `NumberFormat`, `DateFormat`, `intl` | [primitive-formatting.md](references/extensions/primitive-formatting.md) |
 | `Iterable` lookup/indexing, widget list helpers, `Debouncer`, validators, `Result`, extension types, `core/extensions/` barrel export | [collections-helpers.md](references/extensions/collections-helpers.md) |
 | Records `(x, y)`, extension type IDs, pattern matching, guard clause `case _ when ...` | [dart-patterns-records.md](references/dart-patterns-records.md) |
-| `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
+| Flutter/Riverpod `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
 | `build_runner`, missing generated parts, clean checkout, Xcode selection, Flutter SwiftPM generated package, Apple device build, local-vs-CI mismatch | [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
 | Flutter Windows desktop packaging, GitHub Actions Windows installer, Inno Setup, `inno_bundle`, updater/auto-update, CRT DLLs, PowerShell/native installer process, installer/version/AppId failure | [windows-installer-pipeline.md](references/windows-installer-pipeline.md) + [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
 | Dart Decimate, dead code, circular dependency, duplicate code, complexity, dependency hygiene, full zero-finding scan | [dart-decimate.md](references/dart-decimate.md) |
@@ -118,7 +118,7 @@ After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` wri
 
 ### T0 — Core
 
-- [ ] Package-root `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin.
+- [ ] Flutter/Riverpod package: package-root `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin. Pure-Dart CLI: native Dart analysis profile applies; both plugins are N/A.
 - [ ] Global `deterministic-checks` `dart_decimate_gate.py` exits 0 after one full zero-finding scan; changed/base/baseline/audit modes + inherited exceptions + raw scanner calls are forbidden; package scope cited.
 - [ ] Coordinator invokes `npx --yes dart-decimate@latest` once per affected Git root; nested package scope uses exact `--workspace`; existing hooks + `core.hooksPath` preserved. Non-Git project = N/A.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.

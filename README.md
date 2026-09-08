@@ -89,9 +89,11 @@ guidance-only and cannot register runtime hooks.
 | Evals | Defines trigger, routing, and answer-quality regression cases. | [evals/](evals/) |
 | References | Holds detailed guidance so `SKILL.md` stays small and direct. | [references/](skills/building-flutter-apps/references/) |
 
-The hard project gates are package-root `dart analyze` with
-`flutter_skill_lints` and `riverpod_lint` wired under top-level `plugins:` in
-`analysis_options.yaml`, plus Dart Decimate after every Flutter/Dart write batch.
+For Flutter/Riverpod packages, the hard project gates are package-root `dart
+analyze` with `flutter_skill_lints` and `riverpod_lint` wired under top-level
+`plugins:` in `analysis_options.yaml`, plus Dart Decimate after every write
+batch. Pure-Dart CLI packages use their native Dart analysis profile without
+either plugin.
 
 ## Enforcement Coverage
 
@@ -102,7 +104,7 @@ layout:
 
 | Area | What gets enforced |
 |---|---|
-| Analyzer setup | `analysis_options.yaml` exists, strict analyzer flags stay on, generated files are excluded, and both `flutter_skill_lints` and `riverpod_lint` are proven active. |
+| Analyzer setup | Flutter/Riverpod packages keep `analysis_options.yaml`, strict analyzer flags, generated-file exclusions, and both `flutter_skill_lints` and `riverpod_lint`; pure-Dart CLI packages use their native Dart analysis profile. |
 | Code health | Dart Decimate runs one full zero-finding JSON scan per affected Git root; changed/base/baseline/audit modes cannot hide inherited findings. |
 | Git push | The canonical deterministic gate blocks pushes when Dart Decimate reports findings or a tool/config failure. |
 | Riverpod | Generated providers only, no legacy provider constructors, no `ref.watch` in notifier methods, no provider-derived caches in `ConsumerState`, and no standalone event/signal providers. |
@@ -205,12 +207,15 @@ python3 "$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py
 
 Notes:
 
-- `flutter_skill_lints` is an analyzer plugin. Keep it only in
-  `analysis_options.yaml` under `plugins:`; do not add it to `pubspec.yaml`.
+- `flutter_skill_lints: ^0.10.0` and `riverpod_lint: ^3.1.9` are analyzer
+  plugins. Keep both in `analysis_options.yaml` under top-level `plugins:`;
+  do not add either to `pubspec.yaml`.
 - If `lib/core/extensions/` already exists, merge the template files instead of
   overwriting them.
 - A healthy setup should prove that at least one `flutter_skill_lints`
   diagnostic and one `riverpod_lint` diagnostic can fire.
+- Pure-Dart CLI packages use their native Dart analysis profile instead of this
+  Flutter/Riverpod template.
 - Invoke the global canonical deterministic gate; it owns bounded
   `npx --yes dart-decimate@latest` execution. Do not run the scanner raw, copy
   a runtime or adapter into the project, add a project dependency or tool

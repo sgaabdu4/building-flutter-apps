@@ -26,7 +26,7 @@ feature code needs them.
 - Effective Dart Design API shape: `always_declare_return_types`,
   `type_annotate_public_apis`, `avoid_positional_boolean_parameters`,
   `avoid_equals_and_hash_code_on_mutable_classes`,
-  `avoid_private_typedef_functions`, `avoid_returning_this`,
+  `avoid_returning_this`,
   `avoid_setters_without_getters`, `prefer_mixin`,
   `use_to_and_as_if_applicable`
 - Effective Dart Design API safety plugin rules:
@@ -63,13 +63,12 @@ Plugin block:
 
 ```yaml
 plugins:
-  # Stable Riverpod lint pin verified for Riverpod 3.3-era lint coverage.
-  riverpod_lint: 3.1.8
-  flutter_skill_lints:
+  riverpod_lint: ^3.1.9
+  flutter_skill_lints: ^0.10.0
 ```
 
 Match bundled [`references/analysis_options.yaml`](analysis_options.yaml)
-exactly. Both pin `flutter_skill_lints` version OR neither — keep aligned.
+exactly. Keep both plugin constraints aligned with the bundled template.
 
 New-project baseline:
 

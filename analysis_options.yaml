@@ -1,5 +1,9 @@
 # Skill repo tooling only. Flutter apps copy the skill's references/analysis_options.yaml.
 
+plugins:
+  riverpod_lint: ^3.1.9
+  flutter_skill_lints: ^0.10.0
+
 analyzer:
   exclude:
     - skills/building-flutter-apps/references/analysis_options.yaml
