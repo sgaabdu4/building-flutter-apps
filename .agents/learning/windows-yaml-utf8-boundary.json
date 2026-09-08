@@ -1,0 +1,27 @@
+{
+  "evidence": [
+    "Windows Ruby Psych rejected a non-UTF-8 workflow stdin stream.",
+    "The local cp1252 reproduction produced the same invalid-leading-UTF-8-octet error.",
+    "Commit b685f261293172d96f18f09a78479d4c1635562b first proves cp1252 input corrupts the exact Ruby YAML subprocess, then requires the explicit UTF-8 subprocess boundary to parse it.",
+    "Windows installer settlement sentinel CI run 34184076941 completed successfully on b685f261293172d96f18f09a78479d4c1635562b, including the pre-installer input check and real Inno install/uninstall settlement."
+  ],
+  "failure": "Windows installer input contract failed in CI before dispatch validation.",
+  "helper": {
+    "name": "he-learn",
+    "selections": 1,
+    "state": "selected"
+  },
+  "learning_id": "windows-yaml-utf8-boundary",
+  "occurrences": 1,
+  "prevention": {
+    "kind": "deterministic",
+    "owner": "tool/check_windows_installer_inputs.py",
+    "violation_fixture": "tool/check_windows_installer_inputs.py",
+    "valid_fixture": "skills/building-flutter-apps/assets/windows-installer-workflow.yml",
+    "proof": "tool/check_windows_installer_inputs.py"
+  },
+  "root_cause": "The Python subprocess text stream used the Windows default code page instead of UTF-8.",
+  "schema_version": 1,
+  "status": "resolved",
+  "trigger": "false-passing-check"
+}
