@@ -104,11 +104,27 @@ workflow_text = WORKFLOW.read_text(encoding="utf-8")
 reference_text = REFERENCE.read_text(encoding="utf-8")
 ruby = shutil.which("ruby")
 require(ruby is not None, "YAML regression requires the repository's Ruby runtime")
-yaml_result = subprocess.run(
-    [ruby, "-ryaml", "-rjson", "-e", "puts JSON.generate(YAML.safe_load(STDIN.read))"],
+yaml_command = [ruby, "-ryaml", "-rjson", "-e", "puts JSON.generate(YAML.safe_load(STDIN.read))"]
+windows_code_page_result = subprocess.run(
+    yaml_command,
     input=workflow_text,
     capture_output=True,
     text=True,
+    encoding="cp1252",
+    cwd=ROOT,
+    timeout=10,
+    check=False,
+)
+require(
+    windows_code_page_result.returncode != 0,
+    "Windows code-page simulation must expose UTF-8 YAML corruption",
+)
+yaml_result = subprocess.run(
+    yaml_command,
+    input=workflow_text,
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
     cwd=ROOT,
     timeout=10,
     check=False,
