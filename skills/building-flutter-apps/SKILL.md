@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.9.2"
+  version: "5.9.3"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, windows, inno, installer, fire-and-forget, singletons, e2e testing
 ---
 
@@ -76,7 +76,7 @@ Before writing code in any row below, read the listed reference(s). Prefer the n
 | Reusable `presentation/widgets/`, widget-owned navigation/page stack/selected entity/workflow state, direct repository/service/provider access | [presentation-widgets.md](references/presentation-widgets.md) |
 | Accessibility, semantics, tooltip, semanticLabel, image alt text, tap target, contrast, text scaling | [accessibility.md](references/atomic-design/accessibility.md) + [flutter-optimizations.md](references/flutter-optimizations.md#semantics) |
 | Widget test, `ProviderContainer.test()`, `UncontrolledProviderScope`, fakes, mocks, `AppWidgetKeys`, event-contract tests | [testing.md](references/testing.md) |
-| `flutter_driver`, Dart MCP, E2E, `integration_test`, semantic selectors, scenario validation, screenshot/media proof, log capture, native integration builds but fails on device, runtime permissions, plugin hangs, release-only runtime failure | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
+| `flutter_driver`, Dart MCP, Marionette MCP, E2E, `integration_test`, semantic selectors, scenario validation, screenshot/media proof, log capture, native integration builds but fails on device, runtime permissions, plugin hangs, release-only runtime failure | [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 | Hive, `TypeAdapter`, TypeId, box, persistence migration, retired field accounting | [hive-persistence.md](references/hive-persistence.md) |
 | Crashlytics, FirebaseCrashlytics, Sentry, `sentry_flutter`, DSN, error reporting, `Crash.init`, `Crash.error`, `Crash.log`, symbol upload | [error-reporting.md](references/error-reporting.md) |
 | Mixin, capability vs interface, retry helper, RNG, bulk operation | [mixins.md](references/mixins.md) |

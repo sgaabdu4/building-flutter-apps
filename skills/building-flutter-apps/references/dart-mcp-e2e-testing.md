@@ -1,9 +1,9 @@
-# Dart MCP E2E Testing
+# Flutter Runtime and E2E Testing
 
 
 ## Read first
 
-1. Use Dart MCP before shell. Shell fallback only for project cmds MCP cannot run.
+1. Use available Dart MCP for development operations; use compatible Dart MCP or Marionette for live app interaction. Durable regression tests remain in the project runner. Use native commands when MCP is unavailable or cannot perform the operation.
 2. Use requested device class, app entrypoint, env, actors, accounts, data.
 3. Select by semantics/text/tooltips/central `ValueKey`; no coordinate-tap primary selectors.
 4. Wait on observable UI/backend state, never blind sleep.
@@ -13,7 +13,7 @@
 
 ## Trigger
 
-Signals: E2E testing, Dart MCP, flutter_driver, integration_test, source-of-truth verification
+Signals: E2E testing, Dart MCP, Marionette MCP, flutter_driver, integration_test, source-of-truth verification
 
 
 https://docs.flutter.dev/ai/mcp-server
@@ -22,7 +22,7 @@ Runtime E2E means real app behavior on a real simulator/device. Static review, s
 
 ## Rules — NEVER Violate
 
-1. MUST use Dart MCP tools before terminal commands.
+1. MUST select an available tool compatible with the requested operation and app mode; an MCP connection does not replace durable regression tests or prove a release artifact.
 2. MUST run on the asked device class. iOS request means iOS simulator/device; Android request means Android emulator/device.
 3. MUST test the requested app entrypoint/config. Do not switch environments.
 4. MUST define actors, devices, accounts, and test data before running remote/shared-state flows.
@@ -42,7 +42,42 @@ Runtime E2E means real app behavior on a real simulator/device. Static review, s
 18. MUST treat native prompts as platform UI. Flutter widget-tree state alone cannot prove a file picker, permission prompt, keyboard, or share sheet completed.
 19. MUST write one terminal receipt per scenario. A timeout, lost process, missing receipt, pending timer, pending future, subscription, or callback is a failed or incomplete run.
 
-## Tool Map
+## Choose the execution tool
+
+| Need | Route |
+|---|---|
+| Analyze, format, test, launch or inspect development state | Available official Dart and Flutter MCP tools; otherwise the project's native commands. |
+| Explore or smoke-test a running Flutter UI | Existing compatible Dart MCP UI support, or Marionette when its app binding and server are configured. |
+| Repeatable regression or CI proof | Existing `integration_test`/device runner and fixtures. Save the discovered failure there rather than relying on an agent's interaction transcript. |
+| Native OS surface or installed release | Platform automation and the exact requested artifact; Flutter widget inspection alone is insufficient. |
+
+### Optional Marionette runtime interaction
+
+[Marionette](https://github.com/leancodepl/marionette_mcp) drives a running Flutter
+app, not a pure-Dart CLI or backend. Treat it as optional tooling, not a default
+application dependency or global MCP installation.
+
+- Before setup, check the project's Flutter/package compatibility and align the
+  `marionette_flutter` binding with the MCP server version. Use the existing
+  development bootstrap; initialize Marionette only for the intended debug run,
+  before another binding claims the process. Keep widget/integration-test binding
+  initialization separate. See the [single-binding setup](https://github.com/leancodepl/marionette_mcp/blob/main/docs/flutter-setup.md).
+- Discover the actual available tool schema. Connect to the launched app's VM
+  service URI, inspect `get_interactive_elements`, then target actions by stable
+  key or semantics identifier. Reinspect changed screens and assert the visible
+  response after each action. See the [tool reference](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md).
+- Custom controls may require widget/text configuration; `get_logs` requires a
+  configured collector. Missing elements or logs are capability gaps, not proof
+  of absent UI or errors. See [configuration](https://github.com/leancodepl/marionette_mcp/blob/main/docs/configuration.md).
+- Marionette depends on the VM service and does not run against release builds.
+  Its gestures can vary with platform and custom controls. Preserve the requested
+  release/native proof through the appropriate runner; do not silently substitute
+  a debug session. See [limitations](https://github.com/leancodepl/marionette_mcp/blob/main/docs/troubleshooting.md).
+
+## Dart MCP Tool Map
+
+Tool names depend on the connected server/client; discover its actual schemas.
+These existing Dart MCP operations are not Marionette tool names.
 
 | Goal | Tool |
 |------|------|
@@ -78,7 +113,7 @@ Choose the smallest matrix that proves the feature:
 
 ## End-to-End Loop
 
-1. Add project root once.
+1. Establish the project root and selected runtime connection once; for Marionette, connect after the configured app is launched.
 2. Analyze before launch. Fix clear compile/analyzer issues first.
 3. List devices and pick the requested simulator/device class.
 4. Launch every app instance needed for the matrix.
@@ -178,7 +213,7 @@ the receipt.
   After closing a dialog, issue `waitForAbsent(oldDialogKey)` before reusing its
   key for a new dialog. This prevents a stale route from satisfying the next
   `waitFor`.
-- Use the current driver or Dart MCP gesture API with an explicit duration and
+- Use the selected driver's or runtime MCP's gesture API with an explicit duration and
   pointer update frequency when it supports them. For an API that exposes a
   frequency for a stationary long press or drag, use about 60 Hz. The official
   [`FlutterDriver.scroll`](https://api.flutter.dev/flutter/flutter_driver/FlutterDriver/scroll.html)
