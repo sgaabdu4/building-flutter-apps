@@ -292,6 +292,43 @@ Verify:
 - Screenshot subject = exact tested screen + expected state + current app process; wrong/blank/home-screen media = `FAIL`.
 - Runner success + critical Flutter/native/backend log = `FAIL`; parse and assert logs before final exit.
 
+## Native integrations that build but fail on device
+
+Bind the reproduction to the requested physical device or simulator, OS version,
+account/environment, package or bundle ID, flavor, entrypoint, build mode,
+version/build and source revision. Verify the installed artifact matches the
+tested build; a local APK does not prove behavior of an AAB-derived or distributed
+build. Use the existing scenario receipt for this evidence.
+
+Trace only the boundaries involved in the reported failure:
+
+| Boundary | Evidence to obtain |
+|---|---|
+| Packaged configuration | Required native declaration, entitlement or resource exists in the built artifact. |
+| Permission and platform service | Read back the available OS state and perform the requested capability/data operation; a completed permission request alone is insufficient. |
+| Plugin and app owner | Initialization and the smallest relevant call return a value or exact error; trace that result through app state to the UI. |
+| Registration and transport | Current app-instance registration belongs to the expected account/environment; read back the actual provider result. |
+| Device outcome | Native receipt, suppression or rejection, followed by the requested presentation, data change or tap/deep-link behavior. |
+
+Stop at the first failing or unknown prerequisite. Choose one check that
+distinguishes the remaining explanations before resending, rebuilding or
+reinstalling. Bound a hanging observation and capture its terminal result;
+a diagnostic timeout does not establish the correct product timeout or fallback.
+Check the installed plugin version and current platform/provider documentation
+before relying on platform-specific behavior.
+
+Provider acceptance is not OS receipt or visible delivery. Prove requested
+foreground, background, terminated, denied/revoked and tap states independently
+where applicable. For scheduled work, check both pending state and actual firing;
+for device data, prove the requested type/time range before investigating UI
+mapping. An unavailable OS readback remains a gap, not a successful receipt.
+
+After rebuild/update, verify installed-build identity again. After reinstall or
+data reset, re-establish permission, session, installation and token/registration
+evidence instead of reusing the previous instance's results. With an authorized
+fix, rerun the original reproduction and affected downstream states; report any
+unavailable requested device, artifact or boundary explicitly.
+
 ## Failure Triage
 
 - Assertion in logs: fix state/lifecycle first.
