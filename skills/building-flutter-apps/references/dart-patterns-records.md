@@ -47,10 +47,10 @@ Use dot shorthand whenever an existing context supplies the exact namespace:
 ```dart
 mainAxisAlignment: .center,
 padding: const .all(16),
-Axis alignment = .center;
+MainAxisAlignment alignment = .center;
 ```
 
-Keep the type name when there is no contextual type (`final axis = Axis.center`)
+Keep the type name when there is no contextual type (`final axis = Axis.horizontal`)
 or when it is a separate namespace (`Color color = Colors.red`).
 
 `@RecordUse` is only for `dart:ffi`/Code Assets bindings whose native linker
