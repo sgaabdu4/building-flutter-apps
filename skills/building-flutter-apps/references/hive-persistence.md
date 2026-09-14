@@ -176,10 +176,10 @@ TypeIds unique + stable. Change TypeId = break existing data.
 class CacheEntry {
   @HiveField(0)
   final String key;
-  
+
   @HiveField(1)
   final String value;
-  
+
   CacheEntry({required this.key, required this.value});
 }
 
