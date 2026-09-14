@@ -448,20 +448,7 @@ if command -v dart >/dev/null 2>&1; then
   fi
 fi
 
-# 5. Canonical coordinated Dart Decimate gate must exit 0
-DECIMATE_GATE="${HOME:-}/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py"
-if [[ -f "$DECIMATE_GATE" ]] && command -v python3 >/dev/null 2>&1; then
-  DECIMATE_OUT=$(python3 "$DECIMATE_GATE" --package "$FLUTTER_ROOT" --timeout 600 2>&1)
-  DECIMATE_EXIT=$?
-  if [[ $DECIMATE_EXIT -ne 0 ]]; then
-    DECIMATE_PREVIEW=$(printf '%s' "$DECIMATE_OUT" | head -n 30)
-    add_violation "Canonical coordinated Dart Decimate gate failed. Output (first 30 lines):"$'\n'"$DECIMATE_PREVIEW"
-  fi
-else
-  add_violation "Canonical Dart Decimate gate unavailable at \$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py. Install or update global deterministic-checks, then rerun its coordinated gate for $FLUTTER_ROOT."
-fi
-
-# 6. Emit result
+# 5. Emit result
 if [[ ${#VIOLATIONS[@]} -eq 0 ]]; then
   exit 0
 fi

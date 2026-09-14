@@ -23,8 +23,11 @@ Run:
 ```bash
 dart pub get
 dart analyze
-python3 "$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py" --package . --timeout 600
 ```
+
+Then use the [Dart Decimate](dart-decimate.md) project path: an installed Hard
+Eng project runs `python3 .hooks/hard-eng.py check`; a standalone project with
+no established check runs the direct native command from its Git root.
 
 ## Extension template
 
@@ -50,4 +53,4 @@ Expected lint outside `lib/core/extensions/context_extensions.dart`: `use_contex
 
 ## Git pre-push
 
-Read [dart-decimate.md](dart-decimate.md#git-pre-push) → delegate to canonical `deterministic-checks` without replacing an existing hook owner or changing `core.hooksPath`.
+Read [dart-decimate.md](dart-decimate.md#git-pre-push) → preserve the existing project hook owner and `core.hooksPath`; this skill does not install a hook.

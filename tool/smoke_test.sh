@@ -722,38 +722,128 @@ assert_silent "l10n path config"                        "$TEST_DIR/l10n.yaml"
 echo ""
 echo "── 5. Stop hook (preflight_audit.sh) ──"
 TEST_BIN="$TEST_DIR/test-bin"
-TEST_HOME="$TEST_DIR/test-home"
-DECIMATE_GATE_LOG="$TEST_DIR/dart-decimate-gate.log"
-DECIMATE_GATE="$TEST_HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py"
-mkdir -p "$TEST_BIN"
-mkdir -p "$(dirname "$DECIMATE_GATE")"
+EMPTY_HOME="$TEST_DIR/empty-home"
+mkdir -p "$TEST_BIN" "$EMPTY_HOME"
 cat > "$TEST_BIN/dart" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
-cat > "$DECIMATE_GATE" <<'EOF'
-import os
-import sys
-from pathlib import Path
-
-Path(os.environ["DART_DECIMATE_GATE_LOG"]).write_text(" ".join(sys.argv[1:]))
-EOF
 chmod +x "$TEST_BIN/dart"
 
-HOME="$TEST_HOME" PATH="$TEST_BIN:$PATH" DART_DECIMATE_GATE_LOG="$DECIMATE_GATE_LOG" CLAUDE_PROJECT_DIR="$TEST_DIR" "$PREFLIGHT" > /tmp/smoke_pf.json 2>/dev/null
+HOME="$EMPTY_HOME" PATH="$TEST_BIN:$PATH" CLAUDE_PROJECT_DIR="$TEST_DIR" "$PREFLIGHT" > /tmp/smoke_pf.json 2>/dev/null
 if [[ -s /tmp/smoke_pf.json ]]; then
   report pass "dirty Flutter project → block"
 else
   report fail "dirty Flutter project (expected block)"
 fi
-if grep -q -- "--package $TEST_DIR --timeout 600" "$DECIMATE_GATE_LOG" 2>/dev/null; then
-  report pass "Flutter project → canonical coordinated Dart Decimate gate"
+if grep -q 'Dart Decimate gate unavailable' /tmp/smoke_pf.json; then
+  report fail "standalone preflight required a global Dart Decimate gate"
 else
-  report fail "canonical coordinated Dart Decimate gate missing"
+  report pass "standalone preflight does not require a global gate"
 fi
 
+# Keep analyzer-plugin contracts separate from the retired global coordinator.
+CONFIG_DIR=$(mktemp -d)
+CONFIG_OUT="$CONFIG_DIR/preflight.json"
+mkdir -p "$CONFIG_DIR/lib"
+printf 'void main() {}\n' > "$CONFIG_DIR/lib/main.dart"
+
+write_flutter_fixture() {
+  cat > "$CONFIG_DIR/pubspec.yaml" <<'EOF'
+name: fixture
+environment:
+  sdk: ^3.13.0
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.4.3
+EOF
+}
+
+run_config_preflight() {
+  HOME="$EMPTY_HOME" PATH="$TEST_BIN:$PATH" CLAUDE_PROJECT_DIR="$CONFIG_DIR" "$PREFLIGHT" > "$CONFIG_OUT" 2>/dev/null
+}
+
+assert_config_violation() {
+  local name="$1" expected="$2"
+  run_config_preflight
+  if grep -Fq -- "$expected" "$CONFIG_OUT"; then
+    report pass "$name"
+  else
+    report fail "$name"
+  fi
+}
+
+write_flutter_fixture
+cat > "$CONFIG_DIR/analysis_options.yaml" <<'EOF'
+plugins:
+  riverpod_lint: ^3.1.9
+  flutter_skill_lints: ^0.11.2
+EOF
+run_config_preflight
+[[ ! -s "$CONFIG_OUT" ]] && report pass "valid Flutter plugin configuration" || report fail "valid Flutter plugin configuration"
+
+for config_case in nested empty missing-riverpod; do
+  write_flutter_fixture
+  case "$config_case" in
+    nested)
+      cat > "$CONFIG_DIR/analysis_options.yaml" <<'EOF'
+analyzer:
+  plugins:
+    riverpod_lint: ^3.1.9
+    flutter_skill_lints: ^0.11.2
+EOF
+      assert_config_violation "nested analyzer plugins rejected" "top-level plugins: map"
+      ;;
+    empty)
+      cat > "$CONFIG_DIR/analysis_options.yaml" <<'EOF'
+plugins:
+  riverpod_lint: ^3.1.9
+  flutter_skill_lints:
+EOF
+      assert_config_violation "empty analyzer plugin rejected" "Invalid analysis_options.yaml plugin configuration: flutter_skill_lints"
+      ;;
+    missing-riverpod)
+      cat > "$CONFIG_DIR/analysis_options.yaml" <<'EOF'
+plugins:
+  flutter_skill_lints: ^0.11.2
+EOF
+      assert_config_violation "missing riverpod_lint rejected" "missing plugin(s): riverpod_lint"
+      ;;
+  esac
+done
+
+write_flutter_fixture
+cat > "$CONFIG_DIR/pubspec.yaml" <<'EOF'
+name: fixture
+environment:
+  sdk: ^3.13.0
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.4.3
+dev_dependencies:
+  flutter_skill_lints: ^0.11.2
+EOF
+cat > "$CONFIG_DIR/analysis_options.yaml" <<'EOF'
+plugins:
+  riverpod_lint: ^3.1.9
+  flutter_skill_lints: ^0.11.2
+EOF
+assert_config_violation "pubspec analyzer plugin rejected" "not pubspec.yaml: flutter_skill_lints"
+
+cat > "$CONFIG_DIR/pubspec.yaml" <<'EOF'
+name: pure_dart_fixture
+tooling:
+  flutter: metadata only
+EOF
+rm -f "$CONFIG_DIR/analysis_options.yaml"
+run_config_preflight
+[[ ! -s "$CONFIG_OUT" ]] && report pass "pure-Dart project bypasses Flutter preflight" || report fail "pure-Dart project bypasses Flutter preflight"
+rm -rf "$CONFIG_DIR"
+
 NON_FL=$(mktemp -d)
-HOME="$TEST_HOME" PATH="$TEST_BIN:$PATH" DART_DECIMATE_GATE_LOG="$DECIMATE_GATE_LOG" CLAUDE_PROJECT_DIR="$NON_FL" "$PREFLIGHT" > /tmp/smoke_pf2.json 2>/dev/null
+HOME="$EMPTY_HOME" PATH="$TEST_BIN:$PATH" CLAUDE_PROJECT_DIR="$NON_FL" "$PREFLIGHT" > /tmp/smoke_pf2.json 2>/dev/null
 [[ ! -s /tmp/smoke_pf2.json ]] && report pass "non-Flutter dir → silent" || report fail "non-Flutter dir (expected silent)"
 rm -rf "$NON_FL"
 

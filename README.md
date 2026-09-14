@@ -105,8 +105,8 @@ layout:
 | Area | What gets enforced |
 |---|---|
 | Analyzer setup | Flutter/Riverpod packages keep `analysis_options.yaml`, strict analyzer flags, generated-file exclusions, and both `flutter_skill_lints` and `riverpod_lint`; pure-Dart CLI packages use their native Dart analysis profile. |
-| Code health | Dart Decimate runs one full zero-finding JSON scan per affected Git root; changed/base/baseline/audit modes cannot hide inherited findings. |
-| Git push | The canonical deterministic gate blocks pushes when Dart Decimate reports findings or a tool/config failure. |
+| Code health | The project owns its full zero-finding Dart Decimate check: Hard Eng uses its installed runner; a standalone project uses its established command or a direct native scan. |
+| Git push | Existing project-owned hooks and checks can block pushes. This skill preserves their owner and does not replace them. |
 | Riverpod | Generated providers only, no legacy provider constructors, no `ref.watch` in notifier methods, no provider-derived caches in `ConsumerState`, and no standalone event/signal providers. |
 | Async lifecycle | `ref.mounted` / `context.mounted` guards after awaits, safe `finally` handling, cancelled subscriptions/timers/controllers, and stale async write protection. |
 | Widgets | Reusable presentation widgets render immutable inputs and emit typed callbacks; navigation, page stacks, selected records, workflow branching, providers, and infrastructure stay with screens/routes/notifiers. |
@@ -202,7 +202,6 @@ mkdir -p lib/core/extensions
 cp <plugin-cache>/skills/building-flutter-apps/templates/flutter/lib/core/extensions/*.dart ./lib/core/extensions/
 dart pub get
 dart analyze
-python3 "$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py" --package . --timeout 600
 ```
 
 Notes:
@@ -216,10 +215,11 @@ Notes:
   diagnostic and one `riverpod_lint` diagnostic can fire.
 - Pure-Dart CLI packages use their native Dart analysis profile instead of this
   Flutter/Riverpod template.
-- Invoke the global canonical deterministic gate; it owns bounded
-  `npx --yes dart-decimate@latest` execution. Do not run the scanner raw, copy
-  a runtime or adapter into the project, add a project dependency or tool
-  bundle, replace other checks, or override `core.hooksPath`.
+- An installed Hard Eng project runs `python3 .hooks/hard-eng.py check` for its
+  configured native checks. A standalone project without an established Dart
+  Decimate check runs `npx --yes dart-decimate@latest check . --threshold 0
+  --format json` from its Git root. Do not add a wrapper, dependency, or global
+  coordinator for this skill, or replace an existing hook or `core.hooksPath`.
 
 ## What's Included
 
@@ -281,7 +281,6 @@ Run the local structural checks before publishing changes:
 ```bash
 bash tool/check_drift.sh
 bash tool/smoke_test.sh
-python3 tool/dart_decimate_gate_test.py
 python3 tool/check_skill_routing.py
 ruby tool/verify_markdown_examples.rb
 ```
