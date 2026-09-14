@@ -15,11 +15,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 HOSTED_PLUGIN_BLOCK = (
     'plugins:\n'
     '  riverpod_lint: ^3.1.9\n'
-    '  flutter_skill_lints: ^0.11.0\n'
+    '  flutter_skill_lints: ^0.11.2\n'
 )
 HOSTED_PLUGINS = {
     'riverpod_lint': '^3.1.9',
-    'flutter_skill_lints': '^0.11.0',
+    'flutter_skill_lints': '^0.11.2',
 }
 
 
@@ -291,7 +291,7 @@ def analysis_options(local_plugin: Path | None) -> str:
     if local_plugin is None:
         return options
     return options.replace(
-        '  flutter_skill_lints: ^0.11.0\n',
+        '  flutter_skill_lints: ^0.11.2\n',
         f'  flutter_skill_lints:\n    path: {local_plugin}\n',
     )
 
@@ -438,7 +438,7 @@ def main() -> None:
         assert_web_build(package)
 
     if local_plugin is None:
-        print('HOSTED_LINT_RESOLUTION_OK flutter_skill_lints=^0.11.0')
+        print('HOSTED_LINT_RESOLUTION_OK flutter_skill_lints=^0.11.2')
     else:
         print(f'LOCAL_LINT_RESOLUTION_OK flutter_skill_lints={local_plugin}')
     print('COMPATIBILITY_FIXTURE_OK')
