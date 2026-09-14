@@ -90,7 +90,7 @@ def main() -> int:
         valid_analysis_options = (
             "plugins:\n"
             "  riverpod_lint: ^3.1.9\n"
-            "  flutter_skill_lints: ^0.11.0\n"
+            "  flutter_skill_lints: ^0.11.2\n"
         )
         write(project / "pubspec.yaml", flutter_pubspec)
         write(project / "analysis_options.yaml", valid_analysis_options)
@@ -132,7 +132,7 @@ def main() -> int:
             "analyzer:\n"
             "  plugins:\n"
             "    riverpod_lint: ^3.1.9\n"
-            "    flutter_skill_lints: ^0.11.0\n",
+            "    flutter_skill_lints: ^0.11.2\n",
         )
         nested = subprocess.run(
             [str(preflight)],
@@ -183,7 +183,7 @@ def main() -> int:
             project / "pubspec.yaml",
             flutter_pubspec
             + "dev_dependencies:\n"
-            + "  flutter_skill_lints: ^0.11.0\n",
+            + "  flutter_skill_lints: ^0.11.2\n",
         )
         pubspec_plugin = subprocess.run(
             [str(preflight)],
@@ -206,7 +206,7 @@ def main() -> int:
         write(
             project / "analysis_options.yaml",
             "plugins:\n"
-            "  flutter_skill_lints: ^0.11.0\n",
+            "  flutter_skill_lints: ^0.11.2\n",
         )
         missing_riverpod = subprocess.run(
             [str(preflight)],
