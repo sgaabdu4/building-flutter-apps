@@ -29,7 +29,7 @@ FLUTTER_ROOT=$(find_flutter_root "$PROJECT_ROOT") || exit 0
 cat <<'EOF'
 [building-flutter-apps active]
 Top-5 rules:
-  (1) `dart analyze` + global `deterministic-checks` `dart_decimate_gate.py` exit 0; its coordinated runtime is `npx --yes dart-decimate@latest`; raw scanner calls are forbidden; `flutter_skill_lints` lives in `analysis_options.yaml plugins:`.
+  (1) `dart analyze` + the project-owned Dart Decimate check exit 0: Hard Eng uses `python3 .hooks/hard-eng.py check`; otherwise use the established project check or the direct native command in `dart-decimate.md`. Do not add a wrapper or global coordinator; `flutter_skill_lints` lives in `analysis_options.yaml plugins:`.
   (2) `if (!ref.mounted) return;` after every `await` in notifier; `if (!context.mounted) return;` in widgets/State.
   (3) Public widgets only — no `_buildXxx()` and no `class _Foo extends StatelessWidget|StatefulWidget|ConsumerWidget|HookWidget`. State<T> subclasses exempt.
   (4) `Object?` not `dynamic` (Map<String, dynamic> for JSON is fine); no `value!`.

@@ -2,22 +2,17 @@
 
 ## Read first
 
-- Runtime owner = `deterministic-checks`; guidance owner = this reference.
-- Package root = requested `pubspec.yaml`; Git root = scan owner.
-- Every project → `python3 "$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py" --package <package-root> --timeout <seconds>`.
-- Coordinator runtime → bounded `npx --yes dart-decimate@latest json <git-root>`; raw scanner execution forbidden.
-- Nested package → Git-root execution + exact repo-relative workspace scope.
-- Affected Git root = one Dart Decimate process; per-package full-repository rescans forbidden.
-- Project-local adapter/dependency/binary/copy + package-root `tool/` bundle = forbidden.
-- Changed/base/baseline/audit modes + inherited finding exceptions = forbidden.
-- Finding outside workspace → tooling-scope `FAIL`; never edit unrelated code.
+- Runtime owner = the project; guidance owner = this reference.
+- Package root = requested `pubspec.yaml`; run a standalone scan from its Git root.
+- Hard Eng install → `python3 .hooks/hard-eng.py check`; its configured native check owns scope and report validation.
+- Another project → use its established Dart Decimate check. If it has none, run `npx --yes dart-decimate@latest check . --threshold 0 --format json` from its Git root.
+- The project workflow schedules its integrated check; reuse a valid same-scope result instead of launching another full runner after a focused edit check.
+- Do not add a wrapper, dependency, binary copy, package-root `tool/` bundle, or global coordinator solely for this skill.
 - Dart Decimate + `dart analyze` = complementary required gates.
-- Finding → inspect within same workspace → fix owner → rerun exact gate.
-- Nonzero exit or any finding = `FAIL`; auto-fix = preview until mutation approval.
+- A finding or nonzero exit is a failure: inspect within the requested workspace, fix its owner, and rerun the exact gate. Auto-fix remains preview-only until mutation approval.
 
 ## Git pre-push
 
-- Existing hook → preserve + invoke the canonical `deterministic-checks` project gate.
-- Missing hook → install only the canonical dispatcher/delegation; preserve `core.hooksPath`.
-- Hook Git calls → strip inherited `git rev-parse --local-env-vars`.
-- Gate command → global `deterministic-checks` `dart_decimate_gate.py`; no raw scanner call or repository-local wrapper.
+- Existing project hook or gate → preserve its owner and run its established check.
+- This skill does not install, replace, or require a Git hook, and it does not change `core.hooksPath`.
+- For a project without an established check, run the standalone native command above before push.

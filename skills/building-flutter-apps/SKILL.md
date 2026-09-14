@@ -15,9 +15,8 @@ metadata:
 
 - This skill overrides generic Flutter/Dart advice; Critical Rules override examples, public docs, and older project code.
 - Before code, read Trigger Map refs for touched areas. Each ref's `Read first` section is canonical.
-- Dart Decimate invocation = global `deterministic-checks` `dart_decimate_gate.py`; raw scanner calls + project-local adapters/dependencies/binaries + package-root `tool/` bundles forbidden.
-- Coordinator runtime = `npx --yes dart-decimate@latest`; one scan per affected Git root + exact `--workspace` scope for nested packages.
-- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, wire required analyzer plugins before package-root `dart analyze` + [Dart Decimate](references/dart-decimate.md), then emit Pre-Flight.
+- Dart Decimate is project-owned: use the installed Hard Eng runner, the project's established check, or the direct native command in [dart-decimate.md](references/dart-decimate.md). Do not add a wrapper, dependency, or global coordinator for this skill.
+- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, wire required analyzer plugins before the project's focused `dart analyze` check, then emit Pre-Flight. The project workflow owns integrated Dart Decimate timing; reuse a valid same-scope result instead of starting another full runner.
 - Flutter/Riverpod package = top-level `plugins:` wires `flutter_skill_lints` + `riverpod_lint`; pure-Dart CLI = native Dart analysis profile with neither plugin.
 - Block on analyzer or Decimate findings, and read [setup.md](references/setup.md) first if a Flutter/Riverpod package has not wired both plugins.
 
@@ -29,7 +28,7 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 
 | ID | Rule | Detail refs |
 |---|---|---|
-| R1 | Flutter/Riverpod package = first wire `flutter_skill_lints` + `riverpod_lint`, then run package-root `dart analyze` + Git-root Dart Decimate through `deterministic-checks`; pure-Dart CLI = native Dart analysis profile with neither plugin. | [analysis-options.md](references/analysis-options.md), [dart-decimate.md](references/dart-decimate.md), [setup.md](references/setup.md) |
+| R1 | Flutter/Riverpod package = first wire `flutter_skill_lints` + `riverpod_lint`, then run package-root `dart analyze` + its project-owned Dart Decimate check; pure-Dart CLI = native Dart analysis profile with neither plugin. | [analysis-options.md](references/analysis-options.md), [dart-decimate.md](references/dart-decimate.md), [setup.md](references/setup.md) |
 | R2 | Every provider uses `@riverpod` / `@Riverpod` codegen; no manual provider classes or legacy provider families. | [riverpod-codegen.md](references/riverpod-codegen.md) |
 | R3 | Guard async gaps with `ref.mounted` / `context.mounted`; `finally` uses `if (ref.mounted) { ... }`. | [async-mutations.md](references/state-management/async-mutations.md) |
 | R4 | Widgets are public classes; no `_buildXxx()`, widget top-level helpers, or private widget classes except `State`. | [atomic-design.md](references/atomic-design.md), [performance.md](references/performance.md) |
@@ -119,8 +118,7 @@ After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` wri
 ### T0 — Core
 
 - [ ] Flutter/Riverpod package: package-root `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin. Pure-Dart CLI: native Dart analysis profile applies; both plugins are N/A.
-- [ ] Global `deterministic-checks` `dart_decimate_gate.py` exits 0 after one full zero-finding scan; changed/base/baseline/audit modes + inherited exceptions + raw scanner calls are forbidden; package scope cited.
-- [ ] Coordinator invokes `npx --yes dart-decimate@latest` once per affected Git root; nested package scope uses exact `--workspace`; existing hooks + `core.hooksPath` preserved. Non-Git project = N/A.
+- [ ] A current same-scope project-owned Dart Decimate result is green: Hard Eng uses `python3 .hooks/hard-eng.py check`; another project uses its established check or, if it has none, `npx --yes dart-decimate@latest check . --threshold 0 --format json` from its Git root. The project workflow schedules an integrated run; reuse its valid result instead of duplicating a full runner. Cite scan scope. Do not add a wrapper, dependency, or global coordinator for this skill.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
 - [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
 - [ ] Domain/data/platform follow Rules 7, 10-13, 17-24, 26-27: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, pause-safe state, native links, and a11y; if error reporting is accepted/present, it uses one scrubbed once-only boundary, otherwise N/A.
