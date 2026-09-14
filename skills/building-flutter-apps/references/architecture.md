@@ -221,7 +221,7 @@ sealed class ProductModel with _$ProductModel {
         quantity: quantity,
         isActive: isActive,
       );
-  
+
   /// Map to API request body with only name (for example)
   Map<String, dynamic> toNameOnlyRequestBody() => {
         'id': id,
