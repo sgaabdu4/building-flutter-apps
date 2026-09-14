@@ -11,6 +11,10 @@
 The compatibility fixture requires Dart `>=3.13.0 <4.0.0` and Flutter
 `>=3.47.0`. It solves this application and generator family together:
 
+This is a tested floor, not a floating "latest" policy. Projects below it must
+upgrade their SDK constraint, CI image, and local toolchain together; do not add
+legacy branches. Re-run the compatibility fixture before raising the floor.
+
 | Package | Constraint | Purpose |
 |---|---:|---|
 | `flutter_riverpod` | `3.4.3` | State management |
@@ -22,11 +26,11 @@ The compatibility fixture requires Dart `>=3.13.0 <4.0.0` and Flutter
 | `json_serializable` | `6.14.1` | JSON generation |
 | `go_router` | `^18.0.1` | Routing |
 | `go_router_builder` | `4.5.0` | Typed-route generation |
-| `hive_ce` | `^2.19.3` | Local persistence |
+| `hive_ce` | `^2.20.0` | Local persistence |
 | `hive_ce_flutter` | `^2.3.4` | Flutter persistence integration |
 | `hive_ce_generator` | `1.11.3` | Hive adapter generation |
 | `build_runner` | `2.16.1` | Build orchestration |
-| `analyzer` | `14.3.0` | Analyzer |
+| `analyzer` | `14.4.0` | Analyzer |
 | `flutter_lints` | `6.0.0` | Base Flutter lints |
 
 ## Analyzer plugins
@@ -38,11 +42,11 @@ Flutter/Riverpod packages use both plugins in the root
 ```yaml
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.10.0
+  flutter_skill_lints: ^0.11.0
 ```
 
-`flutter_skill_lints ^0.10.0` is built against analyzer `^14.3.0`,
-`analyzer_plugin ^0.14.16`, and `analysis_server_plugin ^0.3.22`.
+`flutter_skill_lints ^0.11.0` is built against analyzer `^14.4.0`,
+`analyzer_plugin ^0.14.17`, and `analysis_server_plugin ^0.3.23`.
 `riverpod_lint ^3.1.9` shares the analyzer-plugin configuration above.
 
 Pure-Dart CLI packages keep their native Dart analysis profile and do not add
@@ -52,7 +56,7 @@ these Flutter/Riverpod plugins.
 
 `tool/run_compatibility_fixture.py` resolves the application family, generates
 Riverpod, Freezed, Hive, JSON, and typed-route code, confirms analyzer
-`14.3.0`, then runs the analyzer with both plugins. Its deliberate probe
+`14.4.0`, then runs the analyzer with both plugins. Its deliberate probe
 requires a `flutter_skill_lints` `avoid_null_bang` diagnostic and a
 `riverpod_lint` `missing_provider_scope` diagnostic while rejecting
 `server.pluginError`. It removes the probe before the Flutter test and web
@@ -61,6 +65,9 @@ build.
 The fixture uses the top-level hosted plugin configuration without a local path
 or dependency override. Its analyzer probe proves that both plugins load and
 report their expected diagnostics without `server.pluginError`.
+
+Before publishing a lint update, set `FLUTTER_SKILL_LINTS_PATH` to its local
+package directory; after publishing, run the default hosted check.
 
 Re-run the fixture after any package, Flutter, Dart, analyzer, or plugin
 configuration upgrade. Do not use dependency overrides as compatibility proof.

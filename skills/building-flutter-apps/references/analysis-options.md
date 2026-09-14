@@ -20,7 +20,8 @@ feature code needs them.
 
 ## Required
 
-- `strict-casts`, `strict-inference`, `strict-raw-types`: true
+- `strict-inference`: true
+- Type safety: `no_dynamic_casts`, `no_raw_types`
 - Async: `unawaited_futures`, `discarded_futures`, `avoid_void_async`
 - Resources: `avoid_print`, `cancel_subscriptions`, `close_sinks`
 - Effective Dart Design API shape: `always_declare_return_types`,
@@ -64,7 +65,7 @@ Plugin block:
 ```yaml
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.10.0
+  flutter_skill_lints: ^0.11.0
 ```
 
 Match bundled [`references/analysis_options.yaml`](analysis_options.yaml)

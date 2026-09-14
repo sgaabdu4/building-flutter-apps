@@ -7,6 +7,8 @@
 2. Multiple ID types → extension types, not raw `String`.
 3. Pattern null-bind with `if (value case final v?)`; never `value!`.
 4. Switch cases use guard clauses; do not nest if/else in case bodies.
+5. On Dart 3.13+, use primary/concise constructors and dot shorthand when the
+   surrounding context makes the type unambiguous.
 
 ## Class modifiers
 
@@ -25,7 +27,34 @@ Contract = `abstract interface class`; Freezed union = `sealed class`; helper na
 
 ## Trigger
 
-Signals: Records, pattern matching, extension types, destructuring, sealed class switch
+Signals: Records, pattern matching, extension types, destructuring, sealed class switch,
+primary constructors, concise constructors, dot shorthand, `@RecordUse`
+
+## Dart 3.13 conciseness
+
+Use a primary constructor when it removes repeated field declarations:
+
+```dart
+class Point(final int x, final int y);
+```
+
+Inside a class, use concise constructor names: `new()`, `new named()`,
+`factory()`, and `factory named()`. Preserve `const`, initializers, redirects,
+and bodies; only the repeated class name disappears.
+
+Use dot shorthand whenever an existing context supplies the exact namespace:
+
+```dart
+mainAxisAlignment: .center,
+padding: const .all(16),
+Axis alignment = .center;
+```
+
+Keep the type name when there is no contextual type (`final axis = Axis.center`)
+or when it is a separate namespace (`Color color = Colors.red`).
+
+`@RecordUse` is only for `dart:ffi`/Code Assets bindings whose native linker
+uses `package:record_use`; normal Flutter application code does not add it.
 
 ## Records (Dart 3.0)
 

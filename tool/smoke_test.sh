@@ -107,7 +107,7 @@ copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 eval_cases = json.loads((root / "evals/evals.json").read_text())["evals"]
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.9.3"
+expected_version = "5.10.0"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -147,11 +147,11 @@ setup_reference = (skill / "references/setup.md").read_text()
 readme = (root / "README.md").read_text()
 expected_plugins = {
     "riverpod_lint": "^3.1.9",
-    "flutter_skill_lints": "^0.10.0",
+    "flutter_skill_lints": "^0.11.0",
 }
 assert yaml_plugins(root / "analysis_options.yaml") == expected_plugins
 assert yaml_plugins(skill / "references/analysis_options.yaml") == expected_plugins
-plugin_block = "plugins:\n  riverpod_lint: ^3.1.9\n  flutter_skill_lints: ^0.10.0\n"
+plugin_block = "plugins:\n  riverpod_lint: ^3.1.9\n  flutter_skill_lints: ^0.11.0\n"
 assert plugin_block in analysis_options_reference
 assert "do not add either analyzer plugin to `pubspec.yaml`" in setup_reference.lower()
 assert "do not add either to `pubspec.yaml`" in readme.lower()
@@ -444,7 +444,7 @@ dependencies:
 cat > "$TEST_DIR/analysis_options.yaml" <<'EOF'
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.10.0
+  flutter_skill_lints: ^0.11.0
 EOF
 
 # Violator (5 old rules)

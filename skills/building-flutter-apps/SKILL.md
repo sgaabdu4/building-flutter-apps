@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.9.3"
+  version: "5.10.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, windows, inno, installer, fire-and-forget, singletons, e2e testing
 ---
 
@@ -89,7 +89,7 @@ Before writing code in any row below, read the listed reference(s). Prefer the n
 | `BuildContext` helpers, `ModalRoute` current-route checks, dialogs, `SnackBarUtils`, snackbar dispatch from notifier | [context-ui.md](references/extensions/context-ui.md) |
 | `DateTime` format/diff/timeAgo/startOfDay, `String` capitalize/truncate/titleCase/initials/format, `int` / `double` / `num` clamp/pluralized/asCurrency/percent/toFixed, `Duration` format, `NumberFormat`, `DateFormat`, `intl` | [primitive-formatting.md](references/extensions/primitive-formatting.md) |
 | `Iterable` lookup/indexing, widget list helpers, `Debouncer`, validators, `Result`, extension types, `core/extensions/` barrel export | [collections-helpers.md](references/extensions/collections-helpers.md) |
-| Records `(x, y)`, extension type IDs, pattern matching, guard clause `case _ when ...` | [dart-patterns-records.md](references/dart-patterns-records.md) |
+| Records `(x, y)`, extension type IDs, pattern matching, primary/concise constructors, `new()`, `factory()`, dot shorthand such as `.center`, `@RecordUse` | [dart-patterns-records.md](references/dart-patterns-records.md) |
 | Flutter/Riverpod `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
 | `build_runner`, missing generated parts, clean checkout, Xcode selection, Flutter SwiftPM generated package, Apple device build, local-vs-CI mismatch | [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
 | Flutter Windows desktop packaging, GitHub Actions Windows installer, Inno Setup, `inno_bundle`, updater/auto-update, CRT DLLs, PowerShell/native installer process, installer/version/AppId failure | [windows-installer-pipeline.md](references/windows-installer-pipeline.md) + [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |

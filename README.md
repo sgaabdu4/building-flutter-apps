@@ -207,7 +207,7 @@ python3 "$HOME/.agents/skills/deterministic-checks/scripts/dart_decimate_gate.py
 
 Notes:
 
-- `flutter_skill_lints: ^0.10.0` and `riverpod_lint: ^3.1.9` are analyzer
+- `flutter_skill_lints: ^0.11.0` and `riverpod_lint: ^3.1.9` are analyzer
   plugins. Keep both in `analysis_options.yaml` under top-level `plugins:`;
   do not add either to `pubspec.yaml`.
 - If `lib/core/extensions/` already exists, merge the template files instead of

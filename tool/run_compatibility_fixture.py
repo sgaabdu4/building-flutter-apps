@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -14,11 +15,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 HOSTED_PLUGIN_BLOCK = (
     'plugins:\n'
     '  riverpod_lint: ^3.1.9\n'
-    '  flutter_skill_lints: ^0.10.0\n'
+    '  flutter_skill_lints: ^0.11.0\n'
 )
 HOSTED_PLUGINS = {
     'riverpod_lint': '^3.1.9',
-    'flutter_skill_lints': '^0.10.0',
+    'flutter_skill_lints': '^0.11.0',
 }
 
 
@@ -36,12 +37,12 @@ dependencies:
   flutter_riverpod: 3.4.3
   freezed_annotation: 3.1.0
   go_router: ^18.0.1
-  hive_ce: ^2.19.3
+  hive_ce: ^2.20.0
   hive_ce_flutter: ^2.3.4
   json_annotation: ^4.12.0
   riverpod_annotation: 4.0.7
 dev_dependencies:
-  analyzer: 14.3.0
+  analyzer: 14.4.0
   build_runner: 2.16.1
   flutter_lints: 6.0.0
   freezed: 4.0.1
@@ -285,6 +286,16 @@ def hosted_analysis_options() -> str:
     return template
 
 
+def analysis_options(local_plugin: Path | None) -> str:
+    options = hosted_analysis_options()
+    if local_plugin is None:
+        return options
+    return options.replace(
+        '  flutter_skill_lints: ^0.11.0\n',
+        f'  flutter_skill_lints:\n    path: {local_plugin}\n',
+    )
+
+
 def assert_hosted_plugin_configuration_regressions() -> None:
     assert_hosted_plugin_configuration(
         HOSTED_PLUGIN_BLOCK + '\nanalyzer:\n  exclude:\n    - build/**\n'
@@ -308,10 +319,11 @@ def assert_hosted_plugin_configuration_regressions() -> None:
         raise SystemExit(f'fixture validator accepted {description}')
 
 
-def assert_valid_fixture(package: Path) -> None:
-    assert_hosted_plugin_configuration(
-        (package / 'analysis_options.yaml').read_text()
-    )
+def assert_valid_fixture(package: Path, local_plugin: Path | None) -> None:
+    if local_plugin is None:
+        assert_hosted_plugin_configuration(
+            (package / 'analysis_options.yaml').read_text()
+        )
     if (package / 'pubspec_overrides.yaml').exists():
         raise SystemExit('valid fixture must not contain pubspec_overrides.yaml')
     lock = package / 'pubspec.lock'
@@ -323,9 +335,9 @@ def assert_valid_fixture(package: Path) -> None:
     analyzer_version = re.search(
         r'(?ms)^  analyzer:\n.*?^    version: "([^"]+)"', lock_text
     )
-    if analyzer_version is None or analyzer_version.group(1) != '14.3.0':
+    if analyzer_version is None or analyzer_version.group(1) != '14.4.0':
         actual = analyzer_version.group(1) if analyzer_version else 'missing'
-        raise SystemExit(f'expected analyzer 14.3.0, resolved {actual}')
+        raise SystemExit(f'expected analyzer 14.4.0, resolved {actual}')
     resolved = json.loads((package / '.dart_tool' / 'package_config.json').read_text())
     names = {entry['name'] for entry in resolved['packages']}
     required = {
@@ -391,13 +403,17 @@ def assert_web_build(package: Path) -> None:
 
 def main() -> None:
     assert_hosted_plugin_configuration_regressions()
+    local_plugin_value = os.environ.get('FLUTTER_SKILL_LINTS_PATH')
+    local_plugin = Path(local_plugin_value).resolve() if local_plugin_value else None
+    if local_plugin is not None and not (local_plugin / 'pubspec.yaml').is_file():
+        raise SystemExit(f'FLUTTER_SKILL_LINTS_PATH is not a Dart package: {local_plugin}')
     with tempfile.TemporaryDirectory(prefix='flutter-skill-generator-') as directory:
         package = Path(directory)
         (package / 'lib').mkdir()
         (package / 'test').mkdir()
         (package / 'web').mkdir()
         (package / 'pubspec.yaml').write_text(PUBSPEC)
-        (package / 'analysis_options.yaml').write_text(hosted_analysis_options())
+        (package / 'analysis_options.yaml').write_text(analysis_options(local_plugin))
         (package / 'build.yaml').write_text(BUILD_YAML)
         (package / 'lib/fixture_model.dart').write_text(MODEL)
         (package / 'lib/fixture_provider.dart').write_text(PROVIDER)
@@ -412,7 +428,7 @@ def main() -> None:
 
         run(['flutter', 'pub', 'get'], package)
         run(['dart', 'run', 'build_runner', 'build'], package)
-        assert_valid_fixture(package)
+        assert_valid_fixture(package, local_plugin)
         (package / 'lib/plugin_probe.dart').write_text(PLUGIN_PROBE)
         assert_plugin_diagnostics(package)
         (package / 'lib/plugin_probe.dart').unlink()
@@ -421,7 +437,10 @@ def main() -> None:
         run(['flutter', 'build', 'web', '--no-pub'], package)
         assert_web_build(package)
 
-    print('HOSTED_LINT_RESOLUTION_OK flutter_skill_lints=^0.10.0')
+    if local_plugin is None:
+        print('HOSTED_LINT_RESOLUTION_OK flutter_skill_lints=^0.11.0')
+    else:
+        print(f'LOCAL_LINT_RESOLUTION_OK flutter_skill_lints={local_plugin}')
     print('COMPATIBILITY_FIXTURE_OK')
 
 
