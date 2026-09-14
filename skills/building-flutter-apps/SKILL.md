@@ -109,7 +109,7 @@ Read [setup.md](references/setup.md) for lint wiring, extension template setup, 
 
 ### Per-Tool Hooks
 
-Use [setup.md](references/setup.md#per-tool-hooks) for install commands. Raw skill installs cannot register runtime hooks or scanners.
+Use [setup.md](references/setup.md#git-pre-push) for pre-push guidance. Raw skill installs cannot register runtime hooks or scanners.
 
 ## Pre-Flight
 
