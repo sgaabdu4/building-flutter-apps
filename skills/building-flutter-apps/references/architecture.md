@@ -17,7 +17,7 @@ Signals: clean architecture, four layers, dependency inversion, domain entity, r
 ## Scope
 
 In: state, nav, deep links, persistence, HTTP boundaries, models/JSON, DI,
-errors, forms (via [Validators](extensions/primitive-formatting.md#validators) +
+errors, forms (via [Validators](extensions/collections-helpers.md#validators) +
 [common-patterns.md](common-patterns.md)), localization, atomic widgets,
 previews, codegen, tests.
 

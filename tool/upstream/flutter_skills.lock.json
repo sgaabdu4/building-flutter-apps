@@ -2,9 +2,9 @@
   "version": 1,
   "source": "https://github.com/flutter/skills.git",
   "branch": "main",
-  "commit": "7cdb7d3c33679ef14a7a7584cec1d5ecb8752586",
-  "checked_at": "2026-09-14T06:10:27Z",
-  "skill_count": 24,
+  "commit": "8c3fcb28036ac0f80713e372582ab0b1a1be59d8",
+  "checked_at": "2026-09-16T23:55:52Z",
+  "skill_count": 25,
   "skills": {
     "dart-add-unit-test": {
       "path": "skills/dart-add-unit-test/SKILL.md",
@@ -14,9 +14,7 @@
     },
     "dart-build-cli-app": {
       "path": "skills/dart-build-cli-app/SKILL.md",
-      "sha256": "39c82e4ca39fadc8d065bad8c39a08cd719a3fc481b6a74ed6175f33ee3fb412",
-      "last_modified": "Fri, 04 May 2026 17:41:00 GMT",
-      "model": "models/gemini-3.1-pro-preview"
+      "sha256": "62880f343b3a927cc23a5ca6cfa65c2b77c35a5129755245e5a52f965fc54d73"
     },
     "dart-collect-coverage": {
       "path": "skills/dart-collect-coverage/SKILL.md",
@@ -70,10 +68,16 @@
       "last_modified": "Thu, 28 May 2026 07:21:07 GMT",
       "model": "models/gemini-3.1-pro-preview"
     },
+    "dart-use-path-package": {
+      "path": "skills/dart-use-path-package/SKILL.md",
+      "sha256": "0b4d6995aa5e50e586305b53e968353c22e8383c3c3a903264551330ffc31f77",
+      "last_modified": "Sun, 06 Sep 2026 07:14:00 GMT",
+      "model": "models/gemini-3.1-pro-preview"
+    },
     "dart-use-pattern-matching": {
       "path": "skills/dart-use-pattern-matching/SKILL.md",
-      "sha256": "39d71b585417a2cca7958d41e19916303053c654a4de5aade8564addfaba1968",
-      "last_modified": "Fri, 24 Apr 2026 15:08:55 GMT",
+      "sha256": "7a4d50dbb310299b332fb5f2072d05260b177e0c8e089d4516d57e646a9da36d",
+      "last_modified": "Sun, 06 Sep 2026 06:43:00 GMT",
       "model": "models/gemini-3.1-pro-preview"
     },
     "dart-use-primary-constructors": {
