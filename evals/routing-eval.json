@@ -34,7 +34,7 @@
   },
   {
     "id": 4,
-    "query": "We're starting a new Flutter service app with ProviderScope, MaterialApp.router, typed routes, records feature folders, Riverpod, Freezed, and Hive.",
+    "query": "We're starting a new Flutter service app with ProviderScope and MaterialApp.router. Build only the initial skeleton; Riverpod, Freezed, Hive, typed routes, and records feature folders are later work.",
     "should_trigger": true,
     "expected_refs": [
       "references/setup.md",
@@ -393,12 +393,11 @@
     "query": "A Sentry event shows a disposed-ref failure after await in a Flutter Riverpod notifier; use the runtime evidence and fix the local lifecycle bug without changing telemetry scope.",
     "should_trigger": true,
     "expected_refs": [
-      "references/error-reporting.md",
       "references/state-management/async-mutations.md",
       "references/state-management-lifecycle.md"
     ],
     "forbidden_refs": [],
-    "max_refs": 3
+    "max_refs": 2
   },
   {
     "id": 39,
@@ -448,5 +447,39 @@
     ],
     "forbidden_refs": [],
     "max_refs": 3
+  },
+  {
+    "id": 43,
+    "query": "A Flutter Riverpod app needs a compatible build_runner, analyzer, and generator dependency upgrade without changing its architecture.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/core-stack.md"
+    ],
+    "forbidden_refs": [
+      "references/windows-installer-pipeline.md"
+    ],
+    "max_refs": 1
+  },
+  {
+    "id": 44,
+    "query": "A pure Dart command-line package needs a package:path dependency update for cross-platform filesystem paths; it has no Flutter or Riverpod code.",
+    "should_trigger": false,
+    "expected_refs": [],
+    "forbidden_refs": [
+      "references/core-stack.md"
+    ],
+    "max_refs": 0
+  },
+  {
+    "id": 45,
+    "query": "Set up this Flutter Riverpod skill's pre-push hook and scanner registration for a project.",
+    "should_trigger": true,
+    "expected_refs": [
+      "references/setup.md"
+    ],
+    "forbidden_refs": [
+      "references/windows-installer-pipeline.md"
+    ],
+    "max_refs": 1
   }
 ]

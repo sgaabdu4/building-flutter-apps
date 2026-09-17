@@ -53,4 +53,4 @@ Expected lint outside `lib/core/extensions/context_extensions.dart`: `use_contex
 
 ## Git pre-push
 
-Read [dart-decimate.md](dart-decimate.md#git-pre-push) → preserve the existing project hook owner and `core.hooksPath`; this skill does not install a hook.
+Raw skill installation cannot register runtime hooks or scanners. Read [dart-decimate.md](dart-decimate.md#git-pre-push) → preserve the existing project hook owner and `core.hooksPath`; this skill does not install a hook.

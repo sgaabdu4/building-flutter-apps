@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.10.2"
+  version: "5.10.3"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, windows, inno, installer, fire-and-forget, singletons, e2e testing
 ---
 
@@ -15,10 +15,7 @@ metadata:
 
 - This skill overrides generic Flutter/Dart advice; Critical Rules override examples, public docs, and older project code.
 - Before code, read Trigger Map refs for touched areas. Each ref's `Read first` section is canonical.
-- Dart Decimate is project-owned: use the installed Hard Eng runner, the project's established check, or the direct native command in [dart-decimate.md](references/dart-decimate.md). Do not add a wrapper, dependency, or global coordinator for this skill.
-- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, wire required analyzer plugins before the project's focused `dart analyze` check, then emit Pre-Flight. The project workflow owns integrated Dart Decimate timing; reuse a valid same-scope result instead of starting another full runner.
-- Flutter/Riverpod package = top-level `plugins:` wires `flutter_skill_lints` + `riverpod_lint`; pure-Dart CLI = native Dart analysis profile with neither plugin.
-- Block on analyzer or Decimate findings, and read [setup.md](references/setup.md) first if a Flutter/Riverpod package has not wired both plugins.
+- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, emit Pre-Flight; its cited rule/reference owns the applicable check.
 
 ## Progressive Disclosure Gate
 
@@ -84,13 +81,15 @@ Before writing code in any row below, read the listed reference(s). Prefer the n
 | `AppLocalizations`, ARB file, gen-l10n, locale fallback, placeholders, plural / select | [localization.md](references/localization.md) |
 | Performance, build cost, `.select()`, `const` constructors, `ListView.builder`, large list compute | [performance.md](references/performance.md) + [flutter-optimizations.md](references/flutter-optimizations.md) |
 | `LayoutBuilder`, `RenderFlex` overflow, `Expanded` / `Flexible` outside `Row` / `Column`, `Positioned` outside `Stack`, text-scale clamp | [layout-diagnostics.md](references/layout-diagnostics.md) |
-| Pagination, infinite scroll, cursor loading, search debounce, form validation, batch processing, pull-to-refresh | [lists-forms-workflows.md](references/common-patterns/lists-forms-workflows.md) + [async-mutations.md](references/state-management/async-mutations.md) |
+| Pagination, infinite scroll, cursor loading, search debounce, registration/form validation and submission, batch processing, pull-to-refresh | [lists-forms-workflows.md](references/common-patterns/lists-forms-workflows.md) + [async-mutations.md](references/state-management/async-mutations.md) |
 | `BuildContext` helpers, `ModalRoute` current-route checks, dialogs, `SnackBarUtils`, snackbar dispatch from notifier | [context-ui.md](references/extensions/context-ui.md) |
 | `DateTime` format/diff/timeAgo/startOfDay, `String` capitalize/truncate/titleCase/initials/format, `int` / `double` / `num` clamp/pluralized/asCurrency/percent/toFixed, `Duration` format, `NumberFormat`, `DateFormat`, `intl` | [primitive-formatting.md](references/extensions/primitive-formatting.md) |
 | `Iterable` lookup/indexing, widget list helpers, `Debouncer`, validators, `Result`, extension types, `core/extensions/` barrel export | [collections-helpers.md](references/extensions/collections-helpers.md) |
 | Records `(x, y)`, extension type IDs, pattern matching, primary/concise constructors, `new()`, `factory()`, dot shorthand such as `.center`, `@RecordUse` | [dart-patterns-records.md](references/dart-patterns-records.md) |
 | Flutter/Riverpod `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
+| Skill setup, Git pre-push, hook/scanner registration | [setup.md](references/setup.md) |
 | `build_runner`, missing generated parts, clean checkout, Xcode selection, Flutter SwiftPM generated package, Apple device build, local-vs-CI mismatch | [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
+| Package constraints, dependency upgrade, generator/analyzer compatibility | [core-stack.md](references/core-stack.md) |
 | Flutter Windows desktop packaging, GitHub Actions Windows installer, Inno Setup, `inno_bundle`, updater/auto-update, CRT DLLs, PowerShell/native installer process, installer/version/AppId failure | [windows-installer-pipeline.md](references/windows-installer-pipeline.md) + [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
 | Dart Decimate, dead code, circular dependency, duplicate code, complexity, dependency hygiene, full zero-finding scan | [dart-decimate.md](references/dart-decimate.md) |
 | Common navigation / form / list / debounce / route-param-fallback patterns | [common-patterns.md](references/common-patterns.md) |
@@ -98,18 +97,6 @@ Before writing code in any row below, read the listed reference(s). Prefer the n
 | Route-param safety, wizard sequencing, guarded next-step navigation | [navigation-flow.md](references/common-patterns/navigation-flow.md) |
 | Dialog / sheet / modal, snapshot value object, post-await teardown, dismiss-then-route, pop fallback, nested navigator dismissal | [modals-navigation.md](references/common-patterns/modals-navigation.md) + [state-management-lifecycle.md](references/state-management-lifecycle.md#state-teardown-belongs-in-the-notifier) |
 | Debounce / throttle / coalesce — `TextField.onChanged`, `Slider.onChanged`, scroll listener, sync `saveAll`, full-collection rewrite after subset mutation, persistence helper, reset/clear sentinel preservation, `_userTapped` gate, `WebView` / `VideoPlayer` in `build`, `_storage.read` in service, `ref.listenManual` ban, keepAlive collection watch, datasource batch loader, zero-value save guard, primitive→VO at notifier boundary, `routeSettings` on modal helper | [debounce-gate-batch.md](references/common-patterns/debounce-gate-batch.md) |
-
-## Core Stack
-
-Version SSOT: [core-stack.md](references/core-stack.md). Stack: Riverpod codegen, Freezed, GoRouter builder, json_serializable/build_runner, Hive CE.
-
-## Setup
-
-Read [setup.md](references/setup.md) for lint wiring, extension template setup, plugin install paths, and analyzer sanity checks.
-
-### Per-Tool Hooks
-
-Use [setup.md](references/setup.md#git-pre-push) for pre-push guidance. Raw skill installs cannot register runtime hooks or scanners.
 
 ## Pre-Flight
 

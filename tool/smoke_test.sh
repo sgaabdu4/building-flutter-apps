@@ -107,7 +107,7 @@ copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 eval_cases = json.loads((root / "evals/evals.json").read_text())["evals"]
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.10.2"
+expected_version = "5.10.3"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -340,8 +340,7 @@ assert "files: []" in inno_bundle_pubspec
 assert "dlls:" not in inno_bundle_pubspec
 openai_yaml = (skill / "agents/openai.yaml").read_text()
 assert 'display_name: "Building Flutter Apps"' in openai_yaml
-assert 'default_prompt: "Use building-flutter-apps ' in openai_yaml
-assert "$building-flutter-apps" not in openai_yaml
+assert 'default_prompt: "Use $building-flutter-apps ' in openai_yaml
 assert "allow_implicit_invocation: true" in openai_yaml
 assert settlement_sentinel.count("-Phase 'sentinel-uninstall-process'") == 1
 assert "Wait-UninstallSettlement" in settlement_sentinel

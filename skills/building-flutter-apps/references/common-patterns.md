@@ -47,7 +47,7 @@ Signals: pagination, search debounce, form validation, GoRouter redirect, typed 
 
 ## Route-Param Safety + Wizard Sequencing
 
-Read [Navigation Flow](common-patterns/navigation-flow.md#route-param-safety-wizard-sequencing).
+Read [Navigation Flow](common-patterns/navigation-flow.md#route-param-safety--wizard-sequencing).
 
 ## Pagination
 
@@ -83,7 +83,7 @@ Read [Routing and App Shell](common-patterns/routing-app-shell.md#long-running-s
 
 ## App Shell + Bootstrap Boundary
 
-Read [Routing and App Shell](common-patterns/routing-app-shell.md#app-shell-bootstrap-boundary).
+Read [Routing and App Shell](common-patterns/routing-app-shell.md#app-shell--bootstrap-boundary).
 
 ## Delta Sync (Incremental Remote Pull)
 
@@ -95,7 +95,7 @@ Read [Modals and Navigation](common-patterns/modals-navigation.md#modal-snapshot
 
 ## Dismiss Modal → Push Route (Bottom Sheet Navigation)
 
-Read [Modals and Navigation](common-patterns/modals-navigation.md#dismiss-modal-push-route-bottom-sheet-navigation).
+Read [Modals and Navigation](common-patterns/modals-navigation.md#dismiss-modal--push-route-bottom-sheet-navigation).
 
 ## Pop Fallback Helpers Check Navigator Stacks
 
@@ -107,4 +107,4 @@ Read [Debounce, Gate, and Batch](common-patterns/debounce-gate-batch.md#debounce
 
 ## Remote Functions + destructive reconciliation
 
-Read [Debounce, Gate, and Batch](common-patterns/debounce-gate-batch.md#remote-functions-destructive-reconciliation).
+Read [Debounce, Gate, and Batch](common-patterns/debounce-gate-batch.md#remote-functions--destructive-reconciliation).
