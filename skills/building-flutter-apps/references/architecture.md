@@ -166,6 +166,7 @@ Domain derivations:
 - 1 entity, 1 derivation → entity getter
 - Same primitive in 2+ entities → Value Object in `/domain/values/` (see [value-objects.md](value-objects.md))
 - Never `core/extensions/` from domain — outer dep, Dependency Rule
+- Required text and unit/currency numbers are VOs (`ProductId`, `DisplayName`, `Money`); models keep primitives and `toEntity()` converts
 
 ```dart
 // features/products/domain/entities/product.dart
@@ -174,14 +175,14 @@ sealed class Product with _$Product {
   const Product._();
 
   const factory Product({
-    required String id,
-    required String name,
-    required double price,
+    required ProductId id,
+    required DisplayName name,
+    required Money price,
     @Default(0) int quantity,
     @Default(true) bool isActive,
   }) = _Product;
 
-  double get totalValue => price * quantity;
+  Money get totalValue => Money(cents: price.cents * quantity, currency: price.currency);
   bool get inStock => quantity > 0;
 }
 ```
@@ -215,9 +216,9 @@ sealed class ProductModel with _$ProductModel {
 
   /// Map to domain entity
   Product toEntity() => Product(
-        id: id,
-        name: name,
-        price: price,
+        id: ProductId(id),
+        name: DisplayName(name),
+        price: Money.usd(price),
         quantity: quantity,
         isActive: isActive,
       );

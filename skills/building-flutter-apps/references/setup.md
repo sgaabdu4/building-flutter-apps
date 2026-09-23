@@ -12,7 +12,7 @@ Signals: new Flutter app, `analysis_options.yaml`, `pubspec.yaml`, `dart analyze
 
 ## Lint wiring
 
-Copy [analysis_options.yaml](analysis_options.yaml) to the project root. It wires `flutter_skill_lints: ^0.11.2` and `riverpod_lint: ^3.1.9` under top-level `plugins:`, keeps strict inference enabled, and enforces `no_dynamic_casts` plus `no_raw_types`.
+Copy [analysis_options.yaml](analysis_options.yaml) to the project root. It wires `flutter_skill_lints: ^0.12.0` and `riverpod_lint: ^3.1.9` under top-level `plugins:`, keeps strict inference enabled, and enforces `no_dynamic_casts` plus `no_raw_types`.
 
 Pure-Dart CLI packages use their native Dart analysis profile; do not add either Flutter/Riverpod plugin.
 

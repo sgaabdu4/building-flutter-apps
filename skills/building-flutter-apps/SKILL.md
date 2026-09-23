@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.10.3"
+  version: "5.11.0"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, windows, inno, installer, fire-and-forget, singletons, e2e testing
 ---
 
@@ -29,14 +29,14 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 | R2 | Every provider uses `@riverpod` / `@Riverpod` codegen; no manual provider classes or legacy provider families. | [riverpod-codegen.md](references/riverpod-codegen.md) |
 | R3 | Guard async gaps with `ref.mounted` / `context.mounted`; `finally` uses `if (ref.mounted) { ... }`. | [async-mutations.md](references/state-management/async-mutations.md) |
 | R4 | Widgets are public classes; no `_buildXxx()`, widget top-level helpers, or private widget classes except `State`. | [atomic-design.md](references/atomic-design.md), [performance.md](references/performance.md) |
-| R5 | Nullability is semantic; no empty/null/bool sentinel fallbacks, `value!`, nullable collections, or raw required domain strings. | [value-objects.md](references/value-objects.md), [freezed-sealed.md](references/freezed-sealed.md) |
+| R5 | Nullability is semantic; no empty/null/bool sentinel fallbacks, `value!`, nullable collections, or raw required domain strings. | [value-objects.md](references/value-objects.md), [freezed-sealed.md](references/freezed-sealed.md); Lints: `domain_raw_required_string` |
 | R6 | All user-facing strings, tooltips, semantics, and visible accessibility copy use `AppLocalizations`. | [localization.md](references/localization.md), [accessibility.md](references/atomic-design/accessibility.md) |
 | R7 | Immutable state/entities use sealed Freezed, one declaration per file, native `switch`, and VO map/when disabled. | [freezed-sealed.md](references/freezed-sealed.md), [value-objects.md](references/value-objects.md) |
 | R8 | `presentation/widgets/` renders immutable inputs + emits typed callbacks; screens/routes/notifiers own navigation, workflow, domain state, and infrastructure. | [presentation-widgets.md](references/presentation-widgets.md) |
 | R9 | Duplicate behavior in 2+ classes becomes a small stateless `*Mixin` with an `on` clause. | [mixins.md](references/mixins.md) |
 | R10 | Storage SDK calls live in local datasources behind repositories; production Hive imports use `hive_ce_flutter`. | [hive-persistence.md](references/hive-persistence.md), [architecture.md](references/architecture.md) |
 | R11 | Primitive/context/collection operations live in `core/extensions/`; domain never imports those extensions. | [context-ui.md](references/extensions/context-ui.md), [primitive-formatting.md](references/extensions/primitive-formatting.md), [collections-helpers.md](references/extensions/collections-helpers.md) |
-| R12 | Domain primitives with meaning become validated Freezed Value Objects; Hive models keep primitives and mappers bridge. | [value-objects.md](references/value-objects.md), [hive-persistence.md](references/hive-persistence.md) |
+| R12 | Domain primitives with meaning become validated Freezed Value Objects; Hive models keep primitives and mappers bridge. | [value-objects.md](references/value-objects.md), [hive-persistence.md](references/hive-persistence.md); Lints: `domain_unit_primitive` |
 | R13 | Typed GoRouter routes are navigation SSOT; redirects are pure resolver logic with nullable by-id fallback UI. | [deep-linking.md](references/deep-linking.md), [routing-app-shell.md](references/common-patterns/routing-app-shell.md) |
 | R14 | Dialogs/sheets render immutable snapshots, pop results, and leave mutations/teardown to notifiers. | [modals-navigation.md](references/common-patterns/modals-navigation.md), [state-management-lifecycle.md](references/state-management-lifecycle.md) |
 | R15 | Debounce, gate, and batch high-frequency UI, sync, persistence, remote-function, reset, and lookup boundaries. | [debounce-gate-batch.md](references/common-patterns/debounce-gate-batch.md) |

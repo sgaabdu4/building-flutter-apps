@@ -218,7 +218,7 @@ Provider returns iface — tests override w/ fake.
 @freezed
 sealed class Order with _$Order {
   const factory Order({
-    required String id,
+    required OrderId id,
     required List<OrderItem> items,
     required OrderStatus status,
   }) = _Order;
@@ -242,12 +242,12 @@ sealed class OrderModel with _$OrderModel {
   }) = _OrderModel;
 
   factory OrderModel.fromDomain(Order o) => OrderModel(
-        id: o.id,
+        id: o.id.value,
         items: o.items.map(OrderItemModel.fromDomain).toList(),
         status: o.status,
       );
 
-  Order toDomain() => Order(id: id, items: items.map((m) => m.toDomain()).toList(), status: status);
+  Order toDomain() => Order(id: OrderId(id), items: items.map((m) => m.toDomain()).toList(), status: status);
 }
 ```
 
@@ -393,15 +393,15 @@ sealed class WorkoutSetModel with _$WorkoutSetModel {
 // /domain/entities/workout_set.dart
 @freezed
 sealed class WorkoutSet with _$WorkoutSet {
-  const factory WorkoutSet({required String id, required Distance distance, required Duration duration}) = _WorkoutSet;
+  const factory WorkoutSet({required WorkoutSetId id, required Distance distance, required Duration duration}) = _WorkoutSet;
 }
 
 // /data/mappers/workout_set_mapper.dart
 extension WorkoutSetMapper on WorkoutSetModel {
-  WorkoutSet toEntity() => WorkoutSet(id: id, distance: Distance.fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
+  WorkoutSet toEntity() => WorkoutSet(id: WorkoutSetId(id), distance: Distance.fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
 }
 extension WorkoutSetToModel on WorkoutSet {
-  WorkoutSetModel toModel() => WorkoutSetModel(id: id, distanceMeters: distance.inMeters, durationSeconds: duration.inSeconds);
+  WorkoutSetModel toModel() => WorkoutSetModel(id: id.value, distanceMeters: distance.inMeters, durationSeconds: duration.inSeconds);
 }
 ```
 
