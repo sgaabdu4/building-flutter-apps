@@ -42,10 +42,10 @@ Flutter/Riverpod packages use both plugins in the root
 ```yaml
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.11.2
+  flutter_skill_lints: ^0.12.0
 ```
 
-`flutter_skill_lints ^0.11.2` is built against analyzer `^14.4.0`,
+`flutter_skill_lints ^0.12.0` is built against analyzer `^14.4.0`,
 `analyzer_plugin ^0.14.17`, and `analysis_server_plugin ^0.3.23`.
 `riverpod_lint ^3.1.9` shares the analyzer-plugin configuration above.
 

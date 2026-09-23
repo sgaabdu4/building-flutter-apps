@@ -374,7 +374,7 @@ sealed class Order with _$Order {
   const Order._();
 
   const factory Order({
-    required String id,
+    required OrderId id,
     required List<OrderItem> items,
     required DateTime createdAt,
   }) = _Order;

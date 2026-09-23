@@ -162,8 +162,12 @@ sealed class DisplayName with _$DisplayName {
 }
 ```
 
+IDs use the same shape (`UserId`, `OrderId`): validated factory + `value` getter.
+
 No `@Default('') String name` in domain entities. Required text uses a VO;
 optional text uses `String?`.
+
+Lints: `domain_raw_required_string` (required `String` on a domain entity constructor), `domain_unit_primitive` (unit/currency-named numbers such as `sizeBytes`, `weightKg`, `price`).
 
 ## Decision matrix
 
@@ -260,15 +264,15 @@ sealed class User with _$User {
 @freezed
 sealed class User with _$User {
   const User._();
-  const factory User({required String id, required Email email}) = _User;
-  User copyWith({String? id, Email? email}) => User(id: id ?? this.id, email: email ?? this.email);
+  const factory User({required UserId id, required Email email}) = _User;
+  User copyWith({UserId? id, Email? email}) => User(id: id ?? this.id, email: email ?? this.email);
 }
 
 // ✅ let Freezed generate copyWith from the redirect — change the constructor if the API is wrong
 @freezed
 sealed class User with _$User {
   const User._();
-  const factory User({required String id, required Email email}) = _User;
+  const factory User({required UserId id, required Email email}) = _User;
 }
 ```
 
@@ -276,13 +280,14 @@ sealed class User with _$User {
 
 Disk sacred. `hive_ce_generator` writes `HiveField(N)` indices to `hive_adapters.g.yaml` (committed) from Freezed ctor param order on first run. Wrapping a primitive in a VO on a `@GenerateAdapters`-registered class regenerates that yaml against the new shape — different binary layout from the one on user disks. `dart analyze` blind. Per the [hive_ce docs](https://github.com/IO-Design-Team/hive_ce_docs/blob/master/custom-objects/generate_adapters.md): *"Changing the type of a field is not supported. You should create a new one instead."*
 
-**Option A — entity stays primitive, VO via getter.** Use when entity shipped w/ user data.
+**Option A — entity stays primitive, VO via getter.** Use when entity shipped w/ user data. Its `/// HiveField(N)` markers keep the locked slots out of `domain_raw_required_string` / `domain_unit_primitive`.
 
 ```dart
 @freezed
 sealed class WorkoutSet with _$WorkoutSet {
   const WorkoutSet._();
   const factory WorkoutSet({
+    /// HiveField(0)
     required String id,
     /// HiveField(1)
     required double distanceMeters,  // locked
@@ -314,12 +319,12 @@ sealed class WorkoutSetModel with _$WorkoutSetModel {
 // /domain/entities/workout_set.dart
 @freezed
 sealed class WorkoutSet with _$WorkoutSet {
-  const factory WorkoutSet({required String id, required Distance distance, required Duration duration}) = _WorkoutSet;
+  const factory WorkoutSet({required WorkoutSetId id, required Distance distance, required Duration duration}) = _WorkoutSet;
 }
 
 // /data/mappers/workout_set_mapper.dart
 extension WorkoutSetMapper on WorkoutSetModel {
-  WorkoutSet toEntity() => WorkoutSet(id: id, distance: Distance.fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
+  WorkoutSet toEntity() => WorkoutSet(id: WorkoutSetId(id), distance: Distance.fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
 }
 ```
 
