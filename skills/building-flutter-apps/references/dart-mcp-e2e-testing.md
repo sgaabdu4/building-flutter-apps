@@ -167,10 +167,12 @@ import `dart:ui`, `package:flutter/rendering.dart`,
 package. Do not place app widgets, providers, repositories, or platform plugin
 code in `test_driver/`.
 
-Prove the boundary before running the device flow:
+Prove the boundary before running the device flow. Run analysis from the
+package root: a folder argument skips analyzer plugins, including
+`avoid_flutter_host_driver_imports`.
 
 ```text
-dart analyze test_driver
+dart analyze --fatal-infos
 dart compile exe test_driver/<scenario>_test.dart
 flutter drive --driver=test_driver/<scenario>_test.dart \
   --target=integration_test/<scenario>_test.dart
