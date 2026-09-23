@@ -437,9 +437,9 @@ if [[ -d "$FLUTTER_ROOT/lib" ]]; then
   [[ $COUNT -gt 0 ]] && add_violation "$COUNT inline date format pattern literal(s) found outside core/extensions/. Add a semantic DateTime extension getter or use a named pattern constant (Critical Rule 11)."
 fi
 
-# 4. dart analyze must exit 0
+# 4. dart analyze must exit 0, infos included (matches the Hard Eng gate)
 if command -v dart >/dev/null 2>&1; then
-  ANALYZE_OUT=$(dart analyze 2>&1)
+  ANALYZE_OUT=$(dart analyze --fatal-infos 2>&1)
   ANALYZE_EXIT=$?
   if [[ $ANALYZE_EXIT -ne 0 ]] || printf '%s' "$ANALYZE_OUT" | grep -qE '\b(error|warning) '; then
     # Truncate analyze output to first 30 lines for the reason

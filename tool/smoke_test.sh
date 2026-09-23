@@ -107,7 +107,7 @@ copilot = json.loads((root / "plugin.json").read_text())
 copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 eval_cases = json.loads((root / "evals/evals.json").read_text())["evals"]
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.11.0"
+expected_version = "5.11.1"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()
@@ -723,8 +723,9 @@ echo "── 5. Stop hook (preflight_audit.sh) ──"
 TEST_BIN="$TEST_DIR/test-bin"
 EMPTY_HOME="$TEST_DIR/empty-home"
 mkdir -p "$TEST_BIN" "$EMPTY_HOME"
-cat > "$TEST_BIN/dart" <<'EOF'
+cat > "$TEST_BIN/dart" <<EOF
 #!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$TEST_DIR/dart-calls.txt"
 exit 0
 EOF
 chmod +x "$TEST_BIN/dart"
@@ -734,6 +735,11 @@ if [[ -s /tmp/smoke_pf.json ]]; then
   report pass "dirty Flutter project → block"
 else
   report fail "dirty Flutter project (expected block)"
+fi
+if grep -qx 'analyze --fatal-infos' "$TEST_DIR/dart-calls.txt" 2>/dev/null; then
+  report pass "preflight analyze fails on infos"
+else
+  report fail "preflight analyze must use --fatal-infos"
 fi
 if grep -q 'Dart Decimate gate unavailable' /tmp/smoke_pf.json; then
   report fail "standalone preflight required a global Dart Decimate gate"
