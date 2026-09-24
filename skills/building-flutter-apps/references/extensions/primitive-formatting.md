@@ -15,9 +15,10 @@ Signals: `DateTime`, `String`, `int`, `double`, `num`, `Duration`, `NumberFormat
 Use semantic helpers, not ad-hoc formatting at call sites:
 
 ```dart
+// core/extensions/date_time_extensions.dart
 extension DateTimeX on DateTime {
-  static DateTime nowUtc() => DateTime.now().toUtc();
-  static DateTime nowLocal() => DateTime.now();
+  static DateTime nowUtc() => DateTime.timestamp();
+  static DateTime nowLocal() => DateTime.timestamp().toLocal();
 
   DateTime get localDayStart {
     final local = toLocal();

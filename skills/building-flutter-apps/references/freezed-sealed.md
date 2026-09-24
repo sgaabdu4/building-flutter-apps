@@ -287,16 +287,15 @@ sealed class Paginated<T> with _$Paginated<T> {
 
 ## Non-Constant Default Values
 
-Use private constructor:
+Use private constructor. Take the clock from `DateTimeX.nowUtc()` ([primitive-formatting.md](extensions/primitive-formatting.md#datetime)), never raw `DateTime.now()`:
 
 ```dart
 @freezed
 sealed class Event with _$Event {
-  Event._({DateTime? createdAt}) : createdAt = createdAt ?? DateTime.now();
+  Event._({DateTime? createdAt}) : createdAt = createdAt ?? DateTimeX.nowUtc();
 
   factory Event({required String title, DateTime? createdAt}) = _Event;
 
-  @override
   final DateTime createdAt;
 }
 ```
