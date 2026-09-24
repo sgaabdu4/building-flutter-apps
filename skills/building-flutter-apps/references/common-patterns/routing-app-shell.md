@@ -226,7 +226,7 @@ directly at the event boundary.
 ### Dialogs and Sheets
 
 Dialogs and sheets are local presentation, not page routes. Use semantic helper
-methods such as `context.showScrollableBottomSheet<T>(...)` or
+methods such as `context.showAppSheet<T>(...)` or
 `showConfirmDialog(...)`. Dismiss from inside the modal widget with
 `Navigator.pop(context, result)` / `Navigator.of(context).maybePop()`.
 

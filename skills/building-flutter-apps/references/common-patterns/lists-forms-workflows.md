@@ -115,7 +115,7 @@ sealed class SearchState with _$SearchState {
 // See references/extensions/collections-helpers.md for the Debouncer class.
 @Riverpod(keepAlive: true)
 class SearchNotifier extends _$SearchNotifier {
-  final _debouncer = Debouncer();
+  final _debouncer = Debouncer(const Duration(milliseconds: 150));
 
   @override
   SearchState build() {

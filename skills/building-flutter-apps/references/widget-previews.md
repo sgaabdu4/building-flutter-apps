@@ -107,13 +107,10 @@ class FakeProductRepository implements IProductRepository {
   Future<List<Product>> fetchAll() async => products;
 
   @override
-  Future<Product?> fetchById(String id) async {
-    for (final product in products) {
-      if (product.id == id) {
-        return product;
-      }
-    }
-    return null;
+  Future<Product> fetchById(String id) async {
+    final product = products.lookupByKey(id, (product) => product.id);
+    if (product == null) throw StateError('Unknown preview product $id');
+    return product;
   }
 }
 ```

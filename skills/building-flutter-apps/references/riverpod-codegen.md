@@ -110,7 +110,7 @@ For one-time fetches and computed values with any auto-dispose dep ([lifecycle m
 ```dart
 // Async fetch — disposes when unused
 @riverpod
-Future<ProductDetail> productDetail(Ref ref, String id) async {
+Future<Product> productDetail(Ref ref, String id) async {
   final repo = ref.read(productRepositoryProvider);
   return repo.fetchById(id);
 }

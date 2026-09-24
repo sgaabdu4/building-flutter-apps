@@ -2,7 +2,7 @@
 
 ## Read first
 
-1. BuildContext operations live in `core/extensions/build_context_extensions.dart` or `context_extensions.dart`.
+1. BuildContext operations live in `core/extensions/context_extensions.dart`, exported from `core/extensions/extensions.dart`.
 2. Route-current checks use `context.isCurrentModalRoute`; never inline `ModalRoute` current-route APIs at call sites.
 3. Snackbars/dialog helpers are UI boundary utilities; notifiers emit state, widgets listen and dispatch UI effects.
 
@@ -15,6 +15,7 @@ Signals: `BuildContext`, `ModalRoute`, `SnackBarUtils`, dialog helpers, route-cu
 Expose semantic helpers from `core/extensions/extensions.dart`:
 
 ```dart
+// core/extensions/context_extensions.dart
 extension BuildContextX on BuildContext {
   AppLocalizations get l10n => AppLocalizations.of(this);
   TextTheme get textTheme => Theme.of(this).textTheme;
@@ -36,7 +37,7 @@ Lint: `use_context_is_current_modal_route`.
 Put repeated modal launch details in semantic `BuildContext` extension members, never top-level functions in widget files. Always pass `routeSettings` so observers/analytics can see modals.
 
 ```dart
-// core/extensions/build_context_extensions.dart
+// core/extensions/context_extensions.dart
 extension ModalContextX on BuildContext {
   Future<T?> showAppSheet<T>({
     required String routeName,
@@ -59,7 +60,7 @@ Notifier owns durable status fields; widget listens and calls UI helpers.
 
 ```dart
 ref.listen(
-  profileNotifierProvider.select((state) => state.errorSerial),
+  profileProvider.select((state) => state.errorSerial),
   (previous, next) {
     if (previous != next && context.mounted) {
       showProfileSaveFailedSnackBar(context, context.l10n);
