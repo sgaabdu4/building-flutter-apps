@@ -178,9 +178,10 @@ state = state.copyWith(error: null); // clear error
 
 ## Deep Copy
 
-When Freezed classes nest other Freezed classes, use deep copy:
+When Freezed classes nest other Freezed classes, use deep copy. One Freezed class per file:
 
 ```dart
+// features/org/domain/entities/company.dart
 @freezed
 sealed class Company with _$Company {
   const factory Company({
@@ -188,7 +189,10 @@ sealed class Company with _$Company {
     required Director director,
   }) = _Company;
 }
+```
 
+```dart
+// features/org/domain/entities/director.dart
 @freezed
 sealed class Director with _$Director {
   const factory Director({
@@ -196,12 +200,22 @@ sealed class Director with _$Director {
     Assistant? assistant,
   }) = _Director;
 }
+```
 
+```dart
+// features/org/domain/entities/assistant.dart
+@freezed
+sealed class Assistant with _$Assistant {
+  const factory Assistant({String? name}) = _Assistant;
+}
+```
+
+```dart
 // Deep copy syntax
-Company newCompany = company.copyWith.director.assistant(name: 'John Smith');
+final Company renamed = company.copyWith.director(name: 'Jane Doe');
 
-// Null-safe deep copy
-Company? newCompany = company.copyWith.director.assistant?.call(name: 'John');
+// Null-safe deep copy (nullable nested field)
+final Company? withAssistant = company.copyWith.director.assistant?.call(name: 'John');
 ```
 
 ## JSON Serialization
