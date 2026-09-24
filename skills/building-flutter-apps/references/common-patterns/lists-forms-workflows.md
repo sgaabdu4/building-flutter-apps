@@ -81,7 +81,7 @@ class PaginatedProductListScreen extends ConsumerWidget {
     return NotificationListener<ScrollNotification>(
       onNotification: (scroll) {
         if (scroll.metrics.pixels >= scroll.metrics.maxScrollExtent - 200) {
-          ref.read(paginatedProductProvider.notifier).loadMore();
+          unawaited(ref.read(paginatedProductProvider.notifier).loadMore());
         }
         return false;
       },

@@ -149,7 +149,7 @@ sealed class ProductState with _$ProductState {
 
 // UI pattern-matches for user-friendly display
 if (state.error case NetworkError(:final message))
-  ErrorBanner(message: message, onRetry: () => ref.read(productProvider.notifier).refresh())
+  ErrorBanner(message: message, onRetry: () => unawaited(ref.read(productProvider.notifier).refresh()))
 else if (state.error case NotFoundError(:final resource))
   Text(l10n.resourceNotFound(resource))
 ```
