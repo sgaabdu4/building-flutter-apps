@@ -110,9 +110,10 @@ Use `ColorScheme` from Material 3 via `context.colors`:
 
 ```dart
 final colors = context.colors;
+final l10n = context.l10n;
 Container(
   color: colors.primaryContainer,
-  child: Text('Title', style: TextStyle(color: colors.onPrimaryContainer)),
+  child: Text(l10n.productsTitle, style: TextStyle(color: colors.onPrimaryContainer)),
 )
 ```
 
@@ -496,7 +497,7 @@ Every widget MUST read from theme. NEVER raw constants:
 // WRONG
 Text('Title', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
 // RIGHT
-Text('Title', style: context.textTheme.titleMedium)
+Text(l10n.productsTitle, style: context.textTheme.titleMedium)
 
 // WRONG
 Container(color: Color(0xFF1565C0))

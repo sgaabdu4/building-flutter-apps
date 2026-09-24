@@ -151,7 +151,7 @@ sealed class ProductState with _$ProductState {
 if (state.error case NetworkError(:final message))
   ErrorBanner(message: message, onRetry: () => ref.read(productProvider.notifier).refresh())
 else if (state.error case NotFoundError(:final resource))
-  Text('$resource not found')
+  Text(l10n.resourceNotFound(resource))
 ```
 
 ## Cross-Provider Communication

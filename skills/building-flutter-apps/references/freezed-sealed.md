@@ -140,9 +140,10 @@ Riverpod `AsyncValue` also sealed:
 
 ```dart
 final asyncData = ref.watch(myAsyncProvider);
+final l10n = context.l10n;
 return switch (asyncData) {
   AsyncData(:final value) => Text(value.toString()),
-  AsyncError(:final error) => Text('Error: $error'),
+  AsyncError() => Text(l10n.loadFailed),
   AsyncLoading() => const ShimmerPlaceholder(), // Prefer skeleton/shimmer over bare CircularProgressIndicator
 };
 ```

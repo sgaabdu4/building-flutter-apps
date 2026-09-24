@@ -69,8 +69,10 @@ class ConfirmScreenBoundary extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      AppTextButton(onPressed: () => _onPressed(context, ref), label: 'Confirm');
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    return AppTextButton(onPressed: () => _onPressed(context, ref), label: l10n.confirmAction);
+  }
 }
 
 class ConfirmDialog extends StatelessWidget {
@@ -78,10 +80,13 @@ class ConfirmDialog extends StatelessWidget {
   final ConfirmSummary summary;
 
   @override
-  Widget build(BuildContext context) => AppPrimaryButton(
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return AppPrimaryButton(
       onPressed: () => Navigator.of(context).pop(true),
-      label: summary.confirmed ? 'Confirm' : 'Exit',
+      label: summary.confirmed ? l10n.confirmAction : l10n.exitAction,
     );
+  }
 }
 ```
 
@@ -91,6 +96,7 @@ class ConfirmDialog extends StatelessWidget {
 testWidgets('confirm dialog renders from summary', (tester) async {
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: ConfirmDialog(
         summary: const ConfirmSummary(entity: e, confirmed: true),
       ),
@@ -125,8 +131,10 @@ class CreateSheet extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      AppPrimaryButton(onPressed: () => _onCreateTapped(context), label: 'Exercise');
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return AppPrimaryButton(onPressed: () => _onCreateTapped(context), label: l10n.createExercise);
+  }
 }
 
 // Caller that opened the sheet:
@@ -143,8 +151,10 @@ class CreateButton extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      AppTextButton(onPressed: () => _openCreateSheet(context), label: 'Create');
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return AppTextButton(onPressed: () => _openCreateSheet(context), label: l10n.createAction);
+  }
 }
 ```
 

@@ -435,8 +435,9 @@ NEVER hardcode spacing, colors, radii, icon sizes. See [atomic-design.md](atomic
 
 ```dart
 // Usage
+final l10n = context.l10n;
 Padding(padding: const EdgeInsets.all(Spacing.s16))
-Text('Title', style: Theme.of(context).textTheme.titleMedium)
+Text(l10n.productsTitle, style: Theme.of(context).textTheme.titleMedium)
 Container(color: Theme.of(context).colorScheme.primary)
 ```
 

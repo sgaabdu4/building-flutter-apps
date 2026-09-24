@@ -50,7 +50,7 @@ CustomScrollView(
       expandedHeight: 200,
       pinned: true,
       flexibleSpace: FlexibleSpaceBar(
-        title: Text('Products'),
+        title: Text(l10n.productsTitle),
         background: Image.network(url, fit: BoxFit.cover),
       ),
     ),
