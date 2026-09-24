@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Ruby checks read UTF-8 Markdown and fail under a US-ASCII locale.
+  LANG: C.UTF-8
+  LC_ALL: C.UTF-8
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    name: Repository checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Provide ripgrep with PCRE2
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends ripgrep
+          fi
+          rg --version
+          rg --pcre2-version
+
+      - name: Show runtimes
+        run: |
+          python3 --version
+          ruby --version
+          pwsh --version
+
+      - name: Skill routing
+        run: python3 tool/check_skill_routing.py
+
+      - name: Windows installer assets
+        run: python3 tool/check_windows_installer_assets.py
+
+      - name: Windows installer inputs
+        run: python3 tool/check_windows_installer_inputs.py
+
+      - name: Drift checker fixtures
+        run: bash tool/check_drift_test.sh
+
+      - name: Drift check
+        run: bash tool/check_drift.sh
+
+      - name: Markdown examples
+        run: ruby tool/verify_markdown_examples.rb
+
+      - name: Plugin and hook smoke test
+        run: bash tool/smoke_test.sh
+
+  upstream-drift:
+    name: Upstream flutter/skills drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Clones github.com/flutter/skills and fails when a tracked upstream
+      # skill changes, so it can go red without any change in this repo.
+      - name: Compare with the locked upstream skill hashes
+        run: ruby tool/check_upstream_flutter_skills.rb

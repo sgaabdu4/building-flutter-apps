@@ -285,6 +285,9 @@ python3 tool/check_skill_routing.py
 ruby tool/verify_markdown_examples.rb
 ```
 
+[CI](.github/workflows/ci.yml) runs these, the Windows installer checks, the
+drift fixtures, and the upstream drift check on every pull request and push to `main`.
+
 ## Code Generation
 
 Use the canonical commands in [core-stack.md](skills/building-flutter-apps/references/core-stack.md#code-generation).
