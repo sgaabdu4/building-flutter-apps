@@ -112,7 +112,7 @@ See also: [State Teardown Belongs in the Notifier](../state-management-lifecycle
 
 ## Dismiss Modal → Push Route (Bottom Sheet Navigation)
 
-**Rule.** Pop sheet with result; caller awaits result, then pushes route.
+**Rule.** Sheet pops with a result; the screen that opened it awaits the result, then pushes the route.
 
 **NEVER:**
 ```dart
@@ -120,9 +120,14 @@ Navigator.of(context).pop();
 await const CreateExerciseRoute().push<String>(context);
 ```
 
-**DO — await pop future, then navigate:**
+**DO — sheet pops a result; the screen awaits it, then navigates:**
+
+The sheet and the button are presentation widgets: the sheet only pops its
+result, and the button emits a callback. The screen that opens the sheet owns
+the page navigation ([presentation-widgets.md](../presentation-widgets.md)).
+
 ```dart
-// Sheet widget:
+// features/create/presentation/widgets/create_sheet.dart
 class CreateSheet extends StatelessWidget {
   const CreateSheet({super.key});
 
@@ -136,24 +141,41 @@ class CreateSheet extends StatelessWidget {
     return AppPrimaryButton(onPressed: () => _onCreateTapped(context), label: l10n.createExercise);
   }
 }
+```
 
-// Caller that opened the sheet:
+```dart
+// features/create/presentation/widgets/create_button.dart
 class CreateButton extends StatelessWidget {
-  const CreateButton({super.key});
+  const CreateButton({required this.onPressed, super.key});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return AppTextButton(onPressed: onPressed, label: l10n.createAction);
+  }
+}
+```
+
+```dart
+// features/create/presentation/screens/create_screen.dart
+class CreateScreen extends ConsumerWidget {
+  const CreateScreen({super.key});
 
   Future<void> _openCreateSheet(BuildContext context) async {
     final choice = await context.showAppSheet<CreateChoice>(
       routeName: 'create-sheet',
       builder: (_) => const CreateSheet(),
     );
-    if (!context.mounted || choice != CreateChoice.exercise) return;
+    if (!context.mounted) return;
+    if (choice != .exercise) return;
     await const CreateExerciseRoute().push<String>(context);
   }
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    return AppTextButton(onPressed: () => _openCreateSheet(context), label: l10n.createAction);
+  Widget build(BuildContext context, WidgetRef ref) {
+    return CreateButton(onPressed: () => unawaited(_openCreateSheet(context)));
   }
 }
 ```
