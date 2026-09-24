@@ -45,7 +45,7 @@ dev_dependencies:
   analyzer: 14.4.0
   build_runner: 2.16.1
   flutter_lints: 6.0.0
-  freezed: 4.0.1
+  freezed: 4.0.2
   go_router_builder: 4.5.0
   hive_ce_generator: 1.11.3
   json_serializable: 6.14.1
