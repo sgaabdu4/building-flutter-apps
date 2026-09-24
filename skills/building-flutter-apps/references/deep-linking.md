@@ -64,7 +64,6 @@ class ProductRoute extends GoRouteData {
 Keep the closure thin.
 
 ```dart
-@visibleForTesting
 String? resolveAppRedirect({
   required String location,
   required AuthStatus authStatus,

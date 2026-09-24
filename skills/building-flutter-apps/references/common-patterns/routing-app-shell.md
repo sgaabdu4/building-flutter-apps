@@ -129,7 +129,6 @@ GoRouter router(Ref ref) {
 ```
 
 ```dart
-@visibleForTesting
 String? resolveAppRedirect({
   required String location,
   required SetupStatus setupStatus,
