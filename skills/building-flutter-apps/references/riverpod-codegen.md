@@ -151,13 +151,13 @@ Generated providers support generics:
 
 ```dart
 @riverpod
-T multiply<T extends num>(Ref ref, T a, T b) {
-  return a * b;
+T larger<T extends num>(Ref ref, T a, T b) {
+  return a >= b ? a : b;
 }
 
 // Usage
-int integer = ref.watch(multiplyProvider<int>(2, 3));
-double decimal = ref.watch(multiplyProvider<double>(2.5, 3.5));
+int integer = ref.watch(largerProvider<int>(2, 3));
+double decimal = ref.watch(largerProvider<double>(2.5, 3.5));
 ```
 
 ## Provider-Derived UI Data

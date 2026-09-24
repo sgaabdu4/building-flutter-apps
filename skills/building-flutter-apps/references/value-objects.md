@@ -87,7 +87,7 @@ sealed class Distance with _$Distance {
 Entity:
 ```dart
 @freezed
-class WorkoutSet with _$WorkoutSet {
+sealed class WorkoutSet with _$WorkoutSet {
   const factory WorkoutSet({required Distance distance, required Duration duration}) = _WorkoutSet;
   const WorkoutSet._();
   double? get paceSecondsPerKm => duration.inSeconds / distance.inKilometers;
@@ -124,7 +124,7 @@ Text(order.total.asDouble.asCurrency(symbol: '\$'))
 ## Email (identity)
 
 ```dart
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(copyWith: false, map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
 sealed class Email with _$Email {
   const Email._();
   const factory Email._raw(String value) = _Email;
@@ -140,10 +140,12 @@ sealed class Email with _$Email {
 
 `User({required Email email})` — invalid string impossible.
 
+`copyWith: false` is required when the validating factory is unnamed: Freezed 4 cannot clone its `input` parameter.
+
 ## Non-empty text
 
 ```dart
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(copyWith: false, map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
 sealed class DisplayName with _$DisplayName {
   const DisplayName._();
   const factory DisplayName._raw(String value) = _DisplayName;
@@ -162,7 +164,7 @@ sealed class DisplayName with _$DisplayName {
 }
 ```
 
-IDs use the same shape (`UserId`, `OrderId`): validated factory + `value` getter.
+IDs use the same shape (`UserId`, `OrderId`): validated factory + `value` getter + `copyWith: false`.
 
 No `@Default('') String name` in domain entities. Required text uses a VO;
 optional text uses `String?`.
