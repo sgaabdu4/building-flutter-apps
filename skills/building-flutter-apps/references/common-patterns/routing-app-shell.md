@@ -151,19 +151,37 @@ Test the matrix: loading, signed out, signed in, setup incomplete, setup complet
 ### Page Navigation
 
 The route class owns the path, params, query params, and generated helper.
-Call it at the event boundary:
+Call it at the event boundary. The boundary is the page/screen; presentation
+widgets emit typed callbacks and never navigate
+([presentation-widgets.md](../presentation-widgets.md)):
 
 ```dart
 // features/products/presentation/widgets/product_card.dart
 class ProductCard extends StatelessWidget {
-  const ProductCard({required this.id, super.key});
+  const ProductCard({required this.onTap, super.key});
 
-  final String id;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return ProductTile(
-      onTap: () => ProductDetailRoute(id: id).go(context),
+    return ProductTile(onTap: onTap);
+  }
+}
+```
+
+```dart
+// features/products/presentation/screens/product_list_screen.dart
+class ProductListScreen extends ConsumerWidget {
+  const ProductListScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ids = ref.watch(productIdsProvider);
+    return ListView.builder(
+      itemCount: ids.length,
+      itemBuilder: (context, index) => ProductCard(
+        onTap: () => ProductDetailRoute(id: ids[index]).go(context),
+      ),
     );
   }
 }
