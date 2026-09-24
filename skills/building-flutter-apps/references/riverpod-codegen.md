@@ -70,7 +70,7 @@ Never create an alias/manual provider to "simplify" a generated provider. Rename
 
 ### keepAlive Providers (long-lived)
 
-For repositories, datasources, services, feature notifiers:
+For repositories, datasources, services, feature notifiers, and computed values whose deps are all keepAlive:
 
 ```dart
 // Functional provider — returns a value, lives forever
@@ -94,20 +94,20 @@ class CartNotifier extends _$CartNotifier {
     );
   }
 }
-```
 
-### Auto-dispose Providers (short-lived)
-
-For computed values, one-time fetches, derived state:
-
-```dart
-// Computed value — disposes when no widget watches it
-@riverpod
+// Computed value — every dep is keepAlive, so it stays keepAlive too
+@Riverpod(keepAlive: true)
 int cartTotal(Ref ref) {
   final items = ref.watch(cartProvider.select((s) => s.items));
   return items.fold(0, (sum, item) => sum + item.price.toInt());
 }
+```
 
+### Auto-dispose Providers (short-lived)
+
+For one-time fetches and computed values with any auto-dispose dep ([lifecycle match](performance.md#keepalive-vs-auto-dispose)):
+
+```dart
 // Async fetch — disposes when unused
 @riverpod
 Future<ProductDetail> productDetail(Ref ref, String id) async {
@@ -130,7 +130,7 @@ Future<List<Product>> productsByCategory(Ref ref, String category) async {
 
 // Class-based with parameters
 @riverpod
-class ProductEditor extends _$ProductEditor {
+class ProductEditorNotifier extends _$ProductEditorNotifier {
   @override
   ProductFormState build(String productId) {
     Future.microtask(() => _loadProduct(productId));
