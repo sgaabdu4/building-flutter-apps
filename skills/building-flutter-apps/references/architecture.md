@@ -29,7 +29,7 @@ HTTP service internals are covered at boundary level in
 ## Scale Rules
 
 - Small feature: one `widgets/` dir. Promote to atomic hierarchy when widgets span 2+ features.
-- Default providers: `@riverpod`. Use `keepAlive: true` only for repos, app-wide services, nav-surviving notifiers.
+- Default providers: `@riverpod`. Use `keepAlive: true` for repos, datasources, app-wide services, and feature notifiers ([riverpod-codegen.md](riverpod-codegen.md#keepalive-providers-long-lived)).
 - Define interfaces for repos/datasources in multi-feature code.
 
 ## Rules — NEVER Violate
