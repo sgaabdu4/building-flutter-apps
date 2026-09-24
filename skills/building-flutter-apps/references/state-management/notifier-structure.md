@@ -46,9 +46,10 @@ CounterState build() {
 ```
 
 ```dart
-// RIGHT: direct seed. An explicit durable owner starts later work.
+// RIGHT: direct seed, then defer the load past build().
 @override
 CounterState build() {
+  Future.microtask(_load);
   return const CounterState(isLoading: true);
 }
 ```
@@ -68,7 +69,7 @@ class ProfileNotifier extends _$ProfileNotifier {
 }
 ```
 
-For durable app state with explicit flags, keep a Freezed state object behind a sync notifier. Start loading from an explicit app/bootstrap owner after its watch/listen path exists, or expose an idempotent `load()` that the durable owner calls. Do not rely on `Future.microtask` ordering to beat route pause or listener attachment.
+For app state with explicit flags, keep a Freezed state object behind a sync notifier: seed state in `build()` and defer the first load with `Future.microtask(_load)` (the `avoid_sync_notifier_state_read` fix). Exception: pause-sensitive startup (below) starts from its durable owner after the watch/listen path exists, through an idempotent `load()`; there, do not rely on `Future.microtask` ordering to beat route pause or listener attachment.
 
 ## Pause-sensitive startup
 
