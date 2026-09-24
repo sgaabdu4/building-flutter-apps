@@ -46,8 +46,16 @@ Lints: `text_field_on_changed_no_debounce`, `slider_on_changed_no_debounce`, `sc
 Use a cancel-and-restart `Timer` / `Future.delayed` / `Debouncer` to coalesce bursts. Keep foreground persistence debounce <=50ms. A queue or generation token only prevents stale/overlapping writes; it does **not** debounce.
 
 ```dart
-class DraftNotifier extends Notifier {
+@Riverpod(keepAlive: true)
+class DraftNotifier extends _$DraftNotifier {
   Timer? _debounce;
+
+  @override
+  DraftState build() {
+    ref.onDispose(() => _debounce?.cancel());
+    return const DraftState();
+  }
+
   void _persistDraft() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 50), _save);
