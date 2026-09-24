@@ -315,7 +315,7 @@ class HiveOrderRepository implements IOrderRepository {
 
 @Riverpod(keepAlive: true)
 Future<IOrderRepository> orderRepository(Ref ref) async {
-  final datasource = await ref.watch(orderLocalDatasourceProvider.future);
+  final datasource = await ref.read(orderLocalDatasourceProvider.future);
   return HiveOrderRepository(datasource);
 }
 ```
