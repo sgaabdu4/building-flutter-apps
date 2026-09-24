@@ -261,33 +261,38 @@ Mutations track side-effect state (idle, pending, success, error) separately fro
 // Mutations = **file scope** (top-level), not inside class. Same instance
 // shared across rebuilds + consumers. Matches Riverpod docs: one mutation =
 // one file-scope `final`, named `<verb><Noun>Mutation`.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_app/core/extensions/extensions.dart';
 
 final addTodoMutation = Mutation<void>(); // experimental API — may change without major bump
 
 class AddTodoScreen extends ConsumerWidget {
   const AddTodoScreen({super.key});
+
+  Future<void> _addTodo(WidgetRef ref) => addTodoMutation.run(ref, (tsx) async {
+        // tsx.get keeps the provider alive until mutation completes
+        await tsx.get(todoListProvider.notifier).addTodo('New Todo');
+      });
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final addTodo = ref.watch(addTodoMutation);
+    final l10n = context.l10n;
 
     return switch (addTodo) {
       MutationIdle() => ElevatedButton(
-          onPressed: () {
-            addTodoMutation.run(ref, (tsx) async {
-              // tsx.get keeps the provider alive until mutation completes
-              await tsx.get(todoListProvider.notifier).addTodo('New Todo');
-            });
-          },
-          child: const Text('Submit'),
+          onPressed: () => unawaited(_addTodo(ref)),
+          child: Text(l10n.addTodoSubmit),
         ),
       MutationPending() => const CircularProgressIndicator(),
       MutationError() => ElevatedButton(
-          onPressed: () { /* retry */ },
-          child: const Text('Retry'),
+          onPressed: () => unawaited(_addTodo(ref)),
+          child: Text(l10n.addTodoRetry),
         ),
-      MutationSuccess() => const Text('Done'),
+      MutationSuccess() => Text(l10n.addTodoDone),
     };
   }
 }
