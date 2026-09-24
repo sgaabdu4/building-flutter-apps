@@ -125,7 +125,7 @@ Does the animation repeat or need manual control?
 
 ```dart
 AnimatedContainer(
-  duration: const Duration(milliseconds: 300),
+  duration: const Duration(milliseconds: 120),
   curve: Curves.easeInOut,
   padding: EdgeInsets.all(isExpanded ? Spacing.s24 : Spacing.s8),
   decoration: BoxDecoration(
@@ -181,7 +181,7 @@ class _MyWidgetState extends State<MyWidget>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 120),
       vsync: this,
     );
   }
