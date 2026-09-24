@@ -60,7 +60,7 @@ String? optionalTextFromInput(String input) {
 import 'package:freezed_annotation/freezed_annotation.dart';
 part 'distance.freezed.dart';
 
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance._meters(double value) = _Meters;
@@ -100,7 +100,7 @@ sealed class WorkoutSet with _$WorkoutSet {
 ```dart
 enum Currency { usd, eur, gbp, sar }
 
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Money with _$Money {
   const Money._();
   const factory Money({required int cents, required Currency currency}) = _Money;
@@ -124,7 +124,7 @@ Text(order.total.asDouble.asCurrency(symbol: '\$'))
 ## Email (identity)
 
 ```dart
-@Freezed(copyWith: false, map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(copyWith: false, map: .none, when: .none)
 sealed class Email with _$Email {
   const Email._();
   const factory Email._raw(String value) = _Email;
@@ -145,7 +145,7 @@ sealed class Email with _$Email {
 ## Non-empty text
 
 ```dart
-@Freezed(copyWith: false, map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(copyWith: false, map: .none, when: .none)
 sealed class DisplayName with _$DisplayName {
   const DisplayName._();
   const factory DisplayName._raw(String value) = _DisplayName;
@@ -205,14 +205,14 @@ class Order {
 }
 
 // ❌ public raw VO constructor — caller skips invariants (vo_public_raw_constructor)
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance.meters(double value) = _Meters;
 }
 
 // ❌ passthrough factory — looks compliant, still skips validation (vo_public_raw_constructor)
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance._meters(double value) = _Meters;
@@ -220,7 +220,7 @@ sealed class Distance with _$Distance {
 }
 
 // ✅ private raw redirect + public factory with EXPLICIT guards in body
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance._meters(double value) = _Meters;
@@ -233,7 +233,7 @@ sealed class Distance with _$Distance {
 }
 
 // ✅ extracted guard helper — still validates, lint passes (body is function call, not bare arg)
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance._meters(double value) = _Meters;

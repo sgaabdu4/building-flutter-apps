@@ -255,7 +255,7 @@ sealed class ApiResponse with _$ApiResponse {
 Customize discriminator key:
 
 ```dart
-@Freezed(unionKey: 'type', unionValueCase: FreezedUnionCase.pascal)
+@Freezed(unionKey: 'type', unionValueCase: .pascal)
 sealed class ApiResponse with _$ApiResponse {
   const factory ApiResponse.success(Object? data) = ApiSuccess;
 
