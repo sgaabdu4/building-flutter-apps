@@ -33,19 +33,21 @@ Lint: `use_context_is_current_modal_route`.
 
 ## Dialog helpers
 
-Put repeated modal launch details in semantic helpers. Always pass `routeSettings` so observers/analytics can see modals.
+Put repeated modal launch details in semantic `BuildContext` extension members, never top-level functions in widget files. Always pass `routeSettings` so observers/analytics can see modals.
 
 ```dart
-Future<T?> showAppSheet<T>({
-  required BuildContext context,
-  required String routeName,
-  required WidgetBuilder builder,
-}) {
-  return showModalBottomSheet<T>(
-    context: context,
-    routeSettings: RouteSettings(name: routeName),
-    builder: builder,
-  );
+// core/extensions/build_context_extensions.dart
+extension ModalContextX on BuildContext {
+  Future<T?> showAppSheet<T>({
+    required String routeName,
+    required WidgetBuilder builder,
+  }) {
+    return showModalBottomSheet<T>(
+      context: this,
+      routeSettings: RouteSettings(name: routeName),
+      builder: builder,
+    );
+  }
 }
 ```
 

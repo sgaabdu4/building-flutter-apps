@@ -117,19 +117,38 @@ await const CreateExerciseRoute().push<String>(context);
 **DO — await pop future, then navigate:**
 ```dart
 // Sheet widget:
-Future<void> _onCreateTapped(BuildContext context) async {
-  Navigator.of(context).pop(CreateChoice.exercise);
+class CreateSheet extends StatelessWidget {
+  const CreateSheet({super.key});
+
+  void _onCreateTapped(BuildContext context) {
+    Navigator.of(context).pop(CreateChoice.exercise);
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      AppPrimaryButton(onPressed: () => _onCreateTapped(context), label: 'Exercise');
 }
 
 // Caller that opened the sheet:
-Future<void> openCreateSheet(BuildContext context) async {
-  final choice = await context.showScrollableBottomSheet<CreateChoice>(
-    builder: (_) => const CreateSheet(),
-  );
-  if (!context.mounted || choice != CreateChoice.exercise) return;
-  await const CreateExerciseRoute().push<String>(context);
+class CreateButton extends StatelessWidget {
+  const CreateButton({super.key});
+
+  Future<void> _openCreateSheet(BuildContext context) async {
+    final choice = await context.showAppSheet<CreateChoice>(
+      routeName: 'create-sheet',
+      builder: (_) => const CreateSheet(),
+    );
+    if (!context.mounted || choice != CreateChoice.exercise) return;
+    await const CreateExerciseRoute().push<String>(context);
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      AppTextButton(onPressed: () => _openCreateSheet(context), label: 'Create');
 }
 ```
+
+`context.showAppSheet` = [Dialog helpers](../extensions/context-ui.md#dialog-helpers).
 
 ## Pop Fallback Helpers Check Navigator Stacks
 
