@@ -38,7 +38,7 @@ Future<bool> save(Entity entity) async {
     Crash.error(e, s);
     state = state.copyWith(
       isSaving: false,
-      saveError: SaveError.from(e), // UI observes and shows feedback
+      saveError: .from(e), // UI observes and shows feedback
     ); // preserve, allow retry
     return false;
   }
@@ -97,7 +97,7 @@ Future<void> _load() async {
     state = state.copyWith(items: items);
   } on Exception catch (e, s) {
     if (!ref.mounted) return;
-    state = state.copyWith(error: AppError.from(e));
+    state = state.copyWith(error: .from(e));
     Crash.error(e, s, reason: 'ProductNotifier._load');
   }
 }

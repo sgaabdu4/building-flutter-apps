@@ -48,7 +48,7 @@ small, purpose-specific, and fire-and-forget (`void` / `Future<void>` only).
 
 ```dart
 abstract final class AnalyticsLog {
-  static FirebaseAnalytics get _analytics => FirebaseAnalytics.instance;
+  static FirebaseAnalytics get _analytics => .instance;
 
   static Future<void> event(String name, {Map<String, Object> params = const {}}) async {
     try {
@@ -95,7 +95,7 @@ caller never reads state/data back. Keep the shape boring:
 final class PushTokenRefresh {
   PushTokenRefresh._();
 
-  static final PushTokenRefresh instance = PushTokenRefresh._();
+  static final PushTokenRefresh instance = ._();
 
   Future<void> refresh() async {
     try {
@@ -116,7 +116,7 @@ Allowed alternate shape when a getter reads better:
 final class PushTokenRefresh {
   PushTokenRefresh._();
 
-  static final PushTokenRefresh _instance = PushTokenRefresh._();
+  static final PushTokenRefresh _instance = ._();
   static PushTokenRefresh get instance => _instance;
 
   Future<void> refresh() async { /* fire-and-forget work */ }

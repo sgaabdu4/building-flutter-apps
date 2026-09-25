@@ -187,7 +187,7 @@ test('handles pre-loaded async data', () {
   final container = ProviderContainer.test(
     overrides: [
       userProvider.overrideWithValue(
-        AsyncValue.data(const User(id: '1', name: 'Test')),
+        .data(const User(id: '1', name: 'Test')),
       ),
     ],
   );
@@ -361,7 +361,7 @@ test('refetches source of truth after remote update event', () async {
   await Future<void>.microtask(() {});
 
   repo.items = [const Product(id: 'p1', name: 'New')];
-  events.emit(const ProductEvent.updated(id: 'p1'));
+  events.emit(const .updated(id: 'p1'));
   await Future<void>.microtask(() {});
 
   expect(container.read(productProvider).items.single.name, 'New');
