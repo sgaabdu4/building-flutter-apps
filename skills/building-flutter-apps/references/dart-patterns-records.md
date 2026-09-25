@@ -95,8 +95,10 @@ extension type ProductId(String value) {}
 
 void deleteProduct(ProductId id) { /* ... */ }
 
-deleteProduct(UserId('u1'));    // compile-time ERROR — wrong type
-deleteProduct(ProductId('p1')); // OK
+void onDelete(UserId userId, ProductId productId) {
+  deleteProduct(userId);    // compile-time ERROR — wrong type
+  deleteProduct(productId); // OK
+}
 ```
 
 Use for: entity IDs, units (Meters, Grams), currencies (USD, EUR).
@@ -139,8 +141,10 @@ class Repo {
 ### Guards
 
 ```dart
+const _premiumPriceThreshold = 1000;
+
 return switch (product) {
-  Product(:final price) when price > 1000 => const PremiumBadge(),
+  Product(:final price) when price > _premiumPriceThreshold => const PremiumBadge(),
   Product(:final stock) when stock == 0   => const OutOfStockBadge(),
   _                                        => const DefaultBadge(),
 };
@@ -168,8 +172,8 @@ switch (auth) {
 }
 
 // List pattern
-var [first, ...rest] = sortedProducts;
-var [_, second] = topTwo; // _ discards first
+final [first, ...rest] = sortedProducts;
+final [_, second] = topTwo; // _ discards first
 ```
 
 ## Wildcard Variables (Dart 3.7)
@@ -192,7 +196,7 @@ Timer.periodic(const Duration(seconds: 1), (_) => onTick());
 final children = [
   const HeaderWidget(),
   ?optionalBanner,        // skipped if null
-  ...?conditionalItems,   // spread skipped if null
+  ...?itemsByGroup[groupId], // spread skipped if null
   const FooterWidget(),
 ];
 

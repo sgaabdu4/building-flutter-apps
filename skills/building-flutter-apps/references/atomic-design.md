@@ -113,7 +113,10 @@ final colors = context.colors;
 final l10n = context.l10n;
 Container(
   color: colors.primaryContainer,
-  child: Text(l10n.productsTitle, style: TextStyle(color: colors.onPrimaryContainer)),
+  child: Text(
+    l10n.productsTitle,
+    style: context.textTheme.bodyMedium?.copyWith(color: colors.onPrimaryContainer),
+  ),
 )
 ```
 

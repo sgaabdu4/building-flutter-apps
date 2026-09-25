@@ -93,6 +93,7 @@ lib/
 │   │   └── app_widget_keys.dart         # AppWidgetKeys — widget/E2E keys
 │   ├── theme/
 │   │   ├── app_colors.dart
+│   │   ├── breakpoints.dart             # Window-size-class widths
 │   │   ├── spacing.dart                 # Spacing constants
 │   │   ├── radii.dart                   # BorderRadius constants
 │   │   └── icon_sizes.dart
