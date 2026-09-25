@@ -168,7 +168,7 @@ Mock `build()` only, keep notifier methods intact:
 test('increment works with custom initial state', () {
   final container = ProviderContainer.test(
     overrides: [
-      counterProvider.overrideWithBuild((ref) => 42),
+      counterProvider.overrideWithBuild((_, _) => 42),
     ],
   );
 

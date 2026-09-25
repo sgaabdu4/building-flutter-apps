@@ -44,6 +44,7 @@ scale, and provider overrides consistently.
 ```dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 
 class AppPreviewShell extends StatelessWidget {
   const AppPreviewShell({
