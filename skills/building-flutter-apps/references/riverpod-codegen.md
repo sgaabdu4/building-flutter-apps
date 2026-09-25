@@ -338,11 +338,13 @@ class TodosNotifier extends _$TodosNotifier {
   Future<List<Todo>> build() async {
     persist(
       ref.watch(storageProvider.future),
-      key: 'todos',
+      key: StorageKeys.todos,
       encode: jsonEncode,
-      decode: (json) {
-        final decoded = jsonDecode(json) as List<Object?>;
-        return decoded.map((item) => Todo.fromJson(item as Map<String, dynamic>)).toList();
+      decode: (json) => switch (jsonDecode(json)) {
+        List<Object?> items => [
+            for (final item in items) Todo.fromJson(item as Map<String, dynamic>),
+          ],
+        _ => throw const FormatException('Expected todo list payload'),
       },
     );
 

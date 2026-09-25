@@ -107,7 +107,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
 
   @override
   Future<List<ProductModel>> fetchAll() async {
-    final payload = await _http.getJson(Uri(path: '/products'));
+    final payload = await _http.getJson(Uri(path: ApiPaths.products));
 
     return switch (payload) {
       List<Object?> items => [
@@ -121,7 +121,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
   @override
   Future<ProductModel> create(ProductModel model) async {
     final payload = await _http.postJson(
-      Uri(path: '/products'),
+      Uri(path: ApiPaths.products),
       body: model.toJson(),
     );
 
@@ -158,9 +158,24 @@ class ProductRepository implements IProductRepository {
 A destructive or batch operation can complete after the client request times out. Treat the initial call as a start acknowledgement, then reconcile the source of truth.
 
 ```dart
-// WRONG — client waits for backend completion.
+// WRONG — client waits for backend completion (`appwrite_blocking_function_execution_in_client`).
 final result = await remote.deleteAccount(userId, waitForCompletion: true);
+```
 
+```dart
+// WRONG — reports the failure before reconcile (`destructive_failure_logged_before_reconcile`).
+Future<DeleteResult> deleteAccount(String userId) async {
+  try {
+    return await remote.startDeleteAccount(userId);
+  } on Exception catch (e, s) {
+    Crash.error(e, s, reason: 'deleteAccount');
+    final deleted = await remote.waitForAccountDeleted(userId, maxAttempts: 60);
+    return deleted ? .ok() : .timedOut();
+  }
+}
+```
+
+```dart
 // RIGHT — async-start + bounded reconcile.
 final started = await remote.startDeleteAccount(userId);
 if (!started.ok) return started;

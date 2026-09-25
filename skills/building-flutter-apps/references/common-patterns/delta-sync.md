@@ -95,10 +95,10 @@ manual repair/admin flows.
 
 ### Per-Table Sync Date Storage
 
+Per-table keys are `StorageKeys` entries such as `StorageKeys.syncDateExercises` ([Key Registries](../architecture.md#key-registries)), never local constants in the repository.
+
 ```dart
 // In settings repository:
-static const exerciseSyncDateKey = 'sync_date_exercises';
-
 Future<DateTime?> getTableSyncDate(String key) async {
   final ms = await _storage.read<int>(key);
   return ms != null ? .fromMillisecondsSinceEpoch(ms, isUtc: true) : null;

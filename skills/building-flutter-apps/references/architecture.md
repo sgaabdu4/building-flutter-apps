@@ -64,6 +64,11 @@ lib/
 ├── core/
 │   ├── config/
 │   │   └── app_config.dart              # Environment variables, API URLs
+│   ├── constants/
+│   │   ├── api_paths.dart               # ApiPaths — request paths
+│   │   └── storage_keys.dart            # StorageKeys — persisted/storage keys
+│   ├── data/
+│   │   └── app_error_mapper.dart        # Exception → AppError mapping
 │   ├── domain/
 │   │   └── errors/
 │   │       └── app_error.dart           # Shared error types
@@ -84,6 +89,8 @@ lib/
 │   │   ├── http_service.dart            # HTTP client wrapper
 │   │   ├── storage_service.dart         # Local persistence
 │   │   └── database_service.dart
+│   ├── testing/
+│   │   └── app_widget_keys.dart         # AppWidgetKeys — widget/E2E keys
 │   ├── theme/
 │   │   ├── app_colors.dart
 │   │   ├── spacing.dart                 # Spacing constants
@@ -149,6 +156,25 @@ lib/
 │           └── widgets/
 │               └── home_section.dart
 └── main.dart
+```
+
+### Key Registries
+
+**Rule.** Persisted/storage keys and API paths are contracts. Define each once in `lib/core/constants/`, never as inline strings or local `static const` in notifiers, repositories, or datasources. Widget/E2E keys follow the same rule in `AppWidgetKeys` ([testing.md](testing.md#widget-key-registry)).
+
+```dart
+// lib/core/constants/storage_keys.dart
+abstract final class StorageKeys {
+  static const todos = 'todos';
+  static const syncDateExercises = 'sync_date_exercises';
+}
+```
+
+```dart
+// lib/core/constants/api_paths.dart
+abstract final class ApiPaths {
+  static const products = '/products';
+}
 ```
 
 ## Layer Responsibilities
@@ -252,21 +278,25 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
 
   @override
   Future<List<ProductModel>> fetchAll() async {
-    final response = await _http.get('/products');
-    return (response as List<Object?>)
-        .map((json) => ProductModel.fromJson(json as Map<String, dynamic>))
-        .toList();
+    final response = await _http.get(ApiPaths.products);
+    return switch (response) {
+      List<Object?> items => [
+          for (final item in items)
+            ProductModel.fromJson(item as Map<String, dynamic>),
+        ],
+      _ => throw const FormatException('Expected product list payload'),
+    };
   }
 
   @override
   Future<ProductModel> fetchById(String id) async {
-    final json = await _http.get('/products/$id');
+    final json = await _http.get('${ApiPaths.products}/$id');
     return .fromJson(json as Map<String, dynamic>);
   }
 
   @override
   Future<void> create(ProductModel model) async {
-    await _http.post('/products', body: model.toJson());
+    await _http.post(ApiPaths.products, body: model.toJson());
   }
 }
 ```

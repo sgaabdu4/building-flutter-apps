@@ -238,14 +238,15 @@ Move heavy compute off main thread. UI thread render frame <16ms (60fps) or <8ms
 Use `Isolate.run` for one-shot heavy work:
 
 ```dart
-final products = await Isolate.run(() {
-  final parsed = jsonDecode(jsonString) as List<Object?>;
-  return parsed
-      .cast<Map<String, dynamic>>()
-      .map(ProductModel.fromJson)
-      .map((m) => m.toEntity())
-      .toList();
-});
+final products = await Isolate.run(
+  () => switch (jsonDecode(jsonString)) {
+    List<Object?> items => [
+        for (final item in items)
+          ProductModel.fromJson(item as Map<String, dynamic>).toEntity(),
+      ],
+    _ => throw const FormatException('Expected product list payload'),
+  },
+);
 ```
 
 | Task | Use Isolate? |

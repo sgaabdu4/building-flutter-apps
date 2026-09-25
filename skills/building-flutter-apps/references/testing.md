@@ -265,6 +265,7 @@ Rules:
 - Prefer feature-prefixed names: `profile.avatar.edit`, `checkout.payment.submit`.
 - No inline `ValueKey('...')` in widgets or tests.
 - Add keys only to real interaction/inspection targets, not every widget.
+- Storage keys and API paths use the sibling registries `StorageKeys` / `ApiPaths` in `lib/core/constants/` ([architecture.md](architecture.md#key-registries)).
 
 ## WidgetTester.container
 

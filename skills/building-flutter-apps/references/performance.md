@@ -216,7 +216,7 @@ state = state.copyWith(rawJson: hugeJsonMap);
 // RIGHT — extract only needed fields
 state = state.copyWith(
   items: parseItems(hugeJsonMap),
-  total: hugeJsonMap['total'] as int,
+  total: parseTotal(hugeJsonMap),
 );
 ```
 

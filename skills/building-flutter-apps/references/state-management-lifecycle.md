@@ -38,7 +38,7 @@ Future<bool> save(Entity entity) async {
     Crash.error(e, s);
     state = state.copyWith(
       isSaving: false,
-      saveError: .from(e), // UI observes and shows feedback
+      saveError: AppErrorMapper.from(e), // UI observes and shows feedback
     ); // preserve, allow retry
     return false;
   }
@@ -97,7 +97,7 @@ Future<void> _load() async {
     state = state.copyWith(items: items);
   } on Exception catch (e, s) {
     if (!ref.mounted) return;
-    state = state.copyWith(error: .from(e));
+    state = state.copyWith(error: AppErrorMapper.from(e));
     Crash.error(e, s, reason: 'ProductNotifier._load');
   }
 }
@@ -107,11 +107,13 @@ Future<void> _load() async {
 
 **Rule.** `AppError` = **sole** error type in notifier state. Never store
 `String? error` — pattern-match typed error in UI. Catch in notifier, wrap
-`AppError.from(e)`, then `Crash.error(e, s, reason: …)`.
+`AppErrorMapper.from(e)`, then `Crash.error(e, s, reason: …)`. `AppError`
+stays a pure `@freezed` domain type; the mapper matches `dart:io`/`dart:async`
+exceptions, so it lives in the data layer.
 
 ```dart
-// core/domain/app_error.dart — `from` ctor for notifier wrap
-sealed class AppError {
+// core/data/app_error_mapper.dart — exception mapping for notifier wrap
+abstract final class AppErrorMapper {
   static AppError from(Object e) => switch (e) {
         SocketException() || TimeoutException() => AppError.network(e.toString()),
         FormatException() => AppError.unexpected(e),
