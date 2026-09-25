@@ -126,7 +126,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
     );
 
     return switch (payload) {
-      Map<String, dynamic> json => ProductModel.fromJson(json),
+      Map<String, dynamic> json => .fromJson(json),
       _ => throw const FormatException('Expected product payload'),
     };
   }
@@ -146,7 +146,7 @@ class ProductRepository implements IProductRepository {
 
   @override
   Future<Product> create(Product draft) async {
-    final created = await _remote.create(ProductModel.fromEntity(draft));
+    final created = await _remote.create(.fromEntity(draft));
     final canonical = await _remote.fetchById(created.id);
     return canonical.toEntity();
   }
@@ -165,7 +165,7 @@ final result = await remote.deleteAccount(userId, waitForCompletion: true);
 final started = await remote.startDeleteAccount(userId);
 if (!started.ok) return started;
 final deleted = await remote.waitForAccountDeleted(userId, maxAttempts: 60);
-return deleted ? DeleteResult.ok() : DeleteResult.timedOut();
+return deleted ? .ok() : .timedOut();
 ```
 
 Log/report destructive failures only after reconcile proves the entity still exists or the source of truth still disagrees.

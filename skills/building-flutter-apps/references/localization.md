@@ -194,9 +194,9 @@ class InviteStatusLabel extends StatelessWidget {
     final l10n = context.l10n;
 
     return switch (status) {
-      InviteStatus.pending => Text(l10n.invitePending),
-      InviteStatus.accepted => Text(l10n.inviteAccepted),
-      InviteStatus.declined => Text(l10n.inviteDeclined),
+      .pending => Text(l10n.invitePending),
+      .accepted => Text(l10n.inviteAccepted),
+      .declined => Text(l10n.inviteDeclined),
     };
   }
 }

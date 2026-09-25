@@ -432,7 +432,7 @@ Future<int> scopedValue(Ref ref) => throw UnimplementedError();
 // Must override before use
 ProviderScope(
   overrides: [
-    scopedValueProvider.overrideWithValue(const AsyncValue.data(42)),
+    scopedValueProvider.overrideWithValue(const .data(42)),
   ],
   child: const MyWidget(),
 )
@@ -460,7 +460,7 @@ External SDK clients (HTTP, database, auth, storage) follow **config → client 
 /// 1. Config — reads from environment, lives forever
 @Riverpod(keepAlive: true)
 BackendConfig backendConfig(Ref ref) {
-  return BackendConfig.fromEnvironment();
+  return .fromEnvironment();
 }
 
 /// 2. Client — depends on config, configured once

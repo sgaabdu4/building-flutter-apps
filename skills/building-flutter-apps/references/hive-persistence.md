@@ -197,7 +197,7 @@ hot path. Standard `Hive` fine for typical key/value.
 
 ```dart
 final box = await IsolatedHive.openBox<OrderModel>('orders');
-await box.put(order.id, OrderModel.fromDomain(order));
+await box.put(order.id, .fromDomain(order));
 final all = await box.values; // async — crosses isolate boundary
 ```
 
@@ -300,7 +300,7 @@ class HiveOrderRepository implements IOrderRepository {
 
   @override
   Future<void> save(Order order) =>
-      _datasource.save(OrderModel.fromDomain(order));
+      _datasource.save(.fromDomain(order));
 
   @override
   Order? get(String id) => _datasource.get(id)?.toDomain();
@@ -398,7 +398,7 @@ sealed class WorkoutSet with _$WorkoutSet {
 
 // /data/mappers/workout_set_mapper.dart
 extension WorkoutSetMapper on WorkoutSetModel {
-  WorkoutSet toEntity() => WorkoutSet(id: WorkoutSetId(id), distance: Distance.fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
+  WorkoutSet toEntity() => WorkoutSet(id: WorkoutSetId(id), distance: .fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
 }
 extension WorkoutSetToModel on WorkoutSet {
   WorkoutSetModel toModel() => WorkoutSetModel(id: id.value, distanceMeters: distance.inMeters, durationSeconds: duration.inSeconds);
