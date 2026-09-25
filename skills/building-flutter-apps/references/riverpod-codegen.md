@@ -133,7 +133,7 @@ Future<List<Product>> productsByCategory(Ref ref, String category) async {
 class ProductEditorNotifier extends _$ProductEditorNotifier {
   @override
   ProductFormState build(String productId) {
-    unawaited(Future.microtask(() => _loadProduct(productId)));
+    unawaited(.microtask(() => _loadProduct(productId)));
     return const ProductFormState();
   }
 

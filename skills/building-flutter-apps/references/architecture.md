@@ -341,7 +341,7 @@ sealed class ProductState with _$ProductState {
 class ProductNotifier extends _$ProductNotifier {
   @override
   ProductState build() {
-    unawaited(Future.microtask(_load)); // Defer — see notifier-structure.md "Sync notifier init trap"
+    unawaited(.microtask(_load)); // Defer — see notifier-structure.md "Sync notifier init trap"
     return const ProductState(isLoading: true);
   }
 
