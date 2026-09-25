@@ -213,10 +213,11 @@ sealed class Assistant with _$Assistant {
 
 ```dart
 // Deep copy syntax
-final Company renamed = company.copyWith.director(name: 'Jane Doe');
+Company renameDirector(Company company) => company.copyWith.director(name: 'Jane Doe');
 
 // Null-safe deep copy (nullable nested field)
-final Company? withAssistant = company.copyWith.director.assistant?.call(name: 'John');
+Company? renameAssistant(Company company) =>
+    company.copyWith.director.assistant?.call(name: 'John');
 ```
 
 ## JSON Serialization
