@@ -34,6 +34,7 @@ TextField(onChanged: (v) {
 
 // Slider/RangeSlider — defer terminal effects
 Slider(
+  value: _local,
   onChanged: (v) => setState(() => _local = v),       // local UI only
   onChangeEnd: (v) => ref.read(p.notifier).set(v),    // one notifier call
 );

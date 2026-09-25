@@ -226,8 +226,8 @@ sealed class ProductModel with _$ProductModel {
   /// Map to API request body with only name (for example)
   Map<String, dynamic> toNameOnlyRequestBody() => {
         'id': id,
-        'name': name
-  }
+        'name': name,
+      };
 }
 ```
 

@@ -315,10 +315,20 @@ class AppShellScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return BottomNavigationBar(
       currentIndex: navigationShell.currentIndex,
       onTap: navigationShell.goBranch,
-      items: const [...],
+      items: [
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.home),
+          label: l10n.homeTab,
+        ),
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.settings),
+          label: l10n.settingsTab,
+        ),
+      ],
     );
   }
 }

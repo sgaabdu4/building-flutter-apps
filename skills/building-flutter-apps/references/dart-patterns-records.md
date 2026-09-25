@@ -123,6 +123,8 @@ Private `final` fields auto-promote after null checks (Dart 3.2) — no ! needed
 
 ```dart
 class Repo {
+  const Repo(this._token);
+
   final String? _token;
 
   bool get isAuthorized {
@@ -179,7 +181,7 @@ var [_, second] = topTwo; // _ discards first
 final (_, price, _) = (id, 9.99, sku);
 
 // Ignore callback parameters
-timer.periodic(const Duration(seconds: 1), (_) => onTick());
+Timer.periodic(const Duration(seconds: 1), (_) => onTick());
 ```
 
 ## Null-aware Collection Elements (Dart 3.8)

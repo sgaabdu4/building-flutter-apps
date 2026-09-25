@@ -191,6 +191,11 @@ class _MyWidgetState extends State<MyWidget>
     _controller.dispose();
     super.dispose();
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(opacity: _controller, child: const FlutterLogo());
+  }
 }
 ```
 

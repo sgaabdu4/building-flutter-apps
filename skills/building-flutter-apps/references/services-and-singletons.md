@@ -36,8 +36,10 @@ Default: boring code. Do not build indirection before the product needs it.
 ```dart
 // Pure helper — no I/O, no SDK ref.
 abstract final class StringCasing {
-  static String camel(String input) => /* ... */;
-  static String snake(String input) => /* ... */;
+  static String snake(String input) =>
+      input.trim().toLowerCase().replaceAll(' ', '_');
+  static String kebab(String input) =>
+      input.trim().toLowerCase().replaceAll(' ', '-');
 }
 ```
 

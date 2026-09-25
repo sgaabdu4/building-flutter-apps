@@ -30,15 +30,26 @@ Dual reporting = requested migration/coverage only; redundancy alone does not ju
 
 ```dart
 abstract final class Crash {
-  static Future<void> init({required FutureOr<void> Function() appRunner});
-  static void log(String message, {Map<String, Object?> extras = const {}});
+  static Future<void> init({
+    required FutureOr<void> Function() appRunner,
+  }) async {
+    // Provider branch below; an init failure still reaches appRunner.
+    await appRunner();
+  }
+
+  static void log(String message, {Map<String, Object?> extras = const {}}) {
+    // Provider breadcrumb.
+  }
+
   static void error(
     Object error,
     StackTrace stackTrace, {
     String? reason,
     bool fatal = false,
     Map<String, Object?> extras = const {},
-  });
+  }) {
+    // Provider capture: Crashlytics recordError or Sentry.captureException.
+  }
 }
 ```
 
