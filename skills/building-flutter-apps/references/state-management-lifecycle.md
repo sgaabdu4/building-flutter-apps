@@ -115,9 +115,9 @@ exceptions, so it lives in the data layer.
 // core/data/app_error_mapper.dart — exception mapping for notifier wrap
 abstract final class AppErrorMapper {
   static AppError from(Object e) => switch (e) {
-        SocketException() || TimeoutException() => AppError.network(e.toString()),
-        FormatException() => AppError.unexpected(e),
-        _ => AppError.unexpected(e),
+        SocketException() || TimeoutException() => .network(e.toString()),
+        FormatException() => .unexpected(e),
+        _ => .unexpected(e),
       };
 }
 ```

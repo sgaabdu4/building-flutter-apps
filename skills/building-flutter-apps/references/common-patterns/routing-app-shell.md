@@ -208,7 +208,7 @@ For pushed screens that may also be opened by deep link, pop when possible and
 otherwise go to a typed fallback route:
 
 ```dart
-class ProductEditorScreen extends StatelessWidget {
+class ProductEditorScreen extends ConsumerWidget {
   const ProductEditorScreen({super.key});
 
   void _closeEditor(BuildContext context) {
@@ -220,7 +220,7 @@ class ProductEditorScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ProductEditorForm(onClose: () => _closeEditor(context));
   }
 }

@@ -293,7 +293,7 @@ Lint: `notifier_param_requires_value_object`. See [value-objects.md](../value-ob
 
 ```dart
 // Private method on the calling screen — no top-level UI helpers.
-class OrderScreen extends StatelessWidget {
+class OrderScreen extends ConsumerWidget {
   const OrderScreen({super.key});
 
   Future<T?> _openConfirm<T>(BuildContext context) => showDialog<T>(
@@ -303,7 +303,7 @@ class OrderScreen extends StatelessWidget {
   );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return DeleteButton(onPressed: () => unawaited(_openConfirm<bool>(context)));
   }
 }
