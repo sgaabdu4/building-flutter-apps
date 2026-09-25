@@ -17,8 +17,8 @@ Use semantic helpers, not ad-hoc formatting at call sites:
 ```dart
 // core/extensions/date_time_extensions.dart
 extension DateTimeX on DateTime {
-  static DateTime nowUtc() => DateTime.timestamp();
-  static DateTime nowLocal() => DateTime.timestamp().toLocal();
+  static DateTime nowUtc() => .timestamp();
+  static DateTime nowLocal() => .timestamp().toLocal();
 
   DateTime get localDayStart {
     final local = toLocal();

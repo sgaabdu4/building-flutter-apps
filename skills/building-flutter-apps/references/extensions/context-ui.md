@@ -17,7 +17,7 @@ Expose semantic helpers from `core/extensions/extensions.dart`:
 ```dart
 // core/extensions/context_extensions.dart
 extension BuildContextX on BuildContext {
-  AppLocalizations get l10n => AppLocalizations.of(this);
+  AppLocalizations get l10n => .of(this);
   TextTheme get textTheme => Theme.of(this).textTheme;
   bool get isCurrentModalRoute => ModalRoute.of(this)?.isCurrent ?? false;
 }

@@ -134,13 +134,13 @@ String? resolveAppRedirect({
   required SetupStatus setupStatus,
 }) {
   switch (setupStatus) {
-    case SetupStatus.loading:
+    case .loading:
       return null; // Stay put — preserves URL on web refresh.
-    case SetupStatus.unauthenticated:
+    case .unauthenticated:
       return _isPublicPage(location) ? null : const LoginRoute().location;
-    case SetupStatus.needsProfileCompletion:
+    case .needsProfileCompletion:
       return location == '/profile-completion' ? null : '/profile-completion';
-    case SetupStatus.setupComplete:
+    case .setupComplete:
       return _isSetupPage(location) ? const HomeRoute().location : null;
   }
 }

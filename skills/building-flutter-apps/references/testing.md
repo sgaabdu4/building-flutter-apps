@@ -22,7 +22,7 @@ Signals: ProviderContainer.test, UncontrolledProviderScope, mocktail, widget tes
 1. **MUST** mock interfaces (`IProductRepository`), NEVER concrete (`ProductRepository`).
 2. **MUST** use `ProviderContainer.test()` — NEVER manual `createContainer`.
 3. **MUST** use `UncontrolledProviderScope` widget tests — NEVER raw `ProviderScope` w/ overrides.
-4. **MUST** prefer explicit `pump()`. `pumpAndSettle` only finite anim/async; bound it with the positional timeout (`pumpAndSettle(const Duration(milliseconds: 100), EnginePhase.sendSemanticsUpdate, const Duration(seconds: 5))`); avoid infinite/ticking.
+4. **MUST** prefer explicit `pump()`. `pumpAndSettle` only finite anim/async; bound it with the positional timeout (`pumpAndSettle(const Duration(milliseconds: 100), .sendSemanticsUpdate, const Duration(seconds: 5))`); avoid infinite/ticking.
 5. **MUST** override repo/datasource level — NEVER mock notifiers direct.
 6. **MUST** use deterministic `ValueKey` selectors from a central key registry for repeated icons, draggable sheets, close/open actions. NEVER use inline string keys, `tapAt(...)`, first-match icon finders, or case-sensitive label text.
 7. **MUST** add event-contract tests for streams/realtime/push/sync/shared remote state: exact subscriptions/listeners, every event family, notifier reaction, stale-source refresh, and removal/delete behavior.

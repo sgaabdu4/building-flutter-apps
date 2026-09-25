@@ -69,15 +69,15 @@ String? resolveAppRedirect({
   required AuthStatus authStatus,
   required SetupStatus setupStatus,
 }) {
-  if (authStatus == AuthStatus.loading) {
+  if (authStatus == .loading) {
     return null;
   }
 
-  if (authStatus == AuthStatus.signedOut) {
+  if (authStatus == .signedOut) {
     return isPublicLocation(location) ? null : const LoginRoute().location;
   }
 
-  if (setupStatus == SetupStatus.incomplete) {
+  if (setupStatus == .incomplete) {
     return location == const SetupRoute().location
         ? null
         : const SetupRoute().location;
