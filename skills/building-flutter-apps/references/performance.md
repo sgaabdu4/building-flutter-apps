@@ -250,7 +250,8 @@ ListView.builder(
 ```dart
 // Cache network images
 Image.network(
-  url,
+  product.imageUrl,
+  semanticLabel: l10n.productImageLabel(product.name),
   cacheWidth: 200,  // decode at display size, not full resolution
   cacheHeight: 200,
 )

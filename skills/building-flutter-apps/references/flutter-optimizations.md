@@ -51,7 +51,11 @@ CustomScrollView(
       pinned: true,
       flexibleSpace: FlexibleSpaceBar(
         title: Text(l10n.productsTitle),
-        background: Image.network(url, fit: BoxFit.cover),
+        background: Image.network(
+          url,
+          fit: .cover,
+          semanticLabel: l10n.productsHeaderImageLabel,
+        ),
       ),
     ),
     SliverPadding(
