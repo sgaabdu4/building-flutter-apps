@@ -104,7 +104,7 @@ enum Currency { usd, eur, gbp, sar }
 sealed class Money with _$Money {
   const Money._();
   const factory Money({required int cents, required Currency currency}) = _Money;
-  factory Money.usd(double dollars) => Money(cents: (dollars * 100).round(), currency: Currency.usd);
+  factory Money.usd(double dollars) => Money(cents: (dollars * 100).round(), currency: .usd);
 
   double get asDouble => cents / 100;
   bool get isPositive => cents > 0;
@@ -302,7 +302,7 @@ sealed class WorkoutSet with _$WorkoutSet {
     /// HiveField(2)
     required int durationSeconds,    // locked
   }) = _WorkoutSet;
-  Distance get distance => Distance.fromMeters(distanceMeters);
+  Distance get distance => .fromMeters(distanceMeters);
   Duration get duration => Duration(seconds: durationSeconds);
 }
 ```
@@ -332,7 +332,7 @@ sealed class WorkoutSet with _$WorkoutSet {
 
 // /data/mappers/workout_set_mapper.dart
 extension WorkoutSetMapper on WorkoutSetModel {
-  WorkoutSet toEntity() => WorkoutSet(id: WorkoutSetId(id), distance: Distance.fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
+  WorkoutSet toEntity() => WorkoutSet(id: WorkoutSetId(id), distance: .fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
 }
 ```
 

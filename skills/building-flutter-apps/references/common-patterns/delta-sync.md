@@ -71,7 +71,7 @@ final DateTime? watermark;
 if (lastTableSync == null) {
   final all = await remote.getAll(userId);
   if (all.isNotEmpty) await repo.mergeAll(all.map((m) => m.toEntity()).toList());
-  watermark = newestUpdatedAt(all) ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  watermark = newestUpdatedAt(all) ?? .fromMillisecondsSinceEpoch(0, isUtc: true);
 } else {
   final changed = await remote.getUpdatedSince(userId, lastTableSync);
   if (changed.isNotEmpty) await repo.mergeAll(changed.map((m) => m.toEntity()).toList());
@@ -101,7 +101,7 @@ static const exerciseSyncDateKey = 'sync_date_exercises';
 
 Future<DateTime?> getTableSyncDate(String key) async {
   final ms = await _storage.read<int>(key);
-  return ms != null ? DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true) : null;
+  return ms != null ? .fromMillisecondsSinceEpoch(ms, isUtc: true) : null;
 }
 
 Future<void> setTableSyncDate(String key, DateTime date) async {

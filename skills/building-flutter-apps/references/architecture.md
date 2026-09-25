@@ -218,7 +218,7 @@ sealed class ProductModel with _$ProductModel {
   Product toEntity() => Product(
         id: ProductId(id),
         name: DisplayName(name),
-        price: Money.usd(price),
+        price: .usd(price),
         quantity: quantity,
         isActive: isActive,
       );
@@ -261,7 +261,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
   @override
   Future<ProductModel> fetchById(String id) async {
     final json = await _http.get('/products/$id');
-    return ProductModel.fromJson(json as Map<String, dynamic>);
+    return .fromJson(json as Map<String, dynamic>);
   }
 
   @override

@@ -63,10 +63,10 @@ abstract final class Radii {
   static const double r16 = 16;
   static const double full = 999;
 
-  static const rounded8 = BorderRadius.all(Radius.circular(r8));
-  static const rounded12 = BorderRadius.all(Radius.circular(r12));
-  static const rounded16 = BorderRadius.all(Radius.circular(r16));
-  static const roundedFull = BorderRadius.all(Radius.circular(full));
+  static const rounded8 = BorderRadius.all(.circular(r8));
+  static const rounded12 = BorderRadius.all(.circular(r12));
+  static const rounded16 = BorderRadius.all(.circular(r16));
+  static const roundedFull = BorderRadius.all(.circular(full));
 }
 ```
 
@@ -91,10 +91,10 @@ Extend Material `TextTheme`:
 // core/theme/app_theme.dart
 ThemeData buildAppTheme() {
   return ThemeData(
-    colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+    colorScheme: .fromSeed(seedColor: Colors.indigo),
     textTheme: const TextTheme(
-      headlineLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      headlineLarge: TextStyle(fontSize: 32, fontWeight: .bold),
+      titleMedium: TextStyle(fontSize: 16, fontWeight: .w600),
       bodyMedium: TextStyle(fontSize: 14),
       labelSmall: TextStyle(fontSize: 11, letterSpacing: 0.5),
     ),
@@ -237,7 +237,7 @@ class StatCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(Spacing.s16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: .start,
           children: [
             Row(
               children: [
@@ -495,7 +495,7 @@ Every widget MUST read from theme. NEVER raw constants:
 
 ```dart
 // WRONG
-Text('Title', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
+Text('Title', style: TextStyle(fontSize: 16, fontWeight: .bold))
 // RIGHT
 Text(l10n.productsTitle, style: context.textTheme.titleMedium)
 
