@@ -248,7 +248,7 @@ sealed class OrderModel with _$OrderModel {
   Order toDomain() => Order(
         id: OrderId(id),
         items: items.map((m) => m.toDomain()).toList(),
-        status: OrderStatus.values.byName(status),
+        status: .values.byName(status),
       );
 }
 ```

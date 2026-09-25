@@ -164,13 +164,20 @@ final result = await remote.deleteAccount(userId, waitForCompletion: true);
 
 ```dart
 // WRONG — reports the failure before reconcile (`destructive_failure_logged_before_reconcile`).
-Future<DeleteResult> deleteAccount(String userId) async {
-  try {
-    return await remote.startDeleteAccount(userId);
-  } on Exception catch (e, s) {
-    Crash.error(e, s, reason: 'deleteAccount');
-    final deleted = await remote.waitForAccountDeleted(userId, maxAttempts: 60);
-    return deleted ? .ok() : .timedOut();
+class AccountRepository implements IAccountRepository {
+  AccountRepository(this._remote);
+
+  final IAccountRemoteDatasource _remote;
+
+  @override
+  Future<DeleteResult> deleteAccount(String userId) async {
+    try {
+      return await _remote.startDeleteAccount(userId);
+    } on Exception catch (e, s) {
+      Crash.error(e, s, reason: 'deleteAccount');
+      final deleted = await _remote.waitForAccountDeleted(userId, maxAttempts: 60);
+      return deleted ? .ok() : .timedOut();
+    }
   }
 }
 ```

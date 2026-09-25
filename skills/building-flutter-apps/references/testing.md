@@ -274,14 +274,15 @@ Access `ProviderContainer` from widget tests:
 
 ```dart
 testWidgets('can access container', (tester) async {
+  final container = ProviderContainer.test();
   await tester.pumpWidget(
     UncontrolledProviderScope(
-      container: ProviderContainer.test(),
+      container: container,
       child: const MaterialApp(home: MyWidget()),
     ),
   );
 
-  final container = tester.container();
+  expect(tester.container(), same(container));
   expect(container.read(myProvider), someValue);
 });
 ```
