@@ -149,7 +149,7 @@ return Padding(padding: const EdgeInsets.all(16), child: child);
 // RIGHT — reuses existing object. `const` requires every argument be const,
 // so the child must be a concrete const widget (here: SizedBox.shrink()).
 // You CANNOT pass a runtime `child` variable into a const constructor.
-return const Padding(padding: EdgeInsets.all(16), child: SizedBox.shrink());
+return const Padding(padding: EdgeInsets.all(Spacing.s16), child: SizedBox.shrink());
 ```
 
 ## Provider Lifecycle
@@ -216,7 +216,7 @@ state = state.copyWith(rawJson: hugeJsonMap);
 // RIGHT — extract only needed fields
 state = state.copyWith(
   items: parseItems(hugeJsonMap),
-  total: hugeJsonMap['total'] as int,
+  total: parseTotal(hugeJsonMap),
 );
 ```
 
@@ -250,7 +250,8 @@ ListView.builder(
 ```dart
 // Cache network images
 Image.network(
-  url,
+  product.imageUrl,
+  semanticLabel: l10n.productImageLabel(product.name),
   cacheWidth: 200,  // decode at display size, not full resolution
   cacheHeight: 200,
 )

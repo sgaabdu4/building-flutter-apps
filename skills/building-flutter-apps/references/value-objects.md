@@ -60,7 +60,7 @@ String? optionalTextFromInput(String input) {
 import 'package:freezed_annotation/freezed_annotation.dart';
 part 'distance.freezed.dart';
 
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance._meters(double value) = _Meters;
@@ -87,11 +87,11 @@ sealed class Distance with _$Distance {
 Entity:
 ```dart
 @freezed
-class WorkoutSet with _$WorkoutSet {
+sealed class WorkoutSet with _$WorkoutSet {
   const factory WorkoutSet({required Distance distance, required Duration duration}) = _WorkoutSet;
   const WorkoutSet._();
-  double? get paceSecondsPerKm => duration.inSeconds / distance.inKilometers;
-  double? get speedKmh => distance.inKilometers / (duration.inSeconds / 3600);
+  double get paceSecondsPerKm => duration.inSeconds / distance.inKilometers;
+  double get speedKmh => distance.inKilometers / (duration.inSeconds / 3600);
 }
 ```
 
@@ -100,11 +100,11 @@ class WorkoutSet with _$WorkoutSet {
 ```dart
 enum Currency { usd, eur, gbp, sar }
 
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Money with _$Money {
   const Money._();
   const factory Money({required int cents, required Currency currency}) = _Money;
-  factory Money.usd(double dollars) => Money(cents: (dollars * 100).round(), currency: Currency.usd);
+  factory Money.usd(double dollars) => Money(cents: (dollars * 100).round(), currency: .usd);
 
   double get asDouble => cents / 100;
   bool get isPositive => cents > 0;
@@ -124,7 +124,7 @@ Text(order.total.asDouble.asCurrency(symbol: '\$'))
 ## Email (identity)
 
 ```dart
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(copyWith: false, map: .none, when: .none)
 sealed class Email with _$Email {
   const Email._();
   const factory Email._raw(String value) = _Email;
@@ -140,10 +140,12 @@ sealed class Email with _$Email {
 
 `User({required Email email})` — invalid string impossible.
 
+`copyWith: false` is required when the validating factory is unnamed: Freezed 4 cannot clone its `input` parameter.
+
 ## Non-empty text
 
 ```dart
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(copyWith: false, map: .none, when: .none)
 sealed class DisplayName with _$DisplayName {
   const DisplayName._();
   const factory DisplayName._raw(String value) = _DisplayName;
@@ -162,7 +164,7 @@ sealed class DisplayName with _$DisplayName {
 }
 ```
 
-IDs use the same shape (`UserId`, `OrderId`): validated factory + `value` getter.
+IDs use the same shape (`UserId`, `OrderId`): validated factory + `value` getter + `copyWith: false`.
 
 No `@Default('') String name` in domain entities. Required text uses a VO;
 optional text uses `String?`.
@@ -189,28 +191,34 @@ Lints: `domain_raw_required_string` (required `String` on a domain entity constr
 import 'package:myapp/core/extensions/num_extensions.dart'; // arch_domain_import ERROR
 
 // ❌ primitive obsession
-class Order {
-  final int totalCents;
-  final String customerEmail;
-  final double weightKg;
+@freezed
+sealed class Order with _$Order {
+  const factory Order({
+    required int totalCents,
+    required String customerEmail,
+    required double weightKg,
+  }) = _Order;
 }
 
 // ✅ VO boundary
-class Order {
-  final Money total;
-  final Email customerEmail;
-  final Weight weight;
+@freezed
+sealed class Order with _$Order {
+  const factory Order({
+    required Money total,
+    required Email customerEmail,
+    required Weight weight,
+  }) = _Order;
 }
 
 // ❌ public raw VO constructor — caller skips invariants (vo_public_raw_constructor)
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance.meters(double value) = _Meters;
 }
 
 // ❌ passthrough factory — looks compliant, still skips validation (vo_public_raw_constructor)
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance._meters(double value) = _Meters;
@@ -218,7 +226,7 @@ sealed class Distance with _$Distance {
 }
 
 // ✅ private raw redirect + public factory with EXPLICIT guards in body
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance._meters(double value) = _Meters;
@@ -231,7 +239,7 @@ sealed class Distance with _$Distance {
 }
 
 // ✅ extracted guard helper — still validates, lint passes (body is function call, not bare arg)
-@Freezed(map: FreezedMapOptions.none, when: FreezedWhenOptions.none)
+@Freezed(map: .none, when: .none)
 sealed class Distance with _$Distance {
   const Distance._();
   const factory Distance._meters(double value) = _Meters;
@@ -257,8 +265,8 @@ sealed class User with _$User {
 sealed class User with _$User {
   const factory User({required Email email}) = _User;
 }
-// inside UserModel.toEntity() or UserImportService — outside /domain/:
-//   User(email: Email(json['email'] as String))
+// inside UserModel.toEntity() or UserImportService — outside /domain/ —
+// wrap the raw email string in an Email value object, then build the User.
 
 // ❌ hand-rolled copyWith in /domain/ (domain_custom_copy_with)
 @freezed
@@ -294,7 +302,7 @@ sealed class WorkoutSet with _$WorkoutSet {
     /// HiveField(2)
     required int durationSeconds,    // locked
   }) = _WorkoutSet;
-  Distance get distance => Distance.fromMeters(distanceMeters);
+  Distance get distance => .fromMeters(distanceMeters);
   Duration get duration => Duration(seconds: durationSeconds);
 }
 ```
@@ -324,7 +332,7 @@ sealed class WorkoutSet with _$WorkoutSet {
 
 // /data/mappers/workout_set_mapper.dart
 extension WorkoutSetMapper on WorkoutSetModel {
-  WorkoutSet toEntity() => WorkoutSet(id: WorkoutSetId(id), distance: Distance.fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
+  WorkoutSet toEntity() => WorkoutSet(id: WorkoutSetId(id), distance: .fromMeters(distanceMeters), duration: Duration(seconds: durationSeconds));
 }
 ```
 
@@ -336,9 +344,9 @@ Lints: `hive_field_no_vo_type` (no VO types on Model ctor params).
 
 ```dart
 group('Distance', () {
-  test('rejects negative', () => expect(() => Distance.fromMeters(-1), throwsA(isA<AssertionError>())));
-  test('m → km', () => expect(Distance.meters(1500).inKilometers, 1.5));
-  test('miles roundtrip', () => expect(Distance.miles(1).inKilometers, closeTo(1.609344, 1e-9)));
+  test('rejects negative', () => expect(() => Distance.fromMeters(-1), throwsA(isA<ArgumentError>())));
+  test('m → km', () => expect(Distance.fromMeters(1500).inKilometers, equals(1.5)));
+  test('m → miles', () => expect(Distance.fromMeters(1609.344).inMiles, closeTo(1, 1e-9)));
 });
 ```
 

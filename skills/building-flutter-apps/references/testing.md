@@ -22,7 +22,7 @@ Signals: ProviderContainer.test, UncontrolledProviderScope, mocktail, widget tes
 1. **MUST** mock interfaces (`IProductRepository`), NEVER concrete (`ProductRepository`).
 2. **MUST** use `ProviderContainer.test()` — NEVER manual `createContainer`.
 3. **MUST** use `UncontrolledProviderScope` widget tests — NEVER raw `ProviderScope` w/ overrides.
-4. **MUST** prefer explicit `pump()`. `pumpAndSettle(timeout: ...)` only finite anim/async; avoid infinite/ticking.
+4. **MUST** prefer explicit `pump()`. `pumpAndSettle` only finite anim/async; bound it with the positional timeout (`pumpAndSettle(const Duration(milliseconds: 100), .sendSemanticsUpdate, const Duration(seconds: 5))`); avoid infinite/ticking.
 5. **MUST** override repo/datasource level — NEVER mock notifiers direct.
 6. **MUST** use deterministic `ValueKey` selectors from a central key registry for repeated icons, draggable sheets, close/open actions. NEVER use inline string keys, `tapAt(...)`, first-match icon finders, or case-sensitive label text.
 7. **MUST** add event-contract tests for streams/realtime/push/sync/shared remote state: exact subscriptions/listeners, every event family, notifier reaction, stale-source refresh, and removal/delete behavior.
@@ -168,7 +168,7 @@ Mock `build()` only, keep notifier methods intact:
 test('increment works with custom initial state', () {
   final container = ProviderContainer.test(
     overrides: [
-      counterProvider.overrideWithBuild((ref) => 42),
+      counterProvider.overrideWithBuild((_, _) => 42),
     ],
   );
 
@@ -187,7 +187,7 @@ test('handles pre-loaded async data', () {
   final container = ProviderContainer.test(
     overrides: [
       userProvider.overrideWithValue(
-        AsyncValue.data(const User(id: '1', name: 'Test')),
+        .data(const User(id: '1', name: 'Test')),
       ),
     ],
   );
@@ -246,8 +246,11 @@ abstract final class AppWidgetKeys {
 Widgets:
 
 ```dart
+final l10n = context.l10n;
+
 IconButton(
   key: const ValueKey(AppWidgetKeys.productCloseButton),
+  tooltip: l10n.closeProductTooltip,
   onPressed: onClose,
   icon: const Icon(Icons.close),
 )
@@ -265,6 +268,7 @@ Rules:
 - Prefer feature-prefixed names: `profile.avatar.edit`, `checkout.payment.submit`.
 - No inline `ValueKey('...')` in widgets or tests.
 - Add keys only to real interaction/inspection targets, not every widget.
+- Storage keys and API paths use the sibling registries `StorageKeys` / `ApiPaths` in `lib/core/constants/` ([architecture.md](architecture.md#key-registries)).
 
 ## WidgetTester.container
 
@@ -272,11 +276,15 @@ Access `ProviderContainer` from widget tests:
 
 ```dart
 testWidgets('can access container', (tester) async {
+  final container = ProviderContainer.test();
   await tester.pumpWidget(
-    const ProviderScope(child: MaterialApp(home: MyWidget())),
+    UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: MyWidget()),
+    ),
   );
 
-  final container = tester.container();
+  expect(tester.container(), same(container));
   expect(container.read(myProvider), someValue);
 });
 ```
@@ -361,7 +369,7 @@ test('refetches source of truth after remote update event', () async {
   await Future<void>.microtask(() {});
 
   repo.items = [const Product(id: 'p1', name: 'New')];
-  events.emit(const ProductEvent.updated(id: 'p1'));
+  events.emit(const .updated(id: 'p1'));
   await Future<void>.microtask(() {});
 
   expect(container.read(productProvider).items.single.name, 'New');
@@ -460,7 +468,7 @@ test('auth state transitions', () async {
 
 | Issue | Fix |
 |-------|-----|
-| `pumpAndSettle` hangs | Explicit `pump()` + bounded `pump(Duration(...))`; `pumpAndSettle(timeout: ...)` finite anim only |
+| `pumpAndSettle` hangs | Explicit `pump()` + bounded `pump(Duration(...))`; `pumpAndSettle` with positional timeout (rule 4) finite anim only |
 | State not updated after async | `await provider.future` (AsyncValue) or `await Future.microtask(() {})` sealed-state |
 | Provider not found | Wrap `UncontrolledProviderScope` |
 | Mock not applied | Verify override matches provider type |

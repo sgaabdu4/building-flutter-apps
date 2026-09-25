@@ -70,7 +70,7 @@ Never create an alias/manual provider to "simplify" a generated provider. Rename
 
 ### keepAlive Providers (long-lived)
 
-For repositories, datasources, services, feature notifiers:
+For repositories, datasources, services, feature notifiers, and computed values whose deps are all keepAlive:
 
 ```dart
 // Functional provider — returns a value, lives forever
@@ -94,23 +94,23 @@ class CartNotifier extends _$CartNotifier {
     );
   }
 }
-```
 
-### Auto-dispose Providers (short-lived)
-
-For computed values, one-time fetches, derived state:
-
-```dart
-// Computed value — disposes when no widget watches it
-@riverpod
+// Computed value — every dep is keepAlive, so it stays keepAlive too
+@Riverpod(keepAlive: true)
 int cartTotal(Ref ref) {
   final items = ref.watch(cartProvider.select((s) => s.items));
   return items.fold(0, (sum, item) => sum + item.price.toInt());
 }
+```
 
+### Auto-dispose Providers (short-lived)
+
+For one-time fetches and computed values with any auto-dispose dep ([lifecycle match](performance.md#keepalive-vs-auto-dispose)):
+
+```dart
 // Async fetch — disposes when unused
 @riverpod
-Future<ProductDetail> productDetail(Ref ref, String id) async {
+Future<Product> productDetail(Ref ref, String id) async {
   final repo = ref.read(productRepositoryProvider);
   return repo.fetchById(id);
 }
@@ -130,10 +130,10 @@ Future<List<Product>> productsByCategory(Ref ref, String category) async {
 
 // Class-based with parameters
 @riverpod
-class ProductEditor extends _$ProductEditor {
+class ProductEditorNotifier extends _$ProductEditorNotifier {
   @override
   ProductFormState build(String productId) {
-    Future.microtask(() => _loadProduct(productId));
+    unawaited(.microtask(() => _loadProduct(productId)));
     return const ProductFormState();
   }
 
@@ -151,13 +151,22 @@ Generated providers support generics:
 
 ```dart
 @riverpod
-T multiply<T extends num>(Ref ref, T a, T b) {
-  return a * b;
+T larger<T extends num>(Ref ref, T a, T b) {
+  return a >= b ? a : b;
 }
 
-// Usage
-int integer = ref.watch(multiplyProvider<int>(2, 3));
-double decimal = ref.watch(multiplyProvider<double>(2.5, 3.5));
+// Usage: watch inside build.
+class LargerValues extends ConsumerWidget {
+  const LargerValues({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final int integer = ref.watch(largerProvider<int>(2, 3));
+    final double decimal = ref.watch(largerProvider<double>(2.5, 3.5));
+    return Text(l10n.largerValues(integer, decimal));
+  }
+}
 ```
 
 ## Provider-Derived UI Data
@@ -168,6 +177,12 @@ double decimal = ref.watch(multiplyProvider<double>(2.5, 3.5));
 // Wrong: provider data copied into State.
 class _HistoryCardState extends ConsumerState<HistoryCard> {
   List<Workout> _historyCache = const [];
+
+  @override
+  Widget build(BuildContext context) {
+    _historyCache = ref.watch(historyProvider);
+    return HistoryList(items: _historyCache);
+  }
 }
 ```
 
@@ -209,15 +224,20 @@ Providers that fail during init retry automatically with exponential backoff (20
 Customize globally:
 
 ```dart
-void main() {
-  runApp(
-    ProviderScope(
-      retry: (retryCount, error) {
-        if (error is ProviderException) return null; // Don't retry dependency failures
-        if (retryCount > 5) return null;             // Stop after 5 retries
-        return Duration(seconds: retryCount * 2);
-      },
-      child: const MyApp(),
+const _maxProviderRetries = 5;
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Crash.init(
+    appRunner: () => runApp(
+      ProviderScope(
+        retry: (retryCount, error) {
+          if (error is ProviderException) return null; // Don't retry dependency failures
+          if (retryCount > _maxProviderRetries) return null; // Stop after max retries
+          return Duration(seconds: retryCount * 2);
+        },
+        child: const MyApp(),
+      ),
     ),
   );
 }
@@ -261,33 +281,39 @@ Mutations track side-effect state (idle, pending, success, error) separately fro
 // Mutations = **file scope** (top-level), not inside class. Same instance
 // shared across rebuilds + consumers. Matches Riverpod docs: one mutation =
 // one file-scope `final`, named `<verb><Noun>Mutation`.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/experimental/mutation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_app/core/extensions/extensions.dart';
 
 final addTodoMutation = Mutation<void>(); // experimental API — may change without major bump
 
 class AddTodoScreen extends ConsumerWidget {
   const AddTodoScreen({super.key});
+
+  Future<void> _addTodo(WidgetRef ref) => addTodoMutation.run(ref, (tsx) async {
+        // tsx.get keeps the provider alive until mutation completes
+        await tsx.get(todoListProvider.notifier).addTodo('New Todo');
+      });
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final addTodo = ref.watch(addTodoMutation);
+    final l10n = context.l10n;
 
     return switch (addTodo) {
       MutationIdle() => ElevatedButton(
-          onPressed: () {
-            addTodoMutation.run(ref, (tsx) async {
-              // tsx.get keeps the provider alive until mutation completes
-              await tsx.get(todoListProvider.notifier).addTodo('New Todo');
-            });
-          },
-          child: const Text('Submit'),
+          onPressed: () => unawaited(_addTodo(ref)),
+          child: Text(l10n.addTodoSubmit),
         ),
       MutationPending() => const CircularProgressIndicator(),
       MutationError() => ElevatedButton(
-          onPressed: () { /* retry */ },
-          child: const Text('Retry'),
+          onPressed: () => unawaited(_addTodo(ref)),
+          child: Text(l10n.addTodoRetry),
         ),
-      MutationSuccess() => const Text('Done'),
+      MutationSuccess() => Text(l10n.addTodoDone),
     };
   }
 }
@@ -314,16 +340,29 @@ class TodosNotifier extends _$TodosNotifier {
   Future<List<Todo>> build() async {
     persist(
       ref.watch(storageProvider.future),
-      key: 'todos',
+      key: StorageKeys.todos,
       encode: jsonEncode,
-      decode: (json) {
-        final decoded = jsonDecode(json) as List<Object?>;
-        return decoded.map((item) => Todo.fromJson(item as Map<String, dynamic>)).toList();
-      },
+      decode: TodoListCodec.decode,
     );
 
     return await fetchTodos();
   }
+}
+```
+
+```dart
+// features/todos/data/models/todo_list_codec.dart — parsing stays in the data layer
+abstract final class TodoListCodec {
+  static List<Todo> decode(String json) => switch (jsonDecode(json)) {
+        final List<Object?> items => [
+            for (final item in items)
+              switch (item) {
+                final Map<String, dynamic> map => Todo.fromJson(map),
+                _ => throw const FormatException('Expected todo object'),
+              },
+          ],
+        _ => throw const FormatException('Expected todo list payload'),
+      };
 }
 ```
 
@@ -408,7 +447,7 @@ Future<int> scopedValue(Ref ref) => throw UnimplementedError();
 // Must override before use
 ProviderScope(
   overrides: [
-    scopedValueProvider.overrideWithValue(const AsyncValue.data(42)),
+    scopedValueProvider.overrideWithValue(const .data(42)),
   ],
   child: const MyWidget(),
 )
@@ -436,7 +475,7 @@ External SDK clients (HTTP, database, auth, storage) follow **config → client 
 /// 1. Config — reads from environment, lives forever
 @Riverpod(keepAlive: true)
 BackendConfig backendConfig(Ref ref) {
-  return BackendConfig.fromEnvironment();
+  return .fromEnvironment();
 }
 
 /// 2. Client — depends on config, configured once

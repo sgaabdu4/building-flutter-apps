@@ -129,19 +129,18 @@ GoRouter router(Ref ref) {
 ```
 
 ```dart
-@visibleForTesting
 String? resolveAppRedirect({
   required String location,
   required SetupStatus setupStatus,
 }) {
   switch (setupStatus) {
-    case SetupStatus.loading:
+    case .loading:
       return null; // Stay put — preserves URL on web refresh.
-    case SetupStatus.unauthenticated:
+    case .unauthenticated:
       return _isPublicPage(location) ? null : const LoginRoute().location;
-    case SetupStatus.needsProfileCompletion:
+    case .needsProfileCompletion:
       return location == '/profile-completion' ? null : '/profile-completion';
-    case SetupStatus.setupComplete:
+    case .setupComplete:
       return _isSetupPage(location) ? const HomeRoute().location : null;
   }
 }
@@ -152,19 +151,37 @@ Test the matrix: loading, signed out, signed in, setup incomplete, setup complet
 ### Page Navigation
 
 The route class owns the path, params, query params, and generated helper.
-Call it at the event boundary:
+Call it at the event boundary. The boundary is the page/screen; presentation
+widgets emit typed callbacks and never navigate
+([presentation-widgets.md](../presentation-widgets.md)):
 
 ```dart
 // features/products/presentation/widgets/product_card.dart
 class ProductCard extends StatelessWidget {
-  const ProductCard({required this.id, super.key});
+  const ProductCard({required this.onTap, super.key});
 
-  final String id;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return ProductTile(
-      onTap: () => ProductDetailRoute(id: id).go(context),
+    return ProductTile(onTap: onTap);
+  }
+}
+```
+
+```dart
+// features/products/presentation/screens/product_list_screen.dart
+class ProductListScreen extends ConsumerWidget {
+  const ProductListScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ids = ref.watch(productIdsProvider);
+    return ListView.builder(
+      itemCount: ids.length,
+      itemBuilder: (context, index) => ProductCard(
+        onTap: () => ProductDetailRoute(id: ids[index]).go(context),
+      ),
     );
   }
 }
@@ -191,17 +208,26 @@ For pushed screens that may also be opened by deep link, pop when possible and
 otherwise go to a typed fallback route:
 
 ```dart
-void closeEditor(BuildContext context) {
-  if (context.canPop()) {
-    context.pop();
-    return;
+class ProductEditorScreen extends ConsumerWidget {
+  const ProductEditorScreen({super.key});
+
+  void _closeEditor(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    const ProductListRoute().go(context);
   }
-  const ProductListRoute().go(context);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ProductEditorForm(onClose: () => _closeEditor(context));
+  }
 }
 ```
 
-Keep this helper generic if it appears in multiple places; it must take a
-`GoRouteData` fallback, never a raw string. Generic `BuildContext` fallback
+Promote this to a generic helper only if it appears in multiple places; it must
+take a `GoRouteData` fallback, never a raw string. Generic `BuildContext` fallback
 helpers are allowed when they do not create route-specific APIs. Do not put
 route-specific helpers on `BuildContext`; call the generated typed route helper
 directly at the event boundary.
@@ -209,7 +235,7 @@ directly at the event boundary.
 ### Dialogs and Sheets
 
 Dialogs and sheets are local presentation, not page routes. Use semantic helper
-methods such as `context.showScrollableBottomSheet<T>(...)` or
+methods such as `context.showAppSheet<T>(...)` or
 `showConfirmDialog(...)`. Dismiss from inside the modal widget with
 `Navigator.pop(context, result)` / `Navigator.of(context).maybePop()`.
 
@@ -260,6 +286,7 @@ ProductDetailRoute(id: product.id).go(context);
 
 // Push with return value.
 final result = await ProductCreateRoute(parentId: product.id).push<bool>(context);
+if (!context.mounted) return;
 
 // Replace when entering a same-flow child route whose success exits the whole flow
 // (auth/login/signup, onboarding step, destructive confirm, import wizard).
@@ -298,10 +325,20 @@ class AppShellScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return BottomNavigationBar(
       currentIndex: navigationShell.currentIndex,
       onTap: navigationShell.goBranch,
-      items: const [...],
+      items: [
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.home),
+          label: l10n.homeTab,
+        ),
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.settings),
+          label: l10n.settingsTab,
+        ),
+      ],
     );
   }
 }
@@ -317,12 +354,14 @@ Most want this (analytics on shell push). Root `RouteObserver` should fire
   when the shell is already available.
 
 ```dart
+Future<void> _createWorkout(BuildContext sheetContext) async {
+  await Navigator.of(sheetContext).maybePop();
+  if (!sheetContext.mounted) return;
+  navigationShell.goBranch(1);
+}
+
 BentoWorkoutSelectorSheet(
-  onCreateWorkout: () async {
-    await Navigator.of(sheetContext).maybePop();
-    if (!sheetContext.mounted) return;
-    navigationShell.goBranch(1);
-  },
+  onCreateWorkout: () => unawaited(_createWorkout(sheetContext)),
 )
 ```
 

@@ -15,9 +15,10 @@ Signals: `DateTime`, `String`, `int`, `double`, `num`, `Duration`, `NumberFormat
 Use semantic helpers, not ad-hoc formatting at call sites:
 
 ```dart
+// core/extensions/date_time_extensions.dart
 extension DateTimeX on DateTime {
-  static DateTime nowUtc() => DateTime.now().toUtc();
-  static DateTime nowLocal() => DateTime.now();
+  static DateTime nowUtc() => .timestamp();
+  static DateTime nowLocal() => .timestamp().toLocal();
 
   DateTime get localDayStart {
     final local = toLocal();
@@ -51,6 +52,11 @@ Required domain strings are Value Objects, not raw `String` with empty sentinels
 extension NumX on num {
   String asCurrency(AppLocalizations l10n, {String? symbol}) {
     return NumberFormat.currency(locale: l10n.localeName, symbol: symbol).format(this);
+  }
+
+  /// `5.23` → `+5.2%`; the receiver is already in percent units.
+  String asSignedPercent(AppLocalizations l10n) {
+    return NumberFormat('+0.0%;-0.0%', l10n.localeName).format(this / 100);
   }
 
   num clamped(num min, num max) => clamp(min, max);

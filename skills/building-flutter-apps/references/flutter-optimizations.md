@@ -50,8 +50,12 @@ CustomScrollView(
       expandedHeight: 200,
       pinned: true,
       flexibleSpace: FlexibleSpaceBar(
-        title: Text('Products'),
-        background: Image.network(url, fit: BoxFit.cover),
+        title: Text(l10n.productsTitle),
+        background: Image.network(
+          url,
+          fit: .cover,
+          semanticLabel: l10n.productsHeaderImageLabel,
+        ),
       ),
     ),
     SliverPadding(
@@ -125,7 +129,7 @@ Does the animation repeat or need manual control?
 
 ```dart
 AnimatedContainer(
-  duration: const Duration(milliseconds: 300),
+  duration: const Duration(milliseconds: 120),
   curve: Curves.easeInOut,
   padding: EdgeInsets.all(isExpanded ? Spacing.s24 : Spacing.s8),
   decoration: BoxDecoration(
@@ -143,7 +147,7 @@ Pass static subtree as `child`, not `builder`. Builder run every frame:
 ```dart
 AnimatedBuilder(
   animation: _controller,
-  child: const Icon(Icons.refresh, size: 48),  // built once
+  child: const Icon(Icons.refresh, size: IconSizes.s48),  // built once
   builder: (context, child) {
     return Transform.rotate(
       angle: _controller.value * 2 * pi,
@@ -162,7 +166,7 @@ AnimatedBuilder(
 Opacity(opacity: 0.5, child: Container(color: Colors.blue))
 
 // RIGHT — no saveLayer
-Container(color: Colors.blue.withValues(alpha: 0.5))
+Container(color: context.colors.primary.withValues(alpha: 0.5))
 
 // RIGHT — for animated opacity
 FadeTransition(opacity: _animation, child: child)
@@ -181,7 +185,7 @@ class _MyWidgetState extends State<MyWidget>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 120),
       vsync: this,
     );
   }
@@ -190,6 +194,11 @@ class _MyWidgetState extends State<MyWidget>
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(opacity: _controller, child: const FlutterLogo());
   }
 }
 ```
@@ -219,7 +228,7 @@ Avoid `IntrinsicWidth`/`IntrinsicHeight`; use fixed height or `ConstrainedBox`:
 IntrinsicHeight(child: Row(children: [/* many children */]))
 
 // BETTER — fixed height
-SizedBox(height: 72, child: Row(children: [/* children */]))
+SizedBox(height: Spacing.s64, child: Row(children: [/* children */]))
 ```
 
 ## Isolates
@@ -229,14 +238,15 @@ Move heavy compute off main thread. UI thread render frame <16ms (60fps) or <8ms
 Use `Isolate.run` for one-shot heavy work:
 
 ```dart
-final products = await Isolate.run(() {
-  final parsed = jsonDecode(jsonString) as List<Object?>;
-  return parsed
-      .cast<Map<String, dynamic>>()
-      .map(ProductModel.fromJson)
-      .map((m) => m.toEntity())
-      .toList();
-});
+final products = await Isolate.run(
+  () => switch (jsonDecode(jsonString)) {
+    List<Object?> items => [
+        for (final item in items)
+          ProductModel.fromJson(item as Map<String, dynamic>).toEntity(),
+      ],
+    _ => throw const FormatException('Expected product list payload'),
+  },
+);
 ```
 
 | Task | Use Isolate? |
@@ -359,7 +369,7 @@ Use when sizing depend on parent constraints, not full window:
 ```dart
 LayoutBuilder(
   builder: (context, constraints) {
-    final crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
+    final crossAxisCount = constraints.maxWidth >= Breakpoints.medium ? 3 : 2;
     return GridView.builder(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
@@ -380,6 +390,16 @@ Follow Material 3 window size classes:
 | Compact | < 600 | Single column, bottom nav |
 | Medium | 600–839 | Two columns, rail nav |
 | Expanded | 840+ | Multi-pane, permanent nav |
+
+Name the thresholds once as tokens; never compare widths to raw numbers:
+
+```dart
+// core/theme/breakpoints.dart
+abstract final class Breakpoints {
+  static const double medium = 600;
+  static const double expanded = 840;
+}
+```
 
 ## Build Modes
 

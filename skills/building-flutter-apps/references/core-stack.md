@@ -21,7 +21,7 @@ legacy branches. Re-run the compatibility fixture before raising the floor.
 | `riverpod_annotation` | `4.0.7` | Provider annotations |
 | `riverpod_generator` | `4.0.9` | Provider generation |
 | `freezed_annotation` | `3.1.0` | Immutable models |
-| `freezed` | `4.0.1` | Immutable-model generation |
+| `freezed` | `4.0.2` | Immutable-model generation |
 | `json_annotation` | `^4.12.0` | JSON annotations |
 | `json_serializable` | `6.14.1` | JSON generation |
 | `go_router` | `^18.0.1` | Routing |
@@ -42,10 +42,10 @@ Flutter/Riverpod packages use both plugins in the root
 ```yaml
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.12.0
+  flutter_skill_lints: ^0.13.0
 ```
 
-`flutter_skill_lints ^0.12.0` is built against analyzer `^14.4.0`,
+`flutter_skill_lints ^0.13.0` is built against analyzer `^14.4.0`,
 `analyzer_plugin ^0.14.17`, and `analysis_server_plugin ^0.3.23`.
 `riverpod_lint ^3.1.9` shares the analyzer-plugin configuration above.
 

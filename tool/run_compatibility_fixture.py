@@ -15,11 +15,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 HOSTED_PLUGIN_BLOCK = (
     'plugins:\n'
     '  riverpod_lint: ^3.1.9\n'
-    '  flutter_skill_lints: ^0.12.0\n'
+    '  flutter_skill_lints: ^0.13.0\n'
 )
 HOSTED_PLUGINS = {
     'riverpod_lint': '^3.1.9',
-    'flutter_skill_lints': '^0.12.0',
+    'flutter_skill_lints': '^0.13.0',
 }
 
 
@@ -45,7 +45,7 @@ dev_dependencies:
   analyzer: 14.4.0
   build_runner: 2.16.1
   flutter_lints: 6.0.0
-  freezed: 4.0.1
+  freezed: 4.0.2
   go_router_builder: 4.5.0
   hive_ce_generator: 1.11.3
   json_serializable: 6.14.1
@@ -106,7 +106,6 @@ void registerFixtureAdapters() {}
 
 ROUTER = """\
 import 'package:flutter/material.dart';
-import 'package:generator_compatibility_fixture/fixture_strings.dart';
 import 'package:go_router/go_router.dart';
 
 part 'fixture_route.g.dart';
@@ -117,7 +116,7 @@ class FixtureRoute extends GoRouteData with $FixtureRoute {
 
   @override
   Widget build(BuildContext context, GoRouterState state) =>
-      const Scaffold(body: Text(FixtureStrings.title));
+      const Scaffold(body: SizedBox.shrink());
 }
 """
 
@@ -126,7 +125,6 @@ MAIN = """\
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:generator_compatibility_fixture/crash.dart';
-import 'package:generator_compatibility_fixture/fixture_strings.dart';
 
 Future<void> main() async {
   await Crash.init();
@@ -136,7 +134,7 @@ Future<void> main() async {
 void runFixture() {
   runApp(
     const ProviderScope(
-      child: MaterialApp(home: Scaffold(body: Text(FixtureStrings.title))),
+      child: MaterialApp(home: Scaffold(body: SizedBox.shrink())),
     ),
   );
 }
@@ -146,13 +144,6 @@ void runFixture() {
 CRASH = """\
 abstract final class Crash {
   static Future<void> init() async {}
-}
-"""
-
-
-FIXTURE_STRINGS = """\
-abstract final class FixtureStrings {
-  static const String title = 'fixture';
 }
 """
 
@@ -291,7 +282,7 @@ def analysis_options(local_plugin: Path | None) -> str:
     if local_plugin is None:
         return options
     return options.replace(
-        '  flutter_skill_lints: ^0.12.0\n',
+        '  flutter_skill_lints: ^0.13.0\n',
         f'  flutter_skill_lints:\n    path: {local_plugin}\n',
     )
 
@@ -421,7 +412,6 @@ def main() -> None:
         (package / 'lib/fixture_route.dart').write_text(ROUTER)
         (package / 'lib/main.dart').write_text(MAIN)
         (package / 'lib/crash.dart').write_text(CRASH)
-        (package / 'lib/fixture_strings.dart').write_text(FIXTURE_STRINGS)
         (package / 'lib/main_dev.dart').write_text(MAIN_DEV)
         (package / 'web/index.html').write_text(WEB_INDEX)
         (package / 'test/fixture_test.dart').write_text(TEST)
@@ -438,7 +428,7 @@ def main() -> None:
         assert_web_build(package)
 
     if local_plugin is None:
-        print('HOSTED_LINT_RESOLUTION_OK flutter_skill_lints=^0.12.0')
+        print('HOSTED_LINT_RESOLUTION_OK flutter_skill_lints=^0.13.0')
     else:
         print(f'LOCAL_LINT_RESOLUTION_OK flutter_skill_lints={local_plugin}')
     print('COMPATIBILITY_FIXTURE_OK')

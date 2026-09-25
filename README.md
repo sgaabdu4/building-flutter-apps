@@ -206,7 +206,7 @@ dart analyze
 
 Notes:
 
-- `flutter_skill_lints: ^0.12.0` and `riverpod_lint: ^3.1.9` are analyzer
+- `flutter_skill_lints: ^0.13.0` and `riverpod_lint: ^3.1.9` are analyzer
   plugins. Keep both in `analysis_options.yaml` under top-level `plugins:`;
   do not add either to `pubspec.yaml`.
 - If `lib/core/extensions/` already exists, merge the template files instead of
@@ -284,6 +284,9 @@ bash tool/smoke_test.sh
 python3 tool/check_skill_routing.py
 ruby tool/verify_markdown_examples.rb
 ```
+
+[CI](.github/workflows/ci.yml) runs these, the Windows installer checks, the
+drift fixtures, and the upstream drift check on every pull request and push to `main`.
 
 ## Code Generation
 

@@ -140,9 +140,10 @@ Riverpod `AsyncValue` also sealed:
 
 ```dart
 final asyncData = ref.watch(myAsyncProvider);
+final l10n = context.l10n;
 return switch (asyncData) {
   AsyncData(:final value) => Text(value.toString()),
-  AsyncError(:final error) => Text('Error: $error'),
+  AsyncError() => Text(l10n.loadFailed),
   AsyncLoading() => const ShimmerPlaceholder(), // Prefer skeleton/shimmer over bare CircularProgressIndicator
 };
 ```
@@ -178,9 +179,10 @@ state = state.copyWith(error: null); // clear error
 
 ## Deep Copy
 
-When Freezed classes nest other Freezed classes, use deep copy:
+When Freezed classes nest other Freezed classes, use deep copy. One Freezed class per file:
 
 ```dart
+// features/org/domain/entities/company.dart
 @freezed
 sealed class Company with _$Company {
   const factory Company({
@@ -188,7 +190,10 @@ sealed class Company with _$Company {
     required Director director,
   }) = _Company;
 }
+```
 
+```dart
+// features/org/domain/entities/director.dart
 @freezed
 sealed class Director with _$Director {
   const factory Director({
@@ -196,12 +201,23 @@ sealed class Director with _$Director {
     Assistant? assistant,
   }) = _Director;
 }
+```
 
+```dart
+// features/org/domain/entities/assistant.dart
+@freezed
+sealed class Assistant with _$Assistant {
+  const factory Assistant({String? name}) = _Assistant;
+}
+```
+
+```dart
 // Deep copy syntax
-Company newCompany = company.copyWith.director.assistant(name: 'John Smith');
+Company renameDirector(Company company) => company.copyWith.director(name: 'Jane Doe');
 
-// Null-safe deep copy
-Company? newCompany = company.copyWith.director.assistant?.call(name: 'John');
+// Null-safe deep copy (nullable nested field)
+Company? renameAssistant(Company company) =>
+    company.copyWith.director.assistant?.call(name: 'John');
 ```
 
 ## JSON Serialization
@@ -219,6 +235,14 @@ sealed class UserModel with _$UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) =>
       _$UserModelFromJson(json);
+
+  const UserModel._();
+
+  User toEntity() => User(
+        id: UserId(id),
+        fullName: DisplayName(fullName),
+        createdAt: createdAt,
+      );
 }
 ```
 
@@ -240,7 +264,7 @@ sealed class ApiResponse with _$ApiResponse {
 Customize discriminator key:
 
 ```dart
-@Freezed(unionKey: 'type', unionValueCase: FreezedUnionCase.pascal)
+@Freezed(unionKey: 'type', unionValueCase: .pascal)
 sealed class ApiResponse with _$ApiResponse {
   const factory ApiResponse.success(Object? data) = ApiSuccess;
 
@@ -272,16 +296,15 @@ sealed class Paginated<T> with _$Paginated<T> {
 
 ## Non-Constant Default Values
 
-Use private constructor:
+Use private constructor. Take the clock from `DateTimeX.nowUtc()` ([primitive-formatting.md](extensions/primitive-formatting.md#datetime)), never raw `DateTime.now()`:
 
 ```dart
 @freezed
 sealed class Event with _$Event {
-  Event._({DateTime? createdAt}) : createdAt = createdAt ?? DateTime.now();
+  Event._({DateTime? createdAt}) : createdAt = createdAt ?? DateTimeX.nowUtc();
 
   factory Event({required String title, DateTime? createdAt}) = _Event;
 
-  @override
   final DateTime createdAt;
 }
 ```
@@ -380,8 +403,8 @@ sealed class Order with _$Order {
   }) = _Order;
 
   double get total => items.fold(0, (sum, i) => sum + i.price * i.quantity);
-  List<String> get productIds => items.map((i) => i.productId).toList();
-  OrderSummary toSummary() => OrderSummary(id: id, itemCount: items.length, total: total);
+  int get itemCount => items.length;
+  OrderSummary toSummary() => OrderSummary(id: id, itemCount: itemCount, total: total);
 }
 ```
 

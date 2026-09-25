@@ -24,7 +24,7 @@ Signals: pagination, search debounce, form validation, GoRouter redirect, typed 
 2. **NEVER** use `ref.watch()` inside GoRouter `redirect` — recreates router every state change.
 3. **MUST** guard `if (!ref.mounted) return;` after EVERY `await` in notifiers (pagination, search, forms, sync).
 4. **MUST** use `ref.listen()` + `refreshListenable` for GoRouter redirect triggers — NEVER `ref.watch()`.
-5. **MUST** debounce search inputs (500ms min) — NEVER call API on every keystroke.
+5. **MUST** debounce search inputs (<=150ms) — NEVER call API on every keystroke.
 6. **During loading, stay put.** Return `null` from redirect — NEVER bounce to splash on web refresh.
 7. **MUST** guard page back with a typed fallback route for deep-link/resume safety.
 8. **NEVER** keep splash/cover routes mounted while initial sync runs. After auth/setup state resolves, route to the shell and let sync hydrate local data in the background. Lint: `router_splash_waits_for_initial_sync`.

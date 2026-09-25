@@ -107,7 +107,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
 
   @override
   Future<List<ProductModel>> fetchAll() async {
-    final payload = await _http.getJson(Uri(path: '/products'));
+    final payload = await _http.getJson(Uri(path: ApiPaths.products));
 
     return switch (payload) {
       List<Object?> items => [
@@ -121,12 +121,12 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
   @override
   Future<ProductModel> create(ProductModel model) async {
     final payload = await _http.postJson(
-      Uri(path: '/products'),
+      Uri(path: ApiPaths.products),
       body: model.toJson(),
     );
 
     return switch (payload) {
-      Map<String, dynamic> json => ProductModel.fromJson(json),
+      Map<String, dynamic> json => .fromJson(json),
       _ => throw const FormatException('Expected product payload'),
     };
   }
@@ -146,7 +146,7 @@ class ProductRepository implements IProductRepository {
 
   @override
   Future<Product> create(Product draft) async {
-    final created = await _remote.create(ProductModel.fromEntity(draft));
+    final created = await _remote.create(.fromEntity(draft));
     final canonical = await _remote.fetchById(created.id);
     return canonical.toEntity();
   }
@@ -158,14 +158,36 @@ class ProductRepository implements IProductRepository {
 A destructive or batch operation can complete after the client request times out. Treat the initial call as a start acknowledgement, then reconcile the source of truth.
 
 ```dart
-// WRONG — client waits for backend completion.
+// WRONG — client waits for backend completion (`appwrite_blocking_function_execution_in_client`).
 final result = await remote.deleteAccount(userId, waitForCompletion: true);
+```
 
+```dart
+// WRONG — reports the failure before reconcile (`destructive_failure_logged_before_reconcile`).
+class AccountRepository implements IAccountRepository {
+  AccountRepository(this._remote);
+
+  final IAccountRemoteDatasource _remote;
+
+  @override
+  Future<DeleteResult> deleteAccount(String userId) async {
+    try {
+      return await _remote.startDeleteAccount(userId);
+    } on Exception catch (e, s) {
+      Crash.error(e, s, reason: 'deleteAccount');
+      final deleted = await _remote.waitForAccountDeleted(userId, maxAttempts: 60);
+      return deleted ? .ok() : .timedOut();
+    }
+  }
+}
+```
+
+```dart
 // RIGHT — async-start + bounded reconcile.
 final started = await remote.startDeleteAccount(userId);
 if (!started.ok) return started;
 final deleted = await remote.waitForAccountDeleted(userId, maxAttempts: 60);
-return deleted ? DeleteResult.ok() : DeleteResult.timedOut();
+return deleted ? .ok() : .timedOut();
 ```
 
 Log/report destructive failures only after reconcile proves the entity still exists or the source of truth still disagrees.

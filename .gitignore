@@ -7,3 +7,5 @@ pubspec.lock
 node_modules/
 __pycache__/
 evals/results/
+# Temporary skill commands written by tool/run_*_eval.py
+.claude/commands/*-skill-*.md

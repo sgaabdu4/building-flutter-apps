@@ -34,7 +34,10 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 
 Future<void> main() async {
   usePathUrlStrategy();
-  runApp(const ProviderScope(child: AppRoot()));
+  WidgetsFlutterBinding.ensureInitialized();
+  await Crash.init(
+    appRunner: () => runApp(const ProviderScope(child: AppRoot())),
+  );
 }
 ```
 
@@ -64,21 +67,20 @@ class ProductRoute extends GoRouteData {
 Keep the closure thin.
 
 ```dart
-@visibleForTesting
 String? resolveAppRedirect({
   required String location,
   required AuthStatus authStatus,
   required SetupStatus setupStatus,
 }) {
-  if (authStatus == AuthStatus.loading) {
+  if (authStatus == .loading) {
     return null;
   }
 
-  if (authStatus == AuthStatus.signedOut) {
+  if (authStatus == .signedOut) {
     return isPublicLocation(location) ? null : const LoginRoute().location;
   }
 
-  if (setupStatus == SetupStatus.incomplete) {
+  if (setupStatus == .incomplete) {
     return location == const SetupRoute().location
         ? null
         : const SetupRoute().location;

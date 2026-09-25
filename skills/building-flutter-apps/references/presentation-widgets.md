@@ -61,7 +61,20 @@ final class ContentView extends StatelessWidget {
   final ValueChanged<ContentItemViewData> onItemTap;
   final VoidCallback onBack;
 
-  // build = render items + invoke callbacks only
+  // Render items and invoke callbacks only.
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return ListTile(
+          title: Text(item.title),
+          onTap: () => onItemTap(item),
+        );
+      },
+    );
+  }
 }
 ```
 
