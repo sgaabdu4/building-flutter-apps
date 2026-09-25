@@ -218,15 +218,18 @@ Providers that fail during init retry automatically with exponential backoff (20
 Customize globally:
 
 ```dart
-void main() {
-  runApp(
-    ProviderScope(
-      retry: (retryCount, error) {
-        if (error is ProviderException) return null; // Don't retry dependency failures
-        if (retryCount > 5) return null;             // Stop after 5 retries
-        return Duration(seconds: retryCount * 2);
-      },
-      child: const MyApp(),
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Crash.init(
+    appRunner: () => runApp(
+      ProviderScope(
+        retry: (retryCount, error) {
+          if (error is ProviderException) return null; // Don't retry dependency failures
+          if (retryCount > 5) return null;             // Stop after 5 retries
+          return Duration(seconds: retryCount * 2);
+        },
+        child: const MyApp(),
+      ),
     ),
   );
 }

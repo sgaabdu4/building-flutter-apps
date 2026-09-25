@@ -34,7 +34,10 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 
 Future<void> main() async {
   usePathUrlStrategy();
-  runApp(const ProviderScope(child: AppRoot()));
+  WidgetsFlutterBinding.ensureInitialized();
+  await Crash.init(
+    appRunner: () => runApp(const ProviderScope(child: AppRoot())),
+  );
 }
 ```
 
