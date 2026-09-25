@@ -147,11 +147,11 @@ setup_reference = (skill / "references/setup.md").read_text()
 readme = (root / "README.md").read_text()
 expected_plugins = {
     "riverpod_lint": "^3.1.9",
-    "flutter_skill_lints": "^0.12.0",
+    "flutter_skill_lints": "^0.13.0",
 }
 assert yaml_plugins(root / "analysis_options.yaml") == expected_plugins
 assert yaml_plugins(skill / "references/analysis_options.yaml") == expected_plugins
-plugin_block = "plugins:\n  riverpod_lint: ^3.1.9\n  flutter_skill_lints: ^0.12.0\n"
+plugin_block = "plugins:\n  riverpod_lint: ^3.1.9\n  flutter_skill_lints: ^0.13.0\n"
 assert plugin_block in analysis_options_reference
 assert "do not add either analyzer plugin to `pubspec.yaml`" in setup_reference.lower()
 assert "do not add either to `pubspec.yaml`" in readme.lower()
@@ -443,7 +443,7 @@ dependencies:
 cat > "$TEST_DIR/analysis_options.yaml" <<'EOF'
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.12.0
+  flutter_skill_lints: ^0.13.0
 EOF
 
 # Violator (5 old rules)
@@ -783,7 +783,7 @@ write_flutter_fixture
 cat > "$CONFIG_DIR/analysis_options.yaml" <<'EOF'
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.12.0
+  flutter_skill_lints: ^0.13.0
 EOF
 run_config_preflight
 [[ ! -s "$CONFIG_OUT" ]] && report pass "valid Flutter plugin configuration" || report fail "valid Flutter plugin configuration"
@@ -796,7 +796,7 @@ for config_case in nested empty missing-riverpod; do
 analyzer:
   plugins:
     riverpod_lint: ^3.1.9
-    flutter_skill_lints: ^0.12.0
+    flutter_skill_lints: ^0.13.0
 EOF
       assert_config_violation "nested analyzer plugins rejected" "top-level plugins: map"
       ;;
@@ -811,7 +811,7 @@ EOF
     missing-riverpod)
       cat > "$CONFIG_DIR/analysis_options.yaml" <<'EOF'
 plugins:
-  flutter_skill_lints: ^0.12.0
+  flutter_skill_lints: ^0.13.0
 EOF
       assert_config_violation "missing riverpod_lint rejected" "missing plugin(s): riverpod_lint"
       ;;
@@ -828,12 +828,12 @@ dependencies:
     sdk: flutter
   flutter_riverpod: ^3.4.3
 dev_dependencies:
-  flutter_skill_lints: ^0.12.0
+  flutter_skill_lints: ^0.13.0
 EOF
 cat > "$CONFIG_DIR/analysis_options.yaml" <<'EOF'
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.12.0
+  flutter_skill_lints: ^0.13.0
 EOF
 assert_config_violation "pubspec analyzer plugin rejected" "not pubspec.yaml: flutter_skill_lints"
 
