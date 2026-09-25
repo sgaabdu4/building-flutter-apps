@@ -248,6 +248,8 @@ class ProductFormNotifier extends _$ProductFormNotifier {
 Extract to `core/utils/batch_utils.dart` for cross-feature reuse:
 
 ```dart
+import 'dart:math';
+
 /// Process items in parallel batches to avoid overwhelming the server.
 Future<void> parallelBatch<T>({
   required List<T> items,
@@ -255,7 +257,7 @@ Future<void> parallelBatch<T>({
   int batchSize = 50,
 }) async {
   for (int i = 0; i < items.length; i += batchSize) {
-    final end = (i + batchSize).clamp(0, items.length);
+    final end = min(i + batchSize, items.length);
     final batch = items.sublist(i, end);
     await Future.wait(batch.map(action));
     await Future<void>.value(); // yield to event loop
