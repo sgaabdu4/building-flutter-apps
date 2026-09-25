@@ -153,11 +153,11 @@ Map<String, List<Item>> get itemsByGroup {
   }
   return map;
 }
-final item = items.firstWhere((item) => item.id == itemId);
+Item get selectedItem => items.firstWhere((item) => item.id == selectedId);
 
 // DO — cache immutable indexes and use O(1) lookup.
 final itemsById = {for (final item in items) item.id: item};
-final item = itemsById[itemId];
+Item? get selectedItem => itemsById[selectedId];
 ```
 
 Lints: `collection_getter_allocates_each_access`, `linear_id_lookup_in_hot_path`, `nested_linear_lookup_by_id`.

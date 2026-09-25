@@ -342,16 +342,27 @@ class TodosNotifier extends _$TodosNotifier {
       ref.watch(storageProvider.future),
       key: StorageKeys.todos,
       encode: jsonEncode,
-      decode: (json) => switch (jsonDecode(json)) {
-        List<Object?> items => [
-            for (final item in items) Todo.fromJson(item as Map<String, dynamic>),
-          ],
-        _ => throw const FormatException('Expected todo list payload'),
-      },
+      decode: TodoListCodec.decode,
     );
 
     return await fetchTodos();
   }
+}
+```
+
+```dart
+// features/todos/data/models/todo_list_codec.dart — parsing stays in the data layer
+abstract final class TodoListCodec {
+  static List<Todo> decode(String json) => switch (jsonDecode(json)) {
+        final List<Object?> items => [
+            for (final item in items)
+              switch (item) {
+                final Map<String, dynamic> map => Todo.fromJson(map),
+                _ => throw const FormatException('Expected todo object'),
+              },
+          ],
+        _ => throw const FormatException('Expected todo list payload'),
+      };
 }
 ```
 

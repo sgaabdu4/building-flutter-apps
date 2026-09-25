@@ -406,7 +406,10 @@ class ProductListScreen extends ConsumerWidget {
     );
   }
 }
+```
 
+```dart
+// features/products/presentation/widgets/product_list_view.dart
 class ProductListView extends StatelessWidget {
   const ProductListView({
     required this.items,
@@ -419,7 +422,6 @@ class ProductListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return ListView.builder(
       itemCount: items.length,
       itemBuilder: (context, index) => ProductCard(

@@ -246,9 +246,11 @@ abstract final class AppWidgetKeys {
 Widgets:
 
 ```dart
+final l10n = context.l10n;
+
 IconButton(
   key: const ValueKey(AppWidgetKeys.productCloseButton),
-  tooltip: context.l10n.closeProductTooltip,
+  tooltip: l10n.closeProductTooltip,
   onPressed: onClose,
   icon: const Icon(Icons.close),
 )
