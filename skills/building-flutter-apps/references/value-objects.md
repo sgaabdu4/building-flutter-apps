@@ -198,10 +198,13 @@ class Order {
 }
 
 // ✅ VO boundary
-class Order {
-  final Money total;
-  final Email customerEmail;
-  final Weight weight;
+@freezed
+sealed class Order with _$Order {
+  const factory Order({
+    required Money total,
+    required Email customerEmail,
+    required Weight weight,
+  }) = _Order;
 }
 
 // ❌ public raw VO constructor — caller skips invariants (vo_public_raw_constructor)
@@ -338,9 +341,9 @@ Lints: `hive_field_no_vo_type` (no VO types on Model ctor params).
 
 ```dart
 group('Distance', () {
-  test('rejects negative', () => expect(() => Distance.fromMeters(-1), throwsA(isA<AssertionError>())));
-  test('m → km', () => expect(Distance.meters(1500).inKilometers, 1.5));
-  test('miles roundtrip', () => expect(Distance.miles(1).inKilometers, closeTo(1.609344, 1e-9)));
+  test('rejects negative', () => expect(() => Distance.fromMeters(-1), throwsA(isA<ArgumentError>())));
+  test('m → km', () => expect(Distance.fromMeters(1500).inKilometers, equals(1.5)));
+  test('m → miles', () => expect(Distance.fromMeters(1609.344).inMiles, closeTo(1, 1e-9)));
 });
 ```
 
