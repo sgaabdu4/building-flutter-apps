@@ -126,7 +126,6 @@ part 'hive_adapters.g.dart';
   AdapterSpec<UserModel>(),
   AdapterSpec<OrderModel>(),
   AdapterSpec<OrderItemModel>(),
-  AdapterSpec<OrderStatus>(), // enums work too
 ], firstTypeId: 1, reservedTypeIds: {0})
 void _hiveAdapters() {}
 ```
@@ -230,7 +229,6 @@ sealed class Order with _$Order {
 @GenerateAdapters([
   AdapterSpec<OrderModel>(),
   AdapterSpec<OrderItemModel>(),
-  AdapterSpec<OrderStatus>(),
 ], firstTypeId: 20)
 @freezed
 sealed class OrderModel with _$OrderModel {
@@ -238,16 +236,20 @@ sealed class OrderModel with _$OrderModel {
   const factory OrderModel({
     required String id,
     required List<OrderItemModel> items,
-    required OrderStatus status,
+    required String status, // OrderStatus.name — domain enum stays Hive-free
   }) = _OrderModel;
 
   factory OrderModel.fromDomain(Order o) => OrderModel(
         id: o.id.value,
         items: o.items.map(OrderItemModel.fromDomain).toList(),
-        status: o.status,
+        status: o.status.name,
       );
 
-  Order toDomain() => Order(id: OrderId(id), items: items.map((m) => m.toDomain()).toList(), status: status);
+  Order toDomain() => Order(
+        id: OrderId(id),
+        items: items.map((m) => m.toDomain()).toList(),
+        status: OrderStatus.values.byName(status),
+      );
 }
 ```
 
@@ -328,7 +330,7 @@ See [architecture.md](architecture.md) for layer chain, [testing.md](testing.md)
 
 ```dart
 // test/shared/hive_test_helper.dart
-class HiveTestHelper {
+abstract final class HiveTestHelper {
   static Future<Directory> initialize(String testName) async {
     final tempDir = Directory('${Directory.current.path}/test_hive_$testName');
     if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);

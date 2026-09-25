@@ -120,8 +120,11 @@ class SaveAllRowsException implements Exception {
   const SaveAllRowsException(this.failures);
   final List<SaveRowResult<Object?>> failures;
   @override
-  String toString() =>
-      'SaveAllRowsException: ${failures.length} item(s) failed; first=${failures.first.error}';
+  String toString() => switch (failures) {
+        [SaveRowResult(:final error?), ...] =>
+          'SaveAllRowsException: ${failures.length} item(s) failed; first=$error',
+        _ => 'SaveAllRowsException: ${failures.length} item(s) failed',
+      };
 }
 
 /// Retries [fn] on transient failures: Appwrite 429/503, [SocketException],

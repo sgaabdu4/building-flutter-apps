@@ -265,8 +265,8 @@ sealed class User with _$User {
 sealed class User with _$User {
   const factory User({required Email email}) = _User;
 }
-// inside UserModel.toEntity() or UserImportService — outside /domain/:
-//   User(email: Email(json['email'] as String))
+// inside UserModel.toEntity() or UserImportService — outside /domain/ —
+// wrap the raw email string in an Email value object, then build the User.
 
 // ❌ hand-rolled copyWith in /domain/ (domain_custom_copy_with)
 @freezed

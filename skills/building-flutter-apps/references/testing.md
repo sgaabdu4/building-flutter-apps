@@ -248,6 +248,7 @@ Widgets:
 ```dart
 IconButton(
   key: const ValueKey(AppWidgetKeys.productCloseButton),
+  tooltip: context.l10n.closeProductTooltip,
   onPressed: onClose,
   icon: const Icon(Icons.close),
 )
@@ -274,7 +275,10 @@ Access `ProviderContainer` from widget tests:
 ```dart
 testWidgets('can access container', (tester) async {
   await tester.pumpWidget(
-    const ProviderScope(child: MaterialApp(home: MyWidget())),
+    UncontrolledProviderScope(
+      container: ProviderContainer.test(),
+      child: const MaterialApp(home: MyWidget()),
+    ),
   );
 
   final container = tester.container();

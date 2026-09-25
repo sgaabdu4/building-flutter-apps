@@ -403,8 +403,8 @@ sealed class Order with _$Order {
   }) = _Order;
 
   double get total => items.fold(0, (sum, i) => sum + i.price * i.quantity);
-  List<String> get productIds => items.map((i) => i.productId).toList();
-  OrderSummary toSummary() => OrderSummary(id: id, itemCount: items.length, total: total);
+  int get itemCount => items.length;
+  OrderSummary toSummary() => OrderSummary(id: id, itemCount: itemCount, total: total);
 }
 ```
 

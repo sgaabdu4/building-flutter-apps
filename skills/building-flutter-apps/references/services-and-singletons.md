@@ -136,12 +136,13 @@ final class PushTokenRefresh {
 ### Testing
 
 Prefer testing callers through a repository/datasource/provider boundary. Tests
-may `await` the fire-and-forget method directly to verify it does not throw.
+may assert the fire-and-forget method directly with `expectLater(..., completes)`
+to verify it does not throw.
 
 ```dart
 void main() {
   test('refresh does not throw', () async {
-    await PushTokenRefresh.instance.refresh();
+    await expectLater(PushTokenRefresh.instance.refresh(), completes);
   });
 }
 ```
@@ -190,11 +191,11 @@ UI await, toast surface, caller reads return value.
 
 ### Testing
 
-Tests `await` the future directly. Do not assert against a real Firebase backend
-in unit/widget tests.
+Tests assert the future directly with `expectLater(..., completes)`. Do not
+assert against a real Firebase backend in unit/widget tests.
 
 ```dart
-await trackEvent('sign_in');
+await expectLater(trackEvent('sign_in'), completes);
 ```
 
 ## Checklist
