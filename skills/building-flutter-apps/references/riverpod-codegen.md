@@ -133,7 +133,7 @@ Future<List<Product>> productsByCategory(Ref ref, String category) async {
 class ProductEditorNotifier extends _$ProductEditorNotifier {
   @override
   ProductFormState build(String productId) {
-    Future.microtask(() => _loadProduct(productId));
+    unawaited(Future.microtask(() => _loadProduct(productId)));
     return const ProductFormState();
   }
 
@@ -155,9 +155,18 @@ T larger<T extends num>(Ref ref, T a, T b) {
   return a >= b ? a : b;
 }
 
-// Usage
-int integer = ref.watch(largerProvider<int>(2, 3));
-double decimal = ref.watch(largerProvider<double>(2.5, 3.5));
+// Usage: watch inside build.
+class LargerValues extends ConsumerWidget {
+  const LargerValues({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final int integer = ref.watch(largerProvider<int>(2, 3));
+    final double decimal = ref.watch(largerProvider<double>(2.5, 3.5));
+    return Text(l10n.largerValues(integer, decimal));
+  }
+}
 ```
 
 ## Provider-Derived UI Data
