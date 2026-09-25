@@ -63,7 +63,7 @@ mixin ConnectivityMixin {
 class ProductNotifier extends _$ProductNotifier with ConnectivityMixin {
   @override
   ProductState build() {
-    Future.microtask(_load); // Defer — see notifier-structure.md "Sync notifier init trap"
+    unawaited(Future.microtask(_load)); // Defer — see notifier-structure.md "Sync notifier init trap"
     return const ProductState();
   }
 

@@ -31,7 +31,7 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
 
   @override
   PaginatedState build() {
-    Future.microtask(() => _loadPage(0)); // Defer — see notifier-structure.md.
+    unawaited(Future.microtask(() => _loadPage(0))); // Defer — see notifier-structure.md.
     return const PaginatedState(isLoading: true);
   }
 
