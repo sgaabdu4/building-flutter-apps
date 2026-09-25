@@ -235,6 +235,14 @@ sealed class UserModel with _$UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) =>
       _$UserModelFromJson(json);
+
+  const UserModel._();
+
+  User toEntity() => User(
+        id: UserId(id),
+        fullName: DisplayName(fullName),
+        createdAt: createdAt,
+      );
 }
 ```
 
