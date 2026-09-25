@@ -191,10 +191,13 @@ Lints: `domain_raw_required_string` (required `String` on a domain entity constr
 import 'package:myapp/core/extensions/num_extensions.dart'; // arch_domain_import ERROR
 
 // ❌ primitive obsession
-class Order {
-  final int totalCents;
-  final String customerEmail;
-  final double weightKg;
+@freezed
+sealed class Order with _$Order {
+  const factory Order({
+    required int totalCents,
+    required String customerEmail,
+    required double weightKg,
+  }) = _Order;
 }
 
 // ✅ VO boundary
