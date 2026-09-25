@@ -90,8 +90,8 @@ Entity:
 sealed class WorkoutSet with _$WorkoutSet {
   const factory WorkoutSet({required Distance distance, required Duration duration}) = _WorkoutSet;
   const WorkoutSet._();
-  double? get paceSecondsPerKm => duration.inSeconds / distance.inKilometers;
-  double? get speedKmh => distance.inKilometers / (duration.inSeconds / 3600);
+  double get paceSecondsPerKm => duration.inSeconds / distance.inKilometers;
+  double get speedKmh => distance.inKilometers / (duration.inSeconds / 3600);
 }
 ```
 
