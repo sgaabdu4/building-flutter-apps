@@ -54,6 +54,11 @@ extension NumX on num {
     return NumberFormat.currency(locale: l10n.localeName, symbol: symbol).format(this);
   }
 
+  /// `5.23` → `+5.2%`; the receiver is already in percent units.
+  String asSignedPercent(AppLocalizations l10n) {
+    return NumberFormat('+0.0%;-0.0%', l10n.localeName).format(this / 100);
+  }
+
   num clamped(num min, num max) => clamp(min, max);
 }
 ```

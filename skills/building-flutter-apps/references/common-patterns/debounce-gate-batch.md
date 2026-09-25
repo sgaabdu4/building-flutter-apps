@@ -25,12 +25,21 @@ TextField(onChanged: (v) {
 
 // DO — Timer cancel-and-restart
 Timer? _debounce;
-TextField(onChanged: (v) {
+
+@override
+void dispose() {
+  _debounce?.cancel();
+  super.dispose();
+}
+
+void _onQueryChanged(String query) {
   _debounce?.cancel();
   _debounce = Timer(const Duration(milliseconds: 150), () {
-    ref.read(searchProvider.notifier).search(v);
+    unawaited(ref.read(searchProvider.notifier).search(query));
   });
-});
+}
+
+TextField(onChanged: _onQueryChanged);
 
 // Slider/RangeSlider — defer terminal effects
 Slider(
@@ -69,14 +78,14 @@ Lints: `notifier_persistence_no_debounce`, `user_visible_duration_too_long`.
 ### Sync push — guard with a dirty list
 
 ```dart
-void pushItems(String userId, List<Entity> items) {
+Future<void> pushItems(String userId, List<Entity> items) async {
   if (items.isEmpty) return;                                // early return
-  remote.saveAll(userId, items.map(Model.fromEntity).toList());
+  await remote.saveAll(userId, items.map(Model.fromEntity).toList());
 }
 
 // or outer dirty check
 if (isDirty) {
-  remote.saveAll(userId, items.map(Model.fromEntity).toList());
+  await remote.saveAll(userId, items.map(Model.fromEntity).toList());
 }
 ```
 
@@ -283,11 +292,21 @@ Lint: `notifier_param_requires_value_object`. See [value-objects.md](../value-ob
 ### Modal helpers — always pass `routeSettings`
 
 ```dart
-Future<T?> openConfirm<T>(BuildContext context) => showDialog<T>(
-  context: context,
-  routeSettings: const RouteSettings(name: 'confirm-dialog'),
-  builder: (_) => const ConfirmDialog(),
-);
+// Private method on the calling screen — no top-level UI helpers.
+class OrderScreen extends StatelessWidget {
+  const OrderScreen({super.key});
+
+  Future<T?> _openConfirm<T>(BuildContext context) => showDialog<T>(
+    context: context,
+    routeSettings: const RouteSettings(name: 'confirm-dialog'),
+    builder: (_) => const ConfirmDialog(),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return DeleteButton(onPressed: () => unawaited(_openConfirm<bool>(context)));
+  }
+}
 ```
 
 Lint: `modal_helper_requires_route_settings`.

@@ -208,17 +208,26 @@ For pushed screens that may also be opened by deep link, pop when possible and
 otherwise go to a typed fallback route:
 
 ```dart
-void closeEditor(BuildContext context) {
-  if (context.canPop()) {
-    context.pop();
-    return;
+class ProductEditorScreen extends StatelessWidget {
+  const ProductEditorScreen({super.key});
+
+  void _closeEditor(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    const ProductListRoute().go(context);
   }
-  const ProductListRoute().go(context);
+
+  @override
+  Widget build(BuildContext context) {
+    return ProductEditorForm(onClose: () => _closeEditor(context));
+  }
 }
 ```
 
-Keep this helper generic if it appears in multiple places; it must take a
-`GoRouteData` fallback, never a raw string. Generic `BuildContext` fallback
+Promote this to a generic helper only if it appears in multiple places; it must
+take a `GoRouteData` fallback, never a raw string. Generic `BuildContext` fallback
 helpers are allowed when they do not create route-specific APIs. Do not put
 route-specific helpers on `BuildContext`; call the generated typed route helper
 directly at the event boundary.
@@ -277,6 +286,7 @@ ProductDetailRoute(id: product.id).go(context);
 
 // Push with return value.
 final result = await ProductCreateRoute(parentId: product.id).push<bool>(context);
+if (!context.mounted) return;
 
 // Replace when entering a same-flow child route whose success exits the whole flow
 // (auth/login/signup, onboarding step, destructive confirm, import wizard).
@@ -344,12 +354,14 @@ Most want this (analytics on shell push). Root `RouteObserver` should fire
   when the shell is already available.
 
 ```dart
+Future<void> _createWorkout(BuildContext sheetContext) async {
+  await Navigator.of(sheetContext).maybePop();
+  if (!sheetContext.mounted) return;
+  navigationShell.goBranch(1);
+}
+
 BentoWorkoutSelectorSheet(
-  onCreateWorkout: () async {
-    await Navigator.of(sheetContext).maybePop();
-    if (!sheetContext.mounted) return;
-    navigationShell.goBranch(1);
-  },
+  onCreateWorkout: () => unawaited(_createWorkout(sheetContext)),
 )
 ```
 

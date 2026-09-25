@@ -59,7 +59,7 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
     await _loadPage(state.page + 1);
   }
 
-  Future<void> refresh() async => _loadPage(0);
+  Future<void> refresh() => _loadPage(0);
 }
 ```
 
@@ -68,6 +68,13 @@ Widget with scroll detection:
 ```dart
 class PaginatedProductListScreen extends ConsumerWidget {
   const PaginatedProductListScreen({super.key});
+
+  bool _onScroll(WidgetRef ref, ScrollNotification scroll) {
+    if (scroll.metrics.pixels >= scroll.metrics.maxScrollExtent - 200) {
+      unawaited(ref.read(paginatedProductProvider.notifier).loadMore());
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -79,12 +86,7 @@ class PaginatedProductListScreen extends ConsumerWidget {
     );
 
     return NotificationListener<ScrollNotification>(
-      onNotification: (scroll) {
-        if (scroll.metrics.pixels >= scroll.metrics.maxScrollExtent - 200) {
-          unawaited(ref.read(paginatedProductProvider.notifier).loadMore());
-        }
-        return false;
-      },
+      onNotification: (scroll) => _onScroll(ref, scroll),
       child: ListView.builder(
         itemCount: items.length + (hasMore ? 1 : 0),
         itemBuilder: (context, index) {

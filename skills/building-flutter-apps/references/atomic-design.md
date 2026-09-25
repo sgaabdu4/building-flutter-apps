@@ -236,6 +236,7 @@ class StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final l10n = context.l10n;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(Spacing.s16),
@@ -256,7 +257,7 @@ class StatCard extends StatelessWidget {
             if (trend case final trendValue?) ...[
               const SizedBox(height: Spacing.s4),
               AppBadge(
-                label: '${trendValue >= 0 ? '+' : ''}${trendValue.toStringAsFixed(1)}%',
+                label: trendValue.asSignedPercent(l10n),
                 color: trendValue >= 0 ? SemanticColors.success : SemanticColors.error,
               ),
             ],
@@ -286,21 +287,22 @@ class StatCard extends StatelessWidget {
 class StatsRow extends StatelessWidget {
   const StatsRow({super.key, required this.stats});
 
-  final List<({String label, String value, IconData? icon, double? trend})> stats;
+  final List<StatViewData> stats;
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: stats
-          .map((s) => Expanded(
-                child: StatCard(
-                  label: s.label,
-                  value: s.value,
-                  icon: s.icon,
-                  trend: s.trend,
-                ),
-              ))
-          .toList(),
+      children: [
+        for (final stat in stats)
+          Expanded(
+            child: StatCard(
+              label: stat.label,
+              value: stat.value,
+              icon: stat.icon,
+              trend: stat.trend,
+            ),
+          ),
+      ],
     );
   }
 }
