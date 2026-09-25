@@ -178,15 +178,22 @@ final items = ref.watch(
 
 ## Form Validation
 
+Notifiers store typed validation errors; the UI maps them to localized copy
+([localization.md](../localization.md#notifier-boundary)).
+
 ```dart
+enum ProductNameError { required, tooShort }
+
+enum ProductPriceError { invalidNumber, notPositive }
+
 @freezed
 sealed class ProductFormState with _$ProductFormState {
   const factory ProductFormState({
     @Default('') String draftName,
     @Default('') String draftDescription,
     @Default(0.0) double draftPrice,
-    String? nameError,
-    String? priceError,
+    ProductNameError? nameError,
+    ProductPriceError? priceError,
     @Default(false) bool isSubmitting,
   }) = _ProductFormState;
 
@@ -201,24 +208,26 @@ sealed class ProductFormState with _$ProductFormState {
 
 @Riverpod(keepAlive: true)
 class ProductFormNotifier extends _$ProductFormNotifier {
+  static const _minNameLength = 3;
+
   @override
   ProductFormState build() => const ProductFormState();
 
   void setName(String value) {
-    String? validationMessage;
-    if (value.isEmpty) validationMessage = 'Name required';
-    if (value.length < 3) validationMessage = 'Name too short';
-    state = state.copyWith(draftName: value, nameError: validationMessage);
+    ProductNameError? nameError;
+    if (value.length < _minNameLength) nameError = .tooShort;
+    if (value.isEmpty) nameError = .required;
+    state = state.copyWith(draftName: value, nameError: nameError);
   }
 
   void setPrice(String value) {
     final parsed = double.tryParse(value);
-    String? validationMessage;
-    if (parsed == null) validationMessage = 'Invalid number';
-    if (parsed != null && parsed <= 0) validationMessage = 'Must be positive';
+    ProductPriceError? priceError;
+    if (parsed == null) priceError = .invalidNumber;
+    if (parsed != null && parsed <= 0) priceError = .notPositive;
     state = state.copyWith(
       draftPrice: parsed ?? 0,
-      priceError: validationMessage,
+      priceError: priceError,
     );
   }
 
@@ -229,7 +238,7 @@ class ProductFormNotifier extends _$ProductFormNotifier {
     try {
       await ref.read(productRepositoryProvider).create(
         Product(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          id: DateTimeX.nowUtc().millisecondsSinceEpoch.toString(),
           name: state.draftName.trim(),
           price: state.draftPrice,
         ),
@@ -243,6 +252,17 @@ class ProductFormNotifier extends _$ProductFormNotifier {
     }
   }
 }
+```
+
+```dart
+// Screen build: map the typed error to localized copy for the field's errorText.
+final l10n = context.l10n;
+final nameError = ref.watch(productFormProvider.select((s) => s.nameError));
+final nameErrorText = switch (nameError) {
+  .required => l10n.productNameRequired,
+  .tooShort => l10n.productNameTooShort,
+  null => null,
+};
 ```
 
 ## Batch Processing
