@@ -177,6 +177,12 @@ class LargerValues extends ConsumerWidget {
 // Wrong: provider data copied into State.
 class _HistoryCardState extends ConsumerState<HistoryCard> {
   List<Workout> _historyCache = const [];
+
+  @override
+  Widget build(BuildContext context) {
+    _historyCache = ref.watch(historyProvider);
+    return HistoryList(items: _historyCache);
+  }
 }
 ```
 
