@@ -132,16 +132,18 @@ class SearchNotifier extends _$SearchNotifier {
       return;
     }
 
-    _debouncer.call(() async {
-      try {
-        final results = await ref.read(productRepositoryProvider).search(query);
-        if (!ref.mounted) return;
-        state = state.copyWith(results: results, isSearching: false);
-      } catch (e) {
-        if (!ref.mounted) return;
-        state = state.copyWith(isSearching: false);
-      }
-    });
+    _debouncer.call(() => unawaited(_runSearch(query)));
+  }
+
+  Future<void> _runSearch(String query) async {
+    try {
+      final results = await ref.read(productRepositoryProvider).search(query);
+      if (!ref.mounted) return;
+      state = state.copyWith(results: results, isSearching: false);
+    } catch (e) {
+      if (!ref.mounted) return;
+      state = state.copyWith(isSearching: false);
+    }
   }
 }
 ```
