@@ -982,7 +982,8 @@ def check_scaffold_update(root: Path, base: str) -> bool:
 
 
 def preserved_instructions(root: Path, base: str, names: set[str]) -> bool:
-    end = "<!-- hard-eng:end -->\n\n"
+    from agent_hooks import instruction_suffix
+
     for name in names & {"AGENTS.md", "CLAUDE.md", "AGENTS.override.md"}:
         blob = f"{base}:{name}"
         original = subprocess.run(
@@ -992,9 +993,8 @@ def preserved_instructions(root: Path, base: str, names: set[str]) -> bool:
             capture_output=True,
             check=False,
         ).stdout
-        if (
-            not (root / name).is_file()
-            or original.split(end, 1)[-1] != (root / name).read_text().split(end, 1)[-1]
-        ):
+        if not (root / name).is_file() or instruction_suffix(
+            original
+        ) != instruction_suffix((root / name).read_text()):
             return False
     return True
