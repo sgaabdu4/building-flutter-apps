@@ -142,6 +142,31 @@ def migrate_workflow_pins(content: str) -> str:
     return content
 
 
+def migrate_pnpm_bootstrap(root: Path, content: str) -> str:
+    manifest = root / "package.json"
+    if not manifest.is_file():
+        return content
+    package = json.loads(manifest.read_text())
+    declared = package.get("packageManager", "")
+    engines = package.get("devEngines", {})
+    manager = engines.get("packageManager") if isinstance(engines, dict) else None
+    if not (
+        isinstance(declared, str)
+        and declared.startswith("pnpm@")
+        or isinstance(manager, dict)
+        and manager.get("name") == "pnpm"
+        and manager.get("version")
+    ):
+        return content
+    return re.sub(
+        r"(?m)^(      - uses: pnpm/setup@[^\n]+\n        with:\n)"
+        r"          version: latest\n"
+        r"(          runtime: [^\n]+\n          install: false\n)(?=      - |\Z)",
+        r"\1\2",
+        content,
+    )
+
+
 OLD_LAUNCHER = "pnpm dlx --allow-build=@jdxcode/mise"
 LAUNCHER = "pnpm dlx --config.ignore-scripts=false --allow-build=@jdxcode/mise"
 
@@ -453,6 +478,7 @@ def configure_ci(
             root, source, migrate_docs_path(source, migrated)
         )
         migrated = migrate_affected_tools(root, source, config, migrated)
+        migrated = migrate_pnpm_bootstrap(root, migrated)
         if migrated != original:
             changes[name] = migrated
         integrated([root / name])
@@ -506,4 +532,4 @@ def configure_ci(
         )
         .replace(block, triggers, 1)
     )
-    changes[name] = workflow_budget(root, changes[name])
+    changes[name] = migrate_pnpm_bootstrap(root, workflow_budget(root, changes[name]))

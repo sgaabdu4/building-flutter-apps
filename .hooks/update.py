@@ -919,14 +919,26 @@ def check_scaffold_update(root: Path, base: str) -> bool:
         return False
     if (
         SOURCE_FILE not in names
+        or not isinstance(previous, str)
+        or not isinstance(revision, str)
         or revision == previous
-        or not all(
-            isinstance(value, str) and re.fullmatch(r"[0-9a-f]{40}", value)
-            for value in (previous, revision)
-        )
+        or not re.fullmatch(r"[0-9a-f]{40}", previous)
+        or not re.fullmatch(r"[0-9a-f]{40}", revision)
     ):
         return False
-    if not isinstance(previous, str) or not isinstance(revision, str):
+    if any(
+        name
+        not in {
+            SOURCE_FILE,
+            "AGENTS.md",
+            "CLAUDE.md",
+            "AGENTS.override.md",
+            ".husky/pre-push",
+            ".agents/biome.json",
+        }
+        and not name.startswith((".hooks/", ".agents/skills/", ".claude/skills/"))
+        for name in names
+    ):
         return False
     if not verified_revision(revision):
         raise ValueError(
