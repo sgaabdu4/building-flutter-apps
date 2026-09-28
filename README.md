@@ -158,8 +158,8 @@ Ownership rules are the point:
 npx skills add https://github.com/sgaabdu4/building-flutter-apps --skill building-flutter-apps
 ```
 
-Codex can invoke it explicitly with `$building-flutter-apps`; other harnesses
-use their own skill-selection syntax.
+Supported hosts are Claude Code and Codex. Codex can invoke the standalone
+skill explicitly with `$building-flutter-apps`.
 
 ### Claude Code
 
@@ -183,16 +183,6 @@ codex plugin add building-flutter-apps@building-flutter-apps
 Codex reads `.codex-plugin/plugin.json`, loads the shared skill, and discovers
 `hooks/hooks.json`. Review and trust the hook definition in `/hooks`, then start
 a new task.
-
-### Copilot CLI
-
-```bash
-copilot plugin marketplace add sgaabdu4/building-flutter-apps
-copilot plugin install building-flutter-apps@building-flutter-apps
-```
-
-Copilot reads `.github/plugin/marketplace.json` and root `plugin.json`, then
-loads `hooks/hooks.copilot.json`.
 
 ## Bootstrap A Flutter Project
 
@@ -236,7 +226,6 @@ changes require a real project package solve and analyzer proof.
 |---|---|---|---|
 | Claude Code | `PostToolUse` | `Stop` | `UserPromptSubmit` |
 | Codex CLI | `PostToolUse` | `Stop` | `UserPromptSubmit` |
-| Copilot CLI | `postToolUse` | `agentStop` | `userPromptSubmitted` |
 
 The hook scripts no-op outside Flutter projects by walking upward for
 `pubspec.yaml`.

@@ -58,10 +58,7 @@ for f in \
   "$PLUGIN_ROOT/.claude-plugin/marketplace.json" \
   "$PLUGIN_ROOT/.codex-plugin/plugin.json" \
   "$PLUGIN_ROOT/.agents/plugins/marketplace.json" \
-  "$PLUGIN_ROOT/plugin.json" \
-  "$PLUGIN_ROOT/.github/plugin/marketplace.json" \
-  "$PLUGIN_ROOT/hooks/hooks.json" \
-  "$PLUGIN_ROOT/hooks/hooks.copilot.json"; do
+  "$PLUGIN_ROOT/hooks/hooks.json"; do
   if python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
     report pass "$(basename "$(dirname "$f")")/$(basename "$f")"
   else
@@ -103,8 +100,6 @@ claude = json.loads((root / ".claude-plugin/plugin.json").read_text())
 claude_marketplace = json.loads((root / ".claude-plugin/marketplace.json").read_text())
 codex = json.loads((root / ".codex-plugin/plugin.json").read_text())
 codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_text())
-copilot = json.loads((root / "plugin.json").read_text())
-copilot_marketplace = json.loads((root / ".github/plugin/marketplace.json").read_text())
 eval_cases = json.loads((root / "evals/evals.json").read_text())["evals"]
 skill = root / "skills/building-flutter-apps"
 expected_version = "5.12.0"
@@ -133,11 +128,8 @@ for pattern in ("*.md", "*.sh", "*.py"):
         assert "templates/flutter/tool/dart_decimate" not in path.read_text(), path
 assert claude.get("version") == expected_version
 assert codex.get("version") == expected_version
-assert copilot.get("version") == expected_version
 assert claude_marketplace["metadata"]["version"] == expected_version
 assert claude_marketplace["plugins"][0]["version"] == expected_version
-assert copilot_marketplace["metadata"]["version"] == expected_version
-assert copilot_marketplace["plugins"][0]["version"] == expected_version
 assert f'version: "{expected_version}"' in (skill / "SKILL.md").read_text()
 skill_text = (skill / "SKILL.md").read_text()
 root_analysis_options = (root / "analysis_options.yaml").read_text()
@@ -386,7 +378,6 @@ assert codex_marketplace["plugins"][0]["source"] == {
     "url": "https://github.com/sgaabdu4/building-flutter-apps.git",
     "ref": "main",
 }
-assert copilot.get("hooks") == "hooks/hooks.copilot.json"
 
 for path in skill.rglob("*.md"):
     text = path.read_text()

@@ -5,4 +5,4 @@
 - Purpose = deterministic architecture + analysis + code-health + reproducible build and delivery guidance.
 - Capabilities = Riverpod/Freezed/GoRouter/Hive patterns + analyzer profile + drift hooks + clean-checkout codegen + provider-neutral Windows installer/update delivery proof.
 - Boundaries = non-Riverpod Flutter stacks + pure-Dart work without Flutter/Riverpod app context excluded.
-- Delivery = supported `main` branch → standalone skill + Claude/Codex/Copilot plugin manifests.
+- Delivery = supported `main` branch → standalone skill + Claude/Codex plugin manifests.
