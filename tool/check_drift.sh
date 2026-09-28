@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# check_drift.sh — Drift regression checker for building-flutter-apps skill
-#
-# Usage:
-#   bash tool/check_drift.sh [--only <rule-id>[,<rule-id>...]] [<path>...]
-#
-# Exit: 0 = all clean, 1 = violations found, 2 = usage error
-#
-# Default scan paths: skill package + README.md + CONTRIBUTING.md
-# Always excluded: AUDIT_REPORT.md tool/
 
 set -euo pipefail
 
@@ -21,13 +12,6 @@ SKILL_ROOT="$REPO_ROOT/skills/building-flutter-apps"
 _TAP_INDEX=0
 _TAP_FAILS=0
 _TAP_ONLY=""
-
-tap_plan_header() {
-  # Called at end once we know total count — use deferred mode instead:
-  # we collect results and emit plan at top (TAP spec requires it first,
-  # but GNU prove/bash-tap accept trailing plan too).
-  true
-}
 
 emit_tap() {
   # emit_tap <rule-id> <description> <hits> <hint>
@@ -125,8 +109,6 @@ rule_b3() {
 # ── Rule: B7 — select() callback must use => arrow syntax ────────────────────
 rule_b7() {
   local hits
-  # Matches .select((s) followed by body that does NOT have => on same line
-  # Pattern: .select((s) <anything-not-containing-=>>
   hits=$(rg -n --no-heading --pcre2 \
     '\.select\(\([a-zA-Z_]\w*\)\s+(?!=>)[^)=]' \
     "${RG_EXCLUDE[@]}" \
@@ -153,9 +135,7 @@ rule_a4_raw() {
 # ── Rule: V7 — riverpod_lint prerelease pin must have comment ────────────────
 rule_v7() {
   local hits
-  # Detect prerelease version pins (e.g. riverpod_lint: 2.3.4-dev.1)
-  # The preceding line must start with '#' (a comment)
-  # We use awk to do context-aware checking
+  # Prerelease pins need an explanatory comment on the preceding line.
   local tmp_hits=""
   for scanpath in "${SCAN_PATHS[@]}"; do
     if [ -d "$scanpath" ]; then
@@ -455,8 +435,7 @@ rule_c1() {
 # ── Rule: W1 — no private widget classes (use public + @visibleForTesting) ───
 rule_w1() {
   local hits
-  # Match: class _Foo extends <widget base>
-  # Exempt: State<T> subclasses (Flutter convention requires private).
+  # State<T> subclasses retain Flutter's private naming convention.
   hits=$(rg -n --no-heading --pcre2 \
     '^\s*class\s+_\w+\s+extends\s+(StatelessWidget|StatefulWidget|ConsumerWidget|ConsumerStatefulWidget|HookWidget|HookConsumerWidget|StatelessHookConsumerWidget)\b' \
     "${RG_EXCLUDE[@]}" \

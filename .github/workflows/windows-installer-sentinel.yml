@@ -38,6 +38,7 @@ concurrency:
 
 jobs:
   settlement:
+    name: settlement
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -49,7 +50,7 @@ jobs:
       - name: Verify scaffold integration and order
         shell: pwsh
         run: |
-          $scannerPath = '${{ github.workspace }}\skills\building-flutter-apps\assets\defender-installer-scan.ps1'
+          $scannerPath = Join-Path $env:GITHUB_WORKSPACE 'skills\building-flutter-apps\assets\defender-installer-scan.ps1'
           $tokens = $null
           $errors = $null
           [void] [System.Management.Automation.Language.Parser]::ParseFile(
@@ -127,7 +128,7 @@ jobs:
           $tokens = $null
           $errors = $null
           [void] [System.Management.Automation.Language.Parser]::ParseFile(
-            '${{ github.workspace }}\skills\building-flutter-apps\assets\inno-uninstall-settlement-sentinel.ps1',
+            (Join-Path $env:GITHUB_WORKSPACE 'skills\building-flutter-apps\assets\inno-uninstall-settlement-sentinel.ps1'),
             [ref] $tokens,
             [ref] $errors
           )

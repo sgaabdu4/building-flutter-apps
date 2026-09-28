@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Smoke test for the `building-flutter-apps` skill and plugin packages.
-# Run from any directory. Builds a temp Flutter project, drives each hook end-to-end
-# with crafted violators + clean fixtures, asserts every rule fires correctly and
-# nothing fires on clean code. Use this before publishing a release.
 
 set -uo pipefail
 
@@ -410,7 +406,11 @@ fi
 echo ""
 echo "── 3. Shell syntax ──"
 for f in "$HOOK" "$PREFLIGHT" "$REMINDER"; do
-  bash -n "$f" 2>/dev/null && report pass "$(basename "$f")" || report fail "$(basename "$f")"
+  if bash -n "$f" 2>/dev/null; then
+    report pass "$(basename "$f")"
+  else
+    report fail "$(basename "$f")"
+  fi
 done
 
 # --------- 4. Build temp Flutter project + fixtures ---------
@@ -666,7 +666,11 @@ assert_block() {
   echo "{\"tool_input\":{\"file_path\":\"$file\"}}" | "$HOOK" > /tmp/smoke_out.json 2>/dev/null
   if [[ -s /tmp/smoke_out.json ]]; then
     DEC=$(python3 -c "import json; print(json.load(open('/tmp/smoke_out.json')).get('decision',''))" 2>/dev/null)
-    [[ "$DEC" == "block" ]] && report pass "$name" || report fail "$name (decision=$DEC)"
+    if [[ "$DEC" == "block" ]]; then
+      report pass "$name"
+    else
+      report fail "$name (decision=$DEC)"
+    fi
   else
     report fail "$name (expected block, got silent)"
   fi
@@ -675,7 +679,11 @@ assert_block() {
 assert_silent() {
   local name="$1" file="$2"
   echo "{\"tool_input\":{\"file_path\":\"$file\"}}" | "$HOOK" > /tmp/smoke_out.json 2>/dev/null
-  [[ ! -s /tmp/smoke_out.json ]] && report pass "$name" || report fail "$name (expected silent)"
+  if [[ ! -s /tmp/smoke_out.json ]]; then
+    report pass "$name"
+  else
+    report fail "$name (expected silent)"
+  fi
 }
 
 assert_block  "violator → 5 old rules fire"             "$TEST_DIR/lib/violator.dart"
@@ -777,7 +785,11 @@ plugins:
   flutter_skill_lints: ^0.13.0
 EOF
 run_config_preflight
-[[ ! -s "$CONFIG_OUT" ]] && report pass "valid Flutter plugin configuration" || report fail "valid Flutter plugin configuration"
+if [[ ! -s "$CONFIG_OUT" ]]; then
+  report pass "valid Flutter plugin configuration"
+else
+  report fail "valid Flutter plugin configuration"
+fi
 
 for config_case in nested empty missing-riverpod; do
   write_flutter_fixture
@@ -835,29 +847,49 @@ tooling:
 EOF
 rm -f "$CONFIG_DIR/analysis_options.yaml"
 run_config_preflight
-[[ ! -s "$CONFIG_OUT" ]] && report pass "pure-Dart project bypasses Flutter preflight" || report fail "pure-Dart project bypasses Flutter preflight"
+if [[ ! -s "$CONFIG_OUT" ]]; then
+  report pass "pure-Dart project bypasses Flutter preflight"
+else
+  report fail "pure-Dart project bypasses Flutter preflight"
+fi
 rm -rf "$CONFIG_DIR"
 
 NON_FL=$(mktemp -d)
 HOME="$EMPTY_HOME" PATH="$TEST_BIN:$PATH" CLAUDE_PROJECT_DIR="$NON_FL" "$PREFLIGHT" > /tmp/smoke_pf2.json 2>/dev/null
-[[ ! -s /tmp/smoke_pf2.json ]] && report pass "non-Flutter dir → silent" || report fail "non-Flutter dir (expected silent)"
+if [[ ! -s /tmp/smoke_pf2.json ]]; then
+  report pass "non-Flutter dir → silent"
+else
+  report fail "non-Flutter dir (expected silent)"
+fi
 rm -rf "$NON_FL"
 
 # --------- 6. UserPromptSubmit ---------
 echo ""
 echo "── 6. UserPromptSubmit hook (skill_reminder.sh) ──"
 CLAUDE_PROJECT_DIR="$TEST_DIR" "$REMINDER" > /tmp/smoke_sr.json 2>/dev/null
-grep -q 'building-flutter-apps active' /tmp/smoke_sr.json 2>/dev/null && report pass "Flutter project → reminder injected" || report fail "reminder missing"
+if grep -q 'building-flutter-apps active' /tmp/smoke_sr.json 2>/dev/null; then
+  report pass "Flutter project → reminder injected"
+else
+  report fail "reminder missing"
+fi
 
 NON_FL2=$(mktemp -d)
 CLAUDE_PROJECT_DIR="$NON_FL2" "$REMINDER" > /tmp/smoke_sr2.json 2>/dev/null
-[[ ! -s /tmp/smoke_sr2.json ]] && report pass "non-Flutter dir → silent" || report fail "non-Flutter reminder fired"
+if [[ ! -s /tmp/smoke_sr2.json ]]; then
+  report pass "non-Flutter dir → silent"
+else
+  report fail "non-Flutter reminder fired"
+fi
 rm -rf "$NON_FL2"
 
 # --------- 7. Doc drift ---------
 echo ""
 echo "── 7. tool/check_drift.sh ──"
-bash "$PLUGIN_ROOT/tool/check_drift.sh" > /dev/null 2>&1 && report pass "check_drift 13/13" || report fail "check_drift failed (run manually to see)"
+if bash "$PLUGIN_ROOT/tool/check_drift.sh" > /dev/null 2>&1; then
+  report pass "check_drift 13/13"
+else
+  report fail "check_drift failed (run manually to see)"
+fi
 
 # --------- Result ---------
 echo ""

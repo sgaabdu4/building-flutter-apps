@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
-# PostToolUse hook for Write|Edit|MultiEdit.
-# Fires on .dart files and l10n.yaml inside a Flutter project (pubspec.yaml present in ancestor).
-# Runs ERE grep + awk context checks to catch grep-able rule violations.
-# Always exits 0. Violations emitted as JSON {"decision":"block","reason":"..."} on stdout,
-# which compatible plugin runtimes interpret as a block + feedback message.
+# Plugin runtimes consume block decisions from stdout; the process exits zero.
 
 set -uo pipefail
 
@@ -82,8 +78,7 @@ esac
 
 VIOLATIONS=()
 
-# add_match consumes `<lineno>:<content>` lines from $1 (a pipeline result captured into a variable)
-# and appends each as a formatted violation. Runs in current shell — no subshell array loss.
+# Append in the current shell to retain the violation array.
 add_match() {
   local rule="$1"
   local fix="$2"
@@ -376,24 +371,16 @@ if grep -qE 'MaterialApp' "$FILE_PATH" 2>/dev/null; then
     "$MATCHES"
 fi
 
-# ---------- Rule 13: Storage SDK outside Local Datasource ----------
-# Fires EVERYWHERE except infrastructure files. Exempt list covers:
-# - datasource files (by name or by path containing data/datasources, data/local, data/storage)
-# - infrastructure / config: core/hive, core/storage, core/persistence, infrastructure/
-# - main / main_*.dart (app boot — Hive.initFlutter etc.)
-# - test files
-# - explicit init / registration / adapter boilerplate
-# - mixins that wrap datasource access (e.g. *_local_datasource_mixin.dart)
+# Rule 13: Storage SDK access belongs in datasource or infrastructure files.
 case "$FILE_PATH" in
   *_datasource.dart|*_datasource_impl.dart|*_datasource_mixin.dart|*local_datasource*.dart|*remote_datasource*.dart) ;;
   */data/datasources/*|*/data/local/*|*/data/storage/*|*/datasources/*) ;;
   */core/hive/*|*/core/storage/*|*/core/persistence/*|*/core/cache/*|*/infrastructure/*) ;;
   */main.dart|*/main_*.dart|main.dart|main_*.dart) ;;
   *_test.dart|*/test/*|*/test_*/*|*/integration_test/*) ;;
-  *_setup.dart|*storage_init.dart|*hive_setup.dart|*_registrar.dart|*hive_adapters.dart|*hive_boxes.dart) ;;
+  *_setup.dart|*storage_init.dart|*_registrar.dart|*hive_adapters.dart|*hive_boxes.dart) ;;
   *)
-    # Storage SDK package imports — file-storage-specific (NOT Platform / HttpStatus / HttpException
-    # which live in dart:io but are legitimately used in services).
+    # Permit non-storage dart:io types used by services.
     MATCHES=$(grep -nE "^import[[:space:]]+['\"]package:(hive|hive_ce|hive_ce_flutter|shared_preferences|flutter_secure_storage|path_provider|sqflite|sembast|isar|drift)['\"/]" "$FILE_PATH" 2>/dev/null)
     add_match "no-storage-sdk-outside-datasource" \
       "Storage SDK import (hive / hive_ce / shared_preferences / flutter_secure_storage / path_provider / sqflite / sembast / isar / drift) outside Local<X>Datasource. Move to data/datasources/. Notifier and widget depend on the repository provider." \
