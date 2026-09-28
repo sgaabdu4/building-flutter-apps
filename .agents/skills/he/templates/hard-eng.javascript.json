@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "packages": [
+    {
+      "name": "app",
+      "path": ".",
+      "language": "javascript",
+      "sources": ["src"],
+      "checks": [
+        {
+          "name": "performance",
+          "role": "performance",
+          "command": ["pnpm", "run", "test:performance"],
+          "report": { "type": "performance-junit", "path": "coverage/performance.xml" }
+        },
+        { "name": "format-lint", "role": "format-lint", "parallel": true, "command": ["biome", "ci", ".", "--error-on-warnings"] },
+        {
+          "name": "focused-tests",
+          "role": "focused-tests",
+          "parallel": true,
+          "command": ["biome", "lint", "--only=suspicious/noFocusedTests", "--error-on-warnings", "."]
+        },
+        {
+          "name": "typing-style",
+          "role": "typing-style",
+          "parallel": true,
+          "command": [
+            "biome",
+            "lint",
+            "--only=suspicious/noVar",
+            "--only=suspicious/noExplicitAny",
+            "--only=suspicious/noImplicitAnyLet",
+            "--only=performance/noAccumulatingSpread",
+            "--error-on-warnings",
+            "."
+          ]
+        },
+        {
+          "name": "types",
+          "role": "types",
+          "parallel": true,
+          "command": [
+            "tsc",
+            "--noEmit",
+            "--strict",
+            "--noImplicitAny",
+            "--noImplicitThis",
+            "--strictNullChecks",
+            "--strictFunctionTypes",
+            "--strictBindCallApply",
+            "--strictPropertyInitialization",
+            "--strictBuiltinIteratorReturn",
+            "--useUnknownInCatchVariables",
+            "--alwaysStrict",
+            "--allowJs",
+            "--checkJs",
+            "--noCheck",
+            "false"
+          ]
+        },
+        {
+          "name": "tests",
+          "role": "tests",
+          "command": ["pnpm", "run", "test:coverage"],
+          "report": { "type": "lcov-tests", "tests": "coverage/junit.xml", "coverage": "coverage/lcov.info" }
+        },
+        {
+          "name": "dead-code-duplicates",
+          "role": "dead-code-duplicates",
+          "command": [
+            "fallow",
+            "--only",
+            "dead-code,dupes",
+            "--max-file-size",
+            "0",
+            "--fail-on-issues",
+            "--format",
+            "json",
+            "--output-file",
+            "coverage/fallow.json"
+          ],
+          "report": { "type": "fallow", "path": "coverage/fallow.json" }
+        }
+      ]
+    }
+  ],
+  "shared": [
+    { "name": "lockfile", "role": "lockfiles", "command": ["pnpm", "install", "--frozen-lockfile"] },
+    {
+      "name": "secrets-files",
+      "role": "secrets-files",
+      "parallel": true,
+      "command": [
+        "gitleaks",
+        "dir",
+        ".",
+        "--redact=100",
+        "--no-banner",
+        "--report-format",
+        "sarif",
+        "--report-path",
+        "coverage/gitleaks-files.sarif"
+      ],
+      "report": { "type": "gitleaks", "path": "coverage/gitleaks-files.sarif" }
+    },
+    {
+      "name": "secrets-history",
+      "role": "secrets-history",
+      "parallel": true,
+      "command": [
+        "gitleaks",
+        "git",
+        ".",
+        "--redact=100",
+        "--no-banner",
+        "--log-opts=--all",
+        "--report-format",
+        "sarif",
+        "--report-path",
+        "coverage/gitleaks-history.sarif"
+      ],
+      "report": { "type": "gitleaks", "path": "coverage/gitleaks-history.sarif" }
+    },
+    {
+      "name": "vulnerabilities",
+      "role": "vulnerabilities",
+      "parallel": true,
+      "command": [
+        "osv-scanner",
+        "scan",
+        "source",
+        "--lockfile=pnpm-lock.yaml",
+        "--allow-no-lockfiles",
+        "--all-packages",
+        "--format=json",
+        "--output-file=coverage/osv.json"
+      ],
+      "report": { "type": "osv", "path": "coverage/osv.json" }
+    },
+    {
+      "name": "security",
+      "role": "security",
+      "parallel": true,
+      "command": [
+        "semgrep",
+        "scan",
+        "--config",
+        "p/javascript",
+        "--config",
+        "p/typescript",
+        "--jobs",
+        "2",
+        "--error",
+        "--strict",
+        "--time",
+        "--json",
+        "--output",
+        "coverage/semgrep.json",
+        "."
+      ],
+      "report": { "type": "semgrep", "path": "coverage/semgrep.json" }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Product Walkthrough Video"
+  short_description: "Check recorded web journeys or deliver polished walkthroughs"
+  default_prompt: "Use $product-walkthrough-video to record and review the product journey for E2E proof; add MP4 conversion and final review when video delivery is requested."
+policy:
+  allow_implicit_invocation: false

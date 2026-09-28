@@ -1,0 +1,22 @@
+rules:
+  - id: dart-accept-invalid-certificate
+    languages: [dart]
+    severity: ERROR
+    message: Reject invalid TLS certificates instead of accepting every certificate.
+    metadata:
+      references:
+        - https://api.dart.dev/dart-io/HttpClient/badCertificateCallback.html
+    pattern-either:
+      - pattern: $CLIENT.badCertificateCallback = (...) => true
+      - pattern: $CLIENT.badCertificateCallback = (...) { return true; }
+  - id: dart-shell-process
+    languages: [dart]
+    severity: ERROR
+    message: Use direct process execution; shell parsing requires a reviewed narrow exception.
+    metadata:
+      references:
+        - https://api.dart.dev/dart-io/Process/run.html
+    pattern-either:
+      - pattern: 'Process.run(..., runInShell: true, ...)'
+      - pattern: 'Process.runSync(..., runInShell: true, ...)'
+      - pattern: 'Process.start(..., runInShell: true, ...)'

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Security Review"
+  short_description: "Review application security with evidence"
+  default_prompt: "Use $security-review to review this authorized application surface for concrete security risks and report supporting evidence and gaps."
+policy:
+  allow_implicit_invocation: true

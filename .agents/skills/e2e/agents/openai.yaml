@@ -1,0 +1,6 @@
+interface:
+  display_name: "E2E"
+  short_description: "Prove user journeys with the existing stack tools"
+  default_prompt: "Use $e2e to verify the requested journey through the real product and report its outcomes and remaining gaps."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codebase Design"
+  short_description: "Design clear code, UI and domain ownership"
+  default_prompt: "Use $codebase-design to simplify these boundaries and define clear public contracts, loading UI or domain guidance where relevant."

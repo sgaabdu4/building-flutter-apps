@@ -1,17 +1,8 @@
 #!/usr/bin/env bash
-# check_drift_test.sh — Fixture-based regression tests for check_drift.sh
-#
-# For each rule, verifies:
-#   positive: violation.md triggers that rule (exit non-zero, rule fails)
-#   negative: clean.md passes that rule (rule does not fail)
-#
-# Usage: bash tool/check_drift_test.sh
-# Exit:  0 = all tests pass, 1 = failures found
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CHECKER="$SCRIPT_DIR/check_drift.sh"
 FIXTURE_DIR="$SCRIPT_DIR/test_fixtures"
 
@@ -23,8 +14,6 @@ FAIL=0
 pass() { echo "ok - $1"; PASS=$(( PASS + 1 )); }
 fail() { echo "not ok - $1"; FAIL=$(( FAIL + 1 )); }
 
-# Run only one checker rule against a single file path.
-# This selects the test subject. It does not suppress findings.
 run_rule_on_file() {
   local rule_id="$1"
   local filepath="$2"
@@ -86,10 +75,7 @@ test_rule() {
   fi
 }
 
-# ── d5 is special: tests Core Stack ownership + README/SKILL links ────────────
-# The d5 violation fixture only tests the inline version pin sub-check (which
-# runs on arbitrary paths). The live Core Stack and README/SKILL link checks
-# are structural checks on the live repo files — we test them separately.
+# d5's inline-pin fixture is separate from its live ownership/link assertions.
 
 test_d5_inline_version() {
   local rule_id="d5"
@@ -101,8 +87,6 @@ test_d5_inline_version() {
     return
   fi
 
-  # For d5, the inline version sub-check runs on the scanned path.
-  # Pass it via the positional path arg, ignore all other rules.
   local pos_output
   pos_output=$(bash "$CHECKER" --only d5 "$violation_file" 2>&1 || true)
   if rule_failed_in_output "d5" "$pos_output"; then

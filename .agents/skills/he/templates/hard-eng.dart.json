@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "packages": [
+    {
+      "name": "app",
+      "path": ".",
+      "language": "dart",
+      "sources": ["lib"],
+      "checks": [
+        {
+          "name": "performance",
+          "role": "performance",
+          "command": ["dart", "test", "test/performance", "--reporter=json"],
+          "report": { "type": "performance-dart", "path": "coverage/performance.jsonl", "stdout": true }
+        },
+        {
+          "name": "format",
+          "role": "format",
+          "parallel": true,
+          "command": [
+            "sh",
+            "-c",
+            "set -e; candidates=$(mktemp); files=$(mktemp); trap 'rm -f \"$candidates\" \"$files\"' EXIT HUP INT TERM; git ls-files -z --cached --others --exclude-standard -- '*.dart' ':(glob,exclude)**/build/**' ':(glob,exclude)**/.dart_tool/**' ':(exclude).agents/**' ':(exclude).hooks/**' ':(exclude)vendor/**' > \"$candidates\"; xargs -0 sh -c 'for path in \"$@\"; do if [ -f \"$path\" ]; then printf \"%s\\0\" \"$path\"; fi; done' sh < \"$candidates\" > \"$files\"; [ -s \"$files\" ] || exit 0; xargs -0 dart format --output=none --set-exit-if-changed < \"$files\""
+          ]
+        },
+        { "name": "types-lint", "role": "types", "parallel": true, "command": ["dart", "analyze", "--fatal-infos", "."] },
+        {
+          "name": "tests",
+          "role": "tests",
+          "command": ["flutter", "test", "--no-pub", "--machine", "--coverage", "--coverage-path=coverage/lcov.info"],
+          "report": { "type": "dart-tests", "tests": "coverage/tests.jsonl", "coverage": "coverage/lcov.info" }
+        },
+        {
+          "name": "dead-code-duplicates",
+          "role": "dead-code-duplicates",
+          "command": ["dart-decimate", "check", ".", "--threshold", "0", "--strict", "--format", "json"],
+          "report": { "type": "dart-decimate", "path": "coverage/dart-decimate.json", "stdout": true }
+        }
+      ]
+    }
+  ],
+  "shared": [
+    { "name": "lockfile", "role": "lockfiles", "command": ["flutter", "pub", "get", "--enforce-lockfile"] },
+    {
+      "name": "secrets-files",
+      "role": "secrets-files",
+      "parallel": true,
+      "command": [
+        "gitleaks",
+        "dir",
+        ".",
+        "--redact=100",
+        "--no-banner",
+        "--report-format",
+        "sarif",
+        "--report-path",
+        "coverage/gitleaks-files.sarif"
+      ],
+      "report": { "type": "gitleaks", "path": "coverage/gitleaks-files.sarif" }
+    },
+    {
+      "name": "secrets-history",
+      "role": "secrets-history",
+      "parallel": true,
+      "command": [
+        "gitleaks",
+        "git",
+        ".",
+        "--redact=100",
+        "--no-banner",
+        "--log-opts=--all",
+        "--report-format",
+        "sarif",
+        "--report-path",
+        "coverage/gitleaks-history.sarif"
+      ],
+      "report": { "type": "gitleaks", "path": "coverage/gitleaks-history.sarif" }
+    },
+    {
+      "name": "vulnerabilities",
+      "role": "vulnerabilities",
+      "parallel": true,
+      "command": [
+        "osv-scanner",
+        "scan",
+        "source",
+        "--lockfile=pubspec.lock",
+        "--all-packages",
+        "--format=json",
+        "--output-file=coverage/osv.json"
+      ],
+      "report": { "type": "osv", "path": "coverage/osv.json" }
+    },
+    {
+      "name": "security",
+      "role": "security",
+      "parallel": true,
+      "command": [
+        "semgrep",
+        "scan",
+        "--config",
+        ".agents/skills/he/security",
+        "--jobs",
+        "2",
+        "--error",
+        "--strict",
+        "--time",
+        "--json",
+        "--output",
+        "coverage/semgrep.json",
+        "."
+      ],
+      "report": { "type": "semgrep", "path": "coverage/semgrep.json" }
+    }
+  ]
+}

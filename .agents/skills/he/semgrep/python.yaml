@@ -1,0 +1,16 @@
+rules:
+  - id: insecure-hash-algorithm-sha1
+    languages: [python]
+    severity: WARNING
+    message: >-
+      SHA-1 is not collision resistant. Use SHA-256 or SHA-3; when a file
+      format mandates SHA-1 for integrity only, declare it with
+      usedforsecurity=False.
+    metadata:
+      cwe:
+        - "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+      references:
+        - https://docs.python.org/3/library/hashlib.html#hashlib.new
+    patterns:
+      - pattern: hashlib.sha1(...)
+      - pattern-not: hashlib.sha1(..., usedforsecurity=False, ...)

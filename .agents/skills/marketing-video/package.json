@@ -1,0 +1,11 @@
+{
+  "name": "marketing-video",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Script, cut, voice, render and review a polished product marketing video from real walkthrough footage.",
+  "dependencies": {
+    "gsap": "3.15.0",
+    "playwright": "1.62.1"
+  }
+}

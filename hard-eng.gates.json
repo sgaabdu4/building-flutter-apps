@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "shipping": {
+    "base": "main",
+    "checks": ["Repository checks", "Upstream flutter/skills drift"],
+    "ui_paths": [],
+    "ci_seconds": 180,
+    "pre_push_seconds": 180,
+    "delivery": []
+  },
+  "packages": [],
+  "shared": [
+    {
+      "name": "skill-routing",
+      "command": ["python3", "tool/check_skill_routing.py"]
+    },
+    {
+      "name": "windows-installer-assets",
+      "command": ["python3", "tool/check_windows_installer_assets.py"]
+    },
+    {
+      "name": "windows-installer-inputs",
+      "command": ["python3", "tool/check_windows_installer_inputs.py"]
+    },
+    {
+      "name": "drift-fixtures",
+      "command": ["bash", "tool/check_drift_test.sh"]
+    },
+    {
+      "name": "skill-drift",
+      "command": ["bash", "tool/check_drift.sh"]
+    },
+    {
+      "name": "markdown-examples",
+      "command": ["ruby", "tool/verify_markdown_examples.rb"]
+    },
+    {
+      "name": "plugin-hook-smoke",
+      "command": ["bash", "tool/smoke_test.sh"]
+    },
+    {
+      "name": "secrets-files",
+      "role": "secrets-files",
+      "parallel": true,
+      "command": [
+        "gitleaks",
+        "dir",
+        ".",
+        "--redact=100",
+        "--no-banner",
+        "--report-format",
+        "sarif",
+        "--report-path",
+        "coverage/gitleaks-files.sarif"
+      ],
+      "report": {
+        "type": "gitleaks",
+        "path": "coverage/gitleaks-files.sarif"
+      }
+    },
+    {
+      "name": "secrets-history",
+      "role": "secrets-history",
+      "parallel": true,
+      "command": [
+        "gitleaks",
+        "git",
+        ".",
+        "--log-opts=--all",
+        "--redact=100",
+        "--no-banner",
+        "--report-format",
+        "sarif",
+        "--report-path",
+        "coverage/gitleaks-history.sarif"
+      ],
+      "report": {
+        "type": "gitleaks",
+        "path": "coverage/gitleaks-history.sarif"
+      }
+    },
+    {
+      "name": "actionlint",
+      "role": "workflows",
+      "parallel": true,
+      "command": ["actionlint", "-no-color"]
+    },
+    {
+      "name": "zizmor",
+      "role": "ci-security",
+      "parallel": true,
+      "command": [
+        "zizmor",
+        "--strict-collection",
+        "--persona=auditor",
+        "--format=plain",
+        "."
+      ]
+    },
+    {
+      "name": "shellcheck",
+      "role": "shell",
+      "parallel": true,
+      "command": [
+        "shellcheck",
+        "--",
+        "hooks/scripts/dart_gate.sh",
+        "hooks/scripts/preflight_audit.sh",
+        "hooks/scripts/skill_reminder.sh",
+        "tool/check_drift.sh",
+        "tool/check_drift_test.sh",
+        "tool/smoke_test.sh"
+      ]
+    }
+  ]
+}

@@ -155,11 +155,12 @@ Ownership rules are the point:
 ### Standalone agent skill
 
 ```bash
-npx skills add https://github.com/sgaabdu4/building-flutter-apps --skill building-flutter-apps
+pnpm dlx skills@latest add https://github.com/sgaabdu4/building-flutter-apps \
+  --skill building-flutter-apps --agent claude-code codex
 ```
 
-Codex can invoke it explicitly with `$building-flutter-apps`; other harnesses
-use their own skill-selection syntax.
+Supported hosts are Claude Code and Codex. Codex can invoke the standalone
+skill explicitly with `$building-flutter-apps`.
 
 ### Claude Code
 
@@ -184,16 +185,6 @@ Codex reads `.codex-plugin/plugin.json`, loads the shared skill, and discovers
 `hooks/hooks.json`. Review and trust the hook definition in `/hooks`, then start
 a new task.
 
-### Copilot CLI
-
-```bash
-copilot plugin marketplace add sgaabdu4/building-flutter-apps
-copilot plugin install building-flutter-apps@building-flutter-apps
-```
-
-Copilot reads `.github/plugin/marketplace.json` and root `plugin.json`, then
-loads `hooks/hooks.copilot.json`.
-
 ## Bootstrap A Flutter Project
 
 ```bash
@@ -217,7 +208,8 @@ Notes:
   Flutter/Riverpod template.
 - An installed Hard Eng project runs `python3 .hooks/hard-eng.py check` for its
   configured native checks. A standalone project without an established Dart
-  Decimate check runs `npx --yes dart-decimate@latest check . --threshold 0
+  Decimate check runs `pnpm dlx --config.ignore-scripts=false
+  --allow-build=dart-decimate dart-decimate@latest check . --threshold 0
   --format json` from its Git root. Do not add a wrapper, dependency, or global
   coordinator for this skill, or replace an existing hook or `core.hooksPath`.
 
@@ -236,7 +228,6 @@ changes require a real project package solve and analyzer proof.
 |---|---|---|---|
 | Claude Code | `PostToolUse` | `Stop` | `UserPromptSubmit` |
 | Codex CLI | `PostToolUse` | `Stop` | `UserPromptSubmit` |
-| Copilot CLI | `postToolUse` | `agentStop` | `userPromptSubmitted` |
 
 The hook scripts no-op outside Flutter projects by walking upward for
 `pubspec.yaml`.

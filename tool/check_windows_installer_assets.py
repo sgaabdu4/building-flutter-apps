@@ -372,7 +372,7 @@ require(
     "Windows CI must pin current audited checkout v7.0.1",
 )
 require(
-    "'${{ github.workspace }}\\skills\\building-flutter-apps\\assets\\defender-installer-scan.ps1'"
+    "Join-Path $env:GITHUB_WORKSPACE 'skills\\building-flutter-apps\\assets\\defender-installer-scan.ps1'"
     in ci_text,
     "Windows CI must parse the exact Defender scanner",
 )
