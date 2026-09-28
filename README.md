@@ -155,7 +155,8 @@ Ownership rules are the point:
 ### Standalone agent skill
 
 ```bash
-npx skills add https://github.com/sgaabdu4/building-flutter-apps --skill building-flutter-apps
+pnpm dlx skills@latest add https://github.com/sgaabdu4/building-flutter-apps \
+  --skill building-flutter-apps --agent claude-code codex
 ```
 
 Supported hosts are Claude Code and Codex. Codex can invoke the standalone
@@ -207,7 +208,8 @@ Notes:
   Flutter/Riverpod template.
 - An installed Hard Eng project runs `python3 .hooks/hard-eng.py check` for its
   configured native checks. A standalone project without an established Dart
-  Decimate check runs `npx --yes dart-decimate@latest check . --threshold 0
+  Decimate check runs `pnpm dlx --config.ignore-scripts=false
+  --allow-build=dart-decimate dart-decimate@latest check . --threshold 0
   --format json` from its Git root. Do not add a wrapper, dependency, or global
   coordinator for this skill, or replace an existing hook or `core.hooksPath`.
 

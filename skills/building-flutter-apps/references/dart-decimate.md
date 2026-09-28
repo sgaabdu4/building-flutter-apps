@@ -5,7 +5,7 @@
 - Runtime owner = the project; guidance owner = this reference.
 - Package root = requested `pubspec.yaml`; run a standalone scan from its Git root.
 - Hard Eng install → `python3 .hooks/hard-eng.py check`; its configured native check owns scope and report validation.
-- Another project → use its established Dart Decimate check. If it has none, run `npx --yes dart-decimate@latest check . --threshold 0 --format json` from its Git root.
+- Another project → use its established Dart Decimate check. If it has none, run `pnpm dlx --config.ignore-scripts=false --allow-build=dart-decimate dart-decimate@latest check . --threshold 0 --format json` from its Git root.
 - The project workflow schedules its integrated check; reuse a valid same-scope result instead of launching another full runner after a focused edit check.
 - Do not add a wrapper, dependency, binary copy, package-root `tool/` bundle, or global coordinator solely for this skill.
 - Dart Decimate + `dart analyze` = complementary required gates.
