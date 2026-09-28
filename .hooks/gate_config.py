@@ -109,6 +109,7 @@ Group = TypedDict(
         "sources": NotRequired[list[str]],
         "depends_on": NotRequired[list[str]],
         "impact_inputs": NotRequired[list[str]],
+        "performance_exception": NotRequired[str],
     },
 )
 GateConfig = TypedDict(
@@ -585,17 +586,27 @@ def selected_services(
     return affected
 
 
-def validate_performance_gate(gate: Gate) -> None:
-    if gate.get("role") != "performance":
-        return
-    if gate.get("parallel", False):
-        raise ValueError("Performance suites must run serially")
-    if gate.get("report", {}).get("type") not in {
-        "performance-junit",
-        "performance-dart",
-        "lighthouse-ci",
-    }:
-        raise ValueError("Performance suite requires a supported native report")
+def validate_performance(group: Group) -> None:
+    reason = group.get("performance_exception")
+    if "performance_exception" in group and (
+        not isinstance(reason, str) or not reason.strip()
+    ):
+        raise ValueError("performance_exception must be a nonblank reviewed reason")
+    suites = [gate for gate in group["checks"] if gate.get("role") == "performance"]
+    if group.get("language") and not suites and reason is None:
+        raise ValueError(
+            "Missing mandatory performance suite; configure a workload and budget "
+            "or a reviewed performance_exception"
+        )
+    for gate in suites:
+        if gate.get("parallel", False):
+            raise ValueError("Performance suites must run serially")
+        if gate.get("report", {}).get("type") not in {
+            "performance-junit",
+            "performance-dart",
+            "lighthouse-ci",
+        }:
+            raise ValueError("Performance suite requires a supported native report")
 
 
 def validate_group(root: Path, group: Group, report_paths: set[Path]) -> int:
@@ -644,10 +655,6 @@ def validate_group(root: Path, group: Group, report_paths: set[Path]) -> int:
         raise ValueError(
             f"{group['path']}: missing mandatory checks: {', '.join(sorted(required - roles))}"
         )
-    if group.get("language") and "performance" not in roles:
-        raise ValueError(
-            "Missing mandatory performance suite; configure a workload and budget"
-        )
     if group.get("language") == "javascript":
         from project_setup import javascript_manager, package_script_arguments
 
@@ -656,7 +663,7 @@ def validate_group(root: Path, group: Group, report_paths: set[Path]) -> int:
             package_script_arguments(gate["command"], directory, pnpm_only=True)
     for gate in group["checks"]:
         validate_gate(gate, directory, report_paths)
-        validate_performance_gate(gate)
+    validate_performance(group)
     return len(group["checks"])
 
 
