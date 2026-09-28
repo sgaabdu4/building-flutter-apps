@@ -1,0 +1,20 @@
+{
+  "name": "product-walkthrough-video",
+  "version": "2.8.0",
+  "private": true,
+  "type": "module",
+  "description": "Strict Playwright screencast pipeline for polished, reviewed product walkthroughs.",
+  "scripts": {
+    "test": "pnpm run test:gesture && pnpm run test:dialog-pointer && pnpm run test:view-transition-pointer",
+    "test:dialog-pointer": "node tests/native-dialog-pointer-smoke.mjs",
+    "test:gesture": "node tests/gesture-smoke.mjs",
+    "test:view-transition-pointer": "node tests/view-transition-pointer-smoke.mjs",
+    "scaffold": "node scripts/scaffold.mjs",
+    "record": "node scripts/run-walkthrough.mjs",
+    "review": "node scripts/review-video.mjs",
+    "convert": "node scripts/convert-mp4.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.62.1"
+  }
+}

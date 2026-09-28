@@ -1,0 +1,4 @@
+interface:
+  display_name: "Writing Great Skills"
+  short_description: "Write terse, routed agent skills"
+  default_prompt: "Use $writing-great-skills to author or review a terse, correctly routed agent skill."

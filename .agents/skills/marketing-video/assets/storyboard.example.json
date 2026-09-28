@@ -1,0 +1,156 @@
+{
+  "brand": {
+    "font": "brand/Display.ttf",
+    "logos": { "a": "brand/acme.svg", "b": "brand/globex.svg" },
+    "colors": {
+      "ink": "#111827",
+      "accent": "#2563eb",
+      "highlight": "#93c5fd",
+      "dark": "#1e3a8a",
+      "tint": "#e0e7ff",
+      "bg": "#f8fafc"
+    }
+  },
+  "subtitles": false,
+  "transitions": "cut",
+  "backdrop": false,
+  "music": { "volume": 0.42 },
+  "voice": { "exaggeration": 0.7, "cfg": 0.4 },
+  "blankCrop": [240, 110, 1200, 790],
+  "shotFrame": 1440,
+  "scenes": [
+    { "id": "01", "type": "intro", "min": 5.6, "voAt": 1.3 },
+    {
+      "id": "02",
+      "type": "statement",
+      "title": "Support every day,<br><span class=\"accent\">not just at appointments.</span>",
+      "bands": [
+        {
+          "kind": "Clinical authority",
+          "logo": "b",
+          "accent": true,
+          "items": ["Assessment", "Guidance", "Eligibility"]
+        },
+        {
+          "kind": "Daily support",
+          "logo": "a",
+          "items": ["Plans", "Accountability", "Progress"]
+        }
+      ],
+      "min": 7.5,
+      "voAt": 0.7
+    },
+    {
+      "id": "02b",
+      "type": "flow",
+      "text": "Acme reads your records.<br><span class=\"accent\">It never writes to them.</span>",
+      "min": 9,
+      "voAt": 0.6,
+      "nodes": [
+        {
+          "name": "Records",
+          "note": "Where the data lives",
+          "badge": "Read-only"
+        },
+        {
+          "name": "Acme",
+          "note": "Checks every item",
+          "hero": true,
+          "logo": "a"
+        },
+        { "name": "Your lists", "rows": [["To fix", "12"], ["Done", "40"]] }
+      ]
+    },
+    {
+      "id": "03",
+      "type": "title",
+      "text": "Let’s see how it works",
+      "min": 2.6,
+      "voAt": 0.3,
+      "tail": 0.6
+    },
+    {
+      "id": "04",
+      "type": "app",
+      "num": 1,
+      "label": "A referral arrives",
+      "who": "Clinic doctor · Admin",
+      "clips": [
+        {
+          "video": "footage/referral.mp4",
+          "from": 25.6,
+          "to": 33.8,
+          "speed": 2.5,
+          "caption": "Refer a patient"
+        },
+        {
+          "video": "footage/referral.mp4",
+          "from": 85,
+          "to": 96,
+          "speed": 2.2,
+          "caption": "Invite sent",
+          "focus": { "from": 89.2, "to": 92, "box": [300, 120, 1100, 260] },
+          "hold": 1.4
+        }
+      ]
+    },
+    {
+      "id": "04b",
+      "type": "app",
+      "num": 2,
+      "label": "Worklists",
+      "groups": [
+        {
+          "line": "04b-1",
+          "shots": [
+            {
+              "file": "lists.png",
+              "caption": "One tab per list",
+              "zoom": "Tabs"
+            },
+            {
+              "file": "lists.png",
+              "caption": "Totals at a glance",
+              "zoom": { "x": 70, "y": 140, "w": 560, "h": 34 }
+            }
+          ]
+        },
+        {
+          "line": "04b-2",
+          "shots": [
+            {
+              "file": "lists-filter.png",
+              "caption": "Filter by owner",
+              "click": "Owner filter"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "04c",
+      "type": "loop",
+      "text": "How it improves",
+      "min": 8,
+      "voAt": 0.6,
+      "nodes": ["Results come in", "Learning each night", "To review", "You approve", "Fewer items to fix"],
+      "you": 3,
+      "badge": "The team decides"
+    },
+    {
+      "id": "05",
+      "type": "collage",
+      "text": "Daily support.<br><span class=\"accent\">Clear progress.</span>",
+      "shots": ["clips/04-1/00030.jpg", "clips/04-2/00060.jpg", "clips/04-1/00090.jpg", "clips/04-2/00010.jpg"],
+      "min": 6
+    },
+    {
+      "id": "06",
+      "type": "outro",
+      "text": "Daily accountability<br><b>for the care you already give.</b>",
+      "cta": "Book a demo",
+      "min": 7.5,
+      "voAt": 1
+    }
+  ]
+}

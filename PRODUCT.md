@@ -1,8 +1,19 @@
 # Building Flutter Apps
 
-- Product = agent skill + enforcement hooks for Flutter Riverpod applications.
-- Users = coding agents maintaining Flutter apps/packages with Riverpod.
-- Purpose = deterministic architecture + analysis + code-health + reproducible build and delivery guidance.
-- Capabilities = Riverpod/Freezed/GoRouter/Hive patterns + analyzer profile + drift hooks + clean-checkout codegen + provider-neutral Windows installer/update delivery proof.
-- Boundaries = non-Riverpod Flutter stacks + pure-Dart work without Flutter/Riverpod app context excluded.
-- Delivery = supported `main` branch → standalone skill + Claude/Codex plugin manifests.
+Agent skill and enforcement hooks for Flutter Riverpod applications.
+
+## Users
+
+Coding agents maintaining Flutter apps and packages with Riverpod through Claude Code or Codex.
+
+## Problem
+
+Flutter guidance and generated code drift from the project's architecture, analyzer rules and reproducible delivery requirements.
+
+## Product Purpose
+
+Provide Riverpod/Freezed/GoRouter/Hive patterns, analyzer configuration, drift hooks, clean-checkout code generation and Windows installer/update delivery proof. The supported `main` branch supplies the standalone skill and Claude/Codex plugin manifests.
+
+## Boundaries
+
+Non-Riverpod Flutter stacks and pure-Dart work without Flutter/Riverpod app context are excluded. This repository distributes guidance and verification assets; it is not a Flutter application.

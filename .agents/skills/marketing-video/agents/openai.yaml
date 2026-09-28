@@ -1,0 +1,6 @@
+interface:
+  display_name: "Marketing Video"
+  short_description: "Script, stage, voice, render and review a product marketing or explainer video"
+  default_prompt: "Use $marketing-video to make a voiced marketing video for this product from real product screens, then review every second before delivery."
+policy:
+  allow_implicit_invocation: false

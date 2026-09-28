@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "packages": [
+    {
+      "name": "app",
+      "path": ".",
+      "language": "python",
+      "sources": ["src"],
+      "checks": [
+        {
+          "name": "performance",
+          "role": "performance",
+          "command": ["pytest", "tests/performance", "--junitxml=coverage/performance.xml"],
+          "report": { "type": "performance-junit", "path": "coverage/performance.xml" }
+        },
+        {
+          "name": "format",
+          "role": "format",
+          "parallel": true,
+          "command": ["ruff", "format", "--check", ".", "--extend-exclude", ".agents/skills,.claude/skills"]
+        },
+        { "name": "lint", "role": "lint", "parallel": true, "command": ["ruff", "check", ".", "--extend-select", "C901,PLR0912,PLR0915"] },
+        {
+          "name": "complexity",
+          "role": "complexity",
+          "parallel": true,
+          "command": [
+            "ruff",
+            "check",
+            ".",
+            "--select",
+            "C901,PLR0912,PLR0915",
+            "--config",
+            "lint.mccabe.max-complexity = 10",
+            "--config",
+            "lint.pylint.max-branches = 12",
+            "--config",
+            "lint.pylint.max-statements = 50"
+          ]
+        },
+        {
+          "name": "types",
+          "role": "types",
+          "parallel": true,
+          "command": ["pyrefly", "check", "--check-unannotated-defs=true", "--min-severity", "info"]
+        },
+        {
+          "name": "annotations",
+          "role": "annotations",
+          "parallel": true,
+          "command": [
+            "ruff",
+            "check",
+            "src",
+            "tests",
+            "--select",
+            "ANN,TID251,RUF017,ASYNC210",
+            "--config",
+            "lint.flake8-annotations.ignore-fully-untyped = false",
+            "--config",
+            "lint.flake8-tidy-imports.banned-api.\"typing.Any\".msg = \"Use a precise type instead of Any\"",
+            "--config",
+            "lint.flake8-tidy-imports.banned-api.\"typing_extensions.Any\".msg = \"Use a precise type instead of Any\""
+          ]
+        },
+        {
+          "name": "tests",
+          "role": "tests",
+          "command": ["pytest", "--cov=src", "--cov-branch", "--cov-report=json:coverage/coverage.json", "--junitxml=coverage/junit.xml"],
+          "report": { "type": "python-tests", "tests": "coverage/junit.xml", "coverage": "coverage/coverage.json" }
+        },
+        { "name": "dead-code", "role": "dead-code", "parallel": true, "command": ["vulture", "src", "tests", "--min-confidence", "60"] },
+        {
+          "name": "duplicates",
+          "role": "duplicates",
+          "command": [
+            "jscpd",
+            "src",
+            "tests",
+            "--format",
+            "python",
+            "--threshold",
+            "0",
+            "--max-size",
+            "100mb",
+            "--max-lines",
+            "1000000",
+            "--reporters",
+            "json",
+            "--output",
+            "coverage/jscpd"
+          ],
+          "report": { "type": "jscpd", "path": "coverage/jscpd/jscpd-report.json" }
+        },
+        {
+          "name": "dependencies",
+          "role": "dependencies",
+          "parallel": true,
+          "command": [
+            "deptry",
+            ".",
+            "--extend-exclude",
+            "(^|/)\\.(hooks|agents)(/|$)",
+            "--no-ansi",
+            "--json-output",
+            "coverage/deptry.json"
+          ],
+          "report": { "type": "deptry", "path": "coverage/deptry.json" }
+        },
+        {
+          "name": "imports",
+          "role": "imports",
+          "parallel": true,
+          "command": ["lint-imports", "--no-logo"],
+          "report": { "type": "import-linter", "path": "coverage/import-linter.txt", "stdout": true }
+        }
+      ]
+    }
+  ],
+  "shared": [
+    { "name": "lockfile", "role": "lockfiles", "command": ["uv", "sync", "--locked"] },
+    {
+      "name": "secrets-files",
+      "role": "secrets-files",
+      "parallel": true,
+      "command": [
+        "gitleaks",
+        "dir",
+        ".",
+        "--redact=100",
+        "--no-banner",
+        "--report-format",
+        "sarif",
+        "--report-path",
+        "coverage/gitleaks-files.sarif"
+      ],
+      "report": { "type": "gitleaks", "path": "coverage/gitleaks-files.sarif" }
+    },
+    {
+      "name": "secrets-history",
+      "role": "secrets-history",
+      "parallel": true,
+      "command": [
+        "gitleaks",
+        "git",
+        ".",
+        "--redact=100",
+        "--no-banner",
+        "--log-opts=--all",
+        "--report-format",
+        "sarif",
+        "--report-path",
+        "coverage/gitleaks-history.sarif"
+      ],
+      "report": { "type": "gitleaks", "path": "coverage/gitleaks-history.sarif" }
+    },
+    {
+      "name": "vulnerabilities",
+      "role": "vulnerabilities",
+      "parallel": true,
+      "command": [
+        "osv-scanner",
+        "scan",
+        "source",
+        "--lockfile=uv.lock",
+        "--all-packages",
+        "--format=json",
+        "--output-file=coverage/osv.json"
+      ],
+      "report": { "type": "osv", "path": "coverage/osv.json" }
+    },
+    {
+      "name": "security",
+      "role": "security",
+      "parallel": true,
+      "command": [
+        "semgrep",
+        "scan",
+        "--config",
+        "p/python",
+        "--jobs",
+        "2",
+        "--error",
+        "--strict",
+        "--time",
+        "--json",
+        "--output",
+        "coverage/semgrep.json",
+        "."
+      ],
+      "report": { "type": "semgrep", "path": "coverage/semgrep.json" }
+    }
+  ]
+}

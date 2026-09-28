@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  checks: read # Verify the upstream scaffold release.
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -27,11 +28,27 @@ jobs:
     name: Repository checks
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      MISE_FETCH_REMOTE_VERSIONS_CACHE: 0s
+      MISE_PREFER_OFFLINE: 'false'
+      MISE_USE_VERSIONS_HOST: 'false'
+      MISE_MINIMUM_RELEASE_AGE: 0s
     steps:
       - name: Check out exact tree
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Use the shared native tool cache
+        run: |
+          {
+            echo "MISE_DATA_DIR=$RUNNER_TEMP/hard-eng-tools/mise/data"
+            echo "MISE_CACHE_DIR=$RUNNER_TEMP/hard-eng-tools/mise/cache"
+            echo "MISE_STATE_DIR=$RUNNER_TEMP/hard-eng-tools/mise/state"
+            echo "PNPM_CONFIG_STORE_DIR=$RUNNER_TEMP/hard-eng-tools/pnpm/store"
+            echo "PNPM_CONFIG_CACHE_DIR=$RUNNER_TEMP/hard-eng-tools/pnpm/cache"
+          } >> "$GITHUB_ENV"
 
       - name: Provide ripgrep with PCRE2
         run: |
@@ -48,26 +65,30 @@ jobs:
           ruby --version
           pwsh --version
 
-      - name: Skill routing
-        run: python3 tool/check_skill_routing.py
+      - name: Cache native tool downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ runner.temp }}/hard-eng-tools/mise/data/installs
+            ${{ runner.temp }}/hard-eng-tools/mise-launcher
+            ${{ runner.temp }}/hard-eng-tools/pnpm/store
+          key: ${{ runner.os }}-${{ runner.arch }}-hard-eng-tools-${{ hashFiles('.hooks/tool_setup.py', 'hard-eng.gates.json') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-hard-eng-tools-
 
-      - name: Windows installer assets
-        run: python3 tool/check_windows_installer_assets.py
+      - uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+        with:
+          version: latest
+          runtime: node@latest
+          install: false
 
-      - name: Windows installer inputs
-        run: python3 tool/check_windows_installer_inputs.py
-
-      - name: Drift checker fixtures
-        run: bash tool/check_drift_test.sh
-
-      - name: Drift check
-        run: bash tool/check_drift.sh
-
-      - name: Markdown examples
-        run: ruby tool/verify_markdown_examples.rb
-
-      - name: Plugin and hook smoke test
-        run: bash tool/smoke_test.sh
+      - name: Verify repository with Hard Eng
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          pnpm dlx --config.ignore-scripts=false --allow-build=@jdxcode/mise --package=@jdxcode/mise@latest mise --no-config install uv@latest &&
+          pnpm dlx --config.ignore-scripts=false --allow-build=@jdxcode/mise --package=@jdxcode/mise@latest mise --no-config exec uv@latest -- uv run --no-project --with pyyaml python .hooks/hard-eng.py check --base "$BASE_SHA"
 
   upstream-drift:
     name: Upstream flutter/skills drift
