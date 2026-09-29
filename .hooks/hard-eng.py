@@ -660,6 +660,20 @@ def biome_children(group: Group, gate: Gate, groups: list[Group]) -> tuple[Path,
     )
 
 
+def require_ci_base(base: str | None) -> None:
+    if (
+        os.environ.get("GITHUB_ACTIONS") == "true"
+        and os.environ.get("GITHUB_EVENT_NAME")
+        in {"push", "pull_request", "pull_request_target"}
+        and (base is None or not base.strip())
+    ):
+        raise ValueError(
+            "GitHub push/PR checks require --base with the comparison commit; "
+            "pass github.event.pull_request.base.sha || github.event.before. "
+            "Manual full checks may omit --base."
+        )
+
+
 def check(
     timeout: float | None = None,
     base: str | None = None,
@@ -667,9 +681,11 @@ def check(
     *,
     verify_plan: bool = True,
 ) -> int:
-    from gate_config import load_groups
+    from gate_config import load_groups, parse_config
     from update import check_scaffold_update
 
+    require_ci_base(base)
+    parse_config((ROOT / "hard-eng.gates.json").read_text())
     if base is not None and check_scaffold_update(ROOT, base):
         return 0
 
@@ -723,6 +739,7 @@ def impact(base: str) -> int:
     from ci_setup import impact_tools
     from gate_config import affected_groups, parse_config
 
+    require_ci_base(base)
     config = parse_config((ROOT / "hard-eng.gates.json").read_text())
     groups: list[Group] = [
         *config["packages"],

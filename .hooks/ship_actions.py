@@ -128,7 +128,14 @@ def pre_push(root: Path) -> int:
             try:
                 if (checkout / ".gitmodules").is_file():
                     subprocess.run(
-                        ["git", "submodule", "update", "--init", "--recursive"],
+                        [
+                            "git",
+                            "submodule",
+                            "update",
+                            "--init",
+                            "--recursive",
+                            "--depth=1",
+                        ],
                         cwd=checkout,
                         env=environment,
                         check=True,

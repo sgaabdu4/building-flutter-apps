@@ -544,6 +544,8 @@ def changed_packages(
 
 def affected_groups(root: Path, groups: list[Group], base: str | None) -> list[Group]:
     packages = groups[:-1]
+    if guidance := dependency_review_guidance(packages):
+        raise ValueError(guidance)
     if base is None or not packages:
         return groups
     by_path = {group["path"]: group for group in packages}
@@ -554,10 +556,7 @@ def affected_groups(root: Path, groups: list[Group], base: str | None) -> list[G
         return groups
     if not selected:
         return [secrets_only(groups[-1])]
-    guidance = dependency_review_guidance(packages)
     if any("depends_on" not in group for group in packages):
-        if guidance is not None:
-            print("Package impact is unknown; checking all packages. " + guidance)
         return groups
     selected = expand_dependents(packages, by_path, selected)
     print("Affected packages and dependents: " + ", ".join(sorted(selected)))
@@ -833,7 +832,7 @@ def validate_package_services(
         require_roles(group["path"], required, roles)
 
 
-def parse_config(content: str) -> GateConfig:
+def parse_config(content: str, *, require_impact_review: bool = True) -> GateConfig:
     config = cast(GateConfig, json.loads(content))
     if (
         not isinstance(config, dict)
@@ -843,6 +842,10 @@ def parse_config(content: str) -> GateConfig:
         raise TypeError(
             "Gate configuration must contain packages and shared lists; rerun the Hard Eng installer to regenerate a retired families configuration from the current templates"
         )
+    if require_impact_review and (
+        guidance := dependency_review_guidance(config["packages"])
+    ):
+        raise ValueError(guidance)
     return config
 
 
