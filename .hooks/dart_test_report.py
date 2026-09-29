@@ -9,24 +9,24 @@ from gate_config import JsonObject
 
 
 def dart_events(path: Path) -> list[JsonObject]:
-    """Return validated events from the supported JSON-lines report."""
-    events = [
-        item
-        for line in path.read_text().splitlines()
-        if line.strip()
-        for event in [json.loads(line)]
-        for item in (event if isinstance(event, list) else [event])
-    ]
-    if not all(isinstance(event, dict) for event in events):
-        raise ValueError("Invalid Dart test report")
-    return [cast(JsonObject, event) for event in events]
+    """Return reporter events, skipping raw test output that shares the stream."""
+    events: list[JsonObject] = []
+    for line in path.read_text().splitlines():
+        try:
+            value = json.loads(line)
+        except ValueError:
+            continue
+        items = value if isinstance(value, list) else [value]
+        if all(isinstance(item, dict) for item in items):
+            events.extend(cast(JsonObject, item) for item in items)
+    return events
 
 
 def failure_summary(path: Path) -> str | None:
     """Return one bounded failing-test summary from a machine-format Dart report."""
     try:
         events = dart_events(path)
-    except (OSError, ValueError, json.JSONDecodeError):
+    except (OSError, ValueError):
         return None
     names: dict[int, str] = {}
     failures: list[int] = []

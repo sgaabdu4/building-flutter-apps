@@ -134,7 +134,6 @@ def line_coverage(
         expected = expected - erased_typescript(expected - files.keys())
     if kind == "dart-tests":
         # Dart LCOV omits simple export barrels: they have no executable lines.
-        expected = expected - erased_dart(expected - files.keys(), directory)
         expected = {
             file
             for file in expected
@@ -144,6 +143,7 @@ def line_coverage(
                 file.read_text(),
             )
         }
+        expected = expected - erased_dart(expected - files.keys())
     missing = expected - files.keys()
     if missing:
         names = ", ".join(str(file.relative_to(directory)) for file in sorted(missing))

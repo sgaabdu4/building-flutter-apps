@@ -2,10 +2,13 @@
 
 import hashlib
 import json
+import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 
 from gate_config import JsonObject, JsonValue, nonproduction_source, repository_files
@@ -439,29 +442,35 @@ def gate_status(root: Path) -> str:
     return status
 
 
-def session_context(root: Path, payload: JsonObject) -> str:
-    from update import update
-
-    messages = []
-    try:
-        messages.append("Hard Eng update result: " + update(root))
-    except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
-        messages.append(
-            f"Hard Eng update failed: {error}. Continue with the existing scaffold; its gates remain required."
-        )
-    messages.append(gate_status(root))
+def record_session(root: Path, payload: JsonObject) -> bool:
+    """Save the session's Git base before a background update can move HEAD."""
     state = session_state(root, payload)
-    if state is not None:
-        try:
-            revision = subprocess.check_output(
-                ["git", "rev-parse", "HEAD"], cwd=root, text=True
-            ).strip()
-            state.parent.mkdir(parents=True, exist_ok=True)
-            if not state.exists():
-                dirty = dirty_files(root, revision)
-                state.write_text(json.dumps({"base": revision, "dirty": dirty}))
-        except (OSError, subprocess.SubprocessError):
-            messages.append("Session revision unavailable; use full checks.")
+    if state is None:
+        return True
+    try:
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True
+        ).strip()
+        state.parent.mkdir(parents=True, exist_ok=True)
+        if not state.exists():
+            dirty = dirty_files(root, revision)
+            state.write_text(json.dumps({"base": revision, "dirty": dirty}))
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return True
+
+
+def session_context(root: Path, payload: JsonObject) -> str:
+    from update_runner import failed_update, start_update
+
+    recorded = record_session(root, payload)
+    try:
+        messages = [start_update(root)]
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
+        messages = [failed_update(error)]
+    messages.append(gate_status(root))
+    if not recorded:
+        messages.append("Session revision unavailable; use full checks.")
     messages.append(
         "Use configured MCPs when relevant to the task. Before relying on one, verify a real call against the intended repository/index, service project or running app/device; registration alone is not readiness. If unavailable, warn and continue with available tools."
     )
@@ -527,7 +536,7 @@ def passed_notice(
 
 def run_check(root: Path, base: str, building: bool) -> tuple[int, str]:
     with tempfile.TemporaryFile() as log:
-        result = subprocess.run(
+        check = subprocess.Popen(
             [
                 sys.executable,
                 str(root / ".hooks/hard-eng.py"),
@@ -539,11 +548,39 @@ def run_check(root: Path, base: str, building: bool) -> tuple[int, str]:
             cwd=root,
             stdout=log,
             stderr=subprocess.STDOUT,
-            check=False,
-            timeout=3500,
+            start_new_session=True,
         )
+
+        def stop_check(signum: int, _frame: object) -> None:
+            with suppress(ProcessLookupError, PermissionError):
+                os.killpg(check.pid, signum)
+
+        # An interrupted Stop hook must not leave the check's tools running.
+        previous = signal.signal(signal.SIGTERM, stop_check)
+        try:
+            returncode = check.wait(timeout=3500)
+        except subprocess.TimeoutExpired:
+            stop_check(signal.SIGKILL, None)
+            check.wait()
+            raise
+        finally:
+            signal.signal(signal.SIGTERM, previous)
         log.seek(max(0, log.tell() - 16000))
-        return result.returncode, log.read().decode("utf-8", errors="replace")
+        return returncode, log.read().decode("utf-8", errors="replace")
+
+
+def last_pass(state: Path | None) -> JsonValue:
+    if state is None or not state.exists():
+        return None
+    saved = json.loads(state.read_text())
+    return saved.get("verified") if isinstance(saved, dict) else None
+
+
+def remember_pass(state: Path | None, verified: JsonObject) -> None:
+    """Record what the last passing check saw, so an unchanged turn need not rerun it."""
+    if state is not None and state.exists():
+        saved = json.loads(state.read_text())
+        state.write_text(json.dumps({**saved, "verified": verified}))
 
 
 def saved_session(state: Path | None) -> tuple[str, JsonObject]:
@@ -589,9 +626,11 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
             cwd=root,
             text=True,
         ).strip()
-        current = dirty_files(root, base).items()
+        current = dirty_files(root, base)
         changed = "".join(
-            f"{name}\n" for name, digest in current if before.get(name) != digest
+            f"{name}\n"
+            for name, digest in current.items()
+            if before.get(name) != digest
         )
         notice, unfinished = planning_feedback(root, set(changed.splitlines()))
         if unfinished:
@@ -616,8 +655,16 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
         building = not SHIP_CLAIM.search(claim) and build_in_progress(
             root, set(changed.splitlines())
         )
+        verified: JsonObject = {"base": base, "files": dict(current)}
+        if not building and last_pass(state) == verified:
+            require_current(root)
+            return {
+                "systemMessage": "Hard Eng: nothing changed since this session's last passing check, so it was not rerun."
+            }
         returncode, output = run_check(root, base, building)
         if returncode == 0:
+            if not building:
+                remember_pass(state, verified)
             require_current(root)
             return passed_notice(building, notice, agent, output)
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:

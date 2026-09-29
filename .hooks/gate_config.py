@@ -190,7 +190,8 @@ def repository_files(root: Path) -> list[Path]:
 
 def nonproduction_source(relative: Path) -> bool:
     return bool(
-        {"test", "tests", "__tests__", "node_modules", "vendor"} & set(relative.parts)
+        {"test", "tests", "integration_test", "__tests__", "node_modules", "vendor"}
+        & set(relative.parts)
         or relative.name.startswith("test_")
         or relative.stem.endswith(("_test", ".test", ".spec"))
         or relative.name.endswith((".d.ts", ".d.mts", ".d.cts"))
@@ -712,6 +713,44 @@ def has_workflows(root: Path, files: list[Path]) -> bool:
     )
 
 
+def unlisted_shell_scripts(
+    root: Path, files: list[Path], shared: list[Gate]
+) -> list[str]:
+    """Scripts absent from explicit shellcheck lists; custom shell gates own inputs."""
+    from project_setup import is_shell_script
+
+    gates = [
+        gate
+        for gate in shared
+        if gate.get("role") == "shell" or Path(gate["command"][0]).name == "shellcheck"
+    ]
+    if not gates or any(
+        Path(gate["command"][0]).name != "shellcheck" or "--" not in gate["command"]
+        for gate in gates
+    ):
+        return []
+    listed = {
+        argument
+        for gate in gates
+        for argument in gate["command"][gate["command"].index("--") + 1 :]
+    }
+    return sorted(
+        str(path.relative_to(root))
+        for path in files
+        if is_shell_script(path) and str(path.relative_to(root)) not in listed
+    )
+
+
+def require_listed_shell_scripts(
+    root: Path, files: list[Path], shared: list[Gate]
+) -> None:
+    if unlisted := unlisted_shell_scripts(root, files, shared):
+        raise ValueError(
+            f"shared: shellcheck omits {', '.join(unlisted)}; rerun setup or list "
+            "them after `--`"
+        )
+
+
 def validate_required_checks(root: Path, config: GateConfig) -> None:
     from project_setup import is_deployment_file, is_shell_script
 
@@ -742,6 +781,7 @@ def validate_required_checks(root: Path, config: GateConfig) -> None:
         if Path(command[0]).name == "trivy" and "config" in command[1:]:
             shared_roles.add("deployment")
     require_roles("shared", required, shared_roles)
+    require_listed_shell_scripts(root, files, config["shared"])
     workspace_languages = dict(manifests)
     by_directory = {
         (

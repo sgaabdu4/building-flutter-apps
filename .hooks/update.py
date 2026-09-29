@@ -9,10 +9,23 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+from collections.abc import Callable
 from operator import itemgetter
 from pathlib import Path
 
 from mcp_setup import retired_settings
+from update_runner import (
+    commit_update,
+    current_head,
+    link_state,
+    rebase_sessions,
+    relink_verified,
+    roll_back,
+    snapshot,
+    stale_message,
+    update_blocker,
+    write_verified,
+)
 
 UPSTREAM = "sgaabdu4/hard-eng"
 REPOSITORY = f"https://github.com/{UPSTREAM}.git"
@@ -109,10 +122,7 @@ def require_current(root: Path) -> None:
             f"Hard Eng freshness could not be verified: {error}"
         ) from error
     if revision is not None:
-        raise ValueError(
-            f"Hard Eng freshness check found newer verified revision {revision}. "
-            "Use the supported updater, preserve local edits, then reverify before shipping or claiming completion."
-        )
+        raise ValueError(stale_message(root, revision))
 
 
 def fetch_sources(temporary: Path, revision: str, previous: str) -> tuple[Path, Path]:
@@ -169,7 +179,7 @@ def scaffold_files(source: Path) -> set[str]:
     return (
         {
             str(path.relative_to(source))
-            for pattern in ("*.py", "ruff.toml")
+            for pattern in ("*.py", "ruff.toml", "dart_declarations.pubspec.*")
             for path in (source / ".hooks").glob(pattern)
         }
         | {
@@ -524,8 +534,30 @@ def write_changes(root: Path, changes: dict[str, str | None]) -> None:
                     break
                 parent.rmdir()
         else:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content)
+            replace_file(target, content.encode())
+
+
+def replace_file(
+    target: Path, content: bytes, ready: Callable[[], bool] = lambda: True
+) -> bool:
+    """Swap in the whole file if `ready` holds just before, so a write is never partial."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_symlink():
+        if not ready():
+            return False
+        target.write_bytes(content)
+        return True
+    pending = target.with_name(target.name + ".hard-eng-pending")
+    try:
+        pending.write_bytes(content)
+        if target.exists():
+            shutil.copymode(target, pending)
+        if not ready():
+            return False
+        pending.replace(target)
+    finally:
+        pending.unlink(missing_ok=True)
+    return True
 
 
 def write_links(root: Path, links: dict[str, str | None]) -> None:
@@ -565,10 +597,13 @@ def verify_candidate(
     candidate: Path,
 ) -> None:
     # Both callers already verified upstream CI for this exact source revision.
+    owner = f"hard-eng-update {os.getpid()}"
     subprocess.run(
-        ["git", "worktree", "add", "--quiet", "--detach", str(candidate), "HEAD"],
+        ["git", "worktree", "add", "-q", "--detach", "--lock", "--reason", owner]
+        + [str(candidate), "HEAD"],
         cwd=root,
         check=True,
+        timeout=120,
     )
     try:
         if (candidate / ".gitmodules").is_file():
@@ -576,6 +611,7 @@ def verify_candidate(
                 ["git", "submodule", "update", "--init", "--recursive", "--depth=1"],
                 cwd=candidate,
                 check=True,
+                timeout=600,
             )
         write_links(candidate, links)
         write_changes(candidate, changes)
@@ -665,83 +701,11 @@ raise SystemExit(not compileall.compile_dir('.hooks', quiet=1))
         )
     finally:
         subprocess.run(
-            ["git", "worktree", "remove", "--force", str(candidate)],
+            ["git", "worktree", "remove", "--force", "--force", str(candidate)],
             cwd=root,
             check=True,
+            timeout=120,
         )
-
-
-def commit_update(
-    root: Path,
-    changes: dict[str, str | None],
-    links: dict[str, str | None],
-    revision: str,
-) -> None:
-    names = sorted({*changes, *links})
-    before = {
-        name: (root / name).read_bytes() if (root / name).exists() else None
-        for name in changes
-    }
-    before_links = {
-        name: str((root / name).readlink()) if (root / name).is_symlink() else None
-        for name in links
-    }
-    try:
-        write_links(root, links)
-        write_changes(root, changes)
-        subprocess.run(
-            ["git", "add", "--force", "--", *names],
-            cwd=root,
-            check=True,
-        )
-        message = f"Update Hard Eng to {revision}"
-        result = subprocess.run(
-            [
-                "git",
-                "commit",
-                "--only",
-                "-m",
-                message,
-                "--",
-                *(
-                    name
-                    for name in names
-                    if not any(other.startswith(f"{name}/") for other in changes)
-                ),
-            ],
-            cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            check=False,
-            timeout=3500,
-        )
-        sys.stderr.write(result.stdout)
-        if result.returncode != 0:
-            # SessionStart stderr never reaches the agent, so the error carries the reason.
-            tail = " | ".join(result.stdout.strip().splitlines()[-5:])
-            raise subprocess.SubprocessError(
-                f"git commit exited {result.returncode}: {tail}".removesuffix(": ")
-            )
-    except (OSError, subprocess.SubprocessError):
-        for name, content in before.items():
-            target = root / name
-            if content is None:
-                target.unlink(missing_ok=True)
-            else:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(content)
-        for name, target in before_links.items():
-            if (root / name).is_dir() and not (root / name).is_symlink():
-                shutil.rmtree(root / name)
-            else:
-                (root / name).unlink(missing_ok=True)
-            if target is not None:
-                (root / name).symlink_to(target, target_is_directory=True)
-        subprocess.run(
-            ["git", "reset", "--quiet", "HEAD", "--", *names], cwd=root, check=True
-        )
-        raise
 
 
 def repair_current_hook(root: Path, previous: str) -> str:
@@ -782,17 +746,37 @@ def repair_installation(root: Path, previous: str) -> str:
         status += "; installed the missing pre-push hook"
     names = sorted({*missing, *added})
     clean = bool(names) and not local_state(root, names)
+    moved = {name for name in missing if retired_parent(root, name)}
     retire_local_generation(root)
     if not names:
         return status + "."
-    write_changes(root, missing)
-    write_links(root, added)
+    # Files beneath a retired link must still be absent when the repair writes them.
+    before = {
+        name: None if name in moved else content
+        for name, content in snapshot(root, missing).items()
+    }
+    before_links = link_state(root, added)
+    applied: list[str] = []
+    try:
+        write_verified(root, missing, before, (), applied)
+        relink_verified(root, added, before_links, applied)
+    except (OSError, ValueError) as error:
+        if kept := roll_back(root, missing, added, before, before_links, applied):
+            raise ValueError(
+                f"{error}; kept later edits to {', '.join(kept)} instead of rolling them back"
+            ) from error
+        raise
     return f"{status}; repaired {install_paths(names)}. " + commit_install(
-        root, names, clean
+        root, names, clean, {**missing, **added}
     )
 
 
-def commit_install(root: Path, names: list[str], clean: bool) -> str:
+def commit_install(
+    root: Path,
+    names: list[str],
+    clean: bool,
+    expected: dict[str, str | None] | None = None,
+) -> str:
     reason = "these paths already had local changes"
     if clean:
         subprocess.run(["git", "add", "--force", "--", *names], cwd=root, check=True)
@@ -800,6 +784,7 @@ def commit_install(root: Path, names: list[str], clean: bool) -> str:
             ["git", "diff", "--cached", "--quiet", "--", *names], cwd=root, check=False
         ).returncode:
             return "Installed files already match the current commit."
+        head = current_head(root)
         result = subprocess.run(
             ["git", "commit", "--only", "-m", "Install Hard Eng", "--", *names],
             cwd=root,
@@ -809,6 +794,7 @@ def commit_install(root: Path, names: list[str], clean: bool) -> str:
             check=False,
         )
         if result.returncode == 0:
+            rebase_sessions(root, head, "Install Hard Eng", expected)
             return "Committed the installed files locally without pushing."
         subprocess.run(["git", "reset", "--quiet", "--", *names], cwd=root, check=False)
         reason = " | ".join(result.stdout.strip().splitlines()[-3:])
@@ -833,15 +819,9 @@ def refuse_local_state(root: Path, names: list[str]) -> None:
 
 
 def update(root: Path, repair: bool = False) -> str:
-    marker = root / SOURCE_FILE
-    if not marker.exists():
-        return "Automatic update unavailable: this checkout has no installed source revision."
-    metadata = json.loads(marker.read_text())
-    if not isinstance(metadata, dict):
-        raise TypeError("Installed source metadata must be an object")
-    previous = metadata.get("revision")
-    if not isinstance(previous, str) or not re.fullmatch(r"[0-9a-f]{40}", previous):
-        return "Installed from an uncommitted working copy; publish a verified source revision before automatic updates."
+    if (blocker := update_blocker(root)) is not None:
+        return blocker
+    previous = json.loads((root / SOURCE_FILE).read_text())["revision"]
     revision = latest_verified(previous)
     if revision is None:
         if repair or local_generation(root):
@@ -856,15 +836,9 @@ def update(root: Path, repair: bool = False) -> str:
         names = sorted({*changes, *links})
         refuse_local_state(root, names)
         local_settings(root)
-        before = {
-            name: (root / name).read_bytes() if (root / name).exists() else None
-            for name in changes
-        }
+        before = snapshot(root, changes)
         verify_candidate(root, source, changes, links, Path(temporary) / "candidate")
-        if any(
-            ((root / name).read_bytes() if (root / name).exists() else None) != content
-            for name, content in before.items()
-        ):
+        if snapshot(root, changes) != before:
             raise ValueError(
                 "Files changed during verification; the update was not applied"
             )
@@ -884,7 +858,7 @@ def update(root: Path, repair: bool = False) -> str:
             raise ValueError(
                 "The update paths changed during verification; nothing was applied"
             )
-        commit_update(root, changes, links, revision)
+        commit_update(root, changes, links, revision, before)
         retire_local_generation(root)
         if hook[0] not in changes:
             install_planned_hook(root, hook)

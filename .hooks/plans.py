@@ -207,7 +207,7 @@ def readiness_errors(
 
 def no_blockers(text: str) -> bool:
     """'None', optionally followed by a note such as 'None. Scope was settled in chat.'"""
-    return re.fullmatch(r"None(?:(?:[.;:]|\s+[—–-])\s.*)?", text) is not None
+    return re.fullmatch(r"None(?:[.;:](?:\s.*)?|\s+[—–-]\s.*)?", text) is not None
 
 
 def draft_handoff(sections: dict[str, str]) -> tuple[str | None, str | None, list[str]]:

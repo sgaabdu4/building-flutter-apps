@@ -1,9 +1,12 @@
-"""Use the consumer's Dart analyzer to prove omitted libraries have no counters."""
+"""Prove omitted Dart libraries have no counters with Hard Eng's pinned analyzer."""
 
 import json
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+
+TOOL = Path(__file__).with_name("dart_declarations.pubspec.yaml")
 
 PARSER = r"""
 import 'dart:convert';
@@ -74,29 +77,61 @@ void main() {
 """
 
 
-def erased_dart(files: set[Path], directory: Path) -> set[Path]:
+def run_dart(
+    arguments: list[str], package: Path, timeout: float, stdin: str | None = None
+) -> str:
+    step = "dart " + " ".join(arguments)
+    try:
+        result = subprocess.run(
+            ["dart", *arguments],
+            cwd=package,
+            input=stdin,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ValueError(
+            f"Dart declaration classifier failed at `{step}`: {error}"
+        ) from error
+    if result.returncode:
+        output = (result.stderr.strip() or result.stdout.strip())[-4000:]
+        raise ValueError(
+            f"Dart declaration classifier failed at `{step}` "
+            f"(exit {result.returncode}): {output}"
+        )
+    return result.stdout
+
+
+def erased_dart(files: set[Path]) -> set[Path]:
     candidates = sorted(file for file in files if file.suffix == ".dart")
-    registry = directory / ".dart_tool/package_config.json"
-    if not candidates or not registry.is_file():
+    if not candidates:
         return set()
     with tempfile.TemporaryDirectory(prefix="hard-eng-dart-parser-") as temporary:
-        script = Path(temporary) / "classify.dart"
-        script.write_text(PARSER)
-        packages = f"--packages={registry.resolve()}"
+        package = Path(temporary)
+        shutil.copyfile(TOOL, package / "pubspec.yaml")
+        shutil.copyfile(TOOL.with_suffix(".lock"), package / "pubspec.lock")
+        (package / "classify.dart").write_text(PARSER)
+        resolve = ["pub", "get", "--enforce-lockfile"]
         try:
-            result = subprocess.run(
-                ["dart", packages, str(script)],
-                input=json.dumps([file.read_text() for file in candidates]) + "\n",
-                text=True,
-                capture_output=True,
-                check=True,
-                timeout=300,
-            )
-            outputs = json.loads(result.stdout)
-        except (OSError, subprocess.SubprocessError, ValueError):
-            return set()  # Unavailable/incompatible parser cannot waive coverage.
+            run_dart([*resolve, "--offline"], package, 120)
+        except ValueError:
+            run_dart(resolve, package, 120)
+        output = run_dart(
+            ["--packages=.dart_tool/package_config.json", "classify.dart"],
+            package,
+            300,
+            json.dumps([file.read_text() for file in candidates]) + "\n",
+        )
+    try:
+        outputs = json.loads(output)
+    except ValueError:
+        outputs = None
     if not isinstance(outputs, list) or len(outputs) != len(candidates):
-        return set()
+        raise ValueError(
+            f"Dart declaration classifier returned invalid output: {output[-4000:]}"
+        )
     return {
-        file for file, output in zip(candidates, outputs, strict=True) if output is True
+        file for file, erased in zip(candidates, outputs, strict=True) if erased is True
     }
