@@ -26,16 +26,15 @@ async function moveMouseWithDuration(page, from, to, durationMs) {
     await page.mouse.move(to.x, to.y, { steps: 12 });
     return;
   }
-  const batches = Math.max(6, Math.ceil(durationMs / 64));
+  // Position follows elapsed time, because a single mouse move can take a whole frame.
+  const frameMs = 16;
   const startedAt = performance.now();
-  for (let batch = 1; batch <= batches; batch += 1) {
-    const progress = batch / batches;
+  for (let frame = 1; ; frame += 1) {
+    const progress = Math.min(1, (performance.now() - startedAt) / durationMs);
     const eased = cubicBezier(progress, 0.4, 0, 0.2, 1);
-    const x = from.x + (to.x - from.x) * eased;
-    const y = from.y + (to.y - from.y) * eased;
-    await page.mouse.move(x, y, { steps: 4 });
-    const targetElapsed = durationMs * progress;
-    const remaining = targetElapsed - (performance.now() - startedAt);
+    await page.mouse.move(from.x + (to.x - from.x) * eased, from.y + (to.y - from.y) * eased);
+    if (progress >= 1) return;
+    const remaining = frame * frameMs - (performance.now() - startedAt);
     if (remaining > 0) await page.waitForTimeout(remaining);
   }
 }

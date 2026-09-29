@@ -1,0 +1,6 @@
+name: hard_eng_dart_declarations
+publish_to: none
+environment:
+  sdk: ^3.11.0
+dependencies:
+  analyzer: 14.4.0
