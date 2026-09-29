@@ -12,6 +12,7 @@ from pathlib import Path
 
 from fallow_report import fallow_report_path, validate_scanner_command
 from gate_config import (
+    Gate,
     GateConfig,
     Group,
     JsonObject,
@@ -203,6 +204,24 @@ def package_script_invocation(
         if not arguments:
             raise ValueError("Configured package test script is empty")
     return arguments, directory
+
+
+def native_typecheck(scripts: JsonObject, checks: list[Gate]) -> bool:
+    """A plain `tsc --noEmit` script repeats the native strict check on the same tsconfig."""
+    selects = {"-p", "--project", "-b", "--build"}
+    plain = str(scripts.get("typecheck", "")).split() == ["tsc", "--noEmit"]
+    return (
+        plain
+        and not {"pretypecheck", "posttypecheck"} & scripts.keys()
+        and any(
+            gate.get("role") == "types"
+            and gate["command"][0] == "tsc"
+            and not any(
+                argument.split("=")[0] in selects for argument in gate["command"]
+            )
+            for gate in checks
+        )
+    )
 
 
 def javascript_manager(directory: Path) -> tuple[str, list[str], str]:

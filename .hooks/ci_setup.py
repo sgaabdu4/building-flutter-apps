@@ -433,16 +433,22 @@ def maintenance_workflows_only(workflows: list[Path]) -> bool:
 
 def runs_hard_eng_check(workflow: object, *, require_base: bool = False) -> bool:
     jobs = workflow.get("jobs") if isinstance(workflow, dict) else None
-    pattern = r"\.hooks/hard-eng\.py\s+check(?:\s|$)"
-    if require_base:
-        pattern += r"[^\n;|&]*--base(?:\s|=)\S+"
-    return isinstance(jobs, dict) and any(
-        isinstance(step, dict)
-        and isinstance(step.get("run"), str)
-        and re.search(pattern, step["run"].replace("\\\n", " "))
+    if not isinstance(jobs, dict):
+        return False
+    commands = [
+        match[0]
         for job in jobs.values()
         if isinstance(job, dict) and isinstance(job.get("steps"), list)
         for step in job["steps"]
+        if isinstance(step, dict) and isinstance(step.get("run"), str)
+        for match in re.finditer(
+            r"\.hooks/hard-eng\.py\s+check(?=\s|$)[^\n;|&]*",
+            step["run"].replace("\\\n", " "),
+        )
+    ]
+    return bool(commands) and (
+        not require_base
+        or all(re.search(r"--base(?:\s|=)\S+", command) for command in commands)
     )
 
 
@@ -450,12 +456,22 @@ def integrated(workflows: list[Path]) -> bool:
     """Existing CI that already runs the check needs no integration reminder."""
     import yaml
 
+    found, complete = False, True
     for path in workflows:
         try:
             workflow = yaml.safe_load(path.read_text())
             if runs_hard_eng_check(workflow):
+                found = True
+                triggers = workflow.get("on", workflow.get(True))
+                if (isinstance(triggers, str) and triggers in MAINTENANCE_EVENTS) or (
+                    isinstance(triggers, (list, dict))
+                    and triggers
+                    and set(triggers) <= MAINTENANCE_EVENTS
+                ):
+                    continue
                 if runs_hard_eng_check(workflow, require_base=True):
-                    return True
+                    continue
+                complete = False
                 print(
                     f"CI adaptation pending: {path.name} runs Hard Eng without --base; "
                     "pass the PR/push comparison commit to enable affected checks.",
@@ -463,13 +479,18 @@ def integrated(workflows: list[Path]) -> bool:
                 )
         except yaml.YAMLError:
             continue
-    return False
+    return found and complete
 
 
 def configure_ci(
     root: Path, source: Path, config: GateConfig, changes: dict[str, str]
 ) -> None:
     name = ".github/workflows/hard-eng.yml"
+    workflows = [
+        path
+        for path in (root / ".github/workflows").glob("*")
+        if path.is_file() and path.suffix in {".yml", ".yaml"}
+    ]
     if (root / name).exists():
         original = (root / name).read_text()
         migrated = migrate_workflow_tools(migrate_workflow_pins(original))
@@ -481,13 +502,8 @@ def configure_ci(
         migrated = migrate_pnpm_bootstrap(root, migrated)
         if migrated != original:
             changes[name] = migrated
-        integrated([root / name])
+        integrated(workflows)
         return
-    workflows = [
-        path
-        for path in (root / ".github/workflows").glob("*")
-        if path.is_file() and path.suffix in {".yml", ".yaml"}
-    ]
     if workflows and not maintenance_workflows_only(workflows):
         if integrated(workflows):
             return

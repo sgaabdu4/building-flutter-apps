@@ -150,7 +150,7 @@ def fetch_sources(temporary: Path, revision: str, previous: str) -> tuple[Path, 
     for tree in (source, old):
         if (tree / ".gitmodules").is_file():
             subprocess.run(
-                ["git", "submodule", "update", "--init", "--recursive"],
+                ["git", "submodule", "update", "--init", "--recursive", "--depth=1"],
                 cwd=tree,
                 check=True,
                 timeout=120,
@@ -573,7 +573,7 @@ def verify_candidate(
     try:
         if (candidate / ".gitmodules").is_file():
             subprocess.run(
-                ["git", "submodule", "update", "--init", "--recursive"],
+                ["git", "submodule", "update", "--init", "--recursive", "--depth=1"],
                 cwd=candidate,
                 check=True,
             )
