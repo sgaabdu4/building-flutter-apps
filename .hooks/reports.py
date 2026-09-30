@@ -146,10 +146,21 @@ def line_coverage(
         expected = expected - erased_dart(expected - files.keys())
     missing = expected - files.keys()
     if missing:
-        names = ", ".join(str(file.relative_to(directory)) for file in sorted(missing))
+        relative = [file.relative_to(directory) for file in sorted(missing)]
+        outside_lib = kind == "dart-tests" and any(
+            path.parts[0] != "lib" for path in relative
+        )
         raise ValueError(
-            f"Coverage report omits production files: {names}. Cover them, or mark "
-            "generator output with `<pattern> linguist-generated=true` in .gitattributes"
+            f"Coverage report omits production files: {', '.join(map(str, relative))}. "
+            "Cover them, or mark generator output with "
+            "`<pattern> linguist-generated=true` in .gitattributes"
+            + (
+                ". Dart outside lib/ needs tests under test/ that import it by relative"
+                " path and import package:test/test.dart (not flutter_test), with test"
+                " as a dev dependency"
+                if outside_lib
+                else ""
+            )
         )
     covered = sum(files[file][0] for file in expected)
     total = sum(files[file][1] for file in expected)

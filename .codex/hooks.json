@@ -1,17 +1,5 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.hooks/hard-eng.py\" session codex",
-            "timeout": 3600,
-            "statusMessage": "Hard Eng: updating project setup"
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [
@@ -20,6 +8,18 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.hooks/hard-eng.py\" stop codex",
             "timeout": 3600,
             "statusMessage": "Hard Eng: verifying changes"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.hooks/hard-eng.py\" session codex",
+            "timeout": 60,
+            "statusMessage": "Hard Eng: updating project setup"
           }
         ]
       }

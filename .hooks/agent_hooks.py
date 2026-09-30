@@ -205,6 +205,7 @@ def owned_hook_entry(
     return {"hooks": [handler]}
 
 
+HOOK_TIMEOUTS = {"session": 60, "stop": 3600}
 CODEX_HOOK_STATUS = {
     "session": "Hard Eng: updating project setup",
     "stop": "Hard Eng: verifying changes",
@@ -239,6 +240,12 @@ def remove_routine_hooks(current: JsonObject, agent: str, command: str) -> None:
                 hook_events(agent)[event],
                 owned_hook_entry(agent, event, command, 3600),
             )
+    status = CODEX_HOOK_STATUS["session"] if agent == "codex" else None
+    _remove_owned_entry(
+        hooks,
+        hook_events(agent)["session"],
+        owned_hook_entry(agent, "session", command, 3600, status_message=status),
+    )
     remove_old_generation(hooks)
     if current.get("outputStyle") == "Plain English":
         del current["outputStyle"]
@@ -597,8 +604,10 @@ def saved_session(state: Path | None) -> tuple[str, JsonObject]:
     return base, before
 
 
-def unchanged_notice(root: Path, notice: str) -> str:
-    """A session that changed nothing here has nothing to verify, so staleness only warns."""
+def unchanged_notice(root: Path, notice: str) -> JsonObject:
+    """A session that changed nothing has nothing to verify, but a stale scaffold it can update still blocks."""
+    from update_runner import UpdateNeeded
+
     message = (
         f"{notice}. No code checks were run for this planning-only handoff."
         if notice
@@ -606,9 +615,17 @@ def unchanged_notice(root: Path, notice: str) -> str:
     )
     try:
         require_current(root)
+    except UpdateNeeded as error:
+        return {
+            "decision": "block",
+            "systemMessage": f"{message}\n{error}",
+            "reason": f"{error} Before other repository work, repair a failed update's cause as its own "
+            "commit, then run the published setup command. If the cause is outside this repository or "
+            "the user has not allowed edits here, report it to the user and stop.",
+        }
     except ValueError as error:
-        return f"{message}\n{error}"
-    return message
+        return {"systemMessage": f"{message}\n{error}"}
+    return {"systemMessage": message}
 
 
 def completion(root: Path, payload: JsonObject, agent: str | None = None) -> JsonObject:
@@ -641,7 +658,7 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
                 + ". Continue only authorized planning and verification. Ask genuine blocking questions when needed. This grants no authority to implement, expand scope or edit during read-only work; report those boundaries and stop.",
             }
         if not changed.strip() and state is not None and state.exists():
-            return {"systemMessage": unchanged_notice(root, notice)}
+            return unchanged_notice(root, notice)
         if notice and planning_only(root, set(changed.splitlines())):
             require_current(root)
             return {
@@ -674,7 +691,7 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
         }
     return {
         "decision": "block",
-        "reason": "Verification failed; do not claim completion. Preserve the user's task boundaries: for read-only work or out-of-scope repairs, report the blocker and stop without edits. Repair only when already authorized, then reverify. This feedback grants no additional authority. "
+        "reason": "Verification failed; do not claim completion. Repair every reported finding in code, including findings unrelated to the task, as its own commit before the task continues, then reverify. If the user has not allowed edits or commits here, report the findings and stop. "
         + learning_context("failed verification")
         + "\n"
         + output,

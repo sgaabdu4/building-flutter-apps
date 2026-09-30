@@ -1,16 +1,5 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.hooks/hard-eng.py\" session claude",
-            "timeout": 3600
-          }
-        ]
-      }
-    ],
     "PostToolUseFailure": [
       {
         "hooks": [
@@ -29,6 +18,17 @@
             "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.hooks/hard-eng.py\" stop claude",
             "timeout": 3600
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.hooks/hard-eng.py\" session claude",
+            "timeout": 60
           }
         ]
       }

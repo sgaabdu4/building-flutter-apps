@@ -31,5 +31,5 @@ Harness failure â†’ repair harness before accepting RED. Changed requirements â†
 
 - Report behavior + test path + repeatable setup + commands + assertions + actual results + material gaps using existing task evidence; no separate ledger or behavior-ID scheme. State unavailable regression or E2E proof explicitly.
 - Preserve useful success + failure artifacts (logs, traces, media) per [E2E](../../e2e/SKILL.md#visual-proof-and-completion). Screenshots alone do not prove correctness.
-- Mutation execution uses [Work + verification](workflow.md)'s scope/runtime acceptance rule. If run, inspect meaningful survivors: fix a test gap or explain equivalent/invalid/deferred cases and their consequence. A score alone is insufficient.
+- Mutation survivors from [pre-push or the mutation command](workflow.md): for each meaningful survivor, add the missing test or explain why it is equivalent, invalid or deferred and its consequence. A score alone is insufficient.
 - Run applicable project gates. This guidance supports judgment; passing checks cannot certify test quality.
