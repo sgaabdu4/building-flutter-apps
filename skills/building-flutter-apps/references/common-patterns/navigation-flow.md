@@ -8,7 +8,7 @@
 
 ## Route-Param Safety + Wizard Sequencing
 
-Use nullable by-id providers. The notifier owns the strict order persist → targeted parent sync → confirmed state; the screen navigates only on that confirmed serial ([UI effects](../state-management/async-mutations.md#ui-effects)). Reordering causes UI flicker (stale parent) or lost writes on dispose.
+Use nullable by-id providers. The notifier owns the strict order persist → targeted parent sync → confirmed state + holds `ref.keepAlive()` until done → leaving mid-save still syncs the parent; the screen navigates only on that confirmed serial ([UI effects](../state-management/async-mutations.md#ui-effects)). Reordering causes UI flicker (stale parent) or lost writes on dispose.
 
 ```dart
 // Plain @riverpod: family + keepAlive would cache every id forever.
@@ -30,6 +30,7 @@ class ProgramWizardNotifier extends _$ProgramWizardNotifier {
     final program = ref.read(programByIdProvider(programId));
     if (program == null) return;
     final updated = program.copyWith(/* ...edits... */);
+    final link = ref.keepAlive();
     try {
       await ref.read(programRepositoryProvider).save(updated);
       if (!ref.mounted) return;
@@ -39,6 +40,8 @@ class ProgramWizardNotifier extends _$ProgramWizardNotifier {
       if (!ref.mounted) return;
       state = state.copyWith(error: AppErrorMapper.from(error));
       Crash.error(error, stackTrace, reason: 'saveAndAdvance');
+    } finally {
+      link.close();
     }
   }
 }
