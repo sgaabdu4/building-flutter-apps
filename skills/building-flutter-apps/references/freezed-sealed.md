@@ -1,4 +1,4 @@
-# Freezed 3.x Sealed Classes
+# Freezed Sealed Classes
 
 
 ## Read first
@@ -33,7 +33,7 @@ Signals: Freezed, sealed class, @freezed, build.yaml, explicit_to_json, copyWith
 ```yaml
 # pubspec.yaml — see core-stack.md for canonical versions
 environment:
-  sdk: '>=3.8.0 <4.0.0'   # freezed requires Dart >= 3.8
+  sdk: '>=3.13.0 <4.0.0'  # core-stack.md SDK floor
 
 dependencies:
   freezed_annotation: <version>
@@ -71,19 +71,18 @@ Single constructor with `sealed class`:
 @freezed
 sealed class Product with _$Product {
   const factory Product({
-    required String id,
-    required String name,
-    required double price,
+    required ProductId id,
+    required DisplayName name,
+    required Money price,
     @Default(0) int quantity,
     @Default(true) bool isActive,
   }) = _Product;
-
-  factory Product.fromJson(Map<String, dynamic> json) =>
-      _$ProductFromJson(json);
 }
 ```
 
-Generated: `copyWith`, `toString`, `==`, `hashCode`, `toJson`.
+Generated: `copyWith`, `toString`, `==`, `hashCode`. Required domain text +
+money = Value Objects ([value-objects.md](value-objects.md)); `fromJson` /
+`toJson` = data model ([JSON Serialization](#json-serialization)).
 
 ## Adding Methods and Getters
 
@@ -95,16 +94,13 @@ sealed class Product with _$Product {
   const Product._();
 
   const factory Product({
-    required String id,
-    required String name,
-    required double price,
+    required ProductId id,
+    required DisplayName name,
+    required Money price,
     @Default(0) int quantity,
   }) = _Product;
 
-  factory Product.fromJson(Map<String, dynamic> json) =>
-      _$ProductFromJson(json);
-
-  double get totalValue => price * quantity;
+  Money get totalValue => Money(cents: price.cents * quantity, currency: price.currency);
   bool get inStock => quantity > 0;
 }
 ```

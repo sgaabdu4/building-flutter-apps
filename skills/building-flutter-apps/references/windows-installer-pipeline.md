@@ -172,6 +172,7 @@
 - Same-step installer = return the resolved path or set `$env:ISCC_PATH` in the current PowerShell process + validate absolute existing `ISCC.exe`.
 - Future-step handoff, when needed = also append `ISCC_PATH=<path>` to `$env:GITHUB_ENV`; this never substitutes for current-process assignment.
 - Consumption contract = installer result → current `$env:ISCC_PATH`/typed parameter → identity/lifecycle guard; assert non-empty/existing path + call order before build.
+- `inno_bundle` compiler ≠ `ISCC_PATH`: neither 0.11.2 nor 0.12.0 reads it. 0.12.0 order = highest `%UserProfile%\.inno_bundle\versions\<v>\ISCC.exe` (≥ 6.4.0) → `C:\Program Files (x86)\Inno Setup 6\ISCC.exe` → `%UserProfile%\AppData\Local\Programs\Inno Setup 6\ISCC.exe`; 0.11.2 = the last two only. None found → default-on `--install-inno` installs one (0.12.0: Inno 6.7.3 download; 0.11.2: Winget). `inno_bundle` compiles → pass `--no-install-inno` + prove before build that the first existing candidate in that order hash-matches `ISCC_PATH`; unproven → the accepted custom Inno owner compiles with `ISCC_PATH`.
 - Ephemeral root = unique `RUNNER_TEMP` child + owner marker + exact-root cleanup guard.
 
 ## Inno ownership

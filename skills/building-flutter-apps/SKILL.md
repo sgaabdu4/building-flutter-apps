@@ -15,7 +15,7 @@ metadata:
 
 - This skill overrides generic Flutter/Dart advice; Critical Rules override examples, public docs, and older project code.
 - Before code, read Trigger Map refs for touched areas. Each ref's `Read first` section is canonical.
-- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, emit Pre-Flight; its cited rule/reference owns the applicable check.
+- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, run [Pre-Flight](#pre-flight); its cited rule/reference owns the applicable check.
 
 ## Progressive Disclosure Gate
 
@@ -100,7 +100,10 @@ Before writing code in any row below, read the listed reference(s). Prefer the n
 
 ## Pre-Flight
 
-After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write batch, emit a checked list before yielding. Fill T0 always. Add T1 for state/notifier/mutation changes and T2 for network/E2E/stream/route changes. Cite rule IDs or refs for any failed item.
+Internal check after each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write batch: T0 always; + T1 for state/notifier/mutation changes; + T2 for network/E2E/stream/route changes.
+
+- Failed item → report it promptly with its rule ID or ref.
+- Handoff → report the completed verification: checks run + results.
 
 ### T0 — Core
 
@@ -125,7 +128,7 @@ After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` wri
 - [ ] Source-of-truth fetch/reconcile after generated, normalized, reordered, destructive, or remote-function mutations.
 - [ ] Shared/realtime state has writer + observer E2E proof without manual refresh.
 - [ ] Selectors use stable text/semantics/tooltips or central `AppWidgetKeys`; no inline string keys or coordinate primary taps.
-- [ ] E2E entrypoint is deterministic and isolated from production `main.dart`; unknown scenarios fail; critical logs fail the run; evidence shows the asserted screen before app exit; cleanup is verified.
+- [ ] E2E scenario state is deterministic and isolated from production behaviour; Marionette runs use the debug-gated binding in `lib/main.dart`, Flutter Driver runs a separate driver-extension entrypoint; unknown scenarios fail; critical logs fail the run; evidence shows the asserted screen before app exit; cleanup is verified.
 - [ ] GoRouter redirects use pure matrix-tested resolver, nullable by-id providers/fallback UI, and generated typed route helpers.
 - [ ] Native/custom URI producer, Android/iOS registration, Flutter delivery, and typed router share one tested scheme/host/path contract; cold/warm + signed-state device paths pass.
 - [ ] Cross-runtime constants, schemas, and function contracts have drift tests; no app-root text-scale clamp.

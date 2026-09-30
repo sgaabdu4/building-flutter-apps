@@ -322,7 +322,7 @@ sealed class WorkoutSetModel with _$WorkoutSetModel {
     required int durationSeconds,
   }) = _WorkoutSetModel;
 }
-@GenerateAdapters([AdapterSpec<WorkoutSetModel>()], firstTypeId: 1) void _h() {}
+// /core/hive/hive_adapters.dart → AdapterSpec<WorkoutSetModel>()
 
 // /domain/entities/workout_set.dart
 @freezed

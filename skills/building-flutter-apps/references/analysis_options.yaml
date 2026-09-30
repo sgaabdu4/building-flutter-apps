@@ -15,7 +15,6 @@ analyzer:
     strict-inference: true
   errors:
     missing_required_param: error
-    missing_return: error
 
 formatter:
   page_width: 100
@@ -23,7 +22,6 @@ formatter:
 linter:
   rules:
     - always_use_package_imports
-    - require_trailing_commas
     - prefer_single_quotes
     - directives_ordering
     - avoid_multiple_declarations_per_line

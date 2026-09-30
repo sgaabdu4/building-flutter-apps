@@ -83,8 +83,8 @@ Widget productCardInStockPreview() {
     overrides: [
       productRepositoryProvider.overrideWithValue(
         FakeProductRepository(
-          products: const [
-            Product(id: 'preview-1', name: 'Suture Kit', price: 24),
+          products: [
+            Product(id: ProductId('preview-1'), name: DisplayName('Suture Kit'), price: .usd(24)),
           ],
         ),
       ),
@@ -109,7 +109,7 @@ class FakeProductRepository implements IProductRepository {
 
   @override
   Future<Product> fetchById(String id) async {
-    final product = products.lookupByKey(id, (product) => product.id);
+    final product = products.lookupByKey(id, (product) => product.id.value);
     if (product == null) {
       return Future<Product>.error(StateError('Unknown preview product $id'));
     }

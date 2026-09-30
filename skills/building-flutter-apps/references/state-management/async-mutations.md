@@ -47,8 +47,8 @@ Do not cache repositories/services in notifier fields just to avoid reading prov
 
 ```dart
 Future<void> placeOrder() async {
-  final auth = ref.read(authNotifierProvider);
-  final cart = ref.read(cartNotifierProvider);
+  final auth = ref.read(authProvider);
+  final cart = ref.read(cartProvider);
   final repo = ref.read(orderRepositoryProvider);
 
   if (auth case Authenticated(:final user)) {
@@ -101,7 +101,7 @@ Do not create standalone `*Signal` / `*Event` / `*Pulse` providers for one-shot 
 
 ```dart
 ref.listen(
-  checkoutNotifierProvider.select((state) => state.successSerial),
+  checkoutProvider.select((state) => state.successSerial),
   (previous, next) {
     if (previous != next) const OrdersRoute().go(context);
   },

@@ -32,20 +32,20 @@ HTTP service internals are covered at boundary level in
 - Default providers: `@riverpod`. Use `keepAlive: true` for repos, datasources, app-wide services, and feature notifiers ([riverpod-codegen.md](riverpod-codegen.md#keepalive-providers-long-lived)).
 - Define interfaces for repos/datasources in multi-feature code.
 
-## Rules — NEVER Violate
+## Rules
 
-1. **MUST** separate data models from domain entities — NEVER reuse one class for both.
-2. **MUST** define `abstract interface class` for every repository and datasource. Constructors MUST take interfaces, NEVER concrete types.
-3. **MUST NEVER** put `fromJson`/`toJson` on domain entities — serialization = Data layer.
-4. **MUST NEVER** import Flutter in Domain — entities pure Dart, zero deps.
-5. **MUST** use `model.toEntity()` in repositories for Data → Domain.
-6. **MUST** follow the exception owner in [state-management-lifecycle.md](state-management-lifecycle.md#exception-ownership): notifiers catch by default; data layers catch only for documented boundary translations/recovery.
-7. **MUST** put feature widgets in `features/x/presentation/widgets/` — shared in `core/widgets/`.
-8. **MUST** keep persistence in data/repository layers by default (e.g. local datasource + repository).
-9. **MUST NEVER** run repository persistence and notifier persistence as dual SSOT for same state.
-10. **MUST NEVER** call a storage SDK (Hive, SharedPreferences, secure_storage, `dart:io`, `path_provider`) from a notifier, widget, or service. Storage lives in `Local<X>Datasource` only, exposed via `<X>Repository`. Imports of `package:hive_ce`, `package:hive_ce_flutter`, `package:shared_preferences`, `package:flutter_secure_storage`, `package:path_provider`, or `dart:io` are forbidden in `presentation/`, `*_notifier.dart`, `*_service.dart`, and `*_repository.dart` files. Exception: one `dart:io` `show` combinator limited to `HttpHeaders`, `HttpStatus`, `SocketException` and `FileSystemException` may supply HTTP constants or boundary exception mapping; it exposes no I/O operations. Broad, `hide` or additional-symbol imports stay forbidden. See [hive-persistence.md](hive-persistence.md) and [exception ownership](state-management-lifecycle.md#exception-ownership).
-11. **MUST** bind providers in screens/subscreens, map domain state to immutable view data, and pass typed callbacks to reusable widgets. Widget dependencies MUST NOT include providers, notifiers, repositories, datasources, services, or routes. See [presentation-widgets.md](presentation-widgets.md).
-12. **MUST** keep typed GoRouter routes as the navigation SSOT. Route definitions live in the router package boundary, and app code navigates with generated route helpers such as `SomeRoute(...).go(context)` / `.push<T>(context)`. Local sheets/dialogs use local semantic helpers and `Navigator.pop` for dismissal.
+1. Data models and domain entities = separate classes, never one for both → wire/storage changes stay out of domain logic.
+2. Every repository and datasource = `abstract interface class`; constructors take interfaces, never concrete types → tests and providers swap implementations without touching callers.
+3. `fromJson`/`toJson` = Data layer only, never on domain entities → serialization changes stay in models.
+4. Domain = pure Dart, zero deps, no Flutter imports → entities run and test without the framework.
+5. Repositories map Data → Domain with `model.toEntity()` → one conversion point per model.
+6. Exception handling follows the [exception owner](state-management-lifecycle.md#exception-ownership): notifiers catch by default; data layers catch only for documented boundary translations/recovery.
+7. Feature widgets = `features/x/presentation/widgets/`; shared widgets = `core/widgets/` → a feature's UI moves or deletes with its feature.
+8. Persistence = data/repository layers by default (e.g. local datasource + repository) → one persistence owner per state.
+9. Never run repository persistence and notifier persistence as dual SSOT for the same state → two writers diverge.
+10. Storage SDKs (Hive, SharedPreferences, secure_storage, `dart:io`, `path_provider`) = `Local<X>Datasource` only, exposed via `<X>Repository`; never called from a notifier, widget or service → storage stays swappable and testable behind one boundary. Imports of `package:hive_ce`, `package:hive_ce_flutter`, `package:shared_preferences`, `package:flutter_secure_storage`, `package:path_provider`, or `dart:io` are forbidden in `presentation/`, `*_notifier.dart`, `*_service.dart`, and `*_repository.dart` files. Exception: one `dart:io` `show` combinator limited to `HttpHeaders`, `HttpStatus`, `SocketException` and `FileSystemException` may supply HTTP constants or boundary exception mapping; it exposes no I/O operations. Broad, `hide` or additional-symbol imports stay forbidden. See [hive-persistence.md](hive-persistence.md) and [exception ownership](state-management-lifecycle.md#exception-ownership).
+11. Screens/subscreens bind providers, map domain state to immutable view data, and pass typed callbacks to reusable widgets. Widget dependencies exclude providers, notifiers, repositories, datasources, services and routes → reusable widgets render and preview from plain inputs. See [presentation-widgets.md](presentation-widgets.md).
+12. Typed GoRouter routes = navigation SSOT. Route definitions live in the router package boundary; app code navigates with generated route helpers such as `SomeRoute(...).go(context)` / `.push<T>(context)` → paths and parameters are checked at compile time. Local sheets/dialogs use local semantic helpers and `Navigator.pop` for dismissal.
 
 Mixin vs interface vs extension: see [mixins.md](mixins.md).
 
