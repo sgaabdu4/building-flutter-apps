@@ -408,11 +408,11 @@ test('fetchAll returns entities from remote', () async {
   verify(() => mockRemote.fetchAll()).called(1);
 });
 
-test('falls back to cache on error', () async {
+test('falls back to cache when offline', () async {
   final mockRemote = MockIProductRemoteDatasource();
   final mockLocal = MockIProductLocalDatasource();
 
-  when(() => mockRemote.fetchAll()).thenThrow(Exception('Network error'));
+  when(() => mockRemote.fetchAll()).thenThrow(const SocketException('offline'));
   when(() => mockLocal.getAll()).thenAnswer((_) async => [
     const ProductModel(id: '1', name: 'Cached', price: 5.00),
   ]);

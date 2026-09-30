@@ -303,8 +303,11 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
 
 MUST define `abstract interface class`. Constructor MUST take datasource interfaces, NEVER concrete types. Provider MUST return interface type.
 
+Cache fallback = transport failure + non-empty cache only; any other failure propagates to the notifier ([exception owner](state-management-lifecycle.md#exception-ownership), [networking.md](networking.md) Read first 4).
+
 ```dart
 // features/products/repositories/product_repository.dart
+import 'dart:io' show SocketException;
 
 /// Interface contract — notifiers depend on this, not the concrete class
 abstract interface class IProductRepository {
@@ -331,9 +334,9 @@ class ProductRepository implements IProductRepository {
       final models = await _remote.fetchAll();
       await _local.cacheAll(models);
       return models.map((m) => m.toEntity()).toList();
-    } catch (_) {
-      // Fallback to cache
+    } on SocketException {
       final cached = await _local.getAll();
+      if (cached.isEmpty) rethrow;
       return cached.map((m) => m.toEntity()).toList();
     }
   }
