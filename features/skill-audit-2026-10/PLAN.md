@@ -4,9 +4,9 @@ Status: Ready
 
 ## Outcome + scope
 
-The skill's code examples, versions, links and rules match the current SDKs/packages and agree with each other and with Hard Eng's shared rules. Fixes the findings of the 2026-10-01 multi-model skill audit, each re-verified against its primary source before editing.
+The skill's code examples, versions, links and rules match the current SDKs/packages and agree with each other and with Hard Eng's shared rules. Fixes the findings of the 2026-10-01 multi-model skill audit, each re-verified against its primary source before editing. The package also meets the `writing-great-skills` checklist: one owner per rule, every reference routed, one-line comments in examples.
 
-Non-goals: new features, restructuring the skill, or changing unrelated guidance.
+Non-goals: new features, restyling passing text, or changing unrelated guidance.
 
 ## Repository context
 
@@ -25,6 +25,9 @@ Authority: Autonomous. The user asked to make every recommended audit change, re
 - [ ] Marionette runs use the debug-gated binding in `lib/main.dart`; the driver-extension entrypoint is described as a separate mode → agrees with Hard Eng `e2e/references/flutter.md`.
 - [ ] Delta-sync examples write only changed rows → agrees with `performance.md` and its lint.
 - [ ] No removed/no-op analyzer options remain in `analysis_options.yaml`.
+- [ ] Examples satisfy the skill's own lints (value objects, imports, preview placement, provider names) → proof package `dart analyze --fatal-infos` + `flutter test`.
+- [ ] Duplicated rules have one owner (pause boundaries, Pre-Flight, Dart Decimate, progressive disclosure, hook reminder, snackbar dispatch) and every relative/`#anchor` link resolves → link check.
+- [ ] Repository cache fallback covers only offline failures with cached rows → proof tests.
 - [ ] `python3 .hooks/hard-eng.py check` passes.
 
 ## Baseline + execution
