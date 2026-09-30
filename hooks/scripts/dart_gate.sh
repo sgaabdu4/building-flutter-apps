@@ -350,7 +350,7 @@ case "$FILE_PATH" in
       *)
         MATCHES=$(grep -nE "(ScaffoldMessenger\.of[[:space:]]*\(|SnackBarUtils\.show)" "$FILE_PATH" 2>/dev/null)
         add_match "no-snackbar-from-widget" \
-          "Notifier or service owns snackbar dispatch. Widget calls notifier method." \
+          "Notifier owns the durable status field; the widget listens and calls a core UI helper outside presentation/ that wraps SnackBarUtils (references/extensions/context-ui.md#snackbar-dispatch)." \
           "$MATCHES"
         ;;
     esac

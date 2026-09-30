@@ -30,7 +30,6 @@ HTTP service internals are covered at boundary level in
 
 - Small feature: one `widgets/` dir. Promote to atomic hierarchy when widgets span 2+ features.
 - Default providers: `@riverpod`. Use `keepAlive: true` for repos, datasources, app-wide services, and feature notifiers ([riverpod-codegen.md](riverpod-codegen.md#keepalive-providers-long-lived)).
-- Define interfaces for repos/datasources in multi-feature code.
 
 ## Rules
 
@@ -77,7 +76,7 @@ lib/
 │   │   ├── context_extensions.dart       # Theme, media, breakpoints, feedback
 │   │   ├── string_extensions.dart        # capitalize, truncate, initials
 │   │   ├── date_time_extensions.dart     # timeAgo, isToday, startOfDay
-│   │   ├── iterable_extensions.dart      # firstWhereOrNull, groupBy
+│   │   ├── iterable_extensions.dart      # lookupByKey, indexOfByKey
 │   │   └── widget_extensions.dart        # separatedBy
 │   ├── mixins/
 │   │   └── connectivity_mixin.dart      # Cross-cutting behavior mixins
@@ -87,7 +86,6 @@ lib/
 │   │   └── app_router.dart              # GoRouter provider with auth redirect
 │   ├── services/
 │   │   ├── http_service.dart            # HTTP client wrapper
-│   │   ├── storage_service.dart         # Local persistence
 │   │   └── database_service.dart
 │   ├── testing/
 │   │   └── app_widget_keys.dart         # AppWidgetKeys — widget/E2E keys
@@ -101,8 +99,7 @@ lib/
 │   │   ├── batch_utils.dart             # Parallel batch processing
 │   │   ├── debouncer.dart               # Timer-based debouncer
 │   │   ├── snack_bar_utils.dart         # Centralized SnackBarUtils (context-free)
-│   │   ├── validators.dart              # Form validation functions
-│   │   └── date_formatter.dart
+│   │   └── validators.dart              # Form validation functions
 │   └── widgets/
 │       ├── atoms/                       # Buttons, badges, indicators
 │       ├── molecules/                   # Avatar tiles, stat cards
@@ -456,7 +453,7 @@ Dialogs and sheets stay local semantic helpers; dismiss them with
 
 | Tier | Data | Auth | Example | Implementation |
 |------|------|------|---------|----------------|
-| 1 | Simple, no PII | None | To-do lists, notes | Single repo, no datasources, Hive |
+| 1 | Simple, no PII | None | To-do lists, notes | Single repo + local Hive datasource, no remote |
 | 2 | Public data | Basic | Social, catalogs | Remote + local datasources, HTTP |
 | 3 | PII, financial | Full | Banking, health | Full arch, domain errors |
 

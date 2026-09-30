@@ -254,7 +254,6 @@ sealed class Distance with _$Distance {
 }
 
 // ❌ named primitive factory on domain entity — boundary in wrong layer (domain_entity_primitive_factory)
-// (entity, not VO — bare `@freezed` is fine here; opt-out only required in /domain/values/)
 @freezed
 sealed class User with _$User {
   const factory User({required Email email}) = _User;
@@ -266,8 +265,7 @@ sealed class User with _$User {
 sealed class User with _$User {
   const factory User({required Email email}) = _User;
 }
-// inside UserModel.toEntity() or UserImportService — outside /domain/ —
-// wrap the raw email string in an Email value object, then build the User.
+// UserModel.toEntity() / UserImportService (outside /domain/) wrap the raw email in Email, then build User.
 
 // ❌ hand-rolled copyWith in /domain/ (domain_custom_copy_with)
 @freezed
@@ -284,6 +282,8 @@ sealed class User with _$User {
   const factory User({required UserId id, required Email email}) = _User;
 }
 ```
+
+`User` is an entity, not a VO: bare `@freezed` is fine; the `@Freezed(map: .none, when: .none)` opt-out is required only in `/domain/values/`.
 
 ### Hive collision
 

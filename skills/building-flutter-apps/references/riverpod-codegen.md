@@ -115,7 +115,7 @@ Future<Product> productDetail(Ref ref, String id) async {
 
 ### Family Providers (parameterized)
 
-Codegen handle family automatically via function parameters:
+Codegen handle family automatically via function parameters. Family providers default to `@riverpod`; avoid `@Riverpod(keepAlive: true)` with unbounded args.
 
 ```dart
 // Parameters become family args — no FamilyNotifier needed
@@ -391,9 +391,7 @@ Riverpod 3.0 pause providers when listeners not visible:
 - If provider only used by paused providers, it pauses too
 - When provider rebuilds, previous subscriptions stay until rebuild completes
 
-Composition rule for pause-sensitive flows:
-- Avoid nested computed chains (computed watches computed, especially family).
-- Prefer one computed provider: watch base state directly, derive via pure helpers.
+Pause-sensitive composition = [pause boundaries](state-management-lifecycle.md#pause-projection-and-mode-boundaries).
 
 Override pause behavior:
 
@@ -498,12 +496,3 @@ StorageService storageService(Ref ref) {
   return StorageService(ref.read(backendClientProvider));
 }
 ```
-
-## Provider Decision Tree
-
-Family providers default to `@riverpod`; avoid `@Riverpod(keepAlive: true)` with unbounded args.
-
-Avoid computed → computed chains on nav/offstage paths. Flatten in parent provider:
-- watch base state directly
-- derive via pure helpers
-- avoid provider → provider indirection

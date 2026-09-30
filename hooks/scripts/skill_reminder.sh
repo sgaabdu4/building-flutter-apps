@@ -25,14 +25,12 @@ FLUTTER_ROOT=$(find_flutter_root "$PROJECT_ROOT") || exit 0
 
 cat <<'EOF'
 [building-flutter-apps active]
-Top-5 rules:
-  (1) `dart analyze` + the project-owned Dart Decimate check exit 0: Hard Eng uses `python3 .hooks/hard-eng.py check`; otherwise use the established project check or the direct native command in `dart-decimate.md`. Do not add a wrapper or global coordinator; `flutter_skill_lints` lives in `analysis_options.yaml plugins:`.
-  (2) `if (!ref.mounted) return;` after every `await` in notifier; `if (!context.mounted) return;` in widgets/State.
-  (3) Public widgets only — no `_buildXxx()` and no `class _Foo extends StatelessWidget|StatefulWidget|ConsumerWidget|HookWidget`. State<T> subclasses exempt.
-  (4) `Object?` not `dynamic` (Map<String, dynamic> for JSON is fine); no `value!`.
-  (5) `@riverpod` codegen for every provider; no manual `Provider(...)`. Use `AppLocalizations` for UI strings, not hardcoded `Text('...')`.
-
-Use the SKILL.md Trigger Map as a progressive-disclosure gate: read the narrowest matching refs only, never bulk-read `references/`. Pre-Flight = internal check after each write batch → report failures promptly with exact refs; report completed verification at handoff.
+Rule owner = the building-flutter-apps SKILL.md; load it before Flutter/Dart edits. Most-missed Critical Rules:
+  R1 package-root `dart analyze` + project-owned Dart Decimate gates; R2 `@riverpod` codegen only;
+  R3 `ref.mounted` / `context.mounted` after awaits; R4 public widget classes, no `_buildXxx()`;
+  R5 no `value!` or sentinel fallbacks; R6 `AppLocalizations` for UI copy.
+  `Object?`, not `dynamic`, except JSON `Map<String, dynamic>`.
+Its Trigger Map is the progressive-disclosure gate; run its Pre-Flight after each write batch.
 EOF
 
 exit 0

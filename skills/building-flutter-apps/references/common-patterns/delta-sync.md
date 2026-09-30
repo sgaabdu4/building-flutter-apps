@@ -64,15 +64,9 @@ Future<void> deleteByIds(Set<String> ids) => _box.deleteAll(ids);
 
 ### Sync Service Flow
 
-```dart
-// Per-table delta sync:
-// 1. Read per-table lastSyncDate from settings
-// 2. If null → first sync full getAll + mergeAll
-// 3. If exists → getUpdatedSince(lastSyncDate) + mergeAll
-// 4. getAllIds from remote, compare to local id values (both Set<String>), deleteByIds for missing
-// 5. Store newest remote updatedAt; for a successful empty first pull, store
-//    an epoch/sentinel watermark so the next run uses delta, not another full pull.
+Per table: no stored sync date → full pull; otherwise pull rows updated since it, then delete local IDs missing from the remote ID set. Store the newest remote `updatedAt`; a successful empty first pull stores an epoch watermark so the next run uses delta, not another full pull.
 
+```dart
 final lastTableSync = await settingsRepo.getTableSyncDate(tableKey);
 final DateTime? watermark;
 

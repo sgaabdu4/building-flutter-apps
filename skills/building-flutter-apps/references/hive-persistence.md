@@ -357,8 +357,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 // Standard Flutter setup: Documents directory + optional subdirectory.
 await Hive.initFlutter('my_app');
 
-// Custom path setup: keep this explicit when preserving an existing data path,
-// e.g. Application Support. Still import through hive_ce_flutter.
+// Custom path, e.g. preserving an existing Application Support path; still import hive_ce_flutter.
 final path = (await getApplicationSupportDirectory()).path;
 Hive.init(path);
 ```
@@ -417,11 +416,9 @@ Constructor signature = append-only schema.
 
 Delete class = retire typeId. Never reuse for successor. Add retired id to `reservedTypeIds`. New class gets fresh id.
 
-```dart
-// WRONG — Program deleted, Routine reused typeId 10
-// Old user data written as Program at id 10 → new RoutineAdapter reads it
-// → cryptic type-cast crash on boot
+Reuse failure: `Program` (typeId 10) deleted + `Routine` given id 10 → old user data written as `Program` is read by the new `RoutineAdapter` → cryptic type-cast crash on boot.
 
+```dart
 // RIGHT
 @GenerateAdapters([
   AdapterSpec<RoutineModel>(),     // new id 12 (next free)

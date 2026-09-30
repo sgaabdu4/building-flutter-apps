@@ -12,15 +12,12 @@ Signals: `BuildContext`, `ModalRoute`, `SnackBarUtils`, dialog helpers, route-cu
 
 ## Context extensions
 
-Expose semantic helpers from `core/extensions/extensions.dart`:
+`isCurrentModalRoute` comes from the copied [extension template](../../templates/flutter/lib/core/extensions/context_extensions.dart). Add other semantic helpers to that same `ContextExtensions` extension, exported from `core/extensions/extensions.dart`:
 
 ```dart
-// core/extensions/context_extensions.dart
-extension BuildContextX on BuildContext {
-  AppLocalizations get l10n => .of(this);
-  TextTheme get textTheme => Theme.of(this).textTheme;
-  bool get isCurrentModalRoute => ModalRoute.of(this)?.isCurrent ?? false;
-}
+// Members added inside the template's existing ContextExtensions body.
+AppLocalizations get l10n => .of(this);
+TextTheme get textTheme => Theme.of(this).textTheme;
 ```
 
 Forbidden outside the extension owner:

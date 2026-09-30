@@ -27,19 +27,17 @@ Thanks for interest. This doc = guidelines for contributing.
 - Mermaid diagrams over prose where fit
 - Include working Dart/Flutter examples
 - Follow existing formatting
-- Keep `skills/building-flutter-apps/SKILL.md` under 500 lines; detailed content goes in its sibling `references/`
+- Keep `skills/building-flutter-apps/SKILL.md` within the line and character limits enforced by `tool/check_skill_routing.py`; detailed content goes in its sibling `references/`
 - Run analyzer with `skills/building-flutter-apps/references/analysis_options.yaml`
 - For package/version reviews, verify the documented install path exactly. Analyzer plugins in top-level `plugins:` are not the same as `pubspec.yaml` dependencies.
 - Run `ruby tool/check_upstream_flutter_skills.rb` before broad Flutter docs updates. If it flags upstream skill changes, review the changed upstream skill(s) before editing this repo. After adopting or intentionally ignoring those changes, refresh the lock with `ruby tool/check_upstream_flutter_skills.rb --update`.
 
 ### Code Examples
 
-```dart
-// Include language identifier
-// Use Riverpod 3.x codegen syntax (@riverpod, @Riverpod)
-// Use Freezed sealed class syntax
-// Follow architecture guidelines (data/domain/repositories/presentation)
-```
+- Include the language identifier on every fence.
+- Use Riverpod 3.x codegen syntax (`@riverpod`, `@Riverpod`).
+- Use Freezed sealed class syntax.
+- Follow the architecture guidelines (data/domain/repositories/presentation).
 
 Run `ruby tool/verify_markdown_examples.rb` before PR. Dart code belongs in `dart` fences, including examples marked `// WRONG`.
 

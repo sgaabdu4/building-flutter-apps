@@ -502,7 +502,7 @@
       "files": [],
       "expectations": [
         "Uses a tiny `abstract final class Crash` facade with public `init`, `log`, and `error` only",
-        "Runs `Crash.init()` once in `main()` before `runApp`",
+        "Runs `Crash.init(appRunner: ...)` once in `main()`, with `runApp` inside `appRunner`",
         "Keeps feature code and notifiers from importing or calling `FirebaseCrashlytics` directly",
         "Rejects adding backend interfaces, fake implementations, debug injection seams, or global hooks by default",
         "Prevents PII in crash reason, message, and extras",
