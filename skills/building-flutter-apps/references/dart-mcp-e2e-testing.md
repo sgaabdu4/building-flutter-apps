@@ -140,8 +140,9 @@ or any SDK that claims a binding:
 const _flutterTestEnvironment = 'FLUTTER_TEST';
 
 Future<void> main() async {
-  final isFlutterTest = Platform.environment.containsKey(_flutterTestEnvironment);
-  if (kDebugMode && !isFlutterTest) {
+  final useMarionette =
+      kDebugMode && !kIsWeb && !Platform.environment.containsKey(_flutterTestEnvironment);
+  if (useMarionette) {
     MarionetteBinding.ensureInitialized();
   } else {
     WidgetsFlutterBinding.ensureInitialized();
@@ -150,8 +151,9 @@ Future<void> main() async {
 }
 ```
 
-Known state = test accounts + seeded source-of-truth data + platform reset;
-never provider overrides in `main.dart`.
+- `kIsWeb` short-circuits first: `Platform.environment` throws on web.
+- `integration_test` runs install `IntegrationTestWidgetsFlutterBinding` and do not reliably see `FLUTTER_TEST` on the device → they call `runAppRoot` or a separate test entrypoint, never `main()`.
+- Known state = test accounts + seeded source-of-truth data + platform reset; never provider overrides in `main.dart`.
 
 Flutter Driver runs → separate driver-extension entrypoint that reuses the
 production bootstrap and makes test-only startup explicit:
