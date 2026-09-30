@@ -158,13 +158,14 @@ sealed class DisplayName with _$DisplayName {
     return DisplayName._raw(trimmed);
   }
 
+  @override
   String get value => switch (this) {
         _DisplayName(:final value) => value,
       };
 }
 ```
 
-IDs use the same shape (`UserId`, `OrderId`): validated factory + `value` getter + `copyWith: false`.
+IDs use the same shape (`UserId`, `OrderId`): validated factory + `@override` `value` getter (Freezed's mixin declares `value`) + `copyWith: false`.
 
 No `@Default('') String name` in domain entities. Required text uses a VO;
 optional text uses `String?`.

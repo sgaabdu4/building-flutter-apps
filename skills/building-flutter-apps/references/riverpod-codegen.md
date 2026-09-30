@@ -33,14 +33,15 @@ dev_dependencies:
 
 Canonical [analysis_options.yaml](analysis_options.yaml): `flutter_skill_lints` + `riverpod_lint`. Apply [analysis-options.md](analysis-options.md#install) before `dart analyze` (use `dart analyze`, not `flutter analyze` — see [analysis-options.md](analysis-options.md#use-dart-analyze-not-flutter-analyze)).
 
-Every file with providers need these:
+Every file with providers needs:
 
 ```dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'my_file.g.dart';
 ```
+
+Add `package:flutter_riverpod/flutter_riverpod.dart` only when the file also uses Flutter-side APIs (`ConsumerWidget`, `WidgetRef`, `ProviderScope`) → otherwise `unnecessary_import`: `riverpod_annotation` already exports `Ref`, `AsyncValue`, `ProviderContainer` and the generated-provider bases.
 
 ## Generated Provider Names
 

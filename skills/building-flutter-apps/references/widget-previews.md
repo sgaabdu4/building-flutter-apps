@@ -26,12 +26,15 @@ Signals: @Preview, AppPreviewShell, widget_previews, provider overrides, preview
 
 ## File Placement
 
-Prefer one preview file next to the widget:
+Preview file next to the widget; preview fakes = `presentation/previews/` → fakes import repository interfaces, which `presentation_widget_infrastructure_dependency` forbids under `presentation/widgets/`:
 
 ```text
-features/products/presentation/widgets/
-  product_card.dart
-  product_card_preview.dart
+features/products/presentation/
+  widgets/
+    product_card.dart
+    product_card_preview.dart
+  previews/
+    fake_product_repository.dart
 ```
 
 If the project already has a preview convention, follow it.

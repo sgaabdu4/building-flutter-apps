@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# UserPromptSubmit hook for compatible plugin runtimes.
-# When the active project is a Flutter project, inject a compact reminder of the top-5 rules
-# as additionalContext (stdout for UserPromptSubmit becomes context).
-# No-ops outside Flutter projects. Always exits 0.
+# UserPromptSubmit stdout becomes agent context; stays silent outside Flutter projects and always exits 0.
 
 set -uo pipefail
 
@@ -35,7 +32,7 @@ Top-5 rules:
   (4) `Object?` not `dynamic` (Map<String, dynamic> for JSON is fine); no `value!`.
   (5) `@riverpod` codegen for every provider; no manual `Provider(...)`. Use `AppLocalizations` for UI strings, not hardcoded `Text('...')`.
 
-Use the SKILL.md Trigger Map as a progressive-disclosure gate: read the narrowest matching refs only, never bulk-read `references/`, and cite exact refs in Pre-Flight after every code change.
+Use the SKILL.md Trigger Map as a progressive-disclosure gate: read the narrowest matching refs only, never bulk-read `references/`. Pre-Flight = internal check after each write batch → report failures promptly with exact refs; report completed verification at handoff.
 EOF
 
 exit 0

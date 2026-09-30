@@ -69,7 +69,7 @@ Future<void> deleteByIds(Set<String> ids) => _box.deleteAll(ids);
 // 1. Read per-table lastSyncDate from settings
 // 2. If null → first sync full getAll + mergeAll
 // 3. If exists → getUpdatedSince(lastSyncDate) + mergeAll
-// 4. getAllIds from remote, compare to local IDs, deleteByIds for missing
+// 4. getAllIds from remote, compare to local id values (both Set<String>), deleteByIds for missing
 // 5. Store newest remote updatedAt; for a successful empty first pull, store
 //    an epoch/sentinel watermark so the next run uses delta, not another full pull.
 
@@ -85,7 +85,7 @@ if (lastTableSync == null) {
   if (changed.isNotEmpty) await repo.mergeAll(changed.map((m) => m.toEntity()).toList());
 
   final remoteIds = (await remote.getAllIds(userId)).toSet();
-  final localIds = (await repo.getAll()).map((e) => e.id).toSet();
+  final localIds = {for (final exercise in await repo.getAll()) exercise.id.value};
   final deleted = localIds.difference(remoteIds);
   if (deleted.isNotEmpty) await repo.deleteByIds(deleted);
   watermark = newestUpdatedAt(changed);

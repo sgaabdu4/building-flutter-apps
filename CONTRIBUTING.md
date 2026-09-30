@@ -37,7 +37,7 @@ Thanks for interest. This doc = guidelines for contributing.
 ```dart
 // Include language identifier
 // Use Riverpod 3.x codegen syntax (@riverpod, @Riverpod)
-// Use Freezed 3.x sealed class syntax
+// Use Freezed sealed class syntax
 // Follow architecture guidelines (data/domain/repositories/presentation)
 ```
 

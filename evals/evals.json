@@ -117,7 +117,7 @@
         "Tests cancelOrder: verifies item removal from state",
         "Tests error case: verifies error is set in state on failure",
         "Uses Mocktail closure syntax for when/thenAnswer and verify",
-        "Awaits provider.future, uses Future.microtask, or uses explicit tester.pump steps for async state updates"
+        "Awaits provider.future, uses pumpEventQueue(), or uses explicit tester.pump steps for async state updates"
       ]
     },
     {
