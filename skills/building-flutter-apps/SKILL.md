@@ -101,7 +101,7 @@ Before code, read only the narrowest matching [Trigger Map](#trigger-map) row(s)
 Internal check after each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write batch: T0 always; + T1 for state/notifier/mutation changes; + T2 for network/E2E/stream/route changes.
 
 - Failed item → report it promptly with its rule ID or ref.
-- Handoff → report the completed verification: checks run + results.
+- Handoff → report the completed verification: refs read + checks run + results.
 
 ### T0 — Core
 
