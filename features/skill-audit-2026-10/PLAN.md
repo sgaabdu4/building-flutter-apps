@@ -16,7 +16,7 @@ Owners: `skills/building-flutter-apps/SKILL.md` + `references/`; checks in `tool
 
 Blockers: None
 Handoff: Approval
-Authority: Autonomous. The user asked to make every recommended audit change, review it, run adversarial review with GPT-6 Astra, test with GPT-6 Luna and Sonnet 5.5, and open a PR.
+Authority: Autonomous. The user asked to make every recommended audit change, review it, run adversarial review with GPT-6 Astra, test with GPT-6 Luna and Sonnet 5.5, and open a PR; after the PR opened, the user approved merging it.
 
 ## Acceptance + steps
 
@@ -51,5 +51,5 @@ Result: Passed
 Evidence: `python3 .hooks/hard-eng.py check` passed. Changed examples compiled in a proof package on the pinned stack: `dart analyze` clean with `flutter_skill_lints` and `riverpod_lint`, and `flutter test` passed, including the offline-fallback cases. GPT-6 Astra adversarial review approved after three rounds and approved a confirmation pass on `99faa73`–`408b8fa`. GPT-6 Luna (max) found three issues: the analyzer options and the subscription-wiring test were restored in `99faa73`. Its `HttpException` fallback suggestion was declined because the skill's lint allows only `SocketException` in repositories, and `package:http` 1.6.0 rethrows `HttpException` as `ClientException` (`io_client.dart:228`). Sonnet 5.5 (high) passed; its one note was fixed in `408b8fa`.
 E2E: N/A — skill documentation; proof is the repository's contract/example checks plus compile checks of changed examples against the pinned SDKs.
 
-Delivery target: PR
-Delivery: Pending — PR checks.
+Delivery target: Merge
+Delivery: Pending — squash merge and post-merge CI on the base branch.
