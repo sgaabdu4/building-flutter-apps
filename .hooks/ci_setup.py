@@ -6,7 +6,7 @@ import re
 import sys
 from pathlib import Path
 
-from gate_config import GateConfig, Group
+from gate_config import GateConfig, Group, JsonValue
 from project_setup import dependency_command
 
 MAINTENANCE_EVENTS = {"schedule", "workflow_dispatch"}
@@ -192,13 +192,12 @@ def migrate_workflow_tools(content: str) -> str:
 def migrate_docs_path(source: Path, content: str) -> str:
     """Add the template's docs-only steps to a generated workflow without them."""
     template = (source / ".github/workflows/hard-eng.yml").read_text()
-    cache = "      - name: Cache native tool downloads\n"
+    setup = "      - uses: pnpm/setup@"
     checks = "      - name: Run required checks\n"
     if "id: impact" in content:
         return content
-    if any(
-        content.count(step) != 1 or step + "        if:" in content
-        for step in (cache, checks)
+    if any(content.count(step) != 1 for step in (setup, checks)) or (
+        checks + "        if:" in content
     ):
         print(
             "Docs-only CI steps not added: .github/workflows/hard-eng.yml is customised. "
@@ -208,13 +207,13 @@ def migrate_docs_path(source: Path, content: str) -> str:
         )
         return content
     impact = template[
-        template.index("      - name: Find whether") : template.index(cache)
+        template.index("      - name: Find whether") : template.index(setup)
     ]
     scan = template[
         template.index("      - name: Run the secret") : template.index(checks)
     ]
     condition = "        if: steps.impact.outputs.docs_only != 'true'\n"
-    content = content.replace(cache, impact + cache + condition)
+    content = content.replace(setup, impact + setup)
     return content.replace(checks, scan + checks + condition)
 
 
@@ -386,20 +385,24 @@ def migrate_affected_tools(
 
 
 def migrate_tool_cache(source: Path, content: str) -> str:
-    """Keep installed tools and store data without their duplicate download caches."""
+    """Keep installed tools and store data in the template's runner storage."""
     template = (source / ".github/workflows/hard-eng.yml").read_text()
     old = '        run: python3 .hooks/hard-eng.py impact --base "$BASE_SHA" >> "$GITHUB_OUTPUT" || echo docs_only=false >> "$GITHUB_OUTPUT"\n'
     start = template.index("        run: |\n", template.index("id: impact"))
-    end = template.index("      - name: Cache native", start)
-    content = content.replace(old, template[start:end], 1)
-    pattern = re.compile(
-        r"(?m)^          path: \$\{\{ runner\.temp \}\}/hard-eng-tools\n"
-        r"          key: \$\{\{ runner\.os \}\}-\$\{\{ runner\.arch \}\}-hard-eng-tools-[^\n]+\n"
-        r"          restore-keys: \$\{\{ runner\.os \}\}-\$\{\{ runner\.arch \}\}-hard-eng-tools-\n"
-    )
-    start = template.index("          path: |\n")
-    end = template.index("      - uses:", start)
-    return pattern.sub(lambda _match: template[start:end], content, count=1)
+    end = template.index("      - uses: pnpm/setup@", start)
+    return content.replace(old, template[start:end], 1)
+
+
+def drop_tool_cache(content: str) -> str:
+    """Remove the generated tool cache; measured restores were no faster than installs."""
+    start = content.find("      - name: Cache native tool downloads\n")
+    if start < 0:
+        return content
+    end = content.find("\n      - ", start + 1) + 1 or len(content)
+    step = content[start:end]
+    if "uses: actions/cache@" not in step or "hard-eng-tools" not in step:
+        return content
+    return content[:start] + content[end:]
 
 
 def maintenance_workflows_only(workflows: list[Path]) -> bool:
@@ -493,7 +496,9 @@ def configure_ci(
     ]
     if (root / name).exists():
         original = (root / name).read_text()
-        migrated = migrate_workflow_tools(migrate_workflow_pins(original))
+        migrated = migrate_workflow_tools(
+            migrate_workflow_pins(drop_tool_cache(original))
+        )
         migrated = migrate_workflow_sdks(root, config, migrated)
         migrated = migrate_workflow_triggers(
             root, source, migrate_docs_path(source, migrated)
@@ -549,3 +554,112 @@ def configure_ci(
         .replace(block, triggers, 1)
     )
     changes[name] = migrate_pnpm_bootstrap(root, workflow_budget(root, changes[name]))
+
+
+RUNNER_MULTIPLIERS = {"windows": 2, "macos": 10}
+
+
+def billed_job(job: dict[str, JsonValue]) -> tuple[int, float, int] | None:
+    """Billed whole minutes, actual minutes and runner multiplier; None when never started."""
+    from shipping import _timestamp
+
+    if not job.get("runner_name") or not job.get("steps"):
+        return None
+    minutes = (
+        _timestamp(job.get("completed_at"), "job")
+        - _timestamp(job.get("started_at"), "job")
+    ) / 60
+    labels = job.get("labels")
+    names = " ".join(map(str, labels if isinstance(labels, list) else [])).lower()
+    multiplier = next(
+        (value for name, value in RUNNER_MULTIPLIERS.items() if name in names), 1
+    )
+    return math.ceil(minutes) * multiplier, minutes, multiplier
+
+
+def workflow_jobs(
+    root: Path, repository: str, days: int
+) -> tuple[int, list[tuple[str, str, dict[str, JsonValue]]]]:
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import UTC, datetime, timedelta
+
+    from shipping import _api_items
+
+    since = (datetime.now(UTC) - timedelta(days=days)).date().isoformat()
+    runs = _api_items(
+        root,
+        f"repos/{repository}/actions/runs?per_page=100&created=>={since}",
+        "workflow_runs",
+        "workflow runs",
+    )
+
+    def jobs(run: dict[str, JsonValue]) -> list[tuple[str, str, dict[str, JsonValue]]]:
+        endpoint = f"repos/{repository}/actions/runs/{run.get('id')}/jobs?per_page=100&filter=all"
+        event = str(run.get("event"))
+        name = run.get("path") if event == "dynamic" else run.get("name")
+        return [
+            (str(name), event, job)
+            for job in _api_items(root, endpoint, "jobs", "workflow jobs")
+        ]
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        return len(runs), [row for rows in pool.map(jobs, runs) for row in rows]
+
+
+def ci_usage(root: Path, repository: str | None, days: int) -> int:
+    """Print billed Actions minutes by workflow, event and job, and jobs run on both push and PR."""
+    from shipping import git, origin_repository
+
+    repository = repository or origin_repository(
+        git(root, "remote", "get-url", "origin").strip()
+    )
+    count, rows = workflow_jobs(root, repository, days)
+    billed: dict[tuple[str, str, str], list[tuple[int, float, int]]] = {}
+    totals = {"billed": 0, "cancelled": 0, "failure": 0, "unstarted": 0, "running": 0}
+    actual = 0.0
+    for workflow, event, job in rows:
+        if job.get("status") != "completed":
+            totals["running"] += 1
+            continue
+        usage = billed_job(job)
+        if usage is None:
+            totals["unstarted"] += 1
+            continue
+        billed.setdefault((workflow, event, str(job.get("name"))), []).append(usage)
+        totals["billed"] += usage[0]
+        actual += usage[1] * usage[2]
+        if job.get("conclusion") in {"cancelled", "failure"}:
+            totals[str(job.get("conclusion"))] += usage[0]
+    print(
+        f"{repository}, last {days} days: {count} runs, {len(rows)} jobs. "
+        f"Billed {totals['billed']} min ({totals['billed'] - actual:.0f} rounding up to whole minutes); "
+        f"cancelled {totals['cancelled']}, failed {totals['failure']}; "
+        f"{totals['unstarted']} jobs never got a runner and are not billed; "
+        f"{totals['running']} jobs still running are not counted. "
+        "Standard runners on public repositories are free."
+    )
+    print("billed  runs  median s  p90 s  workflow / event / job")
+    for (workflow, event, name), usages in sorted(
+        billed.items(), key=lambda item: -sum(usage[0] for usage in item[1])
+    )[:25]:
+        seconds = sorted(usage[1] * 60 for usage in usages)
+        print(
+            f"{sum(usage[0] for usage in usages):6}  {len(usages):4}  "
+            f"{seconds[len(seconds) // 2]:8.0f}  {seconds[int(0.9 * (len(seconds) - 1))]:5.0f}  "
+            f"{workflow} / {event} / {name}"
+        )
+    repeated = {
+        (workflow, name)
+        for workflow, event, name in billed
+        if event == "push" and (workflow, "pull_request", name) in billed
+    }
+    for workflow, name in sorted(repeated):
+        minutes = [
+            sum(usage[0] for usage in billed[workflow, event, name])
+            for event in ("push", "pull_request")
+        ]
+        print(
+            f"Runs on push and pull_request: {workflow} / {name} "
+            f"(push {minutes[0]} min, pull_request {minutes[1]} min)"
+        )
+    return 0

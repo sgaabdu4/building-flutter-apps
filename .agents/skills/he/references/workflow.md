@@ -7,7 +7,7 @@
 - Isolation = start new implementation in a task branch/worktree before code changes; reuse that task's existing isolation on continuation. Preserve other tasks and shared state. PR delivery is the default; [HE Ship](../../he-ship/SKILL.md) owns verification and safe cleanup after the requested delivery.
 - Build = [HE Build](../../he-build/SKILL.md) owns local implementation, verification and Ready for ship in the same plan. [HE Ship](../../he-ship/SKILL.md) owns authorized PR/merge/delivery actions and remote proof. Review-only work stays with its review owner; local Complete does not mean the overall delivery is finished.
 - Learning + steering = use [HE Learn](../../he-learn/SKILL.md) for repeated failures or lasting decisions; session/failure checkpoints remind once at those boundaries. Ordinary prompts/tools need no callback. Prefer deterministic prevention; skills are the last resort. Capture accepted durable choices in `docs/adr/` and read applicable ADRs on the next affected task; routine steering stays in the plan. A hook prompt proves neither learning nor prevention.
-- Mutation = optional; present changed-function scope, covering tests + estimated runtime; obtain acceptance before running.
+- Mutation = pre-push reports mutants on changed production lines after its checks pass (JavaScript: Stryker; Python: mutmut on importable modules; Dart: mutation_test; text-only changes skipped). It stops after 180s and never blocks. For the full result run `python3 .hooks/hard-eng.py mutation --base <ref>`, which checks and mutates a snapshot of HEAD.
 
 ## Participation
 

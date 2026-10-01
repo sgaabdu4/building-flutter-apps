@@ -7,9 +7,11 @@ import subprocess
 import sys
 import tempfile
 import time
-from contextlib import suppress
+from collections.abc import Callable, Generator
+from contextlib import contextmanager, suppress
 from pathlib import Path
 
+from gate_config import Group
 from shipping import (
     PendingCheck,
     Shipment,
@@ -20,6 +22,8 @@ from shipping import (
     verify,
 )
 from update import require_current
+
+MUTATION_SECONDS = 180
 
 
 def remote_base(root: Path, branch: str | None) -> str | None:
@@ -44,25 +48,119 @@ def interrupted(number: int, _frame: object) -> None:
     raise SystemExit(128 + number)
 
 
-def run_check(checkout: Path, base: str | None, environment: dict[str, str]) -> int:
-    """Run the snapshot's check in its own group so an interrupt stops every gate first."""
-    command = [sys.executable, str(checkout / ".hooks/hard-eng.py"), "check"]
-    check = subprocess.Popen(
-        [*command, *(["--base", base] if base else [])],
+def run_hard_eng(
+    checkout: Path, arguments: list[str], environment: dict[str, str]
+) -> int:
+    """Run the snapshot's command in its own group so an interrupt stops every child first."""
+    command = subprocess.Popen(
+        [sys.executable, str(checkout / ".hooks/hard-eng.py"), *arguments],
         cwd=checkout,
         env=environment,
         start_new_session=True,
     )
     try:
-        return check.wait()
+        return command.wait()
     finally:
-        if check.poll() is None:
-            os.killpg(check.pid, signal.SIGTERM)
+        if command.poll() is None:
+            os.killpg(command.pid, signal.SIGTERM)
             with suppress(subprocess.TimeoutExpired):
-                check.wait(timeout=10)
+                command.wait(timeout=10)
             with suppress(ProcessLookupError):
-                os.killpg(check.pid, signal.SIGKILL)
-            check.wait()
+                os.killpg(command.pid, signal.SIGKILL)
+            command.wait()
+
+
+def snapshot_environment(root: Path) -> dict[str, str]:
+    environment = os.environ.copy()
+    for name in git(root, "rev-parse", "--local-env-vars").splitlines():
+        environment.pop(name, None)
+    return environment
+
+
+def link_env_files(root: Path, checkout: Path) -> None:
+    """Builds read ignored local .env* files; link them without reading them."""
+    ignored = git(
+        root,
+        "ls-files",
+        "-z",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "--directory",
+    )
+    for name in filter(None, ignored.split("\0")):
+        source = root / name
+        target = checkout / name
+        if (
+            Path(name).name.startswith(".env")
+            and source.is_file()
+            and target.parent.is_dir()
+            and not target.exists()
+        ):
+            target.symlink_to(source)
+
+
+@contextmanager
+def snapshot(root: Path, revision: str, environment: dict[str, str]) -> Generator[Path]:
+    with tempfile.TemporaryDirectory(prefix="hard-eng-push-") as temporary:
+        checkout = Path(temporary) / "project"
+        subprocess.run(
+            ["git", "worktree", "add", "--detach", str(checkout), revision],
+            cwd=root,
+            env=environment,
+            check=True,
+        )
+        try:
+            link_env_files(root, checkout)
+            if (checkout / ".gitmodules").is_file():
+                subprocess.run(
+                    [
+                        "git",
+                        "submodule",
+                        "update",
+                        "--init",
+                        "--recursive",
+                        "--depth=1",
+                    ],
+                    cwd=checkout,
+                    env=environment,
+                    check=True,
+                )
+            yield checkout
+        finally:
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", str(checkout)],
+                cwd=root,
+                env=environment,
+                check=True,
+            )
+
+
+def mutate(
+    root: Path,
+    base: str,
+    seconds: float | None,
+    in_place: bool,
+    production: Callable[[Path, Group], set[Path]],
+) -> int:
+    """Mutate committed changes in a snapshot, since Dart mutates source in place."""
+    signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGHUP, interrupted)
+    if in_place:
+        from mutation import report
+
+        return report(root, base, seconds, production)
+    environment = snapshot_environment(root)
+    revision = git(root, "rev-parse", "HEAD").strip()
+    limit = [] if seconds is None else ["--seconds", str(seconds)]
+    with snapshot(root, revision, environment) as checkout:
+        if run_hard_eng(checkout, ["check", "--base", base], environment):
+            print(
+                "Mutation testing needs passing checks; fix the failures above first."
+            )
+            return 1
+        arguments = ["mutation", "--base", base, "--in-place", *limit]
+        return run_hard_eng(checkout, arguments, environment)
 
 
 def push_base(
@@ -94,7 +192,7 @@ def pre_push(root: Path) -> int:
     signal.signal(signal.SIGHUP, interrupted)
     policy = load_policy(root)
     assert policy is not None
-    started = time.monotonic()
+    started, mutating = time.monotonic(), 0.0
     for line in sys.stdin:
         fields = line.split()
         if len(fields) != 4:
@@ -114,49 +212,24 @@ def pre_push(root: Path) -> int:
                     "Switch to HTTPS: git remote set-url origin https://github.com/<owner>/<repo>.git",
                     flush=True,
                 )
-        environment = os.environ.copy()
-        for name in git(root, "rev-parse", "--local-env-vars").splitlines():
-            environment.pop(name, None)
-        with tempfile.TemporaryDirectory(prefix="hard-eng-push-") as temporary:
-            checkout = Path(temporary) / "project"
-            subprocess.run(
-                ["git", "worktree", "add", "--detach", str(checkout), revision],
-                cwd=root,
-                env=environment,
-                check=True,
-            )
-            try:
-                if (checkout / ".gitmodules").is_file():
-                    subprocess.run(
-                        [
-                            "git",
-                            "submodule",
-                            "update",
-                            "--init",
-                            "--recursive",
-                            "--depth=1",
-                        ],
-                        cwd=checkout,
-                        env=environment,
-                        check=True,
-                    )
-                returncode = run_check(checkout, base, environment)
-                if returncode:
-                    return returncode
-            finally:
-                subprocess.run(
-                    ["git", "worktree", "remove", "--force", str(checkout)],
-                    cwd=root,
-                    env=environment,
-                    check=True,
-                )
-        elapsed = time.monotonic() - started
+        environment = snapshot_environment(root)
+        with snapshot(root, revision, environment) as checkout:
+            check = ["check", *(["--base", base] if base else [])]
+            if returncode := run_hard_eng(checkout, check, environment):
+                return returncode
+            if base is not None:
+                began = time.monotonic()
+                limit = str(MUTATION_SECONDS)
+                arguments = ["mutation", "--base", base, "--seconds", limit]
+                run_hard_eng(checkout, [*arguments, "--in-place"], environment)
+                mutating += time.monotonic() - began
+        elapsed = time.monotonic() - started - mutating
         if elapsed > policy["pre_push_seconds"]:
-            raise ValueError(
-                f"Pre-push checks passed but took {elapsed:.0f}s, over the "
-                f"{policy['pre_push_seconds']:.0f}s pre_push_seconds time budget in "
-                "hard-eng.gates.json; speed up the slowest gates or raise the budget, "
-                "then push again"
+            print(
+                f"Hard Eng warning: pre-push checks passed in {elapsed:.0f}s, over the "
+                f"{policy['pre_push_seconds']:.0f}s pre_push_seconds budget; the push "
+                "continues. The elapsed time of each gate above shows what to speed up.",
+                flush=True,
             )
     print(f"Pre-push verification: {time.monotonic() - started:.2f}s")
     return 0

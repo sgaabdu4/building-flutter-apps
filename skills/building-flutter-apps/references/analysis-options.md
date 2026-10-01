@@ -3,7 +3,7 @@
 
 ## Read first
 
-1. `dart analyze` from package root. No path arg. Never `flutter analyze lib`.
+1. `dart analyze` from package root with no path or `.`; subdirectory paths skip plugins. Never `flutter analyze lib`.
 2. Analyzer plugins live ONLY in `analysis_options.yaml` top-level `plugins:` — never `pubspec.yaml` deps.
 3. Enable strict casts/inference/raw types. Exclude generated files.
 4. Setup/fix answers must explicitly verify one `flutter_skill_lints` diagnostic and one `riverpod_lint` diagnostic can fire before calling setup complete.
@@ -103,12 +103,11 @@ Scope: `dart analyze` = analyzer/plugin gate. [Dart Decimate](dart-decimate.md) 
 
 ## Use `dart analyze`, NOT `flutter analyze`
 
-Run `dart analyze --fatal-infos` from package root. No path arg. Avoid `flutter analyze` + `flutter analyze lib` + `dart analyze lib`.
+Run `dart analyze --fatal-infos` from package root with no path or `.`. Avoid `flutter analyze` + `flutter analyze lib` + `dart analyze lib`.
 
-Measured on Flutter 3.47.5 / Dart 3.13.4: `flutter analyze` (even at package root) and `dart analyze <dir>` report no plugin diagnostics while printing "No issues found!"; package-root `dart analyze` and single-file paths report them. Without `--fatal-infos`, info diagnostics do not fail the run.
+Measured on Flutter 3.47.5 / Dart 3.13.4: package-root `dart analyze` with no path or `.`, and single-file paths, report plugin diagnostics. `flutter analyze` (even at package root) and subdirectory paths such as `dart analyze lib` report none while printing "No issues found!". Without `--fatal-infos`, info diagnostics do not fail the run.
 
 CI/scripts: `dart analyze`. Never `flutter analyze lib`.
-Tracking: https://github.com/flutter/flutter/issues/184190.
 
 ## Fix plugin crash
 

@@ -1,6 +1,7 @@
 """Run the scaffold update detached from agent startup, one per repository."""
 
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -8,6 +9,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager, suppress
@@ -17,10 +19,20 @@ from typing import TextIO
 
 RESULT_FILE = ".hard-eng/update-result.txt"
 LOG_FILE = ".hard-eng/update.log"
+FAILURE_FILE = ".hard-eng/update-failure.json"
+LOCAL_INPUTS = (".claude/settings.local.json", "CLAUDE.local.md")
 OWNER = re.compile(r"hard-eng-update (\d+)")
+TEMPORARY = re.compile(
+    r"hard-eng-(?:update|push|gate|gitleaks|dart-parser|scaffold-check|mutation)-[a-z0-9_]{8}"
+)
+WORKTREE = re.compile(r"hard-eng-(?:update-.+/candidate|push-.+/project)")
 
 
 class UpdateRunning(ValueError):
+    pass
+
+
+class UpdateNeeded(ValueError):
     pass
 
 
@@ -61,15 +73,21 @@ def update_running(root: Path) -> bool:
     return False
 
 
-def stale_message(root: Path, revision: str) -> str:
+def last_result(root: Path) -> str:
+    result = root / RESULT_FILE
+    return result.read_text().strip() if result.is_file() else "none recorded yet"
+
+
+def stale_error(root: Path, revision: str) -> ValueError:
     if update_running(root):
-        return (
+        return ValueError(
             f"Hard Eng update to newer verified revision {revision} is still running in the "
             f"background ({LOG_FILE}). Wait for it to finish without starting another update, "
             "then reverify before shipping or claiming completion."
         )
-    return (
+    return UpdateNeeded(
         f"Hard Eng freshness check found newer verified revision {revision}. "
+        f"Last update result: {last_result(root)}. "
         "Use the supported updater, preserve local edits, then reverify before shipping or claiming completion."
     )
 
@@ -442,8 +460,51 @@ def alive(process: int) -> bool:
     return True
 
 
+def abandoned(path: Path, owner: re.Match[str] | None) -> bool:
+    """Updaters before the lock ran under a one-hour hook, and a push's checks end within a day."""
+    if owner is not None:
+        return not alive(int(owner[1]))
+    hours = 6 if path.name == "candidate" else 24
+    try:
+        return time.time() - path.parent.stat().st_mtime > hours * 3600
+    except FileNotFoundError:
+        return False
+
+
+def sweep_temporary() -> None:
+    """Directories a killed Hard Eng process left behind; none of its runs lasts a day."""
+    for path in Path(tempfile.gettempdir()).iterdir():
+        with suppress(OSError):
+            if (
+                TEMPORARY.fullmatch(path.name)
+                and path.is_dir()
+                and not path.is_symlink()
+                and time.time() - path.stat().st_mtime > 24 * 3600
+            ):
+                shutil.rmtree(path)
+
+
+def stop_idle_watcher(worktree: Path) -> None:
+    """Git restarts a file watcher on the next command, so stopping an idle one loses nothing."""
+    with suppress(OSError, subprocess.SubprocessError):
+        index = subprocess.check_output(
+            ["git", "rev-parse", "--path-format=absolute", "--git-path", "index"],
+            cwd=worktree,
+            text=True,
+            timeout=30,
+        ).strip()
+        if time.time() - Path(index).stat().st_mtime > 24 * 3600:
+            subprocess.run(
+                ["git", "fsmonitor--daemon", "stop"],
+                cwd=worktree,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+
+
 def remove_stale_candidates(root: Path) -> None:
-    """Remove candidates whose owning update has exited; the caller holds the lock."""
+    """Remove candidates whose update has exited; the caller holds the lock."""
     listing = subprocess.check_output(
         ["git", "worktree", "list", "--porcelain"], cwd=root, text=True
     )
@@ -454,14 +515,13 @@ def remove_stale_candidates(root: Path) -> None:
         }
         path = Path(fields.get("worktree", ""))
         owner = OWNER.fullmatch(fields.get("locked", ""))
-        if (
-            path.name != "candidate"
-            or not path.parent.name.startswith("hard-eng-update-")
-            or owner is None
-            or alive(int(owner[1]))
-        ):
+        if not WORKTREE.fullmatch(f"{path.parent.name}/{path.name}"):
+            if path.is_dir() and path.resolve() != root.resolve():
+                stop_idle_watcher(path)
             continue
-        if not path.exists():
+        if not abandoned(path, owner):
+            continue
+        if owner is not None and not path.exists():
             subprocess.run(
                 ["git", "worktree", "unlock", str(path)], cwd=root, check=True
             )
@@ -472,6 +532,7 @@ def remove_stale_candidates(root: Path) -> None:
             timeout=120,
         ).returncode:
             shutil.rmtree(path.parent, ignore_errors=True)
+    sweep_temporary()
     subprocess.run(["git", "worktree", "prune"], cwd=root, check=True, timeout=60)
 
 
@@ -498,8 +559,58 @@ def locked_update(root: Path, repair: bool = False) -> str:
         return update(root, repair)
 
 
+def update_attempt(root: Path, revision: str) -> str:
+    """What a refused update would see again: any commit or local edit changes it."""
+    digest = hashlib.sha256()
+    for command in (["rev-parse", "HEAD"], ["diff", "HEAD", "--binary"]):
+        digest.update(subprocess.check_output(["git", *command], cwd=root))
+    listing = subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=root
+    )
+    names = [
+        os.fsdecode(name)
+        for name in listing.split(b"\0")
+        if name and not name.startswith(b".hard-eng/")
+    ]
+    for name in [*names, *LOCAL_INPUTS]:
+        path = root / name
+        if path.is_file():
+            digest.update(name.encode() + b"\0" + path.read_bytes())
+    return f"{revision} {digest.hexdigest()}"
+
+
+def known_failure(root: Path, attempt: str) -> str | None:
+    try:
+        saved = json.loads((root / FAILURE_FILE).read_text())
+    except (OSError, ValueError):
+        return None
+    if (
+        not isinstance(saved, dict)
+        or saved.get("attempt") != attempt
+        or not isinstance(saved.get("at"), (int, float))
+        or time.time() - saved["at"] > 24 * 3600
+    ):
+        return None
+    failed = time.strftime("%Y-%m-%d %H:%M %Z", time.localtime(saved["at"]))
+    return failed_update(
+        f"{saved.get('error')} (at {failed}; nothing changed since, so it was not "
+        "retried; fix the cause or run the published setup command to retry now)"
+    )
+
+
+def remember_failure(root: Path, attempt: str, error: Exception) -> None:
+    failure = root / FAILURE_FILE
+    failure.parent.mkdir(parents=True, exist_ok=True)
+    failure.write_text(
+        json.dumps({"attempt": attempt, "at": time.time(), "error": str(error)})
+    )
+
+
 def failed_update(error: Exception | str) -> str:
-    return f"Hard Eng update failed: {error}. Continue with the existing scaffold; its gates remain required."
+    return (
+        f"Hard Eng update failed: {error}. Before other repository work, repair its cause as its own "
+        "commit; report a cause outside this repository to the user. The installed scaffold's gates remain required."
+    )
 
 
 def record_result(root: Path, outcome: str) -> None:
@@ -531,7 +642,7 @@ def apply_update(root: Path) -> int:
     signal.signal(signal.SIGTERM, interrupt_update)
     previous = installed_revision(root)
     try:
-        outcome = update(root)
+        outcome = update(root, remember=True)
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
         outcome = failed_update(error)
         if (revision := installed_revision(root)) != previous:
@@ -625,10 +736,8 @@ def start_update(root: Path) -> str:
                 start_new_session=True,
             )
         status = "Hard Eng update started in the background"
-    result = root / RESULT_FILE
-    last = result.read_text().strip() if result.is_file() else "none recorded yet"
     return (
         f"{status} ({LOG_FILE}); this session keeps the installed scaffold and its gates until "
         "it finishes, and the next session start reports its result. Do not run setup meanwhile. "
-        f"Last update result: {last}"
+        f"Last update result: {last_result(root)}"
     )

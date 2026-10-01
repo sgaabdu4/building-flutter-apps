@@ -564,6 +564,7 @@ def python_gate_command(command: list[str], manager: str) -> list[str]:
         "pytest": ["pytest", "pytest-cov"],
         "deptry": ["deptry"],
         "lint-imports": ["import-linter"],
+        "mutmut": ["pytest", "mutmut"],
     }[command[0]]
     prefix = ["uv", "run", "--no-sync"]
     if manager == "poetry":
@@ -691,17 +692,11 @@ def run_vm_tests(sources: list[str]) -> str:
         + ("['\"]" if source.endswith(".dart") else "/")
         for source in sources
     )
-    contract = (
-        f"Dart sources outside lib/ ({', '.join(sources)}) need tests under test/"
-        " that import them by relative path and import package:test/test.dart"
-        " (not flutter_test); declare test as a dev dependency."
-    )
     return (
         "rm -rf coverage/vm coverage/vm.lcov; vm_tests=$(grep -rlE --include='*_test.dart' "
         + shlex.quote(f"^import +['\"](\\.\\./)+({targets})")
-        + ' test || true); if [ -z "$vm_tests" ]; then echo '
-        + shlex.quote(contract)
-        + " >&2; else dart test --coverage=coverage/vm --reporter=json $vm_tests; "
+        + ' test || true); if [ -n "$vm_tests" ]; then'
+        + " dart test --coverage=coverage/vm --reporter=json $vm_tests; "
         + "dart run coverage:format_coverage --lcov --check-ignore --in=coverage/vm"
         + " --out=coverage/vm.lcov --base-directory=. "
         + shlex.join(f"--report-on={source}" for source in sources)
@@ -709,8 +704,29 @@ def run_vm_tests(sources: list[str]) -> str:
     )
 
 
+VM_TESTS = re.compile(
+    r"rm -rf coverage/vm coverage/vm\.lcov; vm_tests=.*?"
+    r"cat coverage/vm\.lcov >> coverage/lcov\.info; fi; ",
+    re.DOTALL,
+)
+
+
+def generated_tests(command: list[str]) -> list[str]:
+    """The generated tests command without an earlier Dart VM coverage step."""
+    if len(command) != 3 or command[:2] != ["sh", "-c"]:
+        return command
+    script = VM_TESTS.sub("", command[2], count=1)
+    for plain in (FLUTTER_TESTS, DART_TESTS):
+        if script == f"set -e; {shlex.join(plain)}; ":
+            return list(plain)
+    return ["sh", "-c", script] if ["sh", "-c", script] == BROWSER_TESTS else command
+
+
 def outside_lib_coverage(package: Group) -> None:
     """Flutter and test_with_coverage keep only package: URIs; Dart outside lib/ uses dart test."""
+    for gate in package["checks"]:
+        if gate.get("role") == "tests":
+            gate["command"] = generated_tests(gate["command"])
     sources = sorted(
         source
         for source in package.get("sources", [])

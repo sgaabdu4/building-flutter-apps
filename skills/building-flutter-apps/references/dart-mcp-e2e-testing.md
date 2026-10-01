@@ -16,7 +16,7 @@
 Signals: E2E testing, Dart MCP, Marionette MCP, flutter_driver, integration_test, source-of-truth verification
 
 
-https://docs.flutter.dev/ai/mcp-server
+Dart MCP server: [Flutter AI tools](https://docs.flutter.dev/ai/tools#dart-and-flutter-mcp-server) and the [`dart_mcp_server` README](https://github.com/dart-lang/ai/tree/main/pkgs/dart_mcp_server) (tool list, categories, `--enable` / `--disable`).
 
 Runtime E2E means real app behavior on a real simulator/device. Static review, screenshots without interactions, widget tests, or one-device happy paths do not prove sync/collaboration/cloud behavior.
 
@@ -33,7 +33,7 @@ Runtime E2E means real app behavior on a real simulator/device. Static review, s
 9. MUST verify source-of-truth state with an admin/API/CLI/read model when remote data is involved.
 10. MUST stop app processes and clean test data at end.
 11. MUST verify a central widget key registry exists before adding E2E selectors. Default: `lib/core/testing/app_widget_keys.dart` or existing project equivalent.
-12. MUST use a deterministic E2E entrypoint when the app needs runtime overrides or Flutter Driver/MCP connectivity. Default: `lib/main_dev.dart` or existing project equivalent.
+12. MUST start every E2E run from deterministic scenario state isolated from production behaviour. Marionette runs = `lib/main.dart` with its debug-gated binding; Flutter Driver runs = separate driver-extension entrypoint (default `lib/main_dev.dart` or existing project equivalent), never Marionette. See [E2E entrypoints](#e2e-entrypoints).
 13. MUST reject an unknown scenario before executing any valid journey; silent fallback to a default scenario is forbidden.
 14. MUST fail the run when asserted logs contain a critical error, even if the driver/process exits 0.
 15. MUST capture evidence while the app is running on the asserted screen; a screenshot after exit, crash, or navigation away proves nothing.
@@ -58,10 +58,9 @@ app, not a pure-Dart CLI or backend. Treat it as optional tooling, not a default
 application dependency or global MCP installation.
 
 - Before setup, check the project's Flutter/package compatibility and align the
-  `marionette_flutter` binding with the MCP server version. Use the existing
-  development bootstrap; initialize Marionette only for the intended debug run,
-  before another binding claims the process. Keep widget/integration-test binding
-  initialization separate. See the [single-binding setup](https://github.com/leancodepl/marionette_mcp/blob/main/docs/flutter-setup.md).
+  `marionette_flutter` binding with the MCP server version. Binding placement =
+  [E2E entrypoints](#e2e-entrypoints) (upstream: [single-binding setup](https://github.com/leancodepl/marionette_mcp/blob/main/docs/flutter-setup.md)).
+  Keep widget/integration-test binding initialization separate.
 - Discover the actual available tool schema. Connect to the launched app's VM
   service URI, inspect `get_interactive_elements`, then target actions by stable
   key or semantics identifier. Reinspect changed screens and assert the visible
@@ -76,26 +75,28 @@ application dependency or global MCP installation.
 
 ## Dart MCP Tool Map
 
-Tool names depend on the connected server/client; discover its actual schemas.
-These existing Dart MCP operations are not Marionette tool names.
+Names = `dart_mcp_server` tool names; a client may add a prefix (e.g.
+`mcp_dart_`). Discover the connected server's schemas. Not Marionette tool names.
 
-| Goal | Tool |
-|------|------|
-| Set project roots | `mcp_dart_add_roots` |
-| Analyze code | `mcp_dart_analyze_files` |
-| Auto-fix analyzable issues | `mcp_dart_dart_fix` |
-| Format Dart | `mcp_dart_dart_format` |
-| List devices | `mcp_dart_list_devices` |
-| Launch app | `mcp_dart_launch_app` |
-| Run tests | `mcp_dart_run_tests` |
-| Hot restart | `mcp_dart_hot_restart` |
-| List running apps | `mcp_dart_list_running_apps` |
-| Fetch app logs | `mcp_dart_get_app_logs` |
-| Inspect widget tree | `mcp_dart_get_widget_tree` |
-| Get selected widget | `mcp_dart_get_selected_widget` |
-| Pick widget in app | `mcp_dart_set_widget_selection_mode` |
-| Stop app | `mcp_dart_stop_app` |
-| Remove roots | `mcp_dart_remove_roots` |
+| Goal | Tool | Default |
+|------|------|---------|
+| Manage project roots | `roots` | on |
+| Analyze code | `analyze_files` | on |
+| Connect to a running app | `dtd` (`listDtdUris`, then `connect`) or `vm_service` | on |
+| Hot reload / hot restart | `hot_reload` / `hot_restart` | on |
+| Recent runtime errors | `get_runtime_errors` | on |
+| Widget tree, selected widget, selection mode | `widget_inspector` | on |
+| Flutter Driver command | `flutter_driver_command` | on |
+| Auto-fix, format, run tests | `dart_fix`, `dart_format`, `run_tests` | off (`cli`) |
+| List devices, launch/stop app, running apps, app logs | `list_devices`, `launch_app`, `stop_app`, `list_running_apps`, `get_app_logs` | off (`flutter_app_lifecycle`) |
+
+Off by default → enable with a server argument: `dart mcp-server --enable
+flutter_app_lifecycle`, `--enable cli` or `--enable <tool-name>`. Not enabled →
+CLI:
+
+- `flutter devices` → `flutter run --print-dtd -d <device> -t <entrypoint>` →
+  printed DTD URI to `dtd` `connect`; stop that `flutter run` process at the end.
+- `dart fix --apply`, `dart format .`, `flutter test`.
 
 ## Planning Matrix
 
@@ -115,8 +116,8 @@ Choose the smallest matrix that proves the feature:
 
 1. Establish the project root and selected runtime connection once; for Marionette, connect after the configured app is launched.
 2. Analyze before launch. Fix clear compile/analyzer issues first.
-3. List devices and pick the requested simulator/device class.
-4. Launch every app instance needed for the matrix.
+3. List devices (`flutter devices`, or `list_devices` when enabled) and pick the requested simulator/device class.
+4. Launch every app instance needed for the matrix (`flutter run --print-dtd`, or `launch_app` when enabled).
 5. Get widget tree before interacting on each screen. Select by stable text/semantics/key.
 6. Start from a known state: signed-out/signed-in actor, clean route, known backend/source-of-truth data.
 7. Run one segment at a time: setup, create, observe, update, observe, destructive/remove, relaunch, cleanup.
@@ -125,9 +126,37 @@ Choose the smallest matrix that proves the feature:
 10. After all runtime flows pass, run relevant unit/widget tests.
 11. Clean test data, sign out if needed, stop all app processes.
 
-## E2E Entrypoint
+## E2E Entrypoints
 
-Use the production app bootstrap, but make test-only startup explicit:
+One `WidgetsBinding` per process; `MarionetteBinding` and
+`enableFlutterDriverExtension()` each install one → Marionette and Flutter
+Driver = separate run modes, never one process.
+
+Marionette-driven or recorded runs → `lib/main.dart`. First statement of
+`main()` = Marionette in debug runs outside `flutter test`, before `Crash.init`
+or any SDK that claims a binding:
+
+```dart
+const _flutterTestEnvironment = 'FLUTTER_TEST';
+
+Future<void> main() async {
+  final useMarionette =
+      kDebugMode && !kIsWeb && !Platform.environment.containsKey(_flutterTestEnvironment);
+  if (useMarionette) {
+    MarionetteBinding.ensureInitialized();
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
+  await Crash.init(appRunner: runAppRoot);
+}
+```
+
+- `kIsWeb` short-circuits first: `Platform.environment` throws on web.
+- `integration_test` runs install `IntegrationTestWidgetsFlutterBinding` and do not reliably see `FLUTTER_TEST` on the device → they call `runAppRoot` or a separate test entrypoint, never `main()`.
+- Known state = test accounts + seeded source-of-truth data + platform reset; never provider overrides in `main.dart`.
+
+Flutter Driver runs → separate driver-extension entrypoint that reuses the
+production bootstrap and makes test-only startup explicit:
 
 ```dart
 import 'package:flutter_driver/driver_extension.dart';
@@ -148,7 +177,7 @@ Rules:
 - Keep test-only overrides out of `main.dart`.
 - Prefer `--dart-define` flags for known app states: signed out, onboarding incomplete, update required, disabled notifications.
 - Do not mock the feature under test in the E2E entrypoint.
-- Launch the target file explicitly: `flutter run -t lib/main_dev.dart`.
+- Launch the target file explicitly: `flutter run -t lib/main_dev.dart` for Flutter Driver, `flutter run -t lib/main.dart` for Marionette.
 
 Flutter's current integration-test documentation keeps the app test under
 `integration_test/`. When `flutter drive` is used, the host adapter belongs in
@@ -168,8 +197,8 @@ package. Do not place app widgets, providers, repositories, or platform plugin
 code in `test_driver/`.
 
 Prove the boundary before running the device flow. Run analysis from the
-package root: a folder argument skips analyzer plugins, including
-`avoid_flutter_host_driver_imports`.
+package root: a subdirectory argument such as `test_driver` skips analyzer
+plugins, including `avoid_flutter_host_driver_imports`.
 
 ```text
 dart analyze --fatal-infos
@@ -201,8 +230,10 @@ and record an app/data identity at both points.
 The current `flutter drive` contract includes `--keep-app-running` and
 `--use-existing-app`. The first controls whether Flutter stops the app after
 the driver finishes. The second connects to an already running VM service. They
-do not, by themselves, prove that app data was preserved. The current command
-does not expose `--no-uninstall-first`, so do not add that flag to a command.
+do not, by themselves, prove that app data was preserved. `flutter run` and
+`flutter drive` also register a hidden `--[no-]uninstall-first` flag (default
+off, iOS only) → `--no-uninstall-first` restates the default and proves no
+preservation; `--uninstall-first` ≠ cross-platform clean install.
 Use the platform's documented uninstall or data-reset command only for the
 explicit `clean` phase. Capture the exact Flutter tool version and command in
 the receipt.
