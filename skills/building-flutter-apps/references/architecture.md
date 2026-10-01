@@ -303,7 +303,7 @@ class ProductRemoteDatasource implements IProductRemoteDatasource {
 
 MUST define `abstract interface class`. Constructor MUST take datasource interfaces, NEVER concrete types. Provider MUST return interface type.
 
-Cache fallback = transport failure + non-empty cache only; any other failure propagates to the notifier ([exception owner](state-management-lifecycle.md#exception-ownership), [networking.md](networking.md) Read first 4).
+Cache fallback = offline `SocketException` (no network, DNS failure, refused connection) + non-empty cache only; any other failure propagates to the notifier ([exception owner](state-management-lifecycle.md#exception-ownership), [networking.md](networking.md) Read first 4).
 
 ```dart
 // features/products/repositories/product_repository.dart

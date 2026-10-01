@@ -25,7 +25,7 @@ Signals: ProviderContainer.test, UncontrolledProviderScope, mocktail, widget tes
 4. Prefer explicit `pump()`. `pumpAndSettle` = finite animation/async only, bounded with the positional timeout (`pumpAndSettle(const Duration(milliseconds: 100), .sendSemanticsUpdate, const Duration(seconds: 5))`) → an unbounded settle hangs on infinite/ticking animation.
 5. Override repository/datasource providers, not notifiers → the notifier's real state logic stays under test.
 6. Repeated icons, draggable sheets and close/open actions = deterministic `ValueKey` selectors from the central key registry; no inline string keys, `tapAt(...)`, first-match icon finders or case-sensitive label text → those break on layout, order or copy changes and drift from E2E.
-7. Streams/realtime/push/sync/shared remote state = reaction test per event family the feature consumes → assert resulting notifier state or visible UI (update, stale-source refresh, removal/delete fallback). Assert subscription/channel names only when they are a cross-runtime contract (rule 9). See [Event Contract and Sync Tests](#event-contract-and-sync-tests).
+7. Streams/realtime/push/sync/shared remote state = reaction test per event family the feature consumes → assert resulting notifier state or visible UI (update, stale-source refresh, removal/delete fallback). Datasource/service test asserts the registered subscription/channel/filter set → injected-event reaction tests cannot catch missing or wrong wiring; names shared with another runtime also get a drift test (rule 9). See [Event Contract and Sync Tests](#event-contract-and-sync-tests).
 8. Shared fakes, mocks, provider-container factories, platform stubs and async wait helpers = one test helper SSOT → one fix reaches every test.
 9. Constants/schema/field IDs copied across Flutter/backend/functions/native runtimes = contract drift test → a one-sided rename fails a test, not production.
 10. Pause-sensitive provider startup/projections, transient mode-error clearing and native-link contracts, when present = regression tests from the [lifecycle regression matrix](#lifecycle-regression-matrix) → these fail silently (lost first update, stale error, drifted link).
@@ -328,10 +328,10 @@ Cover each event family the feature consumes; skip families it does not:
 - permission/ownership changes
 - stale, partial, duplicate, out-of-order or unrelated events the feature must reconcile or ignore
 
-Registered channel/topic/filter names = assert only when they are a contract shared with another runtime → contract drift test (rule 9):
+Datasource/service wiring test = assert the registered channel/topic/filter/listener set → the reaction test injects events, so it passes even when the real subscription is missing or wrong. Names shared with another runtime also get a contract drift test (rule 9):
 
 ```dart
-test('subscribes to the shared product channel contract', () async {
+test('subscribes to every product event family', () async {
   final source = FakeRemoteEventSource();
   final datasource = ProductRemoteDatasource(source);
 

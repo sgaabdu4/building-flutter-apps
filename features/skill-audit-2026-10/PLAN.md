@@ -24,10 +24,11 @@ Authority: Autonomous. The user asked to make every recommended audit change, re
 - [ ] The Dart MCP tool map and docs link match the current dart_mcp_server → upstream README/CHANGELOG.
 - [ ] Marionette runs use the debug-gated binding in `lib/main.dart`; the driver-extension entrypoint is described as a separate mode → agrees with Hard Eng `e2e/references/flutter.md`.
 - [ ] Delta-sync examples write only changed rows → agrees with `performance.md` and its lint.
-- [ ] No removed/no-op analyzer options remain in `analysis_options.yaml`.
+- [ ] `analysis_options.yaml` keeps every option `flutter_skill_lints` requires (`missing_return: error`, `require_trailing_commas`) → its `cfg_strict_analysis`/`cfg_required_lints` rules stay satisfied.
 - [ ] Examples satisfy the skill's own lints (value objects, imports, preview placement, provider names) → proof package `dart analyze --fatal-infos` + `flutter test`.
 - [ ] Duplicated rules have one owner (pause boundaries, Pre-Flight, Dart Decimate, progressive disclosure, hook reminder, snackbar dispatch) and every relative/`#anchor` link resolves → link check.
 - [ ] Repository cache fallback covers only offline failures with cached rows → proof tests.
+- [ ] Realtime features keep a datasource/service subscription-wiring test beside the reaction test → injected events cannot hide missing wiring.
 - [ ] `python3 .hooks/hard-eng.py check` passes.
 
 ## Baseline + execution
