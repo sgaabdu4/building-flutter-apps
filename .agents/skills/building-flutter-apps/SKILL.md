@@ -14,12 +14,12 @@ metadata:
 ## Read first
 
 - This skill overrides generic Flutter/Dart advice; Critical Rules override examples, public docs, and older project code.
-- Before code, read Trigger Map refs for touched areas. Each ref's `Read first` section is canonical.
-- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, emit Pre-Flight; its cited rule/reference owns the applicable check.
+- Each ref's `Read first` section is canonical.
+- After each `.dart`/`pubspec.yaml`/`build.yaml`/`analysis_options.yaml` write batch, run [Pre-Flight](#pre-flight); its cited rule/reference owns the applicable check.
 
 ## Progressive Disclosure Gate
 
-Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own incidental stack/file words. Do not bulk-read `references/` or parent refs. Cite exact refs in Pre-Flight.
+Before code, read only the narrowest matching [Trigger Map](#trigger-map) row(s); scenario/subsystem rows own incidental stack/file words. Read a parent ref such as `common-patterns.md` only when no scenario row fits; never bulk-read `references/`. Cite exact refs in Pre-Flight.
 
 ## Critical Rules
 
@@ -54,8 +54,6 @@ Read only the narrowest matching Trigger Map row(s); scenario/subsystem rows own
 | R27 | Native/custom links use one URI contract across producer, platform registration, Flutter delivery, and typed router; prove cold/warm + signed-state delivery on the target device. | [deep-linking.md](references/deep-linking.md), [dart-mcp-e2e-testing.md](references/dart-mcp-e2e-testing.md) |
 
 ## Trigger Map
-
-Before writing code in any row below, read the listed reference(s). Prefer the narrowest matching row. Read the large parent refs only when no scenario row fits.
 
 | Touching | Read |
 |---|---|
@@ -92,7 +90,7 @@ Before writing code in any row below, read the listed reference(s). Prefer the n
 | Package constraints, dependency upgrade, generator/analyzer compatibility | [core-stack.md](references/core-stack.md) |
 | Flutter Windows desktop packaging, GitHub Actions Windows installer, Inno Setup, `inno_bundle`, updater/auto-update, CRT DLLs, PowerShell/native installer process, installer/version/AppId failure | [windows-installer-pipeline.md](references/windows-installer-pipeline.md) + [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
 | Dart Decimate, dead code, circular dependency, duplicate code, complexity, dependency hygiene, full zero-finding scan | [dart-decimate.md](references/dart-decimate.md) |
-| Common navigation / form / list / debounce / route-param-fallback patterns | [common-patterns.md](references/common-patterns.md) |
+| Navigation / form / list / debounce / route-param-fallback pattern that no narrower row covers | [common-patterns.md](references/common-patterns.md) |
 | Incremental remote pull, delta token, per-table sync date, merge/delete reconciliation | [delta-sync.md](references/common-patterns/delta-sync.md) |
 | Route-param safety, wizard sequencing, guarded next-step navigation | [navigation-flow.md](references/common-patterns/navigation-flow.md) |
 | Dialog / sheet / modal, snapshot value object, post-await teardown, dismiss-then-route, pop fallback, nested navigator dismissal | [modals-navigation.md](references/common-patterns/modals-navigation.md) + [state-management-lifecycle.md](references/state-management-lifecycle.md#state-teardown-belongs-in-the-notifier) |
@@ -100,12 +98,15 @@ Before writing code in any row below, read the listed reference(s). Prefer the n
 
 ## Pre-Flight
 
-After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write batch, emit a checked list before yielding. Fill T0 always. Add T1 for state/notifier/mutation changes and T2 for network/E2E/stream/route changes. Cite rule IDs or refs for any failed item.
+Internal check after each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write batch: T0 always; + T1 for state/notifier/mutation changes; + T2 for network/E2E/stream/route changes.
+
+- Failed item → report it promptly with its rule ID or ref.
+- Handoff → report the completed verification: refs read + checks run + results.
 
 ### T0 — Core
 
 - [ ] Flutter/Riverpod package: package-root `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin. Pure-Dart CLI: native Dart analysis profile applies; both plugins are N/A.
-- [ ] A current same-scope project-owned Dart Decimate result is green: Hard Eng uses `python3 .hooks/hard-eng.py check`; another project uses its established check or, if it has none, `pnpm dlx --config.ignore-scripts=false --allow-build=dart-decimate dart-decimate@latest check . --threshold 0 --format json` from its Git root. The project workflow schedules an integrated run; reuse its valid result instead of duplicating a full runner. Cite scan scope. Do not add a wrapper, dependency, or global coordinator for this skill.
+- [ ] A current same-scope project-owned Dart Decimate result is green per [dart-decimate.md](references/dart-decimate.md); cite scan scope.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
 - [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
 - [ ] Domain/data/platform follow Rules 7, 10-13, 17-24, 26-27: sealed Freezed, VOs, datasource/repo storage, core extensions, typed routes, debounce/batch, platform APIs, previews, E2E, pause-safe state, native links, and a11y; if error reporting is accepted/present, it uses one scrubbed once-only boundary, otherwise N/A.
@@ -125,7 +126,7 @@ After each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` wri
 - [ ] Source-of-truth fetch/reconcile after generated, normalized, reordered, destructive, or remote-function mutations.
 - [ ] Shared/realtime state has writer + observer E2E proof without manual refresh.
 - [ ] Selectors use stable text/semantics/tooltips or central `AppWidgetKeys`; no inline string keys or coordinate primary taps.
-- [ ] E2E entrypoint is deterministic and isolated from production `main.dart`; unknown scenarios fail; critical logs fail the run; evidence shows the asserted screen before app exit; cleanup is verified.
+- [ ] E2E scenario state is deterministic and isolated from production behaviour; Marionette runs use the debug-gated binding in `lib/main.dart`, Flutter Driver runs a separate driver-extension entrypoint; unknown scenarios fail; critical logs fail the run; evidence shows the asserted screen before app exit; cleanup is verified.
 - [ ] GoRouter redirects use pure matrix-tested resolver, nullable by-id providers/fallback UI, and generated typed route helpers.
 - [ ] Native/custom URI producer, Android/iOS registration, Flutter delivery, and typed router share one tested scheme/host/path contract; cold/warm + signed-state device paths pass.
 - [ ] Cross-runtime constants, schemas, and function contracts have drift tests; no app-root text-scale clamp.

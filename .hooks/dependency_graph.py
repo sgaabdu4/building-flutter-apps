@@ -33,15 +33,47 @@ def dependency_review_guidance(packages: list[Group]) -> str | None:
     if len(packages) < 2:
         return None
     missing = [group["path"] for group in packages if "depends_on" not in group]
-    if not missing:
+    if missing:
+        return (
+            "Review `depends_on` in hard-eng.gates.json for "
+            + ", ".join(missing)
+            + "; list direct internal dependencies, including root "
+            "packages that supply shared lockfiles or tools. Use [] only after "
+            "review confirms none."
+        )
+    reach = reachable(packages)
+    entries = [
+        f"`{group['path']}` -> `{dependency}`"
+        for group in packages
+        for dependency in group["depends_on"]
+        if dependency in reach.get(dependency, ())
+        and group["path"] not in reach[dependency]
+    ]
+    if not entries:
         return None
     return (
-        "Review `depends_on` in hard-eng.gates.json for "
-        + ", ".join(missing)
-        + "; list direct internal dependencies, including root "
-        "packages that supply shared lockfiles or tools. Use [] only after review "
-        "confirms none."
+        "These packages depend on a member of a dependency cycle they are not "
+        "part of, so every change in that cycle checks them: "
+        + ", ".join(entries)
+        + ". Replace each edge with `impact_inputs` naming the files the package "
+        "reads from that member."
     )
+
+
+def reachable(packages: list[Group]) -> dict[str, set[str]]:
+    edges: dict[str, set[str]] = {}
+    for group in packages:
+        edges.setdefault(group["path"], set()).update(group["depends_on"])
+    reach: dict[str, set[str]] = {}
+    for start, direct in edges.items():
+        seen: set[str] = set()
+        pending = list(direct)
+        while pending:
+            if (node := pending.pop()) not in seen:
+                seen.add(node)
+                pending.extend(edges.get(node, ()))
+        reach[start] = seen
+    return reach
 
 
 def expand_dependents(
@@ -62,9 +94,13 @@ def expand_dependents(
     return selected
 
 
-def secrets_only(shared: Group) -> Group:
-    """Plans and top-level docs are read only by the secret scan."""
-    print("Only plans or top-level docs changed; running the secret scan only.")
+def shared_only(shared: Group, names: set[str]) -> Group:
+    """No package reads the change; workflow edits still need workflow linting."""
     roles = {"secrets-files", "secrets-history"}
+    if any(name.startswith(".github/workflows/") for name in names):
+        print("No package reads this change; running workflow and secret checks.")
+        roles |= {"workflows", "ci-security"}
+    else:
+        print("No package reads this change; running the secret scan only.")
     checks = [gate for gate in shared["checks"] if gate.get("role") in roles]
     return {**shared, "checks": checks}

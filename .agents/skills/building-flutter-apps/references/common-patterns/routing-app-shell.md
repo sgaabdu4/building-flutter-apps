@@ -288,8 +288,7 @@ ProductDetailRoute(id: product.id).go(context);
 final result = await ProductCreateRoute(parentId: product.id).push<bool>(context);
 if (!context.mounted) return;
 
-// Replace when entering a same-flow child route whose success exits the whole flow
-// (auth/login/signup, onboarding step, destructive confirm, import wizard).
+// Replace when entering a same-flow child route whose success exits the whole flow.
 const LoginRoute().pushReplacement(context);
 
 // Safe pop with typed fallback.
@@ -299,6 +298,8 @@ if (context.canPop()) {
   const ProductListRoute().go(context);
 }
 ```
+
+Same-flow children = auth/login/signup, onboarding step, destructive confirm, import wizard.
 
 **Forbidden (lint enforced)** — every form below has a typed-route replacement above:
 
@@ -381,10 +382,11 @@ Use a dedicated bootstrap widget under `ProviderScope`:
 ```dart
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Crash.init();
-  runApp(
-    const ProviderScope(
-      child: AppBootstrap(child: MyApp()),
+  await Crash.init(
+    appRunner: () => runApp(
+      const ProviderScope(
+        child: AppBootstrap(child: MyApp()),
+      ),
     ),
   );
 }
@@ -396,8 +398,7 @@ class AppBootstrap extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Eager provider initialization: use watch so the provider stays alive.
-    // Select a stable readiness field when the provider exposes state.
+    // Eager init: watch keeps the provider alive; select a stable readiness field.
     ref.watch(startupProvider.select((state) => state.isReady));
 
     // UI side effects: listen at the root of build.

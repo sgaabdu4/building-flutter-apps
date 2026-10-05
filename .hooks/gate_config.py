@@ -4,14 +4,14 @@ import json
 import os
 import re
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import NotRequired, TypedDict, cast
 
 from dependency_graph import (
     dependency_review_guidance,
     expand_dependents,
     impact_inputs,
-    secrets_only,
+    shared_only,
 )
 
 type JsonValue = (
@@ -512,22 +512,27 @@ def changed_files(root: Path, base: str) -> set[str] | None:
 
 
 def changed_packages(
-    root: Path, by_path: dict[str, Group], base: str, *, prove_update: bool = False
-) -> set[str] | None:
-    names = changed_files(root, base)
-    if names is None:
-        return None
-    selected = packages_for(names, by_path)
-    if selected is not None or not prove_update:
+    root: Path,
+    by_path: dict[str, Group],
+    base: str,
+    names: set[str],
+    *,
+    prove_update: bool = False,
+) -> set[str] | str:
+    """Selected package paths, or why every package must be checked."""
+    selected = packages_for(root, base, names, by_path)
+    if isinstance(selected, set) or not prove_update:
         return selected
     from update import SOURCE_FILE, installed_update_paths, maybe_installed
 
     other = {name for name in names if not maybe_installed(name)}
-    narrowed = packages_for(other, by_path) if SOURCE_FILE in names else None
-    if narrowed is None or narrowed == set(by_path):
-        return None
-    if names - other != installed_update_paths(root, base):
-        return None
+    narrowed = (
+        packages_for(root, base, other, by_path) if SOURCE_FILE in names else selected
+    )
+    if isinstance(narrowed, str):
+        return narrowed
+    if narrowed == set(by_path) or names - other != installed_update_paths(root, base):
+        return selected
     print(
         "Hard Eng update in this change matches its verified release; checking the "
         "packages the other changes affect.",
@@ -536,27 +541,61 @@ def changed_packages(
     return narrowed
 
 
-def packages_for(names: set[str], by_path: dict[str, Group]) -> set[str] | None:
+def runs_checks(root: Path, base: str, name: str) -> bool:
+    """Hard Eng's runner, rules and gate list, or CI that runs or ran them."""
+    if name == "hard-eng.gates.json" or name.startswith(
+        (".hooks/", ".agents/skills/he/")
+    ):
+        return True
+    if not name.startswith(".github/"):
+        return False
+    blob = f"{base}:{name}"
+    text = subprocess.run(
+        ["git", "show", blob],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    ).stdout
+    if (root / name).is_file():
+        text += (root / name).read_text(errors="replace")
+    return not text or "hard-eng.py" in text
+
+
+def is_workflow(name: str) -> bool:
+    path = PurePosixPath(name)
+    return path.parent == PurePosixPath(".github/workflows") and path.suffix in {
+        ".yml",
+        ".yaml",
+    }
+
+
+def packages_for(
+    root: Path, base: str, names: set[str], by_path: dict[str, Group]
+) -> set[str] | str:
     from plans import is_documentation
 
     inputs = {path: impact_inputs(group) for path, group in by_path.items()}
     selected: set[str] = set()
-    for name in names:
-        if name.startswith((".hooks/", ".agents/", ".github/")) or name in {
-            "hard-eng.gates.json",
-            "AGENTS.md",
-        }:
-            return None
+    for name in sorted(names):
+        if runs_checks(root, base, name):
+            return f"{name} changes how every package is checked."
         consumers = {
             path
             for path, prefixes in inputs.items()
             if any(Path(name).is_relative_to(prefix) for prefix in prefixes)
         }
-        if not consumers and is_documentation(Path(name)):
+        if not consumers and (
+            is_documentation(Path(name))
+            or name.startswith(".agents/")
+            or is_workflow(name)
+            or name in {"AGENTS.md", "CLAUDE.md", "AGENTS.override.md"}
+        ):
             continue
         matches = [path for path in by_path if Path(name).is_relative_to(path)]
         if not matches and not consumers:
-            return None
+            return f"no package owns {name}."
         selected.update(consumers)
         if matches:
             selected.add(max(matches, key=len))
@@ -574,11 +613,15 @@ def affected_groups(
     by_path = {group["path"]: group for group in packages}
     if len(by_path) != len(packages):
         return groups
-    selected = changed_packages(root, by_path, base, prove_update=prove_update)
-    if selected is None:
+    names = changed_files(root, base)
+    if names is None:
+        return groups
+    selected = changed_packages(root, by_path, base, names, prove_update=prove_update)
+    if isinstance(selected, str):
+        print("Checking every package: " + selected)
         return groups
     if not selected:
-        return [secrets_only(groups[-1])]
+        return [shared_only(groups[-1], names)]
     if any("depends_on" not in group for group in packages):
         return groups
     selected = expand_dependents(packages, by_path, selected)

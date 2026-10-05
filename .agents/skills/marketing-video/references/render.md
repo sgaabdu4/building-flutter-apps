@@ -4,7 +4,7 @@ Load once scenes + lines exist, and after every revision.
 
 ## Build + render
 
-- `build.mjs` times scenes from clips, shots + lines → `render/scenes.js` + `audio/placement.json`. Fails on a missing, reused or overlapping line.
+- `build.mjs` times scenes from clips, shots + lines → `render/scenes.js` + `audio/placement.json`. Fails on a reused, unplaced or overlapping line, or a group line absent from `lines.json`; a scene whose own line is absent builds unvoiced.
 - Options: `subtitles: true` (sentence subtitles), `transitions: "fade"` (0.4 s crossfade; default `"cut"`), `backdrop: true` (dot grid + slow blurred blobs in `tint`), `music.volume`.
 - `brand` sets colours, fonts + `displayWeight` (default 800; lower for a lighter display face).
 - Stills first: every graphic scene, chapter card, click + zoom. Fix layout before a full render.

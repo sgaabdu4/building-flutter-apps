@@ -13,7 +13,7 @@ brew install ffmpeg
 
 On Linux, install FFmpeg with `sudo apt-get install -y ffmpeg` instead of Homebrew.
 
-The skill is pinned to Playwright 1.62.1, which provides `page.screencast`, persistent user overlays, and exact recording start/stop control.
+The skill pins Playwright in `package.json`; 1.62+ provides `page.screencast`, persistent user overlays, and exact recording start/stop control.
 
 ## Workflow
 
@@ -21,7 +21,7 @@ The skill is pinned to Playwright 1.62.1, which provides `page.screencast`, pers
 
 For E2E-owned recorded web proof, run Phases 1–9 below: inspect/configure the real journey, record, mechanically check, visually inspect, repair and approve the exact WebM. Return the accepted WebM + run/review reports to [E2E](../e2e/SKILL.md#prove-the-journey) for product assertions and durable-state proof. MP4 conversion is unnecessary for this route.
 
-Use the existing `pointer: false` configuration when no presentation pointer is needed; pointer visibility/continuity and click-ripple checks then do not apply. Target geometry, focus, keyboard cues, strict journey checks, checkpoints, readable holds and the remaining mechanical/visual review still apply. This is still a paced recording, not raw rendering or latency proof. Arbitrary browser/device videos lack this recorder's required run report; use native verification for those surfaces.
+Use the existing `pointer: false` configuration when no presentation pointer is needed; the pointer ring and its visibility/continuity and click-ripple checks then do not apply. Drag steps require the pointer's frame-level gesture audit, so pointer-free journeys use click, scroll, type, and press instead. Target geometry, focus, keyboard cues, strict journey checks, checkpoints, readable holds and the remaining mechanical/visual review still apply. This is still a paced recording, not raw rendering or latency proof. Arbitrary browser/device videos lack this recorder's required run report; use native verification for those surfaces.
 
 ### Video delivery
 
@@ -31,7 +31,7 @@ For a polished walkthrough, run Phases 1–11 below with the presentation pointe
 
 - Use Playwright 1.62+ `page.screencast.start()` after the opening state is fully ready.
 - Do not use browser-context `recordVideo` for the delivery recording. It starts during page creation and can capture blank or loading frames.
-- When the pointer is enabled, use one only: the exact 20px red v17 ring in Playwright's `page.screencast.showOverlay()` plane. Recorded E2E may use `pointer: false`; pointer visibility/continuity and click-ripple requirements below apply when enabled. Target/focus evidence and keyboard cues remain required.
+- When the pointer is enabled, use one only: the exact 20px red v17 ring in Playwright's `page.screencast.showOverlay()` plane. Pointer visibility/continuity and click-ripple requirements below apply only then; [Recorded E2E](#recorded-e2e) owns `pointer: false`.
 - Do not put the persistent pointer in application DOM. Keep it in Playwright's user-overlay plane. The same-state reload guard may use the prior checkpoint as a transient document-start bitmap in a recorder-owned closed shadow root; it is not an interactive pointer and must be removed after readiness.
 - Move Playwright's real mouse with timed intermediate events. `mouse.move({ steps })` alone is not pacing.
 - Express canvas and drag-and-drop input with the strict locator-relative `drag` action. Do not replace the runner with custom Playwright code or use unexplained viewport coordinates.
@@ -111,7 +111,7 @@ Strict preflight must remain enabled. Do not weaken the gate to make a broken co
 Set:
 
 - `allowedOrigins` to the local app and only the APIs needed by the journey;
-- `allowedHttpResponses` only for deliberate negative-path responses, matched by exact status and narrow URL substring;
+- `allowedHttpResponses` only for deliberate, asserted negative-path responses, matched by exact status and narrow URL substring;
 - `blockExternalRequests: true`;
 - `blockEventStreams: true` unless an event stream is part of the feature;
 - `acceptDownloads: false`;
@@ -119,7 +119,7 @@ Set:
 
 Use a local safe proxy when an open-source demo references analytics, remote fonts, avatars, or other unrelated third-party assets. Replace those assets locally rather than allowlisting the internet.
 
-An expected failed-auth or validation request must remain visible in evidence. Configure its exact status and a narrow URL substring in `allowedHttpResponses`; the runner records it as `expected-http-response`. If Chromium emits a matching generic console error, allowlist that exact message separately. Never use broad status-only suppression.
+An expected failed-auth or validation request must remain visible in evidence: the runner records a matched `allowedHttpResponses` entry as `expected-http-response` at informational severity. If Chromium emits a matching generic console error, allowlist its narrowest text with `allowedConsoleMessageSubstrings`; that match is a global substring, so it also downgrades the same message from any other request → review every remaining 4xx warning in the run report as unexpected. Never use broad status-only suppression; unmatched 4xx responses remain warnings and unmatched 5xx responses remain errors.
 
 Use `textFromEnv` only for a browser-masked password field. A visible field must reject environment text unless `allowVisibleEnvText: true` explicitly marks known non-sensitive fixture copy. Never expose credentials, tokens, customer data, or private payloads in a visible field.
 
@@ -324,9 +324,7 @@ User-reported defects follow [E2E's reopening rule](../e2e/SKILL.md#prove-the-jo
 }
 ```
 
-Use `allowedHttpResponses` only for an intentional, asserted negative-path step. Match both the exact status and a narrow URL substring. It does not suppress the event: the run report records `expected-http-response` at informational severity. If Chromium also emits a generic console error for that response, allowlist its exact message separately with `allowedConsoleMessageSubstrings`. Unmatched 4xx responses remain warnings and unmatched 5xx responses remain errors.
-
-Set `"pointer": false` to record undecorated evidence media with every other strict protection still enforced. The pointer ring and its review audits are skipped. Drag steps require the pointer's frame-level gesture audit, so pointer-free journeys use click, scroll, type, and press instead.
+Negative-path `allowedHttpResponses` follow [Phase 3](#phase-3-establish-safety-boundaries); `"pointer": false` follows [Recorded E2E](#recorded-e2e).
 
 `reducedMotion: "reduce"` asks the application to honor `prefers-reduced-motion`; it does not rewrite application behavior. Keep meaningful product loaders and state changes. Remove decorative motion in the application or a safe recording fixture rather than masking real behavior in post-production.
 

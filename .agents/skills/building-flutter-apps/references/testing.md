@@ -17,23 +17,20 @@
 Signals: ProviderContainer.test, UncontrolledProviderScope, mocktail, widget tests, event contract
 
 
-## Rules — NEVER Violate
+## Rules
 
-1. **MUST** mock interfaces (`IProductRepository`), NEVER concrete (`ProductRepository`).
-2. **MUST** use `ProviderContainer.test()` — NEVER manual `createContainer`.
-3. **MUST** use `UncontrolledProviderScope` widget tests — NEVER raw `ProviderScope` w/ overrides.
-4. **MUST** prefer explicit `pump()`. `pumpAndSettle` only finite anim/async; bound it with the positional timeout (`pumpAndSettle(const Duration(milliseconds: 100), .sendSemanticsUpdate, const Duration(seconds: 5))`); avoid infinite/ticking.
-5. **MUST** override repo/datasource level — NEVER mock notifiers direct.
-6. **MUST** use deterministic `ValueKey` selectors from a central key registry for repeated icons, draggable sheets, close/open actions. NEVER use inline string keys, `tapAt(...)`, first-match icon finders, or case-sensitive label text.
-7. **MUST** add event-contract tests for streams/realtime/push/sync/shared remote state: exact subscriptions/listeners, every event family, notifier reaction, stale-source refresh, and removal/delete behavior.
-8. **MUST** keep shared fakes, mocks, provider-container factories, platform stubs, and async wait helpers in a test helper SSOT.
-9. **MUST** add contract drift tests when constants/schema/field IDs are copied across Flutter/backend/functions/native runtimes.
-10. **MUST** regression-test pause-sensitive provider startup/projections, transient mode-error clearing, and native-link contracts when those paths exist.
-11. **MUST** wait for the old modal key to be absent before reusing that key for
-    a new modal.
-12. **MUST** test native/plugin boundaries with the real platform wrapper when
-    the behavior depends on a file picker, permission prompt, keyboard, share
-    sheet, or platform channel. A widget mock proves only the Flutter side.
+1. Mock interfaces (`IProductRepository`), not concrete classes (`ProductRepository`) → doubles honour the provider's contract; implementation changes do not break tests.
+2. Containers = `ProviderContainer.test()`, not manual `createContainer` → disposed automatically when the test ends.
+3. Widget tests pass that container through `UncontrolledProviderScope`, not a raw `ProviderScope` with overrides → unit and widget tests share one container/override setup, and the test holds the container before the first pump.
+4. Prefer explicit `pump()`. `pumpAndSettle` = finite animation/async only, bounded with the positional timeout (`pumpAndSettle(const Duration(milliseconds: 100), .sendSemanticsUpdate, const Duration(seconds: 5))`) → an unbounded settle hangs on infinite/ticking animation.
+5. Override repository/datasource providers, not notifiers → the notifier's real state logic stays under test.
+6. Repeated icons, draggable sheets and close/open actions = deterministic `ValueKey` selectors from the central key registry; no inline string keys, `tapAt(...)`, first-match icon finders or case-sensitive label text → those break on layout, order or copy changes and drift from E2E.
+7. Streams/realtime/push/sync/shared remote state = reaction test per event family the feature consumes → assert resulting notifier state or visible UI (update, stale-source refresh, removal/delete fallback). Datasource/service test asserts the registered subscription/channel/filter set → injected-event reaction tests cannot catch missing or wrong wiring; names shared with another runtime also get a drift test (rule 9). See [Event Contract and Sync Tests](#event-contract-and-sync-tests).
+8. Shared fakes, mocks, provider-container factories, platform stubs and async wait helpers = one test helper SSOT → one fix reaches every test.
+9. Constants/schema/field IDs copied across Flutter/backend/functions/native runtimes = contract drift test → a one-sided rename fails a test, not production.
+10. Pause-sensitive provider startup/projections, transient mode-error clearing and native-link contracts, when present = regression tests from the [lifecycle regression matrix](#lifecycle-regression-matrix) → these fail silently (lost first update, stale error, drifted link).
+11. Before reusing a modal key for a new modal, wait for the old key to be absent → otherwise the closing route satisfies the next finder.
+12. File picker, permission prompt, keyboard, share sheet or platform-channel behaviour = test through the real platform wrapper → a widget mock proves only the Flutter side.
 
 ## Setup
 
@@ -62,7 +59,11 @@ class MockIAuthRepository extends Mock implements IAuthRepository {}
 Non-nullable arg matchers → register fallback once `setUpAll`:
 
 ```dart
-setUpAll(() => registerFallbackValue(const Product(id: '', name: '', price: 0)));
+setUpAll(
+  () => registerFallbackValue(
+    Product(id: ProductId('fallback'), name: DisplayName('Fallback'), price: .usd(0)),
+  ),
+);
 ```
 
 **Fake vs Mock** — Mocks (Mocktail) for interaction verify (`verify`, `when`). Fakes (manual subclass) for working impls w/ controlled behavior:
@@ -84,7 +85,7 @@ verify(() => mock.fetchAll()).called(1);
 
 ## ProviderContainer.test
 
-Auto-dispose each test:
+Auto-dispose each test. Sync `Notifier` with deferred `_load` has no `.future` → read the provider, then `await pumpEventQueue()` to drain the load and its awaited repository call; one microtask is not enough.
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -94,7 +95,7 @@ void main() {
   test('fetches products on init', () async {
     final mockRepo = MockIProductRepository();
     when(() => mockRepo.fetchAll()).thenAnswer((_) async => [
-      const Product(id: '1', name: 'Widget', price: 9.99),
+      Product(id: ProductId('1'), name: DisplayName('Widget'), price: .usd(9.99)),
     ]);
 
     final container = ProviderContainer.test(
@@ -103,15 +104,12 @@ void main() {
       ],
     );
 
-    // Trigger build() and flush the deferred Future.microtask(_load) call.
-    // `.future` only exists on AsyncNotifier — for sync Notifier with
-    // microtask-deferred load, pump the microtask queue instead.
     container.read(productProvider);
-    await Future<void>.microtask(() {});
+    await pumpEventQueue();
 
     final state = container.read(productProvider);
     expect(state.items, hasLength(1));
-    expect(state.items.first.name, 'Widget');
+    expect(state.items.first.name.value, 'Widget');
     verify(() => mockRepo.fetchAll()).called(1);
   });
 }
@@ -187,26 +185,26 @@ test('handles pre-loaded async data', () {
   final container = ProviderContainer.test(
     overrides: [
       userProvider.overrideWithValue(
-        .data(const User(id: '1', name: 'Test')),
+        .data(User(id: UserId('1'), name: DisplayName('Test'))),
       ),
     ],
   );
 
   final user = container.read(userProvider);
-  expect(user.value?.name, 'Test');
+  expect(user.value?.name.value, 'Test');
 });
 ```
 
 ## Widget Tests
 
-`UncontrolledProviderScope` inject container:
+`UncontrolledProviderScope` inject container. Explicit frames = trigger + advance through the animation; route transitions avoid hardcoded durations when possible.
 
 ```dart
 testWidgets('shows product list', (tester) async {
   final mockRepo = MockIProductRepository();
   when(() => mockRepo.fetchAll()).thenAnswer((_) async => [
-    const Product(id: '1', name: 'Widget', price: 9.99),
-    const Product(id: '2', name: 'Gadget', price: 19.99),
+    Product(id: ProductId('1'), name: DisplayName('Widget'), price: .usd(9.99)),
+    Product(id: ProductId('2'), name: DisplayName('Gadget'), price: .usd(19.99)),
   ]);
 
   final container = ProviderContainer.test(
@@ -222,8 +220,6 @@ testWidgets('shows product list', (tester) async {
     ),
   );
 
-  // Prefer explicit frames: trigger + advance through animation.
-  // For route transitions, avoid hardcoded durations when possible.
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
 
@@ -295,8 +291,8 @@ testWidgets('can access container', (tester) async {
 test('deleteItem removes from state', () async {
   final mockRepo = MockIProductRepository();
   when(() => mockRepo.fetchAll()).thenAnswer((_) async => [
-    const Product(id: '1', name: 'A', price: 10),
-    const Product(id: '2', name: 'B', price: 20),
+    Product(id: ProductId('1'), name: DisplayName('A'), price: .usd(10)),
+    Product(id: ProductId('2'), name: DisplayName('B'), price: .usd(20)),
   ]);
   when(() => mockRepo.delete(any())).thenAnswer((_) async {});
 
@@ -306,39 +302,36 @@ test('deleteItem removes from state', () async {
     ],
   );
 
-  // Wait for initial load (sync Notifier with deferred microtask load)
+  // Wait for initial load (sync Notifier with deferred load)
   container.read(productProvider);
-  await Future<void>.microtask(() {});
+  await pumpEventQueue();
 
   // Delete and verify
   await container.read(productProvider.notifier).deleteItem('1');
 
   final state = container.read(productProvider);
   expect(state.items, hasLength(1));
-  expect(state.items.first.id, '2');
+  expect(state.items.first.id.value, '2');
 });
 ```
 
 ## Event Contract and Sync Tests
 
-Any stream, realtime, push, subscription, callback, poller, cache invalidation, or source-of-truth refresh path needs tests at two levels:
+Stream, realtime, push, subscription, callback, poller, cache-invalidation or source-of-truth refresh path = notifier/widget reaction test: emit a representative event → assert the resulting state or visible UI (update, refetch, clear/fallback).
 
-1. Datasource/service contract test: proves the exact channel/topic/query/filter/listener set is registered.
-2. Notifier/widget reaction test: emits representative events and proves state updates, refetches, or clears correctly.
-
-Do not test only the happy create event. Cover the event families the product depends on:
+Cover each event family the feature consumes; skip families it does not:
 
 - create/add/join
 - update/rename/status/order
 - delete/remove/leave/revoke
 - generated/regenerated values
 - permission/ownership changes
-- stale, partial, duplicate, out-of-order, and unrelated events
+- stale, partial, duplicate, out-of-order or unrelated events the feature must reconcile or ignore
 
-Minimum contract:
+Datasource/service wiring test = assert the registered channel/topic/filter/listener set → the reaction test injects events, so it passes even when the real subscription is missing or wrong. Names shared with another runtime also get a contract drift test (rule 9):
 
 ```dart
-test('subscribes to every event family needed for item sync', () async {
+test('subscribes to every product event family', () async {
   final source = FakeRemoteEventSource();
   final datasource = ProductRemoteDatasource(source);
 
@@ -350,29 +343,29 @@ test('subscribes to every event family needed for item sync', () async {
 });
 ```
 
-Minimum notifier reaction:
+Notifier reaction:
 
 ```dart
 test('refetches source of truth after remote update event', () async {
   final repo = FakeProductRepository()
-    ..items = [const Product(id: 'p1', name: 'Old')];
-  final events = FakeProductEvents();
+    ..items = [Product(id: ProductId('p1'), name: DisplayName('Old'), price: .usd(1))];
+  final events = FakeProductEventSource();
 
   final container = ProviderContainer.test(
     overrides: [
       productRepositoryProvider.overrideWithValue(repo),
-      productEventsProvider.overrideWithValue(events),
+      productEventSourceProvider.overrideWithValue(events),
     ],
   );
 
   container.read(productProvider);
-  await Future<void>.microtask(() {});
+  await pumpEventQueue();
 
-  repo.items = [const Product(id: 'p1', name: 'New')];
+  repo.items = [Product(id: ProductId('p1'), name: DisplayName('New'), price: .usd(1))];
   events.emit(const .updated(id: 'p1'));
-  await Future<void>.microtask(() {});
+  await pumpEventQueue();
 
-  expect(container.read(productProvider).items.single.name, 'New');
+  expect(container.read(productProvider).items.single.name.value, 'New');
 });
 ```
 
@@ -410,16 +403,16 @@ test('fetchAll returns entities from remote', () async {
   final result = await repo.fetchAll();
 
   expect(result, hasLength(1));
-  expect(result.first.name, 'Test');
+  expect(result.first.name.value, 'Test');
   expect(result.first, isA<Product>()); // Entity, not Model
   verify(() => mockRemote.fetchAll()).called(1);
 });
 
-test('falls back to cache on error', () async {
+test('falls back to cache when offline', () async {
   final mockRemote = MockIProductRemoteDatasource();
   final mockLocal = MockIProductLocalDatasource();
 
-  when(() => mockRemote.fetchAll()).thenThrow(Exception('Network error'));
+  when(() => mockRemote.fetchAll()).thenThrow(const SocketException('offline'));
   when(() => mockLocal.getAll()).thenAnswer((_) async => [
     const ProductModel(id: '1', name: 'Cached', price: 5.00),
   ]);
@@ -427,7 +420,7 @@ test('falls back to cache on error', () async {
   final repo = ProductRepository(mockRemote, mockLocal);
   final result = await repo.fetchAll();
 
-  expect(result.first.name, 'Cached');
+  expect(result.first.name.value, 'Cached');
   verify(() => mockLocal.getAll()).called(1);
 });
 ```
@@ -438,7 +431,7 @@ test('falls back to cache on error', () async {
 test('auth state transitions', () async {
   final mockAuth = MockIAuthRepository();
   when(() => mockAuth.getSession()).thenAnswer(
-    (_) async => const User(id: '1', name: 'Test'),
+    (_) async => User(id: UserId('1'), name: DisplayName('Test')),
   );
 
   final container = ProviderContainer.test(
@@ -452,14 +445,14 @@ test('auth state transitions', () async {
   expect(initial, isA<AuthLoading>());
 
   // Wait for session check
-  await Future<void>.microtask(() {});
+  await pumpEventQueue();
 
   final state = container.read(authProvider);
   expect(state, isA<Authenticated>());
 
   // Pattern match to verify user
   if (state case Authenticated(:final user)) {
-    expect(user.name, 'Test');
+    expect(user.name.value, 'Test');
   }
 });
 ```
@@ -469,12 +462,12 @@ test('auth state transitions', () async {
 | Issue | Fix |
 |-------|-----|
 | `pumpAndSettle` hangs | Explicit `pump()` + bounded `pump(Duration(...))`; `pumpAndSettle` with positional timeout (rule 4) finite anim only |
-| State not updated after async | `await provider.future` (AsyncValue) or `await Future.microtask(() {})` sealed-state |
+| State not updated after async | `await provider.future` (AsyncValue) or `await pumpEventQueue()` sealed-state |
 | Provider not found | Wrap `UncontrolledProviderScope` |
 | Mock not applied | Verify override matches provider type |
 | Container disposed early | `ProviderContainer.test()` — auto-manages |
 | Inline `ValueKey('close')` strings drift from E2E | Put key strings in `AppWidgetKeys`, use constants in widgets/tests |
-| Realtime join/create not observed | Contract-test exact event families plus notifier reaction test for emitted event |
+| Realtime join/create not observed | Emit the join/create event the feature consumes; assert the resulting state or visible UI |
 | Delete/remove leaves stale detail UI | Emit delete/remove event and assert selected state clears or route fallback appears |
 | Generated code/token stale after mutation | Fake source generates new value; notifier must refetch and expose source-of-truth value |
 | Event test passes but real app does not sync | Add writer/observer Dart MCP E2E from [dart-mcp-e2e-testing.md](dart-mcp-e2e-testing.md) |

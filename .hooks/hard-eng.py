@@ -34,6 +34,7 @@ from gate_config import (
 )
 from project_setup import package_script_arguments as test_arguments
 from tool_setup import managed_command, provision_tools
+from untrusted_input import DECLARATIONS, reject_jsdoc_casts
 
 DartAnalyzer = TypedDict(
     "DartAnalyzer",
@@ -360,6 +361,8 @@ def prepare_command(
         )
         if not files:
             return []
+        if gate.get("role") == "typing-style":
+            reject_jsdoc_casts(ROOT / group["path"], files)
         command = [
             value
             for argument in command
@@ -441,6 +444,10 @@ def validate_typescript(
     expected = production_files(directory, group)
     if not {(directory / name).resolve() for name in expected} <= files:
         raise ValueError("TypeScript configuration omits declared production files")
+    if (ROOT / DECLARATIONS).resolve() not in files:
+        raise ValueError(
+            f"TypeScript configuration omits {DECLARATIONS}; rerun the Hard Eng installer"
+        )
 
 
 def prepare_reports(

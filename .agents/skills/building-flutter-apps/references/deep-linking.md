@@ -44,20 +44,22 @@ Future<void> main() async {
 ## Route Parameter Safety
 
 Never throw from widget `build()` for a missing route ID. Parse at the route
-boundary, then use nullable by-id providers and fallback UI.
+boundary, then use nullable by-id providers and fallback UI. Blank id → fallback
+before `ProductId(id)`, whose [validated factory](value-objects.md#non-empty-text) throws on blank input.
 
 ```dart
-class ProductRoute extends GoRouteData {
+@TypedGoRoute<ProductRoute>(path: '/products/:id')
+class ProductRoute extends GoRouteData with $ProductRoute {
   const ProductRoute({required this.id});
 
   final String id;
 
   @override
   Widget build(BuildContext context, GoRouterState state) {
-    if (id.isEmpty) {
+    if (id.trim().isEmpty) {
       return const ProductMissingScreen();
     }
-    return ProductDetailScreen(productId: id);
+    return ProductDetailScreen(productId: ProductId(id));
   }
 }
 ```

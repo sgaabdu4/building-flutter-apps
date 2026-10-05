@@ -31,6 +31,7 @@
             "--only=suspicious/noExplicitAny",
             "--only=suspicious/noImplicitAnyLet",
             "--only=performance/noAccumulatingSpread",
+            "--only=nursery/noUnsafeTypeAssertion",
             "--error-on-warnings",
             "."
           ]

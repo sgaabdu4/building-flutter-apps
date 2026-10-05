@@ -26,12 +26,16 @@ Signals: @Preview, AppPreviewShell, widget_previews, provider overrides, preview
 
 ## File Placement
 
-Prefer one preview file next to the widget:
+Reusable-widget preview = next to the widget, plain immutable inputs (R8), no overrides. Provider-override preview + its fakes = `presentation/previews/` → repository imports + `ref` reads fail `presentation_widget_infrastructure_dependency` under `presentation/widgets/`:
 
 ```text
-features/products/presentation/widgets/
-  product_card.dart
-  product_card_preview.dart
+features/products/presentation/
+  widgets/
+    product_card.dart
+    product_card_preview.dart
+  previews/
+    fake_product_repository.dart
+    product_card_provider_preview.dart
 ```
 
 If the project already has a preview convention, follow it.
@@ -72,10 +76,13 @@ class AppPreviewShell extends StatelessWidget {
 ## Riverpod Preview Pattern
 
 Keep the widget itself production-real. Override only dependencies.
+Target = inline `Consumer` surface binding the real provider → plain widget inputs; never a `presentation/screens/` widget (`widget_preview_screen`).
 
 ```dart
+// features/products/presentation/previews/product_card_provider_preview.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 @Preview(name: 'Product card - in stock')
 Widget productCardInStockPreview() {
@@ -83,13 +90,22 @@ Widget productCardInStockPreview() {
     overrides: [
       productRepositoryProvider.overrideWithValue(
         FakeProductRepository(
-          products: const [
-            Product(id: 'preview-1', name: 'Suture Kit', price: 24),
+          products: [
+            Product(id: ProductId('preview-1'), name: DisplayName('Suture Kit'), price: .usd(24)),
           ],
         ),
       ),
     ],
-    child: const ProductCard(productId: 'preview-1'),
+    child: Consumer(
+      builder: (context, ref, _) {
+        final product = ref.watch(productProvider.select((s) => s.items.firstOrNull));
+        if (product == null) return const SizedBox.shrink();
+        return ProductCard(
+          item: ProductItemViewData(id: product.id, name: product.name),
+          onTap: () {},
+        );
+      },
+    ),
   );
 }
 ```
@@ -109,7 +125,7 @@ class FakeProductRepository implements IProductRepository {
 
   @override
   Future<Product> fetchById(String id) async {
-    final product = products.lookupByKey(id, (product) => product.id);
+    final product = products.lookupByKey(id, (product) => product.id.value);
     if (product == null) {
       return Future<Product>.error(StateError('Unknown preview product $id'));
     }
