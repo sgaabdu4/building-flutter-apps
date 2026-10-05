@@ -17,6 +17,7 @@ flowchart LR
   T -->|Adapt / repair checks| G[references/gates.md]
   T -->|Bulk / async / performance| E[references/efficiency.md]
   T -->|Design / change / review tests| Q[references/testing.md]
+  T -->|Setup / update / MCP failure| I[references/integrations.md]
   click W "references/workflow.md"
   click P "../he-plan/SKILL.md"
   click B "../he-build/SKILL.md"
@@ -25,4 +26,5 @@ flowchart LR
   click G "references/gates.md"
   click E "references/efficiency.md"
   click Q "references/testing.md"
+  click I "references/integrations.md"
 ```

@@ -69,15 +69,7 @@ class ProfileNotifier extends _$ProfileNotifier {
 }
 ```
 
-For app state with explicit flags, keep a Freezed state object behind a sync notifier: seed state in `build()` and defer the first load with `unawaited(.microtask(_load))` (the `avoid_sync_notifier_state_read` fix). Exception: pause-sensitive startup (below) starts from its durable owner after the watch/listen path exists, through an idempotent `load()`. Do not rely on `Future.microtask` ordering there to beat route pause or listener attachment.
-
-## Pause-sensitive startup
-
-- Route widgets may stop listening while covered or offstage; route-local listeners cannot own durable startup or one-shot delivery.
-- Root/bootstrap owner = eagerly watch durable state + register the listener before calling idempotent startup.
-- One-shot navigation/snackbar/status = durable state with an identity/sequence + explicit acknowledgement; never an unbuffered callback.
-- Provider projection = watch the base state directly; avoid computed-provider → computed-provider chains for pause-sensitive values.
-- Regression proof = start covered/paused → emit first update → resume → exact current state or pending event appears once.
+For app state with explicit flags, keep a Freezed state object behind a sync notifier: seed state in `build()` and defer the first load with `unawaited(.microtask(_load))` (the `avoid_sync_notifier_state_read` fix). Exception: pause-sensitive startup starts from its durable owner after the watch/listen path exists, through an idempotent `load()` ([pause boundaries](../state-management-lifecycle.md#pause-projection-and-mode-boundaries)). Do not rely on `Future.microtask` ordering there to beat route pause or listener attachment.
 
 ## Loading and progress
 

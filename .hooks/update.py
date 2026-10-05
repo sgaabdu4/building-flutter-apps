@@ -202,7 +202,12 @@ def scaffold_files(source: Path) -> set[str]:
     return (
         {
             str(path.relative_to(source))
-            for pattern in ("*.py", "ruff.toml", "dart_declarations.pubspec.*")
+            for pattern in (
+                "*.py",
+                "ruff.toml",
+                "dart_declarations.pubspec.*",
+                "untrusted-input.d.ts",
+            )
             for path in (source / ".hooks").glob(pattern)
         }
         | {

@@ -2,7 +2,7 @@
 
 Load when chapters are cut from product recordings. Run `clips.mjs` after every clip edit.
 
-Clip fields in an `app` scene's `clips`: `video`, `from`/`to` (source s), `speed`, `caption`, optional `focus`, `hold`, `blankCrop`, `blankInk`.
+Clip fields in an `app` scene's `clips`: `video`, `from`/`to` (source s), `speed`, `caption`, optional `focus`, `hold`. Storyboard-level `blankCrop` + `blankInk` apply to every clip.
 
 - Pick the moment that proves the step: form filled → confirmation. Skip navigation, spinners, empty states.
 - Speed: typing + scrolling 3–4.5×; decisions + confirmations 1.6–2.5×. Speed tag shows from 3×.

@@ -186,11 +186,11 @@ class OrderNotifier extends _$OrderNotifier {
 
 ## Pause, projection, and mode boundaries
 
-- Durable work = root/bootstrap provider owner, not a route that may pause or leave the tree.
+- Durable work = root/bootstrap provider owner, not a route that may pause or leave the tree; route widgets stop listening while covered or offstage, so route-local listeners own neither durable startup nor one-shot delivery.
 - Pause-sensitive projection = watch the base provider directly and select the needed field there.
-- Computed provider → computed provider chains require proof that pause/resume cannot miss the first update; otherwise flatten the projection.
-- Listener startup = listener/watch exists before the idempotent operation starts.
-- One-shot state = event identity/sequence + acknowledgement; resume must not drop or replay it.
+- Computed provider → computed provider chains require proof that pause/resume cannot miss the first update; otherwise flatten the projection: watch base state once, derive with pure helpers.
+- Listener startup = the owner eagerly watches durable state + registers its listener before the idempotent operation starts.
+- One-shot navigation/snackbar/status = durable state with event identity/sequence + explicit acknowledgement, never an unbuffered callback; resume must not drop or replay it.
 - Login/signup/reset or form-mode switch = clear mode-owned validation/server error + pending flag before showing the new mode.
 - Persistent external failure crosses modes only when product behavior explicitly requires it.
-- Tests = covered route at startup + first update while paused + resume + mode switch after failure.
+- Tests = [lifecycle regression matrix](testing.md#lifecycle-regression-matrix): covered route at startup + first update while paused + resume → exact current state or pending event appears once + mode switch after failure.

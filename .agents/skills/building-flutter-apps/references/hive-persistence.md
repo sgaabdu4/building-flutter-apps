@@ -112,23 +112,21 @@ Gen TypeAdapters for Freezed classes sans @HiveType.
 ```dart
 // lib/core/hive/hive_adapters.dart
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
-import 'package:my_app/features/user/data/models/user_model.dart';
+import 'package:my_app/features/order/data/models/order_item_model.dart';
 import 'package:my_app/features/order/data/models/order_model.dart';
+import 'package:my_app/features/user/data/models/user_model.dart';
 
-part 'hive_adapters.g.dart';
-
-/// TypeId allocation:
-/// 0 - CacheEntry (reserved for @HiveType)
-/// 1 - UserModel
-/// 2 - OrderModel
-/// 3 - OrderItemModel
 @GenerateAdapters([
   AdapterSpec<UserModel>(),
   AdapterSpec<OrderModel>(),
   AdapterSpec<OrderItemModel>(),
 ], firstTypeId: 1, reservedTypeIds: {0})
-void _hiveAdapters() {}
+part 'hive_adapters.g.dart';
 ```
+
+- One `@GenerateAdapters` per package = this file; a second annotated file fails the build.
+- Annotation sits on the `part` directive → no unused placeholder function.
+- First build → `UserModel` 1, `OrderModel` 2, `OrderItemModel` 3, recorded in `hive_adapters.g.yaml`; `reservedTypeIds: {0}` keeps 0 for the manual `@HiveType` `CacheEntry`.
 
 `AdapterSpec<T>()` always names a persistence-layer `Model` from `/data/models/`, never a `/domain/entities/` class. Domain entities stay Hive-free. The mapper bridges (see [Repository Pattern](#repository-pattern) and [VO Interop](#vo-interop)).
 
@@ -158,12 +156,11 @@ Future<void> initializeStorage() async {
 
 TypeIds unique + stable. Change TypeId = break existing data.
 
-```
-// Allocation strategy: Reserve ranges per feature
-// 0-9: Core (AppState, Settings, Cache)
-// 10-19: User feature
-// 20-29: Orders feature
-```
+Allocation = `hive_ce_generator`, no per-feature ranges:
+
+- `firstTypeId` seeds only a new `hive_adapters.g.yaml`.
+- New `AdapterSpec` → schema's next free typeId, skipping `reservedTypeIds`; the committed yaml keeps every assigned id.
+- Append specs to the [central list](#step-1-create-adapter-specification); manual `@HiveType` ids + retired ids → `reservedTypeIds`.
 
 ## Mixing @HiveType and @GenerateAdapters
 
@@ -181,12 +178,9 @@ class CacheEntry {
 
   CacheEntry({required this.key, required this.value});
 }
-
-// Freezed classes use @GenerateAdapters
-@GenerateAdapters([
-  AdapterSpec<User>(),     // typeId: 1
-], firstTypeId: 1, reservedTypeIds: {0})
 ```
+
+Freezed models = the [central annotation](#step-1-create-adapter-specification), which reserves typeId 0 for `CacheEntry`.
 
 ## IsolatedHive (background-isolate)
 
@@ -224,12 +218,10 @@ sealed class Order with _$Order {
 }
 ```
 
+Registration = [central annotation](#step-1-create-adapter-specification); model files carry no Hive annotation.
+
 ```dart
 // features/orders/data/models/order_model.dart — Hive persistence model
-@GenerateAdapters([
-  AdapterSpec<OrderModel>(),
-  AdapterSpec<OrderItemModel>(),
-], firstTypeId: 20)
 @freezed
 sealed class OrderModel with _$OrderModel {
   const OrderModel._();
@@ -352,7 +344,7 @@ void _registerAdapters() {
     Hive.registerAdapter(CacheEntryAdapter());
   }
   if (!Hive.isAdapterRegistered(1)) {
-    Hive.registerAdapter(UserAdapter());
+    Hive.registerAdapter(UserModelAdapter());
   }
 }
 ```
@@ -365,8 +357,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 // Standard Flutter setup: Documents directory + optional subdirectory.
 await Hive.initFlutter('my_app');
 
-// Custom path setup: keep this explicit when preserving an existing data path,
-// e.g. Application Support. Still import through hive_ce_flutter.
+// Custom path, e.g. preserving an existing Application Support path; still import hive_ce_flutter.
 final path = (await getApplicationSupportDirectory()).path;
 Hive.init(path);
 ```
@@ -425,15 +416,13 @@ Constructor signature = append-only schema.
 
 Delete class = retire typeId. Never reuse for successor. Add retired id to `reservedTypeIds`. New class gets fresh id.
 
-```dart
-// WRONG — Program deleted, Routine reused typeId 10
-// Old user data written as Program at id 10 → new RoutineAdapter reads it
-// → cryptic type-cast crash on boot
+Reuse failure: `Program` (typeId 10) deleted + `Routine` given id 10 → old user data written as `Program` is read by the new `RoutineAdapter` → cryptic type-cast crash on boot.
 
+```dart
 // RIGHT
 @GenerateAdapters([
-  AdapterSpec<Routine>(),     // new id 12 (next free)
-  AdapterSpec<RoutineDay>(),  // new id 13
+  AdapterSpec<RoutineModel>(),     // new id 12 (next free)
+  AdapterSpec<RoutineDayModel>(),  // new id 13
 ], firstTypeId: 1, reservedTypeIds: {0, 9, 10, 11}) // 9/10/11 retired
 ```
 
@@ -476,9 +465,9 @@ test/shared/
 
 ## Adding New Entities
 
-1. Create Freezed entity
-2. Add `AdapterSpec<Entity>()` to @GenerateAdapters list
-3. Run `dart run build_runner build`
+1. Create the Freezed data model in `/data/models/`; the domain entity stays Hive-free
+2. Append `AdapterSpec<XModel>()` to the central `@GenerateAdapters` list in `lib/core/hive/hive_adapters.dart`
+3. Run `dart run build_runner build` and commit the updated `hive_adapters.g.yaml`
 4. Update test helper if needed
 
 ## References

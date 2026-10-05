@@ -146,11 +146,11 @@ class HeaderWidget extends StatelessWidget {
 // WRONG — allocates new object on every parent rebuild
 return Padding(padding: const EdgeInsets.all(16), child: child);
 
-// RIGHT — reuses existing object. `const` requires every argument be const,
-// so the child must be a concrete const widget (here: SizedBox.shrink()).
-// You CANNOT pass a runtime `child` variable into a const constructor.
+// RIGHT — reuses existing object.
 return const Padding(padding: EdgeInsets.all(Spacing.s16), child: SizedBox.shrink());
 ```
+
+`const` requires every argument to be const: the child must be a concrete const widget (here `SizedBox.shrink()`), never a runtime `child` variable.
 
 ## Provider Lifecycle
 
@@ -165,10 +165,7 @@ return const Padding(padding: EdgeInsets.all(Spacing.s16), child: SizedBox.shrin
 
 Auto-dispose in all-keepAlive chain can break pause/resume subscription counting. Match lifecycle.
 
-Practical guardrails:
-- If all upstream deps are `keepAlive`, keep downstream computed providers `keepAlive`.
-- Do not stack computed hops in pause-sensitive paths (`computedA -> computedB -> familyC`).
-- Flatten: watch base state once, derive with pure helpers.
+If all upstream deps are `keepAlive`, keep downstream computed providers `keepAlive`. Pause-sensitive computed hops (`computedA -> computedB -> familyC`) follow [pause boundaries](state-management-lifecycle.md#pause-projection-and-mode-boundaries).
 
 ### Equality Filtering
 

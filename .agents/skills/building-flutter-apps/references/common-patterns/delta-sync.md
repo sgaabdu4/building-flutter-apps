@@ -27,44 +27,46 @@ abstract interface class IExerciseRepository {
 
 ### mergeAll Implementation
 
+Repository → map entities to models + delegate. Local datasource → keyed
+upsert of the changed rows only; never read + rewrite the whole collection
+([performance.md](../performance.md) rule 16,
+[hive-persistence.md](../hive-persistence.md#repository-pattern)).
+
 ```dart
+// features/exercises/data/repositories/exercise_repository.dart
 @override
-Future<void> mergeAll(List<Exercise> items) async {
-  final current = await _local.getAll();
-  final updated = [...current];
+Future<void> mergeAll(List<Exercise> items) =>
+    _local.mergeAll(items.map(ExerciseModel.fromEntity).toList());
+```
 
-  final updatedById = {for (final item in updated) item.id: item};
-
-  for (final item in items) {
-    updatedById[item.id] = item;
-  }
-
-  await _local.saveAll(updatedById.values.toList(growable: false));
-}
+```dart
+// features/exercises/data/datasources/hive_exercise_datasource.dart
+@override
+Future<void> mergeAll(List<ExerciseModel> models) =>
+    _box.putAll({for (final model in models) model.id: model});
 ```
 
 ### deleteByIds Implementation
 
+Local datasource → delete the given keys only.
+
 ```dart
+// features/exercises/data/repositories/exercise_repository.dart
 @override
-Future<void> deleteByIds(Set<String> ids) async {
-  final current = await _local.getAll();
-  final filtered = current.where((e) => !ids.contains(e.id)).toList();
-  await _local.saveAll(filtered);
-}
+Future<void> deleteByIds(Set<String> ids) => _local.deleteByIds(ids);
+```
+
+```dart
+// features/exercises/data/datasources/hive_exercise_datasource.dart
+@override
+Future<void> deleteByIds(Set<String> ids) => _box.deleteAll(ids);
 ```
 
 ### Sync Service Flow
 
-```dart
-// Per-table delta sync:
-// 1. Read per-table lastSyncDate from settings
-// 2. If null → first sync full getAll + mergeAll
-// 3. If exists → getUpdatedSince(lastSyncDate) + mergeAll
-// 4. getAllIds from remote, compare to local IDs, deleteByIds for missing
-// 5. Store newest remote updatedAt; for a successful empty first pull, store
-//    an epoch/sentinel watermark so the next run uses delta, not another full pull.
+Per table: no stored sync date → full pull; otherwise pull rows updated since it, then delete local IDs missing from the remote ID set. Store the newest remote `updatedAt`; a successful empty first pull stores an epoch watermark so the next run uses delta, not another full pull.
 
+```dart
 final lastTableSync = await settingsRepo.getTableSyncDate(tableKey);
 final DateTime? watermark;
 
@@ -77,7 +79,7 @@ if (lastTableSync == null) {
   if (changed.isNotEmpty) await repo.mergeAll(changed.map((m) => m.toEntity()).toList());
 
   final remoteIds = (await remote.getAllIds(userId)).toSet();
-  final localIds = (await repo.getAll()).map((e) => e.id).toSet();
+  final localIds = {for (final exercise in await repo.getAll()) exercise.id.value};
   final deleted = localIds.difference(remoteIds);
   if (deleted.isNotEmpty) await repo.deleteByIds(deleted);
   watermark = newestUpdatedAt(changed);

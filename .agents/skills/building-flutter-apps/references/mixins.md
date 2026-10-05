@@ -51,8 +51,7 @@ Signals: mixin, ConnectivityMixin, RetryMixin, on ConsumerState, abstract interf
 ```dart
 // core/mixins/connectivity_mixin.dart
 
-/// Adds connectivity check capability to any notifier.
-/// Keeps the mixin stateless — calls an injected service.
+/// Stateless connectivity-check capability for any notifier; calls an injected service.
 mixin ConnectivityMixin {
   bool checkConnectivity(ConnectivityService service) {
     return service.isConnected;
@@ -127,9 +126,6 @@ class SaveAllRowsException implements Exception {
       };
 }
 
-/// Retries [fn] on transient failures: Appwrite 429/503, [SocketException],
-/// [HttpException]. Non-retryable errors rethrow immediately.
-/// Base 200ms, doubled each retry, ±50ms jitter. Default 3 attempts.
 bool _defaultShouldRetry(Object e) {
   if (e is SocketException || e is HttpException) return true;
   if (e is AppwriteException) return e.code == 429 || e.code == 503;
@@ -159,6 +155,7 @@ Future<T> retryWithBackoff<T>(
 ```
 
 Rules:
+- **Backoff**: `retryWithBackoff` retries transient failures (Appwrite 429/503, `SocketException`, `HttpException`); non-retryable errors rethrow immediately. Base 200ms, doubled each retry, ±50ms jitter, 3 attempts by default.
 - **Module-level RNG**: hoist once. No `math.Random()` per call.
 - **Retryable set explicit**: 429/503 + network IO only. Validation/4xx rethrow immediate.
 - **Partial-failure**: bulk op collects `SaveRowResult` per item. `throwOnPartialFailure` → `SaveAllRowsException` w/ failure list. No silent drop.

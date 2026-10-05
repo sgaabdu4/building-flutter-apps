@@ -24,17 +24,19 @@ flowchart TD
 ## App binding
 
 - `marionette_flutter` is a regular dependency, not a dev dependency: `lib/main.dart` imports it. Upstream 0.6.0 requires Flutter ≥ 3.27. Binding and server versions must match; a mismatch surfaces at `connect`.
-- `MarionetteBinding.ensureInitialized()` = first line of `main()`. A test calling `main()` must not create a second binding, so guard on both `kDebugMode` and `FLUTTER_TEST`:
+- `MarionetteBinding.ensureInitialized()` = first line of `main()`. A test calling `main()` must not create a second binding, so guard on `kDebugMode`, `kIsWeb` (`Platform.environment` throws on web) and `FLUTTER_TEST`:
 
 ```dart
-final isFlutterTest = Platform.environment.containsKey('FLUTTER_TEST');
-if (kDebugMode && !isFlutterTest) {
+final useMarionette =
+    kDebugMode && !kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST');
+if (useMarionette) {
   MarionetteBinding.ensureInitialized();
 } else {
   WidgetsFlutterBinding.ensureInitialized();
 }
 ```
 
+- `integration_test` runs install their own binding and do not reliably see `FLUTTER_TEST` on the device → they call the app's bootstrap or a separate test entrypoint, never `main()`.
 - It must run before `SentryFlutter.init`, not inside its `appRunner`: Sentry claims the binding first and its zone swallows the resulting error, so the app hangs on the splash screen with no exception or log.
 - Debug and profile builds only; the VM service does not exist in release. `main()` does not re-run on hot reload → hot restart after adding the binding.
 
