@@ -34,13 +34,13 @@ An agent that trusts a cold MCP "No errors" would miss plugin lints; the rule te
 
 ## ux_reference
 
-N/A - no visual surface.
+N/A — no visual surface.
 
 ## Verification
 
 Result: Passed
 Evidence: `python3 tool/check_skill_routing.py` exit 0; `ruby tool/verify_markdown_examples.rb` exit 0; `bash tool/smoke_test.sh` PASS 48 FAIL 0.
-E2E: N/A - guidance text; proof is the checks above.
+E2E: N/A — guidance text; proof is the checks above.
 
 Delivery target: Merge
 Delivery: Pending - PR checks green, merge to main, tag v5.12.1.
