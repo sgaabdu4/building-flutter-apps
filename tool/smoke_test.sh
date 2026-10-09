@@ -98,7 +98,7 @@ codex = json.loads((root / ".codex-plugin/plugin.json").read_text())
 codex_marketplace = json.loads((root / ".agents/plugins/marketplace.json").read_text())
 eval_cases = json.loads((root / "evals/evals.json").read_text())["evals"]
 skill = root / "skills/building-flutter-apps"
-expected_version = "5.12.0"
+expected_version = "5.12.1"
 
 assert not (root / "hooks/hooks.codex.json").exists()
 assert not (root / "SKILL.md").exists()

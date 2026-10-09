@@ -7,7 +7,7 @@ description: >-
 license: MIT
 metadata:
   author: sgaabdu4
-  version: "5.12.0"
+  version: "5.12.1"
   tags: flutter, riverpod, freezed, state-management, clean-architecture, dart, hive, crashlytics, sentry, gorouter, gen-l10n, windows, inno, installer, fire-and-forget, singletons, e2e testing
 ---
 
@@ -98,14 +98,14 @@ Before code, read only the narrowest matching [Trigger Map](#trigger-map) row(s)
 
 ## Pre-Flight
 
-Internal check after each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write batch: T0 always; + T1 for state/notifier/mutation changes; + T2 for network/E2E/stream/route changes.
+Internal check after each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_options.yaml` write batch: T0 always; + T1 for state/notifier/mutation changes; + T2 for network/E2E/stream/route changes. Edit loop = analyze only the edited files per [analysis-options.md](references/analysis-options.md#edit-loop); the full package-root run is once before handoff.
 
 - Failed item → report it promptly with its rule ID or ref.
 - Handoff → report the completed verification: refs read + checks run + results.
 
 ### T0 — Core
 
-- [ ] Flutter/Riverpod package: package-root `dart analyze` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin. Pure-Dart CLI: native Dart analysis profile applies; both plugins are N/A.
+- [ ] Flutter/Riverpod package: edited files analyze clean in the edit loop; once before handoff, package-root `dart analyze --fatal-infos` exits 0 with `flutter_skill_lints` + `riverpod_lint`; setup changes prove one diagnostic from each plugin. Pure-Dart CLI: native Dart analysis profile applies; both plugins are N/A.
 - [ ] A current same-scope project-owned Dart Decimate result is green per [dart-decimate.md](references/dart-decimate.md); cite scan scope.
 - [ ] Async gaps are guarded: `ref.mounted` / `context.mounted`, no bare `mounted`, and `finally` uses `if (ref.mounted) { ... }`.
 - [ ] Providers, state, and widgets follow Rules 2-8 and 14: reusable widgets own UI lifecycle only; screens/routes/notifiers own navigation, workflow branching, selected domain records, provider state, and infrastructure.
