@@ -18,7 +18,7 @@ from collections.abc import Generator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 from urllib.parse import unquote, urljoin, urlparse
 
 from gate_config import (
@@ -35,6 +35,9 @@ from gate_config import (
 from project_setup import package_script_arguments as test_arguments
 from tool_setup import managed_command, provision_tools
 from untrusted_input import DECLARATIONS, reject_jsdoc_casts
+
+if TYPE_CHECKING:
+    from argparse import Namespace
 
 DartAnalyzer = TypedDict(
     "DartAnalyzer",
@@ -343,6 +346,9 @@ def prepare_command(
     group: Group, gate: Gate, timeout: float, groups: list[Group] | None = None
 ) -> list[str]:
     command = managed_command(gate["command"], ROOT / group["path"])
+    lockfile = ROOT / group["path"] / "bun.lock"
+    if "--lockfile=bun.lock" in command and not lockfile.exists():
+        command = [value for value in command if value != "--lockfile=bun.lock"]
     if gate.get("role") == "security" and "p/python" in command:
         index = command.index("p/python") + 1
         command = [
@@ -495,6 +501,27 @@ def run_gate(
     timeout: float,
     output_lock: AbstractContextManager[object],
     groups: list[Group] | None = None,
+    related_base: str | None = None,
+) -> bool:
+    """Run a gate under its own limit and record how long a pass took."""
+    from shipping import gate_limit, record_gate_time
+
+    key = f"{group['path']}/{gate['name']}" + ("@related" if related_base else "")
+    started = time.monotonic()
+    limit = gate_limit(ROOT, key, timeout)
+    failed = run_limited_gate(group, gate, limit, output_lock, groups, related_base)
+    if not failed:
+        record_gate_time(ROOT, key, time.monotonic() - started)
+    return failed
+
+
+def run_limited_gate(
+    group: Group,
+    gate: Gate,
+    timeout: float,
+    output_lock: AbstractContextManager[object],
+    groups: list[Group] | None = None,
+    related_base: str | None = None,
 ) -> bool:
     started = time.monotonic()
     print(f"CHECK {group['path']}/{gate['name']}", flush=True)
@@ -508,7 +535,12 @@ def run_gate(
                 f"COVERED {gate['name']} by selected child checks; elapsed {time.monotonic() - started:.3f}s"
             )
             return False
-        from reports import SCANNERS, emit_dart_test_failure, validate_scanner_log
+        from reports import (
+            SCANNERS,
+            emit_dart_test_failure,
+            related_command,
+            validate_scanner_log,
+        )
 
         report = gate.get("report", {})
         kind = report.get("type", "")
@@ -533,6 +565,9 @@ def run_gate(
             report_path, coverage_path, directory, expected_sources = prepare_reports(
                 group, report, kind, tests, scanner, command
             )
+        command, coverage_path = related_command(
+            command, coverage_path, gate, groups or [group], directory, related_base
+        )
         capture = (tests and kind == "dart-tests" and report.get("stdout", True)) or (
             scanner and report.get("stdout") is True
         )
@@ -564,15 +599,10 @@ def run_gate(
                     emit_dart_test_failure(result, tests, kind, report_path)
             validate_scanner_log(scanner, log)
         if result.returncode == 0 and scanner and report_path is not None:
-            if (
-                scanner == "osv"
-                and "--allow-no-lockfiles" in command
-                and [arg for arg in command if arg.startswith("--lockfile")]
-                == ["--lockfile=pnpm-lock.yaml"]
-            ):
+            if scanner == "osv" and "--lockfile=bun.lock" in gate["command"]:
                 from reports import validate_osv
 
-                validate_osv(report_path, empty_pnpm=directory)
+                validate_osv(report_path, empty_bun=directory)
             else:
                 SCANNERS[scanner](report_path)
         from reports import completed_tests, line_coverage, parallel_hint
@@ -580,6 +610,7 @@ def run_gate(
         if (
             result.returncode == 0
             and tests
+            and coverage_path is not None
             and report_path is not None
             and not completed_tests(report_path, kind)
         ):
@@ -596,7 +627,7 @@ def run_gate(
         print(
             f"{'PASS' if result.returncode == 0 else 'FAIL'} {gate['name']} "
             f"(exit {result.returncode}; elapsed {time.monotonic() - started:.3f}s)"
-            + parallel_hint(result.returncode, tests, command),
+            f" @ {group['path']}" + parallel_hint(result.returncode, tests, command),
             flush=True,
         )
         return result.returncode != 0
@@ -611,6 +642,7 @@ def run_gate(
     ) as error:
         print(
             f"FAIL {gate['name']}: {error}; elapsed {time.monotonic() - started:.3f}s"
+            f" @ {group['path']}"
         )
         return True
 
@@ -628,16 +660,6 @@ def check_lock(root: Path) -> Generator[None]:
             print("Waiting for another Hard Eng check in this checkout", flush=True)
             fcntl.flock(lock, fcntl.LOCK_EX)
         yield
-
-
-def gate_timeout(root: Path) -> float:
-    """Each gate may use the whole configured budget: CI's in CI, pre-push's elsewhere."""
-    from shipping import load_policy
-
-    policy = load_policy(root, required=False)
-    if policy is None:
-        return 600
-    return policy["ci_seconds" if os.environ.get("CI") else "pre_push_seconds"]
 
 
 def biome_children(group: Group, gate: Gate, groups: list[Group]) -> tuple[Path, ...]:
@@ -667,20 +689,6 @@ def biome_children(group: Group, gate: Gate, groups: list[Group]) -> tuple[Path,
     )
 
 
-def require_ci_base(base: str | None) -> None:
-    if (
-        os.environ.get("GITHUB_ACTIONS") == "true"
-        and os.environ.get("GITHUB_EVENT_NAME")
-        in {"push", "pull_request", "pull_request_target"}
-        and (base is None or not base.strip())
-    ):
-        raise ValueError(
-            "GitHub push/PR checks require --base with the comparison commit; "
-            "pass github.event.pull_request.base.sha || github.event.before. "
-            "Manual full checks may omit --base."
-        )
-
-
 def proven_elsewhere(base: str | None) -> bool:
     """A merged PR or verified upstream release already proved this change."""
     from shipping import reused_pull_request
@@ -698,14 +706,81 @@ def proven_elsewhere(base: str | None) -> bool:
     return check_scaffold_update(ROOT, base)
 
 
+def plan_base(base: str | None, plan_stage: str | None) -> str | None:
+    from shipping import passed_branch_point
+
+    if base is not None or plan_stage is None:
+        return base
+    if point := passed_branch_point(ROOT):
+        print(
+            f"Base-branch commit {point} passed the required CI checks; "
+            "checking only changes since it.",
+            flush=True,
+        )
+    return point
+
+
+def settled(futures: set[Future[bool]]) -> bool:
+    """Wait for every gate; True when any failed."""
+    return True in [future.result() for future in futures]
+
+
+def run_gates(groups: list[Group], timeout: float, related: str | None) -> bool | None:
+    """Parallel gates share the CPUs; serial ones wait; None when dependency setup failed."""
+    from reports import early_scan, gate_order, scan_blockers
+
+    output_lock = threading.Lock()
+    failed = False
+    pending: set[Future[bool]] = set()
+    scans: dict[Future[bool], str] = {}
+    checks = [(group, gate) for group in groups for gate in group["checks"]]
+    ordered = gate_order(checks)
+    workers = os.cpu_count() or 2
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for group, gate in ordered:
+            if gate.get("parallel", False) and gate.get("role") != "lockfiles":
+                if len(pending) == workers:
+                    done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                    failed |= settled(done)
+                if early_scan(gate) and not scans:
+                    failed |= settled(pending)
+                    pending.clear()
+                future = pool.submit(
+                    run_gate, group, gate, timeout, output_lock, groups, related
+                )
+                if early_scan(gate):
+                    scans[future] = group["path"]
+                else:
+                    pending.add(future)
+            else:
+                for future in scan_blockers(group, gate, scans):
+                    del scans[future]
+                    pending.add(future)
+                failed |= settled(pending)
+                pending.clear()
+                result = run_gate(group, gate, timeout, output_lock, groups, related)
+                failed |= result
+                if result and gate.get("role") == "lockfiles":
+                    print("Dependency setup failed; remaining checks were not run.")
+                    return None
+        failed |= settled(pending | set(scans))
+    return failed
+
+
 def check(
     timeout: float | None = None,
     base: str | None = None,
     plan_stage: str | None = None,
     *,
     verify_plan: bool = True,
+    dependents: bool = True,
+    related_tests: bool = False,
+    quick: bool = False,
 ) -> int:
+    from ci_setup import require_ci_base
     from gate_config import load_groups, parse_config
+    from reports import quick_groups
+    from shipping import gate_budget
 
     require_ci_base(base)
     parse_config((ROOT / "hard-eng.gates.json").read_text())
@@ -713,56 +788,39 @@ def check(
         return 0
 
     with check_lock(ROOT):
-        groups = load_groups(ROOT, base)
-        timeout = timeout or gate_timeout(ROOT)
-        from comments import validate_comments
-        from plans import report_stage, validate_plans
+        groups = load_groups(ROOT, plan_base(base, plan_stage), dependents=dependents)
+        groups = quick_groups(groups, quick)
+        timeout = timeout or gate_budget(ROOT)
+        from comments import validate_comments, validate_suppressions
+        from plans import report_stage, validate_decisions, validate_plans
 
         if verify_plan:
             plan_stage = validate_plans(ROOT, base, plan_stage)
         validate_comments(ROOT, base)
+        validate_suppressions(ROOT, base)
+        validate_decisions(ROOT, base)
         provision_tools(ROOT, groups, timeout)
-        output_lock = threading.Lock()
+        related = base if related_tests else None
 
-        failed = False
-        pending: set[Future[bool]] = set()
-        checks = [(group, gate) for group in groups for gate in group["checks"]]
-        ordered = [item for item in checks if item[1].get("role") == "lockfiles"]
-        ordered += [item for item in checks if item[1].get("role") != "lockfiles"]
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            for group, gate in ordered:
-                if gate.get("parallel", False) and gate.get("role") != "lockfiles":
-                    if len(pending) == 2:
-                        done, pending = wait(pending, return_when=FIRST_COMPLETED)
-                        for future in done:
-                            failed |= future.result()
-                    pending.add(
-                        pool.submit(run_gate, group, gate, timeout, output_lock, groups)
-                    )
-                else:
-                    for future in pending:
-                        failed |= future.result()
-                    pending.clear()
-                    result = run_gate(group, gate, timeout, output_lock, groups)
-                    failed |= result
-                    if result and gate.get("role") == "lockfiles":
-                        print("Dependency setup failed; remaining checks were not run.")
-                        report_stage(True, plan_stage)
-                        return 1
-            for future in pending:
-                failed |= future.result()
+        failed = run_gates(groups, timeout, related) is not False
         report_stage(failed, plan_stage)
         return int(failed)
 
 
 def impact(base: str) -> int:
     """Tell CI whether the check will run only the secret scan, before tools."""
-    from contextlib import redirect_stdout
+    from contextlib import redirect_stdout, suppress
 
-    from ci_setup import impact_tools
+    from ci_setup import impact_tools, require_ci_base
     from gate_config import affected_groups, parse_config
 
     require_ci_base(base)
+    proven = False
+    with redirect_stdout(sys.stderr), suppress(OSError, subprocess.SubprocessError):
+        proven = proven_elsewhere(base)
+    if proven:
+        print("docs_only=true")
+        return 0
     config = parse_config((ROOT / "hard-eng.gates.json").read_text())
     groups: list[Group] = [
         *config["packages"],
@@ -782,18 +840,48 @@ def pre_push() -> int:
     return verify_push(ROOT)
 
 
+def deliver(args: "Namespace") -> int:
+    if args.command == "gap-issue":
+        from gap_issue import file_gap
+
+        return file_gap(ROOT, args.text)
+    if args.command == "challenge":
+        from challenge import challenge
+
+        return challenge(ROOT, args.base, args.host)
+    from ship_actions import run
+
+    return run(ROOT, args.plan, args.pr, args.stage, args.worktree, args.merge_method)
+
+
 def main() -> int:
     import argparse
 
     if Path(sys.argv[0]).name == "pre-push":
         return pre_push()
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.set_defaults(apply=False, merge=True)
     commands = parser.add_subparsers(dest="command", required=True)
     checks = commands.add_parser("check", help="Run applicable native checks")
     checks.add_argument(
         "--base", help="Git comparison base; unknown impact runs all checks"
     )
     checks.add_argument("--plan-stage", choices=("Draft", "Ready", "Complete"))
+    checks.add_argument(
+        "--without-dependents",
+        action="store_true",
+        help="Check changed packages only; CI checks their dependents",
+    )
+    checks.add_argument(
+        "--related-tests",
+        action="store_true",
+        help="Run only JavaScript tests related to the change; CI runs them all",
+    )
+    checks.add_argument(
+        "--quick",
+        action="store_true",
+        help="Run only format, lint, types, tests and the file secret scan, with related JavaScript tests; the Stop hook uses it",
+    )
     impacts = commands.add_parser(
         "impact", help="Print docs_only=true when only the secret scan applies"
     )
@@ -822,16 +910,37 @@ def main() -> int:
     updating.add_argument(
         "--apply", action="store_true", help="Run inside the supervising update process"
     )
+    commands.add_parser(
+        "update-pr",
+        help="Push the prepared Hard Eng update branch, open its PR and merge it once its checks pass; --no-merge prints the merge command instead",
+    ).add_argument("--no-merge", dest="merge", action="store_false")
+    challenging = commands.add_parser(
+        "challenge",
+        help="Have the other agent CLI review this branch read-only and record the result",
+    )
+    challenging.add_argument(
+        "--base", help="Git comparison base; defaults to the merge base"
+    )
+    challenging.add_argument(
+        "--host",
+        choices=("claude", "codex"),
+        help="The running agent, only when it cannot be detected",
+    )
+    commands.add_parser(
+        "gap-issue", help="File a Hard Eng issue for a check it lacks"
+    ).add_argument("text", help="the missing check, described generically")
     shipping = commands.add_parser(
         "ship", help="Verify PR delivery or perform guarded shipping actions"
     )
-    shipping.add_argument("--plan", required=True)
+    shipping.add_argument(
+        "--plan", help="Task plan; optional only when `check` reports Size: small"
+    )
     shipping.add_argument("--pr", required=True)
     shipping.add_argument(
         "--stage", choices=("ready", "merge", "delivered", "cleanup"), default="ready"
     )
     shipping.add_argument("--worktree", help="Task worktree in the same repository")
-    shipping.add_argument("--merge-method", choices=("merge", "squash", "rebase"))
+    shipping.add_argument("--merge-method", choices=("rebase",), default="rebase")
     for event in ("session", "failure", "stop"):
         hook = commands.add_parser(event, help=f"Handle a native {event} hook")
         hook.add_argument("agent", choices=("claude", "codex"))
@@ -840,7 +949,13 @@ def main() -> int:
         from tool_setup import ensure_python_runtime
 
         ensure_python_runtime()
-        return check(base=args.base, plan_stage=args.plan_stage)
+        return check(
+            base=args.base,
+            plan_stage=args.plan_stage,
+            dependents=not args.without_dependents,
+            related_tests=args.related_tests or args.quick,
+            quick=args.quick,
+        )
     if args.command == "impact":
         return impact(args.base)
     if args.command == "pre-push":
@@ -853,16 +968,12 @@ def main() -> int:
         from ship_actions import mutate
 
         return mutate(ROOT, args.base, args.seconds, args.in_place, production_files)
-    if args.command == "update":
-        from update_runner import apply_update, run_update
+    if args.command in {"update", "update-pr"}:
+        from update_runner import update_main
 
-        return apply_update(ROOT) if args.apply else run_update(ROOT)
-    if args.command == "ship":
-        from ship_actions import run
-
-        return run(
-            ROOT, args.plan, args.pr, args.stage, args.worktree, args.merge_method
-        )
+        return update_main(ROOT, args.command == "update-pr", args.apply, args.merge)
+    if args.command in {"challenge", "ship", "gap-issue"}:
+        return deliver(args)
     from agent_hooks import handle_event
 
     return handle_event(ROOT, args.command, args.agent)

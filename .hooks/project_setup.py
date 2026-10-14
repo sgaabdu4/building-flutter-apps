@@ -153,31 +153,41 @@ def is_deployment_file(path: Path) -> bool:
 
 
 def package_script_arguments(
-    command: list[str], directory: Path, pnpm_only: bool = False
+    command: list[str], directory: Path, bun_only: bool = False
 ) -> list[str]:
-    return package_script_invocation(command, directory, pnpm_only)[0]
+    return package_script_invocation(command, directory, bun_only)[0]
+
+
+def package_directory(arguments: list[str], directory: Path) -> tuple[list[str], Path]:
+    """Apply directory flags written before `run` or right after it."""
+    at = 2 if arguments[1:2] in (["run"], ["run-script"]) else 1
+    flags = {"--cwd", "--dir", "--prefix", "-C"}
+    while len(arguments) > at + 1 and arguments[at].split("=", 1)[0] in flags:
+        flag, separator, value = arguments[at].partition("=")
+        if not separator and (Path(arguments[0]).name, *arguments[3:4]) == (
+            "bun",
+            "run",
+        ):
+            raise ValueError(
+                f"Bun prints help for `bun {flag} {arguments[2]} run`; "
+                f"write `bun --cwd={arguments[2]} run`"
+            )
+        directory = (directory / (value or arguments[at + 1])).resolve()
+        arguments = [*arguments[:at], *arguments[at + (1 if separator else 2) :]]
+    return arguments, directory
 
 
 def package_script_invocation(
-    command: list[str], directory: Path, pnpm_only: bool = False
+    command: list[str], directory: Path, bun_only: bool = False
 ) -> tuple[list[str], Path]:
     arguments = list(command)
     scripts_seen = set()
     while arguments:
         executable = Path(arguments[0]).name
-        if pnpm_only and executable in PACKAGE_MANAGERS - {"pnpm"}:
-            raise ValueError(f"JavaScript checks must use pnpm, not: {executable}")
+        if bun_only and executable in PACKAGE_MANAGERS - {"bun", "bunx"}:
+            raise ValueError(f"JavaScript checks must use Bun, not: {executable}")
         if executable in {"npm", "pnpm", "yarn", "bun"}:
-            while len(arguments) > 2 and arguments[1].split("=", 1)[0] in {
-                "--dir",
-                "--prefix",
-                "-C",
-            }:
-                _, separator, value = arguments[1].partition("=")
-                directory = (
-                    directory / (value if separator else arguments[2])
-                ).resolve()
-                arguments = [arguments[0], *arguments[2 if separator else 3 :]]
+            arguments, directory = package_directory(arguments, directory)
             if (
                 len(arguments) > 1
                 and arguments[1].startswith("-")
@@ -224,36 +234,54 @@ def native_typecheck(scripts: JsonObject, checks: list[Gate]) -> bool:
     )
 
 
+def dependency_free(directory: Path) -> bool:
+    """Bun deletes the lockfile of a package that declares nothing to install."""
+    path = directory / "package.json"
+    manifest = json.loads(path.read_text()) if path.is_file() else None
+    fields = (
+        "dependencies",
+        "devDependencies",
+        "optionalDependencies",
+        "peerDependencies",
+    )
+    return (
+        isinstance(manifest, dict)
+        and not manifest.get("workspaces")
+        and not any(manifest.get(key) for key in fields)
+    )
+
+
 def javascript_manager(directory: Path) -> tuple[str, list[str], str]:
     manifest = json.loads((directory / "package.json").read_text())
-    if manifest.get("workspaces") and not (directory / "pnpm-workspace.yaml").is_file():
-        raise ValueError(
-            "pnpm workspaces require pnpm-workspace.yaml; migrate the workspace declaration"
-        )
     declared = manifest.get("packageManager")
-    if declared is not None and (
-        not isinstance(declared, str) or not declared.startswith("pnpm@")
-    ):
-        raise ValueError(
-            f"{directory}: pnpm is required; migrate packageManager to pnpm@VERSION"
-        )
     legacy = [
         name
         for name in (
+            "pnpm-lock.yaml",
+            "pnpm-workspace.yaml",
             "package-lock.json",
             "npm-shrinkwrap.json",
             "yarn.lock",
-            "bun.lock",
             "bun.lockb",
         )
         if (directory / name).exists()
     ]
-    if legacy:
+    if legacy or (
+        declared is not None
+        and (not isinstance(declared, str) or not declared.startswith("bun@"))
+    ):
         raise ValueError(
-            f"{directory}: pnpm is required; migrate and remove legacy lockfiles: "
-            + ", ".join(legacy)
+            f"{directory}: Bun is required. Run `bun install` to convert the lockfile; "
+            "move pnpm-workspace.yaml packages and catalogs to package.json `workspaces`, "
+            "onlyBuiltDependencies/allowBuilds to trustedDependencies, overrides and "
+            "patchedDependencies to package.json, and minimumReleaseAge (minutes) to "
+            "bunfig.toml [install] minimumReleaseAge (seconds). Set packageManager to "
+            "bun@VERSION and use `bun run`, `bun x` and `bun --cwd=DIR run`. Checks run "
+            "every Node tool on Bun: use `bun test` (happy-dom for DOM tests), not "
+            "Vitest, Jest or `node --test`. "
+            "Then delete: " + ", ".join(legacy or ["the old packageManager value"])
         )
-    lockfile = "pnpm-lock.yaml"
+    lockfile = "bun.lock"
     if not (directory / lockfile).exists() and not (directory / ".git").exists():
         for parent in directory.parents:
             if (parent / "package.json").exists() and workspace_matches(
@@ -263,11 +291,11 @@ def javascript_manager(directory: Path) -> tuple[str, list[str], str]:
                 return javascript_manager(parent)
             if (parent / ".git").exists():
                 break
-    if not (directory / lockfile).exists():
+    if not (directory / lockfile).exists() and not dependency_free(directory):
         raise ValueError(
-            f"{directory}: pnpm-lock.yaml is required; run pnpm install and review the migration"
+            f"{directory}: bun.lock is required; run bun install and commit bun.lock"
         )
-    return "pnpm", ["pnpm", "install", "--frozen-lockfile"], lockfile
+    return "bun", ["bun", "install", "--frozen-lockfile"], lockfile
 
 
 def adapt_sources(root: Path, package: Group, files: list[Path]) -> None:
@@ -338,8 +366,8 @@ def dependency_command(directory: Path, language: str) -> tuple[str, list[str], 
 
     manifest = yaml.safe_load((directory / "pubspec.yaml").read_text())
     dependencies = {
-        **manifest.get("dependencies", {}),
-        **manifest.get("dev_dependencies", {}),
+        **(manifest.get("dependencies") or {}),
+        **(manifest.get("dev_dependencies") or {}),
     }
     manager = (
         "flutter"
@@ -413,7 +441,7 @@ def adapt_boundaries(package: Group, typescript: set[str]) -> None:
                 "command": (
                     ["dart-decimate", "check", ".", "--boundary-violations", "--strict"]
                     if package.get("language") == "dart"
-                    else ["pnpm", "run", "lint:boundaries"]
+                    else ["bun", "run", "lint:boundaries"]
                 ),
             }
         )
@@ -427,13 +455,21 @@ def workspace_members(directory: Path, language: str) -> list[str]:
             *workspace.get("members", []),
             *("!" + value for value in workspace.get("exclude", [])),
         ]
-    if language == "javascript" and not (directory / "pnpm-workspace.yaml").exists():
-        return []
+    if language == "javascript":
+        if not (directory / "package.json").exists():
+            return []
+        workspaces = json.loads((directory / "package.json").read_text()).get(
+            "workspaces", []
+        )
+        return (
+            workspaces.get("packages", [])
+            if isinstance(workspaces, dict)
+            else workspaces
+        )
     import yaml
 
-    name = "pubspec.yaml" if language == "dart" else "pnpm-workspace.yaml"
-    manifest = yaml.safe_load((directory / name).read_text())
-    return manifest.get("workspace" if language == "dart" else "packages", [])
+    manifest = yaml.safe_load((directory / "pubspec.yaml").read_text())
+    return manifest.get("workspace", [])
 
 
 def workspace_matches(relative: str, members: list[str]) -> bool:
@@ -831,8 +867,8 @@ def adapt_javascript(directory: Path, package: Group, manager: str) -> None:
                 if output is not None:
                     gate.setdefault("report", {})["path"] = output
     dependencies = {
-        **manifest.get("dependencies", {}),
-        **manifest.get("devDependencies", {}),
+        **(manifest.get("dependencies") or {}),
+        **(manifest.get("devDependencies") or {}),
     }
     if "react" in dependencies:
         package["checks"].append(

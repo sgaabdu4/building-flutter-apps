@@ -4,11 +4,13 @@ import fcntl
 import importlib.util
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -22,9 +24,24 @@ NATIVE_SCANNERS = {
     "react-doctor": "React Doctor",
 }
 MANAGED_PYTHON_SCANNERS = {"ruff", "pyrefly", "vulture", "semgrep", "zizmor", "poetry"}
-MISE_PACKAGE = "@jdxcode/mise"
+SCANNER_VERSIONS: dict[str, str] = {}
+# The platform package installs without the npm-only preinstall of @jdxcode/mise.
+MISE_PACKAGE = "@jdxcode/mise-{}-{}".format(
+    {"darwin": "darwin", "linux": "linux"}[sys.platform],
+    {"arm64": "arm64", "aarch64": "arm64", "x86_64": "x64", "amd64": "x64"}[
+        platform.machine().lower()
+    ],
+)
 MISE_LATEST = MISE_PACKAGE + "@latest"
-MISE_BINARY = Path("node_modules/@jdxcode/mise/bin/mise")
+MISE_BINARY = Path("node_modules", MISE_PACKAGE, "bin/mise")
+NOT_INSTALLED = (
+    "Tools are not installed yet and cannot be fetched now: {error}. "
+    "Connect once or run the full check (python3 .hooks/hard-eng.py check) to install them."
+)
+
+
+def quick_mode() -> bool:
+    return "--quick" in sys.argv
 
 
 def ensure_python_runtime() -> None:
@@ -46,11 +63,54 @@ def ensure_python_runtime() -> None:
         )
 
 
+def entry_point_names(directory: Path) -> list[str]:
+    """Functions the project's console scripts call, which vulture cannot see being used."""
+    try:
+        project = tomllib.loads((directory / "pyproject.toml").read_text())["project"]
+    except (OSError, KeyError, tomllib.TOMLDecodeError):
+        return []
+    targets = [
+        target
+        for table in ("scripts", "gui-scripts")
+        for target in project.get(table, {}).values()
+        if isinstance(target, str)
+    ]
+    return sorted(
+        {
+            target.split(":")[-1].split("[")[0].split(".")[-1].strip()
+            for target in targets
+        }
+        - {""}
+    )
+
+
+def with_entry_points(command: list[str], directory: Path) -> list[str]:
+    names = entry_point_names(directory)
+    if command[0] != "vulture" or not names:
+        return command
+    return [*command, "--ignore-names", ",".join(names)]
+
+
+def uvx_scanner(command: list[str]) -> list[str]:
+    """A configured `uvx ruff@latest …` gate runs like `ruff …`, so it is pinned too."""
+    tool = command[1] if len(command) > 1 and command[0] == "uvx" else ""
+    name = tool.removesuffix("@latest")
+    if tool.endswith("@latest") and name in MANAGED_PYTHON_SCANNERS:
+        return [name, *command[2:]]
+    return command
+
+
 def managed_command(command: list[str], directory: Path | None = None) -> list[str]:
+    command = uvx_scanner(command)
     if directory is not None:
-        command = managed_scanner_command(command, directory)
+        command = with_entry_points(
+            managed_scanner_command(command, directory), directory
+        )
     if command[0] in MANAGED_PYTHON_SCANNERS:
-        return ["uvx", command[0] + "@latest", *command[1:]]
+        offline = ["--offline"] if quick_mode() else []
+        version = SCANNER_VERSIONS.get(command[0])
+        tool = f"{command[0]}@{version or 'latest'}"
+        return ["uvx", *offline, tool, *command[1:]]
     return command
 
 
@@ -89,17 +149,19 @@ def provision_tools(root: Path, groups: list[Group], timeout: float) -> None:
         "biome": "npm:@biomejs/biome",
         "tsc": "npm:typescript",
         "fallow": "npm:fallow",
-        "dart-decimate": 'npm:dart-decimate[allow_builds=["dart-decimate"]]',
+        "dart-decimate": "npm:dart-decimate",
         "react-doctor": "npm:react-doctor",
         "jscpd": "npm:jscpd",
         "lhci": "npm:@lhci/cli",
         "k6": "aqua:grafana/k6",
     }
     commands = [
-        package_script_invocation(
-            managed_scanner_command(gate["command"], root / group["path"]),
-            root / group["path"],
-        )[0]
+        uvx_scanner(
+            package_script_invocation(
+                managed_scanner_command(gate["command"], root / group["path"]),
+                root / group["path"],
+            )[0]
+        )
         for group in groups
         for gate in group["checks"]
     ]
@@ -116,10 +178,49 @@ def provision_tools(root: Path, groups: list[Group], timeout: float) -> None:
         packages[name] + "@latest" for name in executables & packages.keys()
     )
     if selected:
-        provision_batch(root, selected, timeout)
+        provision_batch(selected, timeout)
+    pin_python_scanners(sorted(executables & MANAGED_PYTHON_SCANNERS), timeout)
 
 
-def provision_batch(root: Path, batch: list[str], timeout: float) -> None:
+def scanner_version(name: str, offline: bool, timeout: float) -> str | None:
+    """The scanner's latest version, or None when it cannot run."""
+    try:
+        done = subprocess.run(
+            ["uvx", *(["--offline"] if offline else []), name + "@latest", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=True,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    found = re.search(r"\d+(?:\.\d+)+", done.stdout)
+    return found[0] if found else ""
+
+
+def pin_python_scanners(names: list[str], timeout: float) -> None:
+    """Resolve each scanner's latest version once, serially, so parallel gates run it
+    pinned instead of each refreshing uv's shared interpreter cache at once."""
+    for name in names:
+        version = scanner_version(name, quick_mode(), timeout)
+        if version is None and quick_mode():
+            version = scanner_version(name, False, timeout)
+            if version is None:
+                raise ValueError(NOT_INSTALLED.format(error=f"{name} could not be run"))
+        if version:
+            SCANNER_VERSIONS[name] = version
+
+
+def provision_batch(batch: list[str], timeout: float) -> None:
+    # Bun reads a user bunfig release-age limit and ignores MISE_MINIMUM_RELEASE_AGE.
+    batch = [
+        re.sub(
+            r"^(npm:[^\[]+?)(@latest)$",
+            r'\1[bun_args="--minimum-release-age=0"]\2',
+            tool,
+        )
+        for tool in batch
+    ]
     storage = (
         Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir())) / "hard-eng-tools"
     )
@@ -128,24 +229,71 @@ def provision_batch(root: Path, batch: list[str], timeout: float) -> None:
         "MISE_DATA_DIR": "mise/data",
         "MISE_CACHE_DIR": "mise/cache",
         "MISE_STATE_DIR": "mise/state",
-        "PNPM_CONFIG_STORE_DIR": "pnpm/store",
-        "PNPM_CONFIG_CACHE_DIR": "pnpm/cache",
+        "BUN_INSTALL_CACHE_DIR": "bun/cache",
     }.items():
         environment.setdefault(name, str(storage / directory))
-    data_directory = Path(environment["MISE_DATA_DIR"])
+    bun_node(storage, environment)
     if shutil.which("gh"):
         environment.setdefault(
             "MISE_GITHUB_CREDENTIAL_COMMAND",
             'gh auth token --hostname "$MISE_CREDENTIAL_HOST"',
         )
+    if quick_mode():
+        try:
+            if use_installed_tools(batch, storage, environment, timeout):
+                return
+            print("Install missing native tools: " + ", ".join(batch), flush=True)
+            provision_latest(batch, storage, environment, timeout)
+        except (subprocess.SubprocessError, OSError, ValueError) as error:
+            raise ValueError(NOT_INSTALLED.format(error=error)) from error
+        return
     print("Prepare latest native tools: " + ", ".join(batch), flush=True)
+    provision_latest(batch, storage, environment, timeout)
+
+
+def newest_launcher(launchers: Path) -> Path | None:
+    found = [
+        path for path in launchers.glob("[0-9]*/") if (path / MISE_BINARY).is_file()
+    ]
+    return max(
+        found,
+        key=lambda path: [int(part) for part in re.findall(r"\d+", path.name)],
+        default=None,
+    )
+
+
+def use_installed_tools(
+    batch: list[str], storage: Path, environment: dict[str, str], timeout: float
+) -> bool:
+    """Resolve already-installed tool versions without any network request."""
+    launcher = newest_launcher(storage / "mise-launcher")
+    if launcher is None:
+        return False
+    result = subprocess.run(
+        [str(launcher / MISE_BINARY), "--no-config", "env", "--json", *batch],
+        cwd=storage,
+        text=True,
+        timeout=timeout,
+        capture_output=True,
+        check=False,
+        env={**environment, "MISE_OFFLINE": "1", "MISE_NPM_PACKAGE_MANAGER": "bun"},
+    )
+    if result.returncode != 0 or "Failed to resolve tool version" in result.stderr:
+        return False
+    export_tool_paths(result.stdout, Path(environment["MISE_DATA_DIR"]))
+    return True
+
+
+def provision_latest(
+    batch: list[str], storage: Path, environment: dict[str, str], timeout: float
+) -> None:
     with mise_launcher(storage / "mise-launcher", environment, timeout) as mise:
         environment["PATH"] = os.pathsep.join(
             [str(mise.parent), environment.get("PATH", os.defpath)]
         )
         command = [
             "env",
-            "MISE_NPM_PACKAGE_MANAGER=pnpm",
+            "MISE_NPM_PACKAGE_MANAGER=bun",
             "MISE_PREFER_OFFLINE=false",
             "MISE_USE_VERSIONS_HOST=false",
             "MISE_MINIMUM_RELEASE_AGE=0s",
@@ -155,7 +303,8 @@ def provision_batch(root: Path, batch: list[str], timeout: float) -> None:
         for arguments in (["install", *batch], ["env", "--json", *batch]):
             result = subprocess.run(
                 [*command, *arguments],
-                cwd=root,
+                # The project's packageManager pin would otherwise pick the Bun mise drives.
+                cwd=storage,
                 text=True,
                 timeout=timeout,
                 capture_output=True,
@@ -173,7 +322,30 @@ def provision_batch(root: Path, batch: list[str], timeout: float) -> None:
                 raise ValueError(
                     "Latest tool versions could not be resolved; retry provisioning"
                 )
-    environment = json.loads(result.stdout)
+    export_tool_paths(result.stdout, Path(environment["MISE_DATA_DIR"]))
+
+
+def bun_node(storage: Path, environment: dict[str, str]) -> None:
+    """Run every `#!/usr/bin/env node` tool on Bun, so checks prove the Bun runtime."""
+    bun = shutil.which("bun", path=environment.get("PATH"))
+    if bun is None:
+        return
+    directory = storage / "bun-node"
+    directory.mkdir(parents=True, exist_ok=True)
+    link = directory / "node"
+    if not link.is_symlink() or link.readlink() != Path(bun):
+        temporary = directory / f".node-{os.getpid()}"
+        temporary.unlink(missing_ok=True)
+        temporary.symlink_to(bun)
+        temporary.replace(link)
+    for target in (environment, os.environ):
+        target["PATH"] = os.pathsep.join(
+            [str(directory), target.get("PATH", os.defpath)]
+        )
+
+
+def export_tool_paths(output: str, data_directory: Path) -> None:
+    environment = json.loads(output)
     if not isinstance(environment, dict) or not isinstance(
         environment.get("PATH"), str
     ):
@@ -182,6 +354,7 @@ def provision_batch(root: Path, batch: list[str], timeout: float) -> None:
         path
         for path in environment["PATH"].split(os.pathsep)
         if Path(path).resolve().is_relative_to(data_directory.resolve())
+        and Path(path).parts[-2:] != ("node_modules", ".bin")
     ]
     os.environ["PATH"] = os.pathsep.join([*tool_paths, os.environ["PATH"]])
 
@@ -191,10 +364,16 @@ def mise_launcher(
     launchers: Path, environment: dict[str, str], timeout: float
 ) -> Generator[Path]:
     """Yield the newest published mise, installed once per version and held while used."""
+    if shutil.which("bun", path=environment.get("PATH")) is None:
+        raise ValueError(
+            "Hard Eng installs its tools with Bun: install Bun, or in CI add an "
+            "oven-sh/setup-bun step before the check"
+        )
     launchers.mkdir(parents=True, exist_ok=True)
+    (launchers / "package.json").write_text('{"private": true}\n')
     version = json.loads(
         subprocess.run(
-            ["pnpm", "view", MISE_LATEST, "version", "--json"],
+            ["bun", "pm", "view", MISE_LATEST, "version", "--json"],
             cwd=launchers,
             env=environment,
             text=True,
@@ -204,7 +383,7 @@ def mise_launcher(
         ).stdout
     )
     if not isinstance(version, str) or not re.fullmatch(r"\d[\w.+-]*", version):
-        raise TypeError("pnpm did not return a usable latest mise version")
+        raise TypeError("Bun did not return a usable latest mise version")
     installation = launchers / version
     with (launchers / f"{version}.lock").open("a") as use:
         fcntl.flock(use, fcntl.LOCK_SH)
@@ -212,12 +391,14 @@ def mise_launcher(
             try:
                 fcntl.flock(
                     install,
-                    fcntl.LOCK_EX | (fcntl.LOCK_NB if installation.is_dir() else 0),
+                    fcntl.LOCK_EX
+                    | (fcntl.LOCK_NB if (installation / MISE_BINARY).is_file() else 0),
                 )
             except BlockingIOError:
                 pass
             else:
-                if not installation.is_dir():
+                if not (installation / MISE_BINARY).is_file():
+                    shutil.rmtree(installation, ignore_errors=True)
                     install_launcher(installation, environment, timeout)
                 prune_launchers(launchers, version)
         yield installation / MISE_BINARY
@@ -229,16 +410,9 @@ def install_launcher(
     staging = Path(tempfile.mkdtemp(prefix=".staging-", dir=installation.parent))
     try:
         (staging / "package.json").write_text('{"private": true}\n')
+        package = f"{MISE_PACKAGE}@{installation.name}"
         result = subprocess.run(
-            [
-                "pnpm",
-                "add",
-                "--dir",
-                str(staging),
-                "--config.ignore-scripts=false",
-                f"--allow-build={MISE_PACKAGE}",
-                f"{MISE_PACKAGE}@{installation.name}",
-            ],
+            ["bun", "add", "--minimum-release-age=0", package],
             cwd=staging,
             env=environment,
             text=True,

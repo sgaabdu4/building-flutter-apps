@@ -4,6 +4,8 @@ import json
 import math
 import os
 import shlex
+import shutil
+import subprocess
 from pathlib import Path
 
 from gate_config import Gate, Group, JsonObject, Report
@@ -19,9 +21,9 @@ def owns_package_fallow(
     command = gate["command"]
     if gate.get("report", {}).get("type") != "fallow":
         return False
-    if command[:3] == ["pnpm", "run", "check:fallow"]:
+    if command[:3] == ["bun", "run", "check:fallow"]:
         return True
-    if command[:2] != ["pnpm", "run"] or gate.get("parallel"):
+    if command[:2] != ["bun", "run"] or gate.get("parallel"):
         return False
     try:
         standalone = shlex.split(scripts.get("check:fallow", ""))
@@ -80,15 +82,14 @@ def _dependency_coverage_commands(
             return None
         owner_commands = _serial_test_prerequisites(owner_group, None)
         if not owner_commands or any(
-            command[:2] != ["pnpm", "run"] for command in owner_commands
+            command[:2] != ["bun", "run"] for command in owner_commands
         ):
             return None
         commands.extend(
             [
                 [
-                    "pnpm",
-                    "--dir",
-                    os.path.relpath(dependency, start=group["path"]),
+                    "bun",
+                    "--cwd=" + os.path.relpath(dependency, start=group["path"]),
                     "run",
                     *command[2:],
                 ]
@@ -121,9 +122,9 @@ TOLERANCE_FLAGS = {
 
 def native_scanner_command(arguments: list[str]) -> list[str] | None:
     """Return a scanner executable with its arguments behind package-manager prefixes."""
-    if arguments[:2] in (["pnpm", "dlx"], ["pnpm", "exec"]):
-        arguments = arguments[2:]
-        while arguments and arguments[0].startswith(("--package=", "--allow-build=")):
+    if arguments[:2] == ["bun", "x"] or arguments[:1] == ["bunx"]:
+        arguments = arguments[2 if arguments[0] == "bun" else 1 :]
+        while arguments and arguments[0].startswith(("--package=", "--bun")):
             arguments = arguments[1:]
     if not arguments:
         return None
@@ -283,3 +284,90 @@ def validate_fallow(path: Path) -> None:
                 raise ValueError("Fallow report lacks a valid analysis scope")
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError("Fallow report is incomplete") from error
+
+
+def write_istanbul(lcov: Path, directory: Path) -> None:
+    """Give Fallow the Istanbul map Bun cannot write, with Fallow's own function spans."""
+    istanbul = lcov.parent / "coverage-final.json"
+    # A map written after this lcov came from the same test run; only an older one is stale.
+    if istanbul.exists() and istanbul.stat().st_mtime_ns < lcov.stat().st_mtime_ns:
+        istanbul.unlink()
+    fallow = shutil.which("fallow")
+    if fallow is None:
+        return
+    empty = lcov.parent / "fallow-function-listing.json"
+    empty.write_text("{}")
+    listing = subprocess.run(
+        # An explicit empty map stops a configured, not yet written map from failing the listing.
+        [fallow, "health", "--root", ".", "--max-crap", "0.001"]
+        + ["--coverage", str(empty), "--format", "json"],
+        cwd=directory,
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+    )
+    empty.unlink()
+    try:
+        findings = json.loads(listing.stdout)["findings"]
+    except (ValueError, KeyError, TypeError):
+        return
+    if listing.returncode not in {0, 1} or not isinstance(findings, list):
+        return
+    hits: dict[Path, dict[int, int]] = {}
+    source = None
+    for record in lcov.read_text().splitlines():
+        if record.startswith("SF:"):
+            source = (directory / record[3:]).resolve()
+            hits.setdefault(source, {})
+        elif record.startswith("DA:") and source is not None:
+            line, count = (int(value) for value in record[3:].split(",")[:2])
+            hits[source][line] = hits[source].get(line, 0) + count
+    spans_by_path: dict[Path, list[int]] = {}
+    for index, finding in enumerate(findings):
+        finding_path = (directory / finding["path"]).resolve()
+        spans_by_path.setdefault(finding_path, []).append(index)
+    coverage: dict[str, JsonObject] = {}
+    for path, lines in hits.items():
+        spans = [findings[index] for index in spans_by_path.get(path, [])]
+        ends = [f["line"] + f["line_count"] - 1 for f in spans]
+        coverage[str(path)] = {
+            "path": str(path),
+            "statementMap": {
+                str(index): {
+                    "start": {"line": line, "column": 0},
+                    "end": {"line": line, "column": 1_000_000},
+                }
+                for index, line in enumerate(lines)
+            },
+            "s": {str(index): lines[line] for index, line in enumerate(lines)},
+            "fnMap": {
+                str(index): {
+                    "name": span["name"],
+                    "line": span["line"],
+                    "decl": {
+                        "start": {"line": span["line"], "column": 0},
+                        "end": {"line": span["line"], "column": 1_000_000},
+                    },
+                    "loc": {
+                        "start": {"line": span["line"], "column": 0},
+                        "end": {"line": end, "column": 1_000_000},
+                    },
+                }
+                for index, (span, end) in enumerate(zip(spans, ends))
+            },
+            "f": {
+                str(index): max(
+                    (
+                        count
+                        for line, count in lines.items()
+                        if span["line"] <= line <= end
+                    ),
+                    default=0,
+                )
+                for index, (span, end) in enumerate(zip(spans, ends))
+            },
+            "branchMap": {},
+            "b": {},
+        }
+    istanbul.write_text(json.dumps(coverage))

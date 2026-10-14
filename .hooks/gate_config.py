@@ -4,13 +4,15 @@ import json
 import os
 import re
 import subprocess
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 
 from dependency_graph import (
+    cycle_members,
     dependency_review_guidance,
     expand_dependents,
     impact_inputs,
+    is_workflow,
     shared_only,
 )
 
@@ -131,7 +133,7 @@ LANGUAGES = {
 }
 LOCKFILES = {
     "python": ("uv.lock", "poetry.lock"),
-    "javascript": ("pnpm-lock.yaml",),
+    "javascript": ("bun.lock",),
     "dart": ("pubspec.lock",),
 }
 
@@ -417,15 +419,17 @@ def validate_gate(gate: Gate, directory: Path, report_paths: set[Path]) -> None:
 
 
 def dart_scan_includes_boundaries(gate: Gate) -> bool:
-    command = ["dart-decimate", "check", ".", "--threshold", "0"]
+    command = gate["command"]
+    arguments = iter(command[3:])
+    options = {
+        argument: next(arguments, "") if argument in {"--threshold", "--format"} else ""
+        for argument in arguments
+    }
     report = gate.get("report", {})
     return (
         gate.get("role") == "dead-code-duplicates"
-        and gate["command"]
-        in (
-            [*command, "--strict", "--format", "json"],
-            [*command, "--format", "json", "--strict"],
-        )
+        and command[:3] == ["dart-decimate", "check", "."]
+        and options == {"--threshold": "0", "--format": "json", "--strict": ""}
         and report.get("type") == "dart-decimate"
         and report.get("stdout") is True
     )
@@ -563,20 +567,13 @@ def runs_checks(root: Path, base: str, name: str) -> bool:
     return not text or "hard-eng.py" in text
 
 
-def is_workflow(name: str) -> bool:
-    path = PurePosixPath(name)
-    return path.parent == PurePosixPath(".github/workflows") and path.suffix in {
-        ".yml",
-        ".yaml",
-    }
-
-
 def packages_for(
     root: Path, base: str, names: set[str], by_path: dict[str, Group]
 ) -> set[str] | str:
-    from plans import is_documentation
+    from plans import is_documentation, is_plan_capture, plan_folders
 
     inputs = {path: impact_inputs(group) for path, group in by_path.items()}
+    folders = plan_folders(root)
     selected: set[str] = set()
     for name in sorted(names):
         if runs_checks(root, base, name):
@@ -586,14 +583,16 @@ def packages_for(
             for path, prefixes in inputs.items()
             if any(Path(name).is_relative_to(prefix) for prefix in prefixes)
         }
+        matches = [path for path in by_path if Path(name).is_relative_to(path)]
+        language = by_path[max(matches, key=len)].get("language") if matches else None
         if not consumers and (
-            is_documentation(Path(name))
+            is_documentation(Path(name), language)
+            or is_plan_capture(name, folders)
             or name.startswith(".agents/")
             or is_workflow(name)
             or name in {"AGENTS.md", "CLAUDE.md", "AGENTS.override.md"}
         ):
             continue
-        matches = [path for path in by_path if Path(name).is_relative_to(path)]
         if not matches and not consumers:
             return f"no package owns {name}."
         selected.update(consumers)
@@ -603,7 +602,12 @@ def packages_for(
 
 
 def affected_groups(
-    root: Path, groups: list[Group], base: str | None, *, prove_update: bool = False
+    root: Path,
+    groups: list[Group],
+    base: str | None,
+    *,
+    prove_update: bool = False,
+    dependents: bool = True,
 ) -> list[Group]:
     packages = groups[:-1]
     if guidance := dependency_review_guidance(packages):
@@ -622,9 +626,13 @@ def affected_groups(
         return groups
     if not selected:
         return [shared_only(groups[-1], names)]
-    if any("depends_on" not in group for group in packages):
+    if not dependents:
+        print("Pre-push leaves dependents of changed packages to CI.")
+        selected = cycle_members(packages, by_path, selected)
+    elif any("depends_on" not in group for group in packages):
         return groups
-    selected = expand_dependents(packages, by_path, selected)
+    else:
+        selected = expand_dependents(packages, by_path, selected)
     print("Affected packages and dependents: " + ", ".join(sorted(selected)))
     return selected_services(root, packages, selected) + [groups[-1]]
 
@@ -725,7 +733,7 @@ def validate_group(root: Path, group: Group, report_paths: set[Path]) -> int:
 
         javascript_manager(directory)
         for gate in group["checks"]:
-            package_script_arguments(gate["command"], directory, pnpm_only=True)
+            package_script_arguments(gate["command"], directory, bun_only=True)
     for gate in group["checks"]:
         validate_gate(gate, directory, report_paths)
     validate_performance(group)
@@ -919,8 +927,8 @@ def validate_package_services(
                 "Wire check:fallow into this package's gate with a native fallow report; a separate combined scan does not verify that audit"
             )
         dependencies = {
-            **manifest.get("dependencies", {}),
-            **manifest.get("devDependencies", {}),
+            **(manifest.get("dependencies") or {}),
+            **(manifest.get("devDependencies") or {}),
         }
         required = {"react"} if "react" in dependencies else set()
         required.update(
@@ -954,7 +962,9 @@ def parse_config(content: str, *, require_impact_review: bool = True) -> GateCon
     return config
 
 
-def load_groups(root: Path, base: str | None = None) -> list[Group]:
+def load_groups(
+    root: Path, base: str | None = None, *, dependents: bool = True
+) -> list[Group]:
     validate_documents(root)
     config = parse_config((root / "hard-eng.gates.json").read_text())
     if type(config.get("scan_git_history", True)) is not bool:
@@ -982,4 +992,4 @@ def load_groups(root: Path, base: str | None = None) -> list[Group]:
     for gate in config["shared"]:
         if gate.get("role") == "secrets-history":
             gate["command"] = new_commits_command(gate["command"], root, base)
-    return affected_groups(root, groups, base, prove_update=True)
+    return affected_groups(root, groups, base, prove_update=True, dependents=dependents)

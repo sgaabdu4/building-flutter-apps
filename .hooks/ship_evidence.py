@@ -42,8 +42,9 @@ def attachment_urls(body: str, paths: list[str], patterns: list[str]) -> list[st
         return []
     before = _BEFORE.findall(body) + _RAW_BEFORE.findall(body)
     after = _AFTER.findall(body) + _RAW_AFTER.findall(body)
-    if len(before) != 1 or len(after) != 1 or before[0] == after[0]:
+    urls = before + after
+    if not before or len(before) != len(after) or len(set(urls)) != len(urls):
         raise ValueError(
             "UI changes require distinct Before and After attachments or an explained unchanged appearance"
         )
-    return [before[0], after[0]]
+    return urls

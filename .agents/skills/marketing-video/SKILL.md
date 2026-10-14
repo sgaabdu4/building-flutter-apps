@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Marketing Video
 
-Output = real product screens + big brand type + one calm voice → reviewed MP4. Scripts run by path from any directory (`node <skill>/scripts/<name>.mjs <work>`); each video's work folder lives outside the skill.
+Output = real product screens + big brand type + one calm voice → reviewed MP4. Scripts run by path from any directory (`bun <skill>/scripts/<name>.mjs <work>`); each video's work folder lives outside the skill.
 
 ## Routes
 

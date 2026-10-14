@@ -7,12 +7,14 @@ Load when a user or authorized workflow makes, changes or questions a lasting pr
 - Authority = distinguish the user's accepted choice from a proposal, inferred preference or unverified assumption. A request to investigate is not acceptance. Existing authorization covers routine implementation choices; a record adds no new authority.
 - Capture = inspect source evidence, compare existing decisions, then write the smallest record below. Include only alternatives that explain the choice. Link the source decision/task and applicable proof; pending verification stays pending. Never copy secrets or raw transcripts.
 - Change = fix factual errors in place; a materially different accepted decision gets a new ADR and marks the previous record Superseded with a link. Preserve why the earlier choice existed. Uncertain drift → investigate; do not silently rewrite an active requirement to match possibly broken code.
-- Use = read the relevant Accepted record at the next affected planning/design/review step. Verify referenced paths + actual scope; an obsolete version or different project may invalidate applicability. Briefly record that use in the existing task evidence when validating a new learning route.
+- Applies to = every record lists the path prefixes it governs. The Stop hook shows an Accepted record's Decision once per session when a changed file starts with a prefix; `check` fails a changed record without the line and an Accepted record whose last file under a prefix this change deletes (update the line or mark it Superseded).
+- Use = matching records are shown automatically; still read applicable Accepted records when planning/design/review. Verify referenced paths + actual scope; an obsolete version or different project may invalidate applicability. Briefly record that use in the existing task evidence when validating a new learning route.
 
 ```markdown
 # NNNN — Decision
 
 Status: Proposed | Accepted | Superseded by [NNNN](NNNN-name.md)
+Applies to: `path/prefix/`, `another/prefix/`
 
 ## Context
 Constraint or evidence that made the choice necessary.

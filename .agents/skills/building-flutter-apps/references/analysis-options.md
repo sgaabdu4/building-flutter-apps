@@ -3,7 +3,7 @@
 
 ## Read first
 
-1. `dart analyze` from package root with no path or `.`; subdirectory paths skip plugins. Never `flutter analyze lib`.
+1. Final run = `dart analyze --fatal-infos` from package root with no path or `.`, once before handoff; folder paths skip plugins. Never `flutter analyze lib`. Edit loop = edited files only, see [Edit loop](#edit-loop).
 2. Analyzer plugins live ONLY in `analysis_options.yaml` top-level `plugins:` — never `pubspec.yaml` deps.
 3. Enable strict casts/inference/raw types. Exclude generated files.
 4. Setup/fix answers must explicitly verify one `flutter_skill_lints` diagnostic and one `riverpod_lint` diagnostic can fire before calling setup complete.
@@ -108,6 +108,15 @@ Run `dart analyze --fatal-infos` from package root with no path or `.`. Avoid `f
 Measured on Flutter 3.47.5 / Dart 3.13.4: package-root `dart analyze` with no path or `.`, and single-file paths, report plugin diagnostics. `flutter analyze` (even at package root) and subdirectory paths such as `dart analyze lib` report none while printing "No issues found!". Without `--fatal-infos`, info diagnostics do not fail the run.
 
 CI/scripts: `dart analyze`. Never `flutter analyze lib`.
+
+## Edit loop
+
+A full or cold run costs minutes (114-150 s on a ~1,100-file app under load). Do not run it after each small fix; run focused tests per fix.
+
+1. Dart MCP `analyze_files` when available: `roots: [{"root": "file:///abs/package/", "paths": ["lib/x.dart", "test/x_test.dart"]}]`. The root URI must end with `/`; without it `paths` resolve one folder too high and the tool reports "No errors" for files it never read.
+2. The first result after a cold start (server stops after 10 idle minutes) or a new root can say "No errors" before plugin lints arrive (5 s on a tiny package, up to 260 s on a large one under load). Treat it as not covering `riverpod_lint` / `flutter_skill_lints`. Warm, it answers in about 1.5 s with plugin lints.
+3. No MCP tool: from package root run `dart analyze --fatal-infos <file1> <file2> ...`, naming each edited file. A file list loads plugins (14 s cold for one file). Never pass a folder: it skips plugin lints and still prints "No issues found!" (Dart 3.13.4, dart-lang/sdk#61481).
+4. Before handoff or ship: one package-root `dart analyze --fatal-infos`, plus the full test suite and gate. It catches breakage in files you did not edit and covers the MCP cold-start window.
 
 ## Fix plugin crash
 

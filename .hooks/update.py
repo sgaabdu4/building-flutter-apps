@@ -14,6 +14,7 @@ from collections.abc import Callable
 from operator import itemgetter
 from pathlib import Path
 
+import hook_chain
 from mcp_setup import retired_settings
 from update_runner import (
     commit_update,
@@ -185,10 +186,36 @@ def fetch_sources(temporary: Path, revision: str, previous: str) -> tuple[Path, 
             subprocess.run(
                 ["git", "submodule", "update", "--init", "--recursive", "--depth=1"],
                 cwd=tree,
+                stdout=sys.stderr,
                 check=True,
                 timeout=120,
             )
     return source, old
+
+
+def revision_follows(revision: str, reference: str) -> bool:
+    """Whether upstream's history puts revision after reference."""
+    with tempfile.TemporaryDirectory(prefix="hard-eng-update-") as temporary:
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--quiet",
+                "--bare",
+                "--filter=blob:none",
+                REPOSITORY,
+                temporary,
+            ],
+            check=True,
+            timeout=120,
+        )
+        ordered = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", reference, revision],
+            cwd=temporary,
+            check=False,
+            timeout=30,
+        )
+    return revision != reference and ordered.returncode == 0
 
 
 def scaffold_files(source: Path) -> set[str]:
@@ -218,7 +245,15 @@ def scaffold_files(source: Path) -> set[str]:
             ]
             for path in repository_files(skill)
         }
-        | {str(path.relative_to(source)) for path in source.glob(".agents/biome.json")}
+        | {
+            str(path.relative_to(source))
+            for pattern in (
+                ".agents/biome.json",
+                ".claude/rules/*.md",
+                ".claude/output-styles/*.md",
+            )
+            for path in source.glob(pattern)
+        }
     )
 
 
@@ -259,32 +294,14 @@ def pre_push_missing(root: Path) -> bool:
     return not target.exists() and not target.is_symlink()
 
 
-def planned_hook(root: Path, plan: object) -> tuple[str, str]:
-    if not isinstance(plan, dict):
-        raise TypeError("Setup plan must be an object")
-    hook = plan.get("hook")
-    if not isinstance(hook, dict):
-        raise TypeError("Setup plan is missing the pre-push hook")
-    hook_path, hook_content = hook.get("path"), hook.get("content")
-    if not isinstance(hook_path, str) or not isinstance(hook_content, str):
-        raise TypeError("Setup plan has an invalid pre-push hook")
-    if hook_path == ".husky/pre-push":
-        if (root / hook_path).is_symlink():
-            raise ValueError("Preserve the existing hook symlink before updating")
-        files = plan.get("files")
-        if not isinstance(files, dict):
-            raise TypeError("Setup plan must include file changes")
-        files[hook_path] = hook_content
-    return hook_path, hook_content
-
-
 def update_plan(
-    root: Path, source: Path, previous: Path
+    root: Path, source: Path, previous: Path, env: dict[str, str] | None = None
 ) -> tuple[dict[str, str | None], dict[str, str | None], tuple[str, str], list[str]]:
-    output = subprocess.check_output(
+    planned = subprocess.run(
         [
             "uv",
             "run",
+            "--quiet",
             "--project",
             str(source),
             "--locked",
@@ -299,11 +316,18 @@ def update_plan(
             str(previous),
         ],
         cwd=root,
+        env=env,
+        capture_output=True,
         text=True,
         timeout=60,
+        check=False,
     )
-    plan = json.loads(output)
-    hook = planned_hook(root, plan)
+    sys.stderr.write(planned.stderr)
+    if planned.returncode != 0:
+        reason = " | ".join(planned.stderr.strip().splitlines()[-5:])
+        raise ValueError(f"setup refused the update: {reason or 'no reason printed'}")
+    plan = json.loads(planned.stdout)
+    hook = hook_chain.planned_hook(root, plan)
     changes: dict[str, str | None] = {
         name: content
         for name, content in plan["files"].items()
@@ -609,6 +633,7 @@ def install_planned_hook(root: Path, hook: tuple[str, str]) -> bool:
         and target.stat().st_mode & 0o111
     ):
         return False
+    hook_chain.preserve(root, target)
     if target.is_symlink():
         target.unlink()
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -649,7 +674,9 @@ def validate_gates(root: Path, source: Path, changes: dict[str, str | None]) -> 
 
 
 def repair_current_hook(root: Path, previous: str) -> str:
-    if not pre_push_missing(root):
+    if not pre_push_missing(root) and not hook_chain.foreign_hook(
+        root, hook_chain.locate(root)[1]
+    ):
         return "No newer CI-verified Hard Eng revision is available."
     with tempfile.TemporaryDirectory(prefix="hard-eng-update-") as temporary:
         source, old = fetch_sources(Path(temporary), previous, previous)
@@ -758,8 +785,8 @@ def refuse_local_state(root: Path, names: list[str]) -> None:
         )
 
 
-def update(root: Path, repair: bool = False, *, remember: bool = False) -> str:
-    """The background run remembers a refusal; setup always retries."""
+def update(root: Path, repair: bool = False, *, remember: Path | None = None) -> str:
+    """The background run remembers a refusal under the given root; setup always retries."""
     if (blocker := update_blocker(root)) is not None:
         return blocker
     previous = json.loads((root / SOURCE_FILE).read_text())["revision"]
@@ -769,15 +796,15 @@ def update(root: Path, repair: bool = False, *, remember: bool = False) -> str:
             return repair_installation(root, previous)
         return repair_current_hook(root, previous)
     attempt = update_attempt(root, revision) if remember else None
-    if attempt is not None and (known := known_failure(root, attempt)):
+    if attempt is not None and remember and (known := known_failure(remember, attempt)):
         return known
     with tempfile.TemporaryDirectory(prefix="hard-eng-update-") as temporary:
         source, old = fetch_sources(Path(temporary), revision, previous)
         try:
             return install_revision(root, source, old, revision)
         except (ValueError, TypeError, subprocess.CalledProcessError) as error:
-            if attempt is not None:
-                remember_failure(root, attempt, error)
+            if attempt is not None and remember:
+                remember_failure(remember, attempt, error)
             raise
 
 
@@ -824,13 +851,20 @@ INSTALLED_FILES = {
     "CLAUDE.md",
     "AGENTS.override.md",
     ".husky/pre-push",
+    ".github/workflows/hard-eng.yml",
 }
 
 
 def maybe_installed(name: str) -> bool:
     """A path a Hard Eng update can write, checked before any network proof."""
     return name in INSTALLED_FILES | {".agents/biome.json"} or name.startswith(
-        (".hooks/", ".agents/skills/", ".claude/skills/")
+        (
+            ".hooks/",
+            ".agents/skills/",
+            ".claude/skills/",
+            ".claude/rules/",
+            ".claude/output-styles/",
+        )
     )
 
 
@@ -877,6 +911,8 @@ def release_installed(
     root: Path, base: str, names: set[str], revision: str, previous: str
 ) -> bool:
     """Whether these paths hold exactly what the verified release installs."""
+    from ci_setup import workflow_installed
+
     with tempfile.TemporaryDirectory(prefix="hard-eng-scaffold-check-") as temporary:
         source, old = fetch_sources(Path(temporary), revision, previous)
         allowed = scaffold_files(source) | scaffold_files(old) | INSTALLED_FILES
@@ -886,9 +922,11 @@ def release_installed(
             for path in (tree / ".agents/skills").iterdir()
             if path.is_dir()
         }
-        changes, links, _, _ = update_plan(root, source, source)
+        env = hook_chain.own_hooks_env(root)
+        changes, links, _, _ = update_plan(root, source, source, env)
         if (
             not names <= allowed
+            or (env is not None and ".husky/pre-push" in names)
             or changes
             or links
             or any(
@@ -896,6 +934,7 @@ def release_installed(
                 for name in scaffold_files(old) - scaffold_files(source)
             )
             or not preserved_instructions(root, base, names)
+            or not workflow_installed(root, base, names, (source, old))
         ):
             return False
         validate_gates(root, source, {})

@@ -13,18 +13,20 @@ def erased_typescript(files: set[Path]) -> set[Path]:
     if not candidates:
         return set()
     script = """
-const { readFileSync } = require('node:fs');
-const { stripTypeScriptTypes } = require('node:module');
-if (typeof stripTypeScriptTypes !== 'function') throw Error('Node type stripping required');
-const sources = JSON.parse(readFileSync(0, 'utf8'));
-console.log(JSON.stringify(sources.map(source => {
-  try { return stripTypeScriptTypes(source); }
+const sources = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+console.log(JSON.stringify(sources.map(([loader, source]) => {
+  try { return new Bun.Transpiler({ loader }).transformSync(source); }
   catch { return null; }
 })));
 """
     result = subprocess.run(
-        ["node", "-e", script],
-        input=json.dumps([file.read_text() for file in candidates]),
+        ["bun", "-e", script],
+        input=json.dumps(
+            [
+                ["tsx" if file.suffix == ".tsx" else "ts", file.read_text()]
+                for file in candidates
+            ]
+        ),
         text=True,
         capture_output=True,
         check=True,
