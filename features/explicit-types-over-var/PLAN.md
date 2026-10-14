@@ -4,11 +4,11 @@ Status: Ready
 
 ## Outcome + scope
 
-Release v5.12.2. The analysis profile requires an explicit type instead of `var`, enforced by `flutter_skill_lints` `prefer_type_over_var` (default-enabled again in 0.13.4). `final` and `const` without a type stay allowed. Non-goals: `always_specify_types`, plugin pins, other profile rules.
+Release v5.12.2. The analysis profile requires an explicit type instead of `var`, enforced by `flutter_skill_lints` `prefer_type_over_var` (default-enabled again in 0.13.4). `final` and `const` without a type stay allowed. The `flutter_skill_lints` pin rises to `^0.13.4`, the first release with the restored rule. Non-goals: `always_specify_types`, other profile rules.
 
 ## Repository context
 
-Owners: `skills/building-flutter-apps/references/analysis-options.md` (profile rules); version strings in `.claude-plugin/`, `.codex-plugin/`, `SKILL.md` and `tool/smoke_test.sh`. Before this change the profile said `prefer_type_over_var` "is forbidden" and that `omit_local_variable_types` stayed off only until explicit local types were removed. No skill example uses `var`, so no example changes.
+Owners: `skills/building-flutter-apps/references/analysis-options.md` (profile rules); plugin pins in `analysis_options.yaml`, `references/analysis_options.yaml`, `setup.md`, `core-stack.md`, `README.md` and `tool/`; version strings in `.claude-plugin/`, `.codex-plugin/`, `SKILL.md` and `tool/smoke_test.sh`. Before this change the profile said `prefer_type_over_var` "is forbidden" and that `omit_local_variable_types` stayed off only until explicit local types were removed. No skill example uses `var`, so no example changes.
 
 ## Decisions + authorization
 
@@ -20,6 +20,7 @@ Authority: Owner's correction: ban `var` only, keep inferred `final`, replace th
 
 - [ ] `analysis-options.md` requires explicit types instead of `var`, names `prefer_type_over_var` as the enforcer, and keeps untyped `final`/`const` allowed.
 - [ ] The `omit_local_variable_types` note no longer says the project should move away from explicit local types.
+- [ ] Every `flutter_skill_lints` pin in the skill, root config and tooling is `^0.13.4`.
 - [ ] Version 5.12.2 matches in plugin manifests, `SKILL.md` and `tool/smoke_test.sh`; full `python3 .hooks/hard-eng.py check` passes.
 
 ## Baseline + execution
@@ -30,7 +31,7 @@ Execution: One builder; text edits and version bump.
 
 ## Risks + recovery
 
-Projects pinned below `flutter_skill_lints` 0.13.4 lack the rule; `^0.13.0` resolves to 0.13.4 on a fresh resolve. Recovery = follow-up patch.
+A project still resolving 0.13.3 would lack the rule; the `^0.13.4` pin forces the release that has it. Recovery = follow-up patch.
 
 ## ux_reference
 
