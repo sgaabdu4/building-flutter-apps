@@ -1,6 +1,6 @@
 # Explicit types over var
 
-Status: Ready
+Status: Complete
 
 ## Outcome + scope
 
@@ -18,10 +18,10 @@ Authority: Owner's correction: ban `var` only, keep inferred `final`, replace th
 
 ## Acceptance + steps
 
-- [ ] `analysis-options.md` requires explicit types instead of `var`, names `prefer_type_over_var` as the enforcer, and keeps untyped `final`/`const` allowed.
-- [ ] The `omit_local_variable_types` note no longer says the project should move away from explicit local types.
-- [ ] Every `flutter_skill_lints` pin in the skill, root config and tooling is `^0.13.4`.
-- [ ] Version 5.12.2 matches in plugin manifests, `SKILL.md` and `tool/smoke_test.sh`; full `python3 .hooks/hard-eng.py check` passes.
+- [x] `analysis-options.md` requires explicit types instead of `var`, names `prefer_type_over_var` as the enforcer, and keeps untyped `final`/`const` allowed.
+- [x] The `omit_local_variable_types` note no longer says the project should move away from explicit local types.
+- [x] Every `flutter_skill_lints` pin in the skill, root config and tooling is `^0.13.4`.
+- [x] Version 5.12.2 matches in plugin manifests, `SKILL.md` and `tool/smoke_test.sh`; full `python3 .hooks/hard-eng.py check` passes.
 
 ## Baseline + execution
 
@@ -35,13 +35,13 @@ A project still resolving 0.13.3 would lack the rule; the `^0.13.4` pin forces t
 
 ## ux_reference
 
-N/A - text-only skill guidance; no rendered interface changes.
+N/A — text-only skill guidance; no rendered interface changes.
 
 ## Verification
 
-Result: Pending
-Evidence: Pending the full check.
-E2E: N/A - no application runtime is deployed by this repository; the smoke, routing and markdown-example checks cover the affected skill files.
+Result: Passed
+Evidence: Full `python3 .hooks/hard-eng.py check --plan-stage Ready` passed 12 of 12 (skill-routing, windows-installer-assets, windows-installer-inputs, drift-fixtures, skill-drift, markdown-examples, plugin-hook-smoke, actionlint, secrets-history, shellcheck, zizmor, secrets-files). `tool/run_compatibility_fixture.py` printed `HOSTED_LINT_RESOLUTION_OK flutter_skill_lints=^0.13.4` and `COMPATIBILITY_FIXTURE_OK`. A scratch package using hosted `flutter_skill_lints ^0.13.4` reported `prefer_type_over_var` on top-level, local, `for`-in and `for`-in pattern `var` and nothing on untyped `final` or `const`. Codex adversarial review round 1 found the `^0.13.0` pin still allowed 0.13.3, which lacks the rule; the pin is now `^0.13.4`. Round 2 approved with no findings.
+E2E: N/A — no application runtime is deployed by this repository; the smoke, routing and markdown-example checks cover the affected skill files.
 
 Delivery target: Merge
-Delivery: Pending - PR checks green, merge to main, tag v5.12.2.
+Delivery: Pending — PR checks green, merge to main, tag v5.12.2.
