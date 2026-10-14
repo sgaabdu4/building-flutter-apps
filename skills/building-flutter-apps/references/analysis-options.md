@@ -68,7 +68,7 @@ Plugin block:
 ```yaml
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.13.0
+  flutter_skill_lints: ^0.13.4
 ```
 
 Match bundled [`references/analysis_options.yaml`](analysis_options.yaml)
