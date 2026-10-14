@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   checks: read # Verify the upstream scaffold release.
+  pull-requests: read # Find the merged PR whose passed checks cover a base-branch push.
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -46,8 +47,7 @@ jobs:
             echo "MISE_DATA_DIR=$RUNNER_TEMP/hard-eng-tools/mise/data"
             echo "MISE_CACHE_DIR=$RUNNER_TEMP/hard-eng-tools/mise/cache"
             echo "MISE_STATE_DIR=$RUNNER_TEMP/hard-eng-tools/mise/state"
-            echo "PNPM_CONFIG_STORE_DIR=$RUNNER_TEMP/hard-eng-tools/pnpm/store"
-            echo "PNPM_CONFIG_CACHE_DIR=$RUNNER_TEMP/hard-eng-tools/pnpm/cache"
+            echo "BUN_INSTALL_CACHE_DIR=$RUNNER_TEMP/hard-eng-tools/bun/cache"
           } >> "$GITHUB_ENV"
 
       - name: Provide ripgrep with PCRE2
@@ -65,21 +65,9 @@ jobs:
           ruby --version
           pwsh --version
 
-      - name: Cache native tool downloads
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          path: |
-            ${{ runner.temp }}/hard-eng-tools/mise/data/installs
-            ${{ runner.temp }}/hard-eng-tools/mise-launcher
-            ${{ runner.temp }}/hard-eng-tools/pnpm/store
-          key: ${{ runner.os }}-${{ runner.arch }}-hard-eng-tools-${{ hashFiles('.hooks/tool_setup.py', 'hard-eng.gates.json') }}
-          restore-keys: ${{ runner.os }}-${{ runner.arch }}-hard-eng-tools-
-
-      - uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
-        with:
-          version: latest
-          runtime: node@latest
-          install: false
+          bun-version: latest
 
       - name: Verify repository with Hard Eng
         env:
@@ -87,8 +75,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          pnpm dlx --config.ignore-scripts=false --allow-build=@jdxcode/mise --package=@jdxcode/mise@latest mise --no-config install uv@latest &&
-          pnpm dlx --config.ignore-scripts=false --allow-build=@jdxcode/mise --package=@jdxcode/mise@latest mise --no-config exec uv@latest -- uv run --no-project --with pyyaml python .hooks/hard-eng.py check --base "$BASE_SHA"
+          bun x --package="@jdxcode/mise-linux-${RUNNER_ARCH,,}@latest" mise --no-config install uv@latest &&
+          bun x --package="@jdxcode/mise-linux-${RUNNER_ARCH,,}@latest" mise --no-config exec uv@latest -- uv run --no-project --with pyyaml python .hooks/hard-eng.py check --base "$BASE_SHA"
 
   upstream-drift:
     name: Upstream flutter/skills drift
