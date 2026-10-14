@@ -4,15 +4,21 @@ import json
 import math
 import re
 import subprocess
+import tomllib
 import xml.etree.ElementTree as ET
+from concurrent.futures import Future
 from pathlib import Path
 from typing import TextIO, cast
 
 from coverage_sources import erased_typescript
 from dart_coverage import erased_dart
 from dart_test_report import dart_events, failure_summary
-from fallow_report import validate_fallow
-from gate_config import JsonObject
+from fallow_report import validate_fallow, write_istanbul
+from gate_config import Gate, Group, JsonObject
+from project_setup import (
+    dependency_free,
+    package_script_invocation,
+)
 
 
 def dart_test_failure(
@@ -43,6 +49,148 @@ def parallel_hint(code: int, tests: bool, command: list[str]) -> str:
         "\nThese tests ran in parallel (-n auto). If they pass serially, isolate "
         "the state they share, or set -n 0 in this gate's command."
     )
+
+
+SCAN_ROLES = frozenset(
+    {
+        "secrets-files",
+        "secrets-history",
+        "security",
+        "vulnerabilities",
+        "workflows",
+        "ci-security",
+        "shell",
+    }
+)
+
+
+def early_scan(gate: Gate) -> bool:
+    return gate.get("role") in SCAN_ROLES and gate.get("parallel", False) is True
+
+
+QUICK_ROLES = frozenset(
+    {
+        "format",
+        "lint",
+        "format-lint",
+        "types",
+        "annotations",
+        "typing-style",
+        "imports",
+        "tests",
+        "focused-tests",
+        "secrets-files",
+    }
+)
+
+
+READ_ONLY_ROLES = (
+    QUICK_ROLES
+    | SCAN_ROLES
+    | {
+        "tests",
+        "performance",
+        "complexity",
+        "dead-code",
+        "duplicates",
+        "dead-code-duplicates",
+        "dependencies",
+        "types-lint",
+        "react",
+        "shipped-format",
+    }
+)
+
+
+def gate_order(checks: list[tuple[Group, Gate]]) -> list[tuple[Group, Gate]]:
+    """Setup first; scans start after the last gate that may write files they read,
+    and after performance suites, which must run alone."""
+    setup = [item for item in checks if item[1].get("role") == "lockfiles"]
+    scans = [item for item in checks if early_scan(item[1])]
+    others = [item for item in checks if item not in setup and item not in scans]
+    producers = [
+        index
+        for index, (_, gate) in enumerate(others)
+        if gate.get("role") not in READ_ONLY_ROLES
+    ]
+    cut = producers[-1] + 1 if producers else 0
+    later = others[cut:]
+    timed = [item for item in later if item[1].get("role") == "performance"]
+    return setup + others[:cut] + timed + scans + [i for i in later if i not in timed]
+
+
+def scan_blockers(
+    group: Group, gate: Gate, scans: dict[Future[bool], str]
+) -> set[Future[bool]]:
+    """Scans a serial gate waits for: all before timing, and same-folder ones before
+    JavaScript tests, whose runners clear coverage/ where scan reports live."""
+    if gate.get("role") == "performance":
+        return set(scans)
+    if group.get("language") == "javascript" and gate.get("role") == "tests":
+        return {future for future, path in scans.items() if path == group["path"]}
+    return set()
+
+
+def quick_groups(groups: list[Group], quick: bool = True) -> list[Group]:
+    if not quick:
+        return groups
+    return [
+        {
+            **group,
+            "checks": [
+                gate for gate in group["checks"] if gate.get("role") in QUICK_ROLES
+            ],
+        }
+        for group in groups
+    ]
+
+
+def related_test_flags(
+    gate: Gate, groups: list[Group], directory: Path, base: str
+) -> list[str]:
+    """Native related-test flags for a pre-push JavaScript test gate, else none."""
+    if gate.get("report", {}).get("type") != "lcov-tests":
+        return []
+    # A Fallow gate run through a package script may read this run's coverage.
+    if any(
+        other.get("report", {}).get("type") == "fallow"
+        and other["command"][:2] == ["bun", "run"]
+        for selected in groups
+        for other in selected["checks"]
+    ):
+        return []
+    arguments, directory = package_script_invocation(gate["command"], directory)
+    if any(re.search(r"[;&|]", argument) for argument in arguments):
+        return []
+    runner = Path(arguments[0]).name
+    if arguments[:2] == ["bun", "test"]:
+        bunfig = directory / "bunfig.toml"
+        # Bun has no flag to lift a configured coverage threshold for a partial run.
+        if bunfig.is_file() and "coverageThreshold" in tomllib.loads(
+            bunfig.read_text()
+        ).get("test", ()):
+            return []
+        return [f"--changed={base}", "--pass-with-no-tests"]
+    if runner == "vitest":
+        return ["--changed", base, "--coverage.enabled=false", "--passWithNoTests"]
+    if runner == "jest":
+        return [f"--changedSince={base}", "--coverage=false", "--passWithNoTests"]
+    return []
+
+
+def related_command(
+    command: list[str],
+    coverage: Path | None,
+    gate: Gate,
+    groups: list[Group],
+    directory: Path,
+    base: str | None,
+) -> tuple[list[str], Path | None]:
+    flags: list[str] = related_test_flags(gate, groups, directory, base) if base else []
+    if not flags:
+        return command, coverage
+    print("Related tests only; CI runs the full suite and coverage.")
+    return [*command, *flags], None
 
 
 def validate_scanner_log(scanner: str | None, log: TextIO) -> None:
@@ -130,6 +278,8 @@ def line_coverage(
 ) -> tuple[int, int]:
     reader = python_coverage if kind == "python-tests" else lcov_coverage
     files = reader(path, directory)
+    if kind == "lcov-tests" and "\nFN:" not in path.read_text():
+        write_istanbul(path, directory)
     if kind == "lcov-tests":
         expected = expected - erased_typescript(expected - files.keys())
     if kind == "dart-tests":
@@ -247,53 +397,8 @@ def osv_layers(report: JsonObject) -> list[JsonObject]:
     return cast(list[JsonObject], layers)
 
 
-def dependency_free_pnpm(directory: Path) -> bool:
-    try:
-        manifest = json.loads((directory / "package.json").read_text())
-        # uv supplies PyYAML's isolated runtime; a JavaScript consumer's Python may lack it.
-        lock = json.loads(
-            subprocess.check_output(
-                [
-                    "uv",
-                    "run",
-                    "--no-project",
-                    "--with",
-                    "pyyaml",
-                    "python",
-                    "-c",
-                    "import json,sys,yaml; json.dump(yaml.safe_load(sys.stdin),sys.stdout)",
-                ],
-                input=(directory / "pnpm-lock.yaml").read_text(),
-                text=True,
-                stderr=subprocess.PIPE,
-                timeout=30,
-            )
-        )
-    except (OSError, ValueError, subprocess.SubprocessError):
-        return False
-    return (
-        isinstance(manifest, dict)
-        and isinstance(lock, dict)
-        and all(
-            manifest.get(key, {}) == {}
-            for key in (
-                "dependencies",
-                "devDependencies",
-                "optionalDependencies",
-                "peerDependencies",
-            )
-        )
-        and not manifest.get("workspaces")
-        and not (directory / "pnpm-workspace.yaml").exists()
-        and str(lock.get("lockfileVersion")) == "9.0"
-        and lock.get("importers") == {".": {}}
-        and lock.get("packages", {}) == {}
-        and lock.get("snapshots", {}) == {}
-    )
-
-
 def validate_osv(
-    path: Path, *, image: bool = False, empty_pnpm: Path | None = None
+    path: Path, *, image: bool = False, empty_bun: Path | None = None
 ) -> None:
     try:
         report = json.loads(path.read_text())
@@ -307,10 +412,13 @@ def validate_osv(
         if (
             results in (None, [])
             and not image
-            and empty_pnpm is not None
-            and dependency_free_pnpm(empty_pnpm)
+            and empty_bun is not None
+            and not (empty_bun / "bun.lock").exists()
+            and dependency_free(empty_bun)
         ):
-            print("OSV: standalone pnpm manifest and lockfile confirm no dependencies")
+            print(
+                "OSV: package.json declares no dependencies, so Bun keeps no lockfile"
+            )
             return
         if not isinstance(results, list):
             raise TypeError("OSV results must be a list")

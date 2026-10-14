@@ -34,5 +34,12 @@
       }
     ]
   },
-  "enabledMcpjsonServers": ["dart"]
+  "enabledMcpjsonServers": ["dart"],
+  "advisorModel": "fable",
+  "outputStyle": "Plain STE",
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  }
 }

@@ -5,14 +5,14 @@
   "type": "module",
   "description": "Strict Playwright screencast pipeline for polished, reviewed product walkthroughs.",
   "scripts": {
-    "test": "pnpm run test:gesture && pnpm run test:dialog-pointer && pnpm run test:view-transition-pointer",
-    "test:dialog-pointer": "node tests/native-dialog-pointer-smoke.mjs",
-    "test:gesture": "node tests/gesture-smoke.mjs",
-    "test:view-transition-pointer": "node tests/view-transition-pointer-smoke.mjs",
-    "scaffold": "node scripts/scaffold.mjs",
-    "record": "node scripts/run-walkthrough.mjs",
-    "review": "node scripts/review-video.mjs",
-    "convert": "node scripts/convert-mp4.mjs"
+    "test": "bun run test:gesture && bun run test:dialog-pointer && bun run test:view-transition-pointer",
+    "test:dialog-pointer": "bun tests/native-dialog-pointer-smoke.mjs",
+    "test:gesture": "bun tests/gesture-smoke.mjs",
+    "test:view-transition-pointer": "bun tests/view-transition-pointer-smoke.mjs",
+    "scaffold": "bun scripts/scaffold.mjs",
+    "record": "bun scripts/run-walkthrough.mjs",
+    "review": "bun scripts/review-video.mjs",
+    "convert": "bun scripts/convert-mp4.mjs"
   },
   "dependencies": {
     "playwright": "1.63.0"

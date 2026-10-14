@@ -232,7 +232,7 @@ def run_gate_command(
         from gate_config import has_workflows, repository_files
 
         zizmor = any(
-            Path(part).name.partition("@")[0] == "zizmor" for part in command[:2]
+            Path(part).name.partition("@")[0] == "zizmor" for part in command[:3]
         )
         if zizmor and not has_workflows(directory, repository_files(directory)):
             stderr.write("No GitHub workflows to audit: zizmor collected no inputs.\n")

@@ -128,7 +128,7 @@ def javascript(
     from tool_setup import provision_batch
 
     remaining = 600 if deadline is None else max(deadline - time.monotonic(), 1)
-    provision_batch(directory, ["npm:@stryker-mutator/core@latest"], remaining)
+    provision_batch(["npm:@stryker-mutator/core@latest"], remaining)
     report, config, output = work / "report.json", work / "stryker.json", work / "log"
     # Stryker reads each path as a minimatch glob; brackets wrap its metacharacters.
     literal = {name: GLOB.sub(r"[\g<0>]", name) for name in files}
@@ -302,6 +302,19 @@ def xunit_survivors(document: str) -> Result:
     return tested, survivors
 
 
+def dart_test_command(tests: list[str]) -> str:
+    settings = []
+    if tests and tests[0] == "env":
+        for argument in tests[1:]:
+            if "=" not in argument or argument.startswith("-"):
+                break
+            settings.append(argument)
+    runner = (
+        "flutter test --no-pub" if "flutter test" in " ".join(tests) else "dart test"
+    )
+    return shlex.join(["env", *settings]) + f" {runner}" if settings else runner
+
+
 def dart(
     directory: Path,
     files: dict[str, set[int]],
@@ -334,8 +347,7 @@ def dart(
             "timeout": "3600",
         },
     )
-    flutter = "flutter test" in " ".join(tests)
-    command.text = "flutter test --no-pub" if flutter else "dart test"
+    command.text = dart_test_command(tests)
     config = work / "mutations.xml"
     ET.ElementTree(document).write(config, encoding="unicode")
     run(

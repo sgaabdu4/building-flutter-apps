@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from collections import deque
-from pathlib import PurePosixPath, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from gate_config import Group
+
+
+def owner_language(by_path: dict[str, Group], name: str) -> str | None:
+    matches = [path for path in by_path if Path(name).is_relative_to(path)]
+    return by_path[max(matches, key=len)].get("language") if matches else None
 
 
 def impact_inputs(group: Group) -> list[PurePosixPath]:
@@ -92,6 +97,28 @@ def expand_dependents(
                 selected.add(dependent)
                 pending.append(dependent)
     return selected
+
+
+def cycle_members(
+    packages: list[Group], by_path: dict[str, Group], selected: set[str]
+) -> set[str]:
+    """Selected packages plus the ones they share a cycle with, as Fallow coverage needs."""
+    if any("depends_on" not in group for group in packages):
+        return selected
+    reached = expand_dependents(packages, by_path, set(selected))
+    return {
+        path
+        for path in reached
+        if selected & expand_dependents(packages, by_path, {path})
+    }
+
+
+def is_workflow(name: str) -> bool:
+    path = PurePosixPath(name)
+    return path.parent == PurePosixPath(".github/workflows") and path.suffix in {
+        ".yml",
+        ".yaml",
+    }
 
 
 def shared_only(shared: Group, names: set[str]) -> Group:

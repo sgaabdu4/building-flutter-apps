@@ -38,6 +38,6 @@ flowchart TD
 
 ## Apply + continue
 
-- Decisions/steering = [terse ADR capture](references/decisions.md). Inspect relevant accepted ADRs before applying a past lesson; current user instructions + verified applicability govern. A code/decision conflict may be a product regression, not stale documentation.
+- Decisions/steering = [terse ADR capture](references/decisions.md). Matching accepted ADRs are shown by the Stop hook; still read applicable ones before applying a past lesson; current user instructions + verified applicability govern. A code/decision conflict may be a product regression, not stale documentation.
 - Scope = authorized local prevention continues through [HE Build](../he-build/SKILL.md) with affected checks; post-ship edits need fresh proof and separately authorized [HE Ship](../he-ship/SKILL.md) delivery. Source-toolkit/global/cross-project changes require their own existing authority.
 - Progress = fix risk at the affected stage; learning does not seize unrelated work. No useful durable gap → no new artifact. Missing evidence/authority → retain the concrete next action in the existing plan. A checkpoint, ADR or skill is never a substitute for implementation and proof.

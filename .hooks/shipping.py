@@ -7,6 +7,7 @@ import math
 import os
 import re
 import subprocess
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,7 +35,7 @@ ShippingPolicy = TypedDict(
 @dataclass(frozen=True)
 class Shipment:
     root: Path
-    plan: Path
+    plan: Path | None
     pr_url: str
     repository: str
     remote: str
@@ -44,6 +45,7 @@ class Shipment:
     base: str
     merged_sha: str | None
     delivery_target: str
+    review_bypass: bool = False
 
 
 class ShippingError(ValueError):
@@ -68,10 +70,32 @@ _SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 _PR_URL = re.compile(
     r"^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/pull/([1-9][0-9]*)/?$"
 )
-_PR_SUBJECT = re.compile(r"\(#([1-9][0-9]*)\)$")
 _GH_TIMEOUT = 30.0
 _GIT_TIMEOUT = 30.0
 _DELIVERY_TIMEOUT = 120.0
+_REVIEW_QUERY = (
+    "query($owner:String!,$name:String!,$number:Int!){viewer{login} "
+    "repository(owner:$owner,name:$name){pullRequest(number:$number){"
+    "viewerDidAuthor viewerCanMergeAsAdmin reviewDecision isMergeQueueEnabled "
+    "reviewThreads(first:100){totalCount nodes{isResolved}} "
+    "baseRef{branchProtectionRule{"
+    "requiresCommitSignatures requiresDeployments lockBranch requiresStrictStatusChecks "
+    "requiredStatusCheckContexts} rules(first:100){totalCount nodes{type parameters{"
+    "...on RequiredStatusChecksParameters{strictRequiredStatusChecksPolicy "
+    "requiredStatusChecks{context}}}}}} "
+    "commits(last:1){nodes{commit{oid statusCheckRollup{state contexts(first:100){"
+    "totalCount nodes{...on CheckRun{name conclusion} ...on StatusContext{context state}}"
+    "}}}}}}}}"
+)
+_PASSED = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+_BYPASSABLE_RULES = {
+    "PULL_REQUEST",
+    "REQUIRED_STATUS_CHECKS",
+    "REQUIRED_LINEAR_HISTORY",
+    "NON_FAST_FORWARD",
+    "DELETION",
+    "CREATION",
+}
 
 
 @dataclass(frozen=True)
@@ -273,6 +297,51 @@ def _policy(raw: dict[str, JsonValue]) -> ShippingPolicy:
     }
 
 
+GATE_FLOOR_SECONDS = 600
+GATE_TIMES_LOCK = threading.Lock()
+
+
+def gate_budget(root: Path) -> float:
+    """Each gate's ceiling: CI's budget in CI, pre-push's elsewhere."""
+    policy = load_policy(root, required=False)
+    if policy is None:
+        return 600
+    return policy["ci_seconds" if os.environ.get("CI") else "pre_push_seconds"]
+
+
+def gate_times(root: Path) -> Path:
+    common = subprocess.check_output(
+        ["git", "rev-parse", "--git-common-dir"], cwd=root, text=True
+    ).strip()
+    return root / common / "hard-eng-gate-times.json"
+
+
+def gate_limit(root: Path, key: str, budget: float) -> float:
+    """A hung gate stops at three times its last passing time, not the whole budget."""
+    try:
+        times = json.loads(gate_times(root).read_text())
+    except (OSError, ValueError, subprocess.CalledProcessError):
+        return budget
+    last = times.get(key) if isinstance(times, dict) else None
+    if not isinstance(last, int | float):
+        return budget
+    return min(budget, max(GATE_FLOOR_SECONDS, 3 * last))
+
+
+def record_gate_time(root: Path, key: str, seconds: float) -> None:
+    path = gate_times(root)
+    with GATE_TIMES_LOCK:
+        try:
+            loaded = json.loads(path.read_text())
+        except (OSError, ValueError):
+            loaded = None
+        times: dict[str, JsonValue] = loaded if isinstance(loaded, dict) else {}
+        times[key] = round(seconds, 3)
+        temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        temporary.write_text(json.dumps(times))
+        temporary.replace(path)
+
+
 def load_policy(root: Path, required: bool = True) -> ShippingPolicy | None:
     """Load and strictly validate the existing project's shipping policy."""
 
@@ -456,20 +525,26 @@ def _checks(root: Path, repository: str, revision: str, policy: ShippingPolicy) 
             raise ShippingError(f"required check is outside the CI budget: {name}")
 
 
-def _pull_request_head(root: Path, repository: str, base: str) -> tuple[str, str]:
-    """The merged PR head and its tree, when the pushed commit merges exactly one PR."""
-    parents = git(root, "rev-list", "--parents", "--max-count=1", "HEAD").split()[1:]
-    if not parents or parents[0] != base:
-        raise ShippingError("push is not one commit onto the previous base")
-    if len(parents) == 2:
-        git(root, "merge-base", "--is-ancestor", base, parents[1])
-        return parents[1], git(root, "rev-parse", f"{parents[1]}^{{tree}}").strip()
-    number = _PR_SUBJECT.search(git(root, "log", "-1", "--format=%s").strip())
-    if len(parents) != 1 or number is None:
-        raise ShippingError("pushed commit names no merged PR")
-    endpoint = f"repos/{repository}/git/ref/pull/{number[1]}/head"
-    reference = _object(_json(gh(root, "api", endpoint), "PR ref"), "PR ref")
-    head = _sha(_object(reference.get("object"), "PR ref").get("sha"), "PR ref")
+def _pull_request_head(
+    root: Path, repository: str, base: str, branch: str
+) -> tuple[str, str]:
+    """The head and tree of the one PR merged into this push, whatever the merge method."""
+    revision = git(root, "rev-parse", "HEAD").strip()
+    endpoint = f"repos/{repository}/commits/{revision}/pulls"
+    value = _json(gh(root, "api", endpoint), "commit PRs")
+    if not isinstance(value, list):
+        raise ShippingError("commit PRs response is invalid")
+    heads = set()
+    for item in value:
+        pull = _object(item, "PR")
+        if (
+            pull.get("merged_at")
+            and _object(pull.get("base"), "PR base").get("ref") == branch
+        ):
+            heads.add(_sha(_object(pull.get("head"), "PR head").get("sha"), "PR head"))
+    if len(heads) != 1:
+        raise ShippingError("push merges no single PR")
+    head = heads.pop()
     endpoint = f"repos/{repository}/compare/{base}...{head}"
     comparison = _object(_json(gh(root, "api", endpoint), "compare"), "compare")
     if comparison.get("status") not in {"ahead", "identical"}:
@@ -492,13 +567,31 @@ def reused_pull_request(root: Path, base: str) -> str | None:
         ):
             return None
         repository = _repo(os.environ.get("GITHUB_REPOSITORY"), "workflow")
-        head, tree = _pull_request_head(root, repository, _sha(base, "push base"))
+        head, tree = _pull_request_head(
+            root, repository, _sha(base, "push base"), policy["base"]
+        )
         if tree != git(root, "rev-parse", "HEAD^{tree}").strip():
             return None
         _checks(root, repository, head, policy)
     except ShippingError:
         return None
     return head
+
+
+def passed_branch_point(root: Path) -> str | None:
+    """The shipping-base commit HEAD left, when its required checks passed in CI."""
+    from comments import branch_point
+
+    try:
+        policy = load_policy(root, required=False)
+        point = branch_point(root)
+        if policy is None or point == "HEAD":
+            return None
+        remote = git(root, "remote", "get-url", "origin").strip()
+        _checks(root, origin_repository(remote), point, policy)
+    except ShippingError:
+        return None
+    return point
 
 
 def _changed_paths(root: Path, owner: str, name: str, number: int) -> list[str]:
@@ -625,6 +718,17 @@ def _plan_target(root: Path, plan: Path) -> tuple[Path, str]:
     return resolved_plan, targets[0]
 
 
+def _delivery_scope(root: Path, plan: Path | None) -> tuple[Path | None, str]:
+    if plan is not None:
+        return _plan_target(root, plan)
+    from plans import size_verdict
+
+    small, reason = size_verdict(root)
+    if not small:
+        raise ShippingError(f"a big change needs a plan: {reason}")
+    return None, "Merge"
+
+
 def _remote_sha(root: Path, base: str, remote_url: str) -> str:
     ref = f"refs/heads/{base}"
     output = git(root, "ls-remote", "--heads", remote_url, ref).strip()
@@ -659,23 +763,165 @@ def _delivered(root: Path, pull: _PullRequest, base: str, remote_url: str) -> st
     return pull.merge_commit_sha
 
 
+def _complete_nodes(value: JsonValue) -> list[dict[str, JsonValue]] | None:
+    nodes = value.get("nodes") if isinstance(value, dict) else None
+    if not isinstance(value, dict) or not isinstance(nodes, list):
+        return None
+    if value.get("totalCount") != len(nodes):
+        return None
+    return [node for node in nodes if isinstance(node, dict)]
+
+
+def _required_checks(
+    protection: dict[str, JsonValue], rules: list[dict[str, JsonValue]]
+) -> set[str]:
+    contexts = protection.get("requiredStatusCheckContexts")
+    names: list[JsonValue] = list(contexts) if isinstance(contexts, list) else []
+    for rule in rules:
+        parameters = rule.get("parameters")
+        checks = (
+            parameters.get("requiredStatusChecks")
+            if isinstance(parameters, dict)
+            else None
+        )
+        if isinstance(checks, list):
+            names += [
+                check.get("context") for check in checks if isinstance(check, dict)
+            ]
+    return {name for name in names if isinstance(name, str)}
+
+
+def _other_merge_requirement(
+    pull: dict[str, JsonValue], rollup: dict[str, JsonValue]
+) -> str | None:
+    """Why something besides the review may block; admin merge would bypass it too."""
+    if pull.get("isMergeQueueEnabled") is not False:
+        return "the base branch may require a merge queue"
+    threads = _complete_nodes(pull.get("reviewThreads"))
+    if threads is None or any(node.get("isResolved") is not True for node in threads):
+        return "a review conversation is unresolved"
+    base = pull.get("baseRef")
+    rules = _complete_nodes(base.get("rules") if isinstance(base, dict) else None)
+    if not isinstance(base, dict) or rules is None:
+        return "the base branch rules are unreadable"
+    protection = base.get("branchProtectionRule") or {}
+    if not isinstance(protection, dict) or any(
+        value is not False
+        for key, value in protection.items()
+        if key != "requiredStatusCheckContexts"
+    ):
+        return "branch protection has another merge requirement"
+    other = {str(node.get("type")) for node in rules} - _BYPASSABLE_RULES
+    if other:
+        return "a ruleset has another merge requirement: " + ", ".join(sorted(other))
+    if any(
+        rule.get("type") == "REQUIRED_STATUS_CHECKS"
+        and not (
+            isinstance(rule.get("parameters"), dict)
+            and cast(dict[str, JsonValue], rule["parameters"]).get(
+                "strictRequiredStatusChecksPolicy"
+            )
+            is False
+        )
+        for rule in rules
+    ):
+        return "a ruleset needs the branch up to date, which admin merge would skip"
+    contexts = _complete_nodes(rollup.get("contexts"))
+    passed = {
+        str(node.get("name") or node.get("context"))
+        for node in contexts or []
+        if node.get("conclusion") in _PASSED or node.get("state") == "SUCCESS"
+    }
+    missing = _required_checks(protection, rules) - passed
+    if contexts is None or missing:
+        return "a required check has not passed: " + ", ".join(sorted(missing))
+    return None
+
+
+def _review_bypass_problem(
+    root: Path, owner: str, name: str, number: int, head_sha: str
+) -> str | None:
+    """Why a blocked PR is not blocked solely by a review only its author could give."""
+    value = _json(
+        gh(
+            root,
+            "api",
+            "graphql",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={number}",
+            "-f",
+            f"query={_REVIEW_QUERY}",
+        ),
+        "review query",
+    )
+    data = _object(_object(value, "review response").get("data"), "review data")
+    viewer = _text(_object(data.get("viewer"), "viewer"), "login", "viewer")
+    repository = _object(data.get("repository"), "review repository")
+    pull = _object(repository.get("pullRequest"), "review PR")
+    nodes = _object(pull.get("commits"), "review commits").get("nodes")
+    commit = (
+        _object(_object(nodes[0], "review commit").get("commit"), "review commit")
+        if isinstance(nodes, list) and len(nodes) == 1
+        else {}
+    )
+    rollup = commit.get("statusCheckRollup")
+    if pull.get("viewerDidAuthor") is not True:
+        return "the viewer did not author the PR"
+    if pull.get("viewerCanMergeAsAdmin") is not True:
+        return "the author cannot bypass the review requirement"
+    if pull.get("reviewDecision") != "REVIEW_REQUIRED":
+        return "the block is not an outstanding required review"
+    if commit.get("oid") != head_sha or not (
+        isinstance(rollup, dict) and rollup.get("state") == "SUCCESS"
+    ):
+        return "not every head check succeeded"
+    if problem := _other_merge_requirement(pull, rollup):
+        return problem
+    collaborators = _api_items(
+        root,
+        f"repos/{owner}/{name}/collaborators?per_page=100",
+        "collaborators",
+        "collaborators query",
+    )
+    pushers = {
+        item.get("login")
+        for item in collaborators
+        if isinstance(item.get("permissions"), dict)
+        and cast(dict[str, JsonValue], item["permissions"]).get("push") is True
+    }
+    if pushers != {viewer}:
+        return "another collaborator can give the review"
+    return None
+
+
 def _ready_state(
     root: Path,
     pull: _PullRequest,
     policy: ShippingPolicy,
     branch: str,
     local_head: str,
-) -> tuple[str, None]:
+    identity: tuple[str, str, int],
+) -> bool:
+    """Verify the open PR; True when only an author-unsatisfiable review blocks it."""
     if pull.state != "open" or pull.draft:
         raise ShippingError("PR must be open and ready for review")
     if branch != pull.head_ref or local_head != pull.head_sha:
         raise ShippingError("local task branch or HEAD does not match PR")
     if branch == policy["base"]:
         raise ShippingError("shipping requires a task branch distinct from base")
-    if pull.mergeable is not True or pull.mergeable_state != "clean":
+    bypass = pull.mergeable is True and pull.mergeable_state == "blocked"
+    if bypass:
+        problem = _review_bypass_problem(root, *identity, pull.head_sha)
+        if problem is not None:
+            raise ShippingError(f"PR mergeability is not clean: {problem}")
+    elif pull.mergeable is not True or pull.mergeable_state != "clean":
         raise ShippingError("PR mergeability is not clean")
     _clean(root)
-    return pull.head_sha, None
+    return bypass
 
 
 def _delivery(root: Path, policy: ShippingPolicy, revision: str, pr_url: str) -> None:
@@ -695,7 +941,7 @@ def _delivery(root: Path, policy: ShippingPolicy, revision: str, pr_url: str) ->
             )
 
 
-def verify(root: Path, plan: Path, pr_url: str, stage: str) -> Shipment:
+def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
     if stage not in {"ready", "delivered"}:
         raise ShippingError("shipping stage must be ready or delivered")
     policy = cast(ShippingPolicy, load_policy(root, required=True))
@@ -706,7 +952,7 @@ def verify(root: Path, plan: Path, pr_url: str, stage: str) -> Shipment:
     url = f"https://github.com/{owner}/{name}/pull/{number}"
     if repository != f"{owner}/{name}".lower():
         raise ShippingError("PR URL repository does not match origin")
-    resolved_plan, target = _plan_target(resolved_root, plan)
+    resolved_plan, target = _delivery_scope(resolved_root, plan)
     if target == "Deploy" and not policy["delivery"]:
         raise ShippingError("Deploy target requires configured delivery checks")
     pull = _pull(resolved_root, owner, name, number)
@@ -714,10 +960,12 @@ def verify(root: Path, plan: Path, pr_url: str, stage: str) -> Shipment:
         raise ShippingError("PR base branch does not match shipping policy")
     if pull.base_repository != repository or pull.head_repository != repository:
         raise ShippingError("PR repository or head repository does not match origin")
+    review_bypass = False
     if stage == "ready":
-        revision, merged_sha = _ready_state(
-            resolved_root, pull, policy, branch, local_head
+        review_bypass = _ready_state(
+            resolved_root, pull, policy, branch, local_head, (owner, name, number)
         )
+        revision, merged_sha = pull.head_sha, None
     else:
         _clean(resolved_root)
         revision = _delivered(resolved_root, pull, policy["base"], origin_url)
@@ -743,4 +991,5 @@ def verify(root: Path, plan: Path, pr_url: str, stage: str) -> Shipment:
         base=policy["base"],
         merged_sha=merged_sha,
         delivery_target=target,
+        review_bypass=review_bypass,
     )

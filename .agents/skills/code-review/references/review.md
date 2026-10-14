@@ -6,4 +6,5 @@
 - Claims = trace the failure scenario through actual data, state, permissions, ordering or callers. For plans/diagnoses/proof, separate proposed behavior from implemented behavior and claimed results from observed results.
 - Tests = apply [Test design + quality](../../he/references/testing.md) to affected tests and claimed proof. Passing gates do not establish requirement coverage, realistic UI behavior or deployed success.
 - Finding = precise location + code/evidence fact + triggering condition + concrete impact + smallest useful correction. Rank by impact and likelihood. Remove preference-only, duplicate, speculative and already-disproved candidates; an unresolved question is not a confirmed defect.
-- Result = actionable findings first, then material coverage limits + unverified checks. No findings → say so without implying unperformed verification or approval of unknown behavior.
+- Plan match = when the task has a PLAN.md, list every acceptance item as met or not met with its test/check result as proof; skip none. No plan → say so.
+- Result = actionable findings first, then the Plan match, then material coverage limits + unverified checks. No findings → say so without implying unperformed verification or approval of unknown behavior.

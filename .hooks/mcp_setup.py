@@ -368,7 +368,9 @@ def retired_server(name: str, settings: object) -> bool:
             )
     if retired_integration(name) or retired_integration(command):
         return True
-    if Path(command).name in {"pnpm", "npm"} and arguments[:1] in (["dlx"], ["exec"]):
+    if (
+        Path(command).name in {"pnpm", "npm"} and arguments[:1] in (["dlx"], ["exec"])
+    ) or (Path(command).name == "bun" and arguments[:1] == ["x"]):
         arguments = arguments[1:]
     elif Path(command).name in {"node", "python", "python3"}:
         return bool(arguments) and retired_integration(arguments[0])

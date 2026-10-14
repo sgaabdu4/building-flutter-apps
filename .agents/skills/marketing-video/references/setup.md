@@ -6,8 +6,8 @@ Load when the runtime is missing or before the first command. Reuse existing env
 
 ```bash
 cd <skill>
-pnpm install --frozen-lockfile --ignore-scripts
-pnpm exec playwright install chromium
+bun install --frozen-lockfile --ignore-scripts
+bun x playwright install chromium
 brew install ffmpeg
 ```
 
@@ -46,15 +46,15 @@ One per video, outside this skill + out of version control (outside the reposito
 `<skill>` = this package's path; any working directory.
 
 ```bash
-node <skill>/scripts/clips.mjs <work>
-node <skill>/scripts/takes.mjs <work> [ids] [first-seed]
-node <skill>/scripts/pick.mjs <work>
-node <skill>/scripts/build.mjs <work>
-node <skill>/scripts/render.mjs <work> --stills 3 12.5
-node <skill>/scripts/render.mjs <work> <work>/out/silent.mp4
-node <skill>/scripts/mix.mjs <work> <work>/music/track.mp3 <work>/out/silent.mp4 <work>/out/final.mp4
-node <skill>/scripts/audit.mjs <work>/out/final.mp4 <work>/audit
-node <skill>/scripts/pick.mjs <work> <work>/out/final.mp4
+bun <skill>/scripts/clips.mjs <work>
+bun <skill>/scripts/takes.mjs <work> [ids] [first-seed]
+bun <skill>/scripts/pick.mjs <work>
+bun <skill>/scripts/build.mjs <work>
+bun <skill>/scripts/render.mjs <work> --stills 3 12.5
+bun <skill>/scripts/render.mjs <work> <work>/out/silent.mp4
+bun <skill>/scripts/mix.mjs <work> <work>/music/track.mp3 <work>/out/silent.mp4 <work>/out/final.mp4
+bun <skill>/scripts/audit.mjs <work>/out/final.mp4 <work>/audit
+bun <skill>/scripts/pick.mjs <work> <work>/out/final.mp4
 ```
 
 - `clips.mjs` = recordings route only. `build.mjs` refuses clips whose storyboard range changed since the last `clips.mjs`.

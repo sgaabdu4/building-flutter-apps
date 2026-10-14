@@ -1,10 +1,12 @@
 """Check plan declarations; evidence truth and authorization still need review."""
 
 import re
-from pathlib import Path
+import subprocess
+from pathlib import Path, PurePosixPath
 
-from gate_config import changed_files, repository_files
-from shipping import load_policy
+from dependency_graph import owner_language
+from gate_config import Group, changed_files, parse_config, repository_files
+from shipping import ShippingError, load_policy
 
 SECTIONS = (
     "Outcome + scope",
@@ -30,27 +32,34 @@ def is_plan_path(path: Path) -> bool:
 CAPTURES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".mp4", ".mov", ".webm"}
 
 
-def planning_only(root: Path, names: set[str]) -> bool:
-    """Markdown and captures, such as screenshots, kept in a feature plan's folder."""
-    folders = {
+def plan_folders(root: Path) -> set[Path]:
+    return {
         path.parent.relative_to(root)
         for path in repository_files(root)
         if is_plan_path(path.relative_to(root))
     } - {Path(".")}
+
+
+def is_plan_capture(name: str, folders: set[Path]) -> bool:
+    return Path(name).suffix.lower() in CAPTURES and bool(
+        folders.intersection(Path(name).parents)
+    )
+
+
+def planning_only(root: Path, names: set[str]) -> bool:
+    """Markdown and captures, such as screenshots, kept in a feature plan's folder."""
+    folders = plan_folders(root)
     return all(
-        Path(name).suffix.lower() == ".md"
-        or (
-            Path(name).suffix.lower() in CAPTURES
-            and folders.intersection(Path(name).parents)
-        )
+        Path(name).suffix.lower() == ".md" or is_plan_capture(name, folders)
         for name in names
     )
 
 
-def is_documentation(path: Path) -> bool:
-    """Plans and top-level Markdown, which only the secret scan reads."""
-    top_level = path.parent == Path(".") and path.suffix.lower() == ".md"
-    return is_plan_path(path) or (top_level and path.name != "AGENTS.md")
+def is_documentation(path: Path, owner_language: str | None = None) -> bool:
+    """Plans and Markdown, except nested Markdown a JavaScript site may build from."""
+    markdown = path.suffix.lower() == ".md" and path.name != "AGENTS.md"
+    site = owner_language == "javascript" and path.parent != Path(".")
+    return is_plan_path(path) or (markdown and not site)
 
 
 def report_stage(failed: bool, stage: str | None) -> None:
@@ -352,6 +361,165 @@ def plan_stage(root: Path, path: Path, changed: set[str]) -> str:
     return status
 
 
+MAX_SMALL_LINES = 20
+MAX_SMALL_FILES = 3
+PROTECTED_NAMES = {
+    "pyproject.toml",
+    "uv.lock",
+    "poetry.lock",
+    "package.json",
+    "pnpm-lock.yaml",
+    "package-lock.json",
+    "yarn.lock",
+    "pubspec.yaml",
+    "pubspec.lock",
+    "hard-eng.gates.json",
+    "AGENTS.md",
+    "AGENTS.override.md",
+    "schema.prisma",
+    "appwrite.json",
+    "appwrite.config.json",
+}
+PROTECTED_DIRECTORIES = {".github", ".hooks", ".agents", ".claude", "migrations"}
+TEST_DIRECTORIES = {"tests", "test", "__tests__"}
+
+
+def _is_protected(path: PurePosixPath) -> bool:
+    return (
+        path.name in PROTECTED_NAMES
+        or (path.name.startswith("requirements") and path.suffix == ".txt")
+        or path.name.startswith("bun.lock")
+        or path.suffix == ".sql"
+        or bool(PROTECTED_DIRECTORIES.intersection(path.parts[:-1]))
+    )
+
+
+def _is_test(path: PurePosixPath) -> bool:
+    name = path.name
+    return (
+        bool(TEST_DIRECTORIES.intersection(path.parts[:-1]))
+        or name.startswith("test_")
+        or name.endswith(("_test.py", "_test.dart"))
+        or bool(re.search(r"\.(?:test|spec)\.", name))
+    )
+
+
+def _git_output(root: Path, *args: str) -> str:
+    return subprocess.check_output(
+        ["git", *args], cwd=root, text=True, stderr=subprocess.DEVNULL
+    )
+
+
+def _file_reason(name: str, added: str, removed: str) -> str | None:
+    path = PurePosixPath(name)
+    if added == "-":
+        return f"it changes the binary file {name}"
+    if _is_protected(path):
+        return f"it changes {name}, which always needs a plan"
+    if _is_test(path) and int(removed):
+        return f"it removes lines from the test file {name}"
+    return None
+
+
+def default_branch_point(root: Path) -> str | None:
+    try:
+        policy = load_policy(root, required=False)
+    except ShippingError:
+        policy = None
+    name = policy["base"] if policy else "main"
+    for reference in (f"origin/{name}", name):
+        try:
+            return _git_output(root, "merge-base", "HEAD", reference).strip()
+        except (subprocess.CalledProcessError, OSError):
+            continue
+    return None
+
+
+def _branch_change(root: Path, point: str) -> tuple[list[str], list[str], list[str]]:
+    status = _git_output(
+        root, "diff", "--name-status", "--no-renames", "-z", point, "--"
+    ).split("\0")
+    counts = _git_output(
+        root, "diff", "--numstat", "--no-renames", "-z", point, "--"
+    ).split("\0")
+    untracked = _git_output(
+        root, "ls-files", "--others", "--exclude-standard", "-z"
+    ).split("\0")
+    return status, counts, untracked
+
+
+def _counted_lines(counts: list[str], names: set[str]) -> int | str:
+    """Changed lines in the counted files, or the first reason one of them needs a plan."""
+    total = 0
+    for entry in filter(None, counts):
+        added, removed, name = entry.split("\t", 2)
+        if name not in names:
+            continue
+        if reason := _file_reason(name, added, removed):
+            return reason
+        total += int(added) + int(removed)
+    return total
+
+
+def configured_packages(root: Path) -> dict[str, Group]:
+    try:
+        config = parse_config(
+            (root / "hard-eng.gates.json").read_text(), require_impact_review=False
+        )
+    except (OSError, ValueError, TypeError):
+        return {}
+    return {group["path"]: group for group in config["packages"]}
+
+
+def size_verdict(root: Path) -> tuple[bool, str]:
+    """Whether the whole branch change, not just this session's, is small, and the first reason."""
+    point = default_branch_point(root)
+    if point is None:
+        return False, "the branch point with the default branch cannot be found"
+    try:
+        status, counts, untracked = _branch_change(root, point)
+    except (subprocess.CalledProcessError, OSError):
+        return False, "the change cannot be measured"
+    names = {name for name in status[1::2] + untracked if name}
+    packages = configured_packages(root)
+
+    def documentation(name: str) -> bool:
+        return is_documentation(Path(name), owner_language(packages, name))
+
+    if all(documentation(name) for name in names):
+        return True, "documentation only"
+
+    names = {
+        name
+        for name in names
+        if not documentation(name) or _is_protected(PurePosixPath(name))
+    }
+    if any(
+        kind[:1] in {"A", "D", "T"} and name in names
+        for kind, name in zip(status[0::2], status[1::2], strict=False)
+    ) or any(name in names for name in untracked):
+        return False, "it adds, deletes or renames a file"
+    counted = _counted_lines(counts, names)
+    if isinstance(counted, str):
+        return False, counted
+    total = counted
+    if len(names) > MAX_SMALL_FILES:
+        return False, f"it changes {len(names)} files, more than {MAX_SMALL_FILES}"
+    if total > MAX_SMALL_LINES:
+        return False, f"it changes {total} lines, more than {MAX_SMALL_LINES}"
+    plural = "file" if len(names) == 1 else "files"
+    return True, f"{len(names)} {plural}, {total} changed lines"
+
+
+def plan_not_needed(root: Path) -> bool:
+    small, reason = size_verdict(root)
+    if small:
+        print(f"Size: small ({reason}); no plan needed.")
+    else:
+        print(f"Size: big, because {reason}; a plan is needed.")
+    return small
+
+
 def validate_plans(
     root: Path, base: str | None = None, stage: str | None = None
 ) -> str:
@@ -373,7 +541,11 @@ def validate_plans(
         ]
     if not applicable and explicit_stage:
         applicable = paths
-    if (changed != set() or explicit_stage) and not applicable:
+    if (
+        (changed != set() or explicit_stage)
+        and not applicable
+        and (explicit_stage or not plan_not_needed(root))
+    ):
         raise ValueError(
             "repository changes need an applicable PLAN.md; use the HE Plan template"
         )
@@ -392,3 +564,82 @@ def validate_plans(
             )
         effective_stage = min(effective_stage, status, key=STAGES.index)
     return stage if explicit_stage or not applicable else effective_stage
+
+
+ADR_NAME = re.compile(r"docs/adr/\d{4}-[^/]+\.md")
+ADR_PREFIXES = re.compile(r"`(?!/)[^`\s]+`(?:, *`(?!/)[^`\s]+`)*")
+
+
+def decision_field(content: str, name: str) -> str | None:
+    found = re.search(rf"(?m)^{name}: *(.*?) *$", content.split("\n## ", 1)[0])
+    return found[1] if found else None
+
+
+def decision_prefixes(content: str) -> list[str]:
+    line = decision_field(content, "Applies to") or ""
+    return re.findall(r"`([^`]+)`", line) if ADR_PREFIXES.fullmatch(line) else []
+
+
+def accepted_decisions(root: Path) -> list[tuple[str, str, list[str]]]:
+    found = []
+    for path in repository_files(root):
+        name = path.relative_to(root).as_posix()
+        if ADR_NAME.fullmatch(name):
+            content = path.read_text(errors="replace")
+            prefixes = decision_prefixes(content)
+            if prefixes and decision_field(content, "Status") == "Accepted":
+                found.append((name, content, prefixes))
+    return found
+
+
+def matched_decisions(root: Path, names: list[str]) -> dict[str, str]:
+    """ADR path to its title and Decision text, for each Accepted ADR whose prefix a name starts with."""
+    matched = {}
+    for name, content, prefixes in accepted_decisions(root):
+        if any(file.startswith(prefix) for file in names for prefix in prefixes):
+            title = content.splitlines()[0].lstrip("# ")
+            decision = re.search(r"(?ms)^## Decision\n(.*?)(?=^## |\Z)", content)
+            matched[name] = (
+                f"{title} ({name})\n{decision[1].strip() if decision else ''}"
+            )
+    return matched
+
+
+def validate_decisions(root: Path, base: str | None = None) -> None:
+    point = base or default_branch_point(root) or "HEAD"
+    changed = changed_files(root, point)
+    if changed is None:
+        raise ValueError(
+            "Cannot verify decision scope; fetch or supply a valid Git --base"
+        )
+    found = []
+    for name in sorted(changed):
+        path = root / name
+        if ADR_NAME.fullmatch(name) and path.is_file():
+            content = path.read_text(errors="replace")
+            superseded = (decision_field(content, "Status") or "").startswith(
+                "Superseded"
+            )
+            if not superseded and not decision_prefixes(content):
+                found.append(
+                    f"{name} needs an 'Applies to:' line under Status listing path "
+                    "prefixes in backticks, such as Applies to: `src/payments/`"
+                )
+    before: list[str] = []
+    try:
+        before = _git_output(root, "ls-tree", "-r", "--name-only", "-z", point).split(
+            "\0"
+        )
+    except (subprocess.CalledProcessError, OSError):
+        pass
+    now = [path.relative_to(root).as_posix() for path in repository_files(root)]
+    for name, _, prefixes in accepted_decisions(root):
+        found += [
+            f"{name}: this change removes the last file under {prefix}; update the "
+            "decision's 'Applies to:' line or mark it Superseded"
+            for prefix in prefixes
+            if any(file.startswith(prefix) for file in before)
+            and not any(file.startswith(prefix) for file in now)
+        ]
+    if found:
+        raise ValueError("Decision records are out of date: " + "; ".join(found))

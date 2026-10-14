@@ -44,6 +44,6 @@ Review: [TODO: Inspected flow/states/devices + direction]
 
 Result: Pending
 Evidence: [TODO: Actual commands/results + limits before Complete]
-E2E: Required — [TODO: Journey + expected proof; Complete needs Passed evidence or N/A — reason; deployment-only proof uses Delivery plus configured Deploy verifier]
+E2E: Required — [TODO: Journey + E2E test + expected proof; Complete needs Passed evidence or N/A — reason; deployment-only proof uses Delivery plus configured Deploy verifier]
 
 [TODO: If shipping: Delivery target: PR, Merge or Deploy; Delivery: Pending — required remote proof.]

@@ -12,8 +12,8 @@ from contextlib import suppress
 from pathlib import Path
 
 from gate_config import JsonObject, JsonValue, nonproduction_source, repository_files
-from update import require_current
 
+GATE_OUTPUT_LIMIT = 8000
 # The HE Build handoff line, not a quoted or negated mention of it.
 SHIP_CLAIM = re.compile(r"^[*_ ]*Ready for ship[*_]*\s*[—–-]", re.MULTILINE)
 
@@ -152,7 +152,7 @@ def project_pre_push(root: Path, hook: Path) -> Path:
     A linked worktree may run the hooks of the repository's common checkout.
     """
     owner = root
-    if not hook.parent.resolve().is_relative_to(root):
+    if not hook.parent.resolve().is_relative_to(root.resolve()):
         common = Path(
             subprocess.check_output(
                 ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
@@ -163,7 +163,21 @@ def project_pre_push(root: Path, hook: Path) -> Path:
         directory = hook.parent.resolve()
         if directory != common / "hooks":
             if common.name != ".git" or not directory.is_relative_to(common.parent):
-                raise ValueError("Git hooks point outside this repository")
+                origin = (
+                    subprocess.run(
+                        ["git", "config", "--show-origin", "core.hooksPath"],
+                        cwd=root,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    .stdout.strip()
+                    .replace("\t", " as ")
+                )
+                raise ValueError(
+                    f"Git hooks point outside this repository: {directory} is not under {root}"
+                    + (f" (core.hooksPath set in {origin})" if origin else "")
+                )
             owner, hook = common.parent, directory / hook.name
     shim = '#!/usr/bin/env sh\n. "$(dirname "$0")/h"'
     if (
@@ -363,11 +377,7 @@ def _without_old_generation(entries: list[JsonValue]) -> list[JsonValue]:
 
 
 def learning_context(event: str) -> str:
-    return (
-        f"HE Learn checkpoint ({event}): inspect current evidence for repeated failures or lasting decisions/steering. "
-        "Use .agents/skills/he-learn/SKILL.md: deterministic prevention first, skills last; accepted decisions -> docs/adr/. "
-        "No qualifying evidence -> continue without new files."
-    )
+    return f"HE Learn ({event}): repeat failure or lasting decision → .agents/skills/he-learn/SKILL.md; else continue."
 
 
 def context_output(native: str, message: str) -> JsonObject:
@@ -411,7 +421,7 @@ def gate_status(root: Path) -> str:
 
     try:
         load_groups(root)
-        status = "Gates: configuration valid."
+        status = "Gates: ok."
     except (
         OSError,
         ValueError,
@@ -443,8 +453,8 @@ def gate_status(root: Path) -> str:
         pending = []
     if pending and (root / SOURCE_FILE).exists():
         status += (
-            " Uncommitted Hard Eng paths stop updates and are missing from new "
-            "worktrees; commit them: " + install_paths(pending)
+            " Uncommitted Hard Eng paths block updates + new worktrees; commit: "
+            + install_paths(pending)
         )
     return status
 
@@ -475,11 +485,19 @@ def session_context(root: Path, payload: JsonObject) -> str:
         messages = [start_update(root)]
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
         messages = [failed_update(error)]
+    from hook_chain import restore_note
+
+    if note := restore_note(root):
+        messages.append(note)
     messages.append(gate_status(root))
-    if not recorded:
-        messages.append("Session revision unavailable; use full checks.")
     messages.append(
-        "Use configured MCPs when relevant to the task. Before relying on one, verify a real call against the intended repository/index, service project or running app/device; registration alone is not readiness. If unavailable, warn and continue with available tools."
+        "Open the task's skill first: he-plan, he-build, he-ship or code-review. "
+        "Tests fail before your edits → fix only that and stop; the feature waits until that fix merges."
+    )
+    if not recorded:
+        messages.append("Session revision unavailable → full checks.")
+    messages.append(
+        "MCPs: use when relevant; verify a real call before relying (registration ≠ ready); unavailable → warn + continue."
     )
     messages.append(learning_context("start/resume"))
     return "\n".join(messages)
@@ -534,11 +552,53 @@ def passed_notice(
 ) -> JsonObject:
     if building:
         return {
-            "systemMessage": "Hard Eng: build in progress — checks passed with the "
-            "plan Ready; finishing still needs Complete and "
-            "`check --plan-stage Complete`."
+            "systemMessage": "Hard Eng: build in progress; checks pass at Ready. "
+            "Finish needs Complete + `check --plan-stage Complete`."
         }
     return {"systemMessage": notice} if notice else completion_notice(agent, output)
+
+
+def failure_summary(log: str) -> str:
+    """Failed gate names, then the first failing gate's output from its start."""
+    failures = re.findall(
+        r"FAIL (\S+?)(?: \(exit \d+;|: [^\n]*; elapsed)(?:[^\n]*? @ (\S+))?",
+        log,
+    )
+    if not failures:
+        return log[-GATE_OUTPUT_LIMIT:]
+    heading = "Failed gates: " + ", ".join(dict.fromkeys(n for n, _ in failures)) + "\n"
+    name, package = failures[0]
+    owner = re.escape(f"{package}/" if package else "") or r"(?:\S*/)?"
+    start = re.search(rf"OUTPUT {owner}{re.escape(name)}[^\n]*\n", log)
+    if start is None:
+        return heading + log[-GATE_OUTPUT_LIMIT:]
+    body = log[start.end() :]
+    tail = f"[^\n]* @ {re.escape(package)}(?!\\S)" if package else ""
+    finished = re.escape(name) + r"(?: \(exit|:)" + tail
+    end = re.search(rf"(?m)^(?:CHECK|OUTPUT) \S*/\S+|(?:PASS|FAIL) {finished}", body)
+    return heading + body[: end.start() if end else None][:GATE_OUTPUT_LIMIT]
+
+
+def show_decisions(root: Path, names: list[str], state: Path | None) -> str:
+    """Accepted ADRs matching these files and not yet shown this session; records them as shown."""
+    from plans import matched_decisions
+
+    if state is None or not state.exists():
+        return ""
+    saved = json.loads(state.read_text())
+    shown = saved.get("decisions", [])
+    pending = {
+        name: text
+        for name, text in matched_decisions(root, names).items()
+        if name not in shown
+    }
+    if not pending:
+        return ""
+    state.write_text(json.dumps({**saved, "decisions": [*shown, *pending]}))
+    return (
+        "\nAccepted decisions below apply to changed files; confirm each, fix if not.\n\n"
+        + "\n\n".join(pending.values())
+    )
 
 
 def run_check(root: Path, base: str, building: bool) -> tuple[int, str]:
@@ -548,6 +608,7 @@ def run_check(root: Path, base: str, building: bool) -> tuple[int, str]:
                 sys.executable,
                 str(root / ".hooks/hard-eng.py"),
                 "check",
+                "--quick",
                 "--base",
                 base,
                 *(["--plan-stage", "Ready"] if building else []),
@@ -572,8 +633,9 @@ def run_check(root: Path, base: str, building: bool) -> tuple[int, str]:
             raise
         finally:
             signal.signal(signal.SIGTERM, previous)
-        log.seek(max(0, log.tell() - 16000))
-        return returncode, log.read().decode("utf-8", errors="replace")
+        log.seek(0)
+        text = log.read().decode("utf-8", errors="replace")
+        return returncode, text if returncode == 0 else failure_summary(text)
 
 
 def last_pass(state: Path | None) -> JsonValue:
@@ -604,37 +666,47 @@ def saved_session(state: Path | None) -> tuple[str, JsonObject]:
     return base, before
 
 
-def unchanged_notice(root: Path, notice: str) -> JsonObject:
-    """A session that changed nothing has nothing to verify, but a stale scaffold it can update still blocks."""
-    from update_runner import UpdateNeeded
+def with_freshness(root: Path, output: JsonObject) -> JsonObject:
+    from update_runner import freshness_note
 
+    note = freshness_note(root)
+    if not note:
+        return output
+    shown = output.get("systemMessage")
+    return {**output, "systemMessage": f"{shown}\n{note}" if shown else note}
+
+
+def unchanged_notice(root: Path, notice: str) -> JsonObject:
     message = (
-        f"{notice}. No code checks were run for this planning-only handoff."
+        f"{notice}. Planning-only; no code checks run."
         if notice
-        else "No repository changes since this session's Git base; no code checks were run."
+        else "No changes since session base; no code checks run."
     )
-    try:
-        require_current(root)
-    except UpdateNeeded as error:
+    return with_freshness(root, {"systemMessage": message})
+
+
+def paused_turn(payload: JsonObject) -> JsonObject | None:
+    if payload.get("stop_hook_active") is True:
         return {
-            "decision": "block",
-            "systemMessage": f"{message}\n{error}",
-            "reason": f"{error} Before other repository work, repair a failed update's cause as its own "
-            "commit, then run the published setup command. If the cause is outside this repository or "
-            "the user has not allowed edits here, report it to the user and stop.",
+            "systemMessage": "Report blockers honestly; don't claim a pass; no stop-hook loop."
         }
-    except ValueError as error:
-        return {"systemMessage": f"{message}\n{error}"}
-    return {"systemMessage": message}
+    tasks = payload.get("background_tasks")
+    if isinstance(tasks, list) and any(
+        isinstance(task, dict)
+        and task.get("type") in {"subagent", "workflow", "teammate"}
+        for task in tasks
+    ):
+        return {
+            "systemMessage": "Hard Eng: background agents still editing; checks run after they finish. Don't claim done."
+        }
+    return None
 
 
 def completion(root: Path, payload: JsonObject, agent: str | None = None) -> JsonObject:
     from plans import build_in_progress, planning_feedback, planning_only
 
-    if payload.get("stop_hook_active") is True:
-        return {
-            "systemMessage": "Report remaining verification blockers honestly. Do not claim a pass; no repeated stop-hook loop."
-        }
+    if (paused := paused_turn(payload)) is not None:
+        return paused
     state = session_state(root, payload)
     base, before = saved_session(state)
     try:
@@ -655,16 +727,15 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
                 "decision": "block",
                 "systemMessage": notice,
                 "reason": notice
-                + ". Continue only authorized planning and verification. Ask genuine blocking questions when needed. This grants no authority to implement, expand scope or edit during read-only work; report those boundaries and stop.",
+                + ". Only authorized planning/verification; ask real blockers. No authority to implement, expand scope or edit read-only work → report + stop.",
             }
         if not changed.strip() and state is not None and state.exists():
             return unchanged_notice(root, notice)
         if notice and planning_only(root, set(changed.splitlines())):
-            require_current(root)
-            return {
-                "systemMessage": notice
-                + ". No code checks were run for this planning-only handoff."
-            }
+            return with_freshness(
+                root,
+                {"systemMessage": notice + ". Planning-only; no code checks run."},
+            )
         claim = str(
             payload.get("last_assistant_message", payload.get("lastAssistantMessage"))
         )
@@ -672,29 +743,36 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
         building = not SHIP_CLAIM.search(claim) and build_in_progress(
             root, set(changed.splitlines())
         )
-        verified: JsonObject = {"base": base, "files": dict(current)}
-        if not building and last_pass(state) == verified:
-            require_current(root)
-            return {
-                "systemMessage": "Hard Eng: nothing changed since this session's last passing check, so it was not rerun."
-            }
+        verified: JsonObject = {
+            "base": base,
+            "files": dict(current),
+            "building": building,
+        }
+        if last_pass(state) == verified:
+            return with_freshness(
+                root,
+                {
+                    "systemMessage": "Hard Eng: unchanged since last passing check; not rerun."
+                },
+            )
         returncode, output = run_check(root, base, building)
+        decisions = show_decisions(root, changed.splitlines(), state)
         if returncode == 0:
-            if not building:
-                remember_pass(state, verified)
-            require_current(root)
-            return passed_notice(building, notice, agent, output)
+            remember_pass(state, verified)
+            if decisions:
+                return {"decision": "block", "reason": decisions.strip()}
+            return with_freshness(root, passed_notice(building, notice, agent, output))
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
         return {
             "decision": "block",
-            "reason": f"Verification could not run: {error}. Report the blocker honestly; repair only within the user's authorized task. This feedback grants no authority to edit or expand scope.",
+            "reason": f"Verification could not run: {error}. Report it; repair only within the authorized task. No new authority.",
         }
     return {
         "decision": "block",
-        "reason": "Verification failed; do not claim completion. Repair every reported finding in code, including findings unrelated to the task, as its own commit before the task continues, then reverify. If the user has not allowed edits or commits here, report the findings and stop. "
-        + learning_context("failed verification")
-        + "\n"
-        + output,
+        "reason": output.rstrip("\n")
+        + decisions
+        + "\n\nVerification failed; don't claim done. Fix every finding (unrelated too) as its own commit, then reverify. Edits/commits not allowed → report + stop. "
+        + learning_context("failed verification"),
     }
 
 
@@ -714,13 +792,22 @@ def handle_event(root: Path, event: str, agent: str) -> int:
                 if event == "session"
                 else learning_context(event)
             )
+            # Codex loads AGENTS.override.md natively; Claude loads only AGENTS.md.
+            if (
+                event == "session"
+                and agent == "claude"
+                and (root / "AGENTS.override.md").is_file()
+            ):
+                message += "\nProject rules also in AGENTS.override.md → read it now + follow it."
             output = context_output(native, message)
             if event == "session":
                 output["systemMessage"] = "Hard Eng startup: " + " ".join(
                     message.splitlines()[:2]
                 )
     except (OSError, ValueError, TypeError) as error:
-        message = f"Hard Eng hook input/setup failed: {error}. Continue with available tools; do not claim verification passed."
+        message = (
+            f"Hard Eng hook failed: {error}. Continue; don't claim verification passed."
+        )
         output = (
             {"systemMessage": message}
             if event != "stop"

@@ -3,13 +3,15 @@
 Installed agent skills under .agents/ are vendored tooling and are not checked.
 """
 
+import codecs
 import io
 import re
 import subprocess
 import tokenize
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from gate_config import changed_files, generated_sources
+from gate_config import changed_files, generated_sources, initial_base
+from plans import _is_test as is_test_path
 
 HASH = {".py", ".pyi", ".sh", ".bash", ".zsh"}
 JAVASCRIPT = {".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"}
@@ -270,4 +272,277 @@ def validate_comments(root: Path, base: str | None) -> None:
             "Code comments are none by default: delete each block below, and add one "
             "terse line of why only where naming, types, structure or a test cannot "
             "carry a needed non-obvious constraint. " + "; ".join(found)
+        )
+
+
+PYTHON_OFF = re.compile(
+    r"#\s*(noqa|type:\s*ignore|pyrefly:\s*ignore|pyright:\s*ignore|pylint:\s*disable"
+    r"|pragma:\s*no cover)|\b(pytest\.)?mark\.(skip(if)?|xfail)\b|pytest\.(skip|xfail)\("
+)
+SCRIPT_OFF = re.compile(
+    r"eslint-disable|@ts-(ignore|expect-error|nocheck)|biome-ignore"
+    r"|\b(it|test|describe|suite)\.(skip|only)\(|\b(xit|xdescribe|fit|fdescribe)\("
+    r"|(/\*|//)\s*(istanbul|c8|v8) ignore"
+)
+DART_OFF = re.compile(r"//\s*ignore(_for_file)?:|\bskip:(?=\s*(?!false\b)\S)|@Skip\(")
+UNOWNED = (".hooks/", ".agents/", ".claude/")
+
+
+def switch_off_pattern(name: str) -> re.Pattern[str] | None:
+    suffix = Path(name).suffix
+    if suffix == ".py":
+        return PYTHON_OFF
+    if suffix == ".dart":
+        return DART_OFF
+    return SCRIPT_OFF if suffix in JAVASCRIPT else None
+
+
+def diff_base(root: Path, base: str) -> str:
+    head = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", "HEAD"],
+        cwd=root,
+        capture_output=True,
+        check=False,
+    )
+    unborn = base == "HEAD" and head.returncode == 1
+    return initial_base(root) if unborn or re.fullmatch("0{40}|0{64}", base) else base
+
+
+def header_path(text: str) -> str:
+    """Git ends a name holding a space with a tab and C-quotes unusual names."""
+    text = text.removesuffix("\t")
+    if len(text) > 1 and text[0] == text[-1] == '"':
+        text = codecs.escape_decode(text[1:-1].encode())[0].decode(errors="replace")
+    return text[2:]
+
+
+def diff_lines(
+    root: Path, base: str
+) -> tuple[dict[str, list[tuple[int, str]]], dict[str, list[tuple[int, str]]]]:
+    """Added and removed (line number, text) pairs per file; untracked files count as added."""
+    diff = subprocess.check_output(
+        [
+            "git",
+            "-c",
+            "core.quotepath=off",
+            "diff",
+            "-U0",
+            "--no-color",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
+            diff_base(root, base),
+            "--",
+        ],
+        cwd=root,
+        text=True,
+        errors="replace",
+    )
+    added: dict[str, list[tuple[int, str]]] = {}
+    removed: dict[str, list[tuple[int, str]]] = {}
+    name, old, new, in_hunk = "", 0, 0, False
+    for line in diff.splitlines():
+        hunk = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)", line)
+        if line.startswith("diff --git "):
+            in_hunk = False
+        elif hunk:
+            old, new, in_hunk = int(hunk[1]), int(hunk[2]), True
+        elif in_hunk and line[:1] == "+":
+            added.setdefault(name, []).append((new, line[1:]))
+            new += 1
+        elif in_hunk and line[:1] == "-":
+            removed.setdefault(name, []).append((old, line[1:]))
+            old += 1
+        elif (
+            not in_hunk
+            and line.startswith(("+++ ", "--- "))
+            and line[4:] != "/dev/null"
+        ):
+            name = header_path(line[4:])
+    untracked = subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=root,
+        text=True,
+    )
+    for other in filter(None, untracked.split("\0")):
+        if (root / other).is_file() and not (root / other).is_symlink():
+            text = (root / other).read_text(errors="replace")
+            added[other] = list(enumerate(text.splitlines(), 1))
+    return added, removed
+
+
+def assertion_lines(name: str, lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    words = ("assert",) if name.endswith(".py") else ("assert", "expect(")
+    return [(n, text) for n, text in lines if any(word in text for word in words)]
+
+
+WORD = re.compile(r"[A-Za-z_]\w*")
+LITERAL = re.compile(r"\"(\\.|[^\"\\\n])*\"|'(\\.|[^'\\\n])*'|`(\\.|[^`\\\n])*`")
+TEST_START = re.compile(
+    r"^\s*((async\s+)?def\s|class\s|(it|test|testWidgets|describe|group)(\.\w+)?\()"
+)
+IMPORT = re.compile(r"^\s*(import|from|export|use)\b|\brequire\(")
+SYNTAX = {"import", "from", "as", "export", "use", "require", "const", "let", "var"}
+DEFINITION = re.compile(
+    r"\b(?:def|class|function|fn|struct|enum|trait|interface|mixin|extension)\s+(\w+)"
+    r"|^(?:export\s+)?(?:const|let|var|final|type)\s+(?:(?:[\w<>?\[\]]|,\s*)+\s+)?(\w+)\s*(?=[=:;<])"
+    r"|^(\w+)\s*(?::[^=]*)?=(?!=)|^(\w+)\s*\(\)\s*\{"
+    r"|^[A-Za-z_][\w<>?,\[\] ]*\s(\w+)\s*\("
+)
+
+
+def is_code(name: str) -> bool:
+    return Path(name).suffix in HASH | SLASH and not is_test_path(PurePosixPath(name))
+
+
+def defined_names(text: str) -> list[str]:
+    found = DEFINITION.findall(LITERAL.sub(" ", text))
+    return [name for groups in found for name in groups if name]
+
+
+def removed_blocks(lines: list[tuple[int, str]]) -> list[list[tuple[int, str]]]:
+    blocks: list[list[tuple[int, str]]] = []
+    for number, text in lines:
+        if blocks and blocks[-1][-1][0] == number - 1:
+            blocks[-1].append((number, text))
+        else:
+            blocks.append([(number, text)])
+    return blocks
+
+
+def retired_names(
+    root: Path, removed: dict[str, list[tuple[int, str]]]
+) -> tuple[set[str], set[str]]:
+    names = {
+        word
+        for name, lines in removed.items()
+        if is_code(name)
+        for _, text in lines
+        for word in defined_names(text)
+    }
+    modules = {
+        word
+        for name in removed
+        if is_code(name) and not (root / name).exists()
+        for word in WORD.findall(PurePosixPath(name).stem)
+    }
+    names |= modules
+    remaining = subprocess.check_output(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=root,
+        text=True,
+    )
+    for name in filter(None, remaining.split("\0")):
+        path = root / name
+        if names and is_code(name) and path.is_file() and not path.is_symlink():
+            names -= set(WORD.findall(path.read_text(errors="replace")))
+    return names, modules & names
+
+
+def split_tests(block: list[tuple[int, str]]) -> list[list[tuple[int, str]]]:
+    tests: list[list[tuple[int, str]]] = [[]]
+    for number, text in block:
+        if TEST_START.match(text) and tests[-1]:
+            tests.append([])
+        tests[-1].append((number, text))
+    return tests
+
+
+REMOVAL = re.compile(
+    r"^\s*(?:[-*]\s+)?Removed test:\s*(.+?)\s*::\s*(.+?)\s*::\s*(\S.*)$"
+)
+
+
+TEST_NAME = re.compile(
+    r"\s*(?:async\s+)?(?:def|class)\s+(\w+)"
+    r"|\s*[\w.]+(?:\.each\b.*?\)\s*)?\(\s*(['\"`])(.*?)\2",
+    re.DOTALL,
+)
+
+
+def test_name(test: list[tuple[int, str]]) -> str | None:
+    if not test or not TEST_START.match(test[0][1]):
+        return None
+    match = TEST_NAME.match("\n".join(text for _, text in test))
+    return match and (match[1] or match[3])
+
+
+def recorded_removals(added: dict[str, list[tuple[int, str]]]) -> set[tuple[str, str]]:
+    return {
+        (match[1].strip("`"), match[2].strip("`'\""))
+        for name, lines in added.items()
+        if PurePosixPath(name).name == "PLAN.md"
+        for _, text in lines
+        if (match := REMOVAL.match(text))
+    }
+
+
+def lost_assertions(
+    blocks: list[tuple[str, list[tuple[int, str]]]],
+    retired: tuple[set[str], set[str]],
+    recorded: set[tuple[str, str]],
+) -> list[str]:
+    names, modules = retired
+    imported: dict[str, set[str]] = {}
+    for name, block in blocks:
+        imported.setdefault(name, set()).update(
+            word
+            for _, text in block
+            if IMPORT.search(text) and modules.intersection(WORD.findall(text))
+            for word in WORD.findall(text)
+        )
+    lost: list[str] = []
+    for name, block in blocks:
+        gone = names | imported[name] - SYNTAX
+        for test in split_tests(block):
+            text = "\n".join(t for _, t in test)
+            if (name, test_name(test)) in recorded:
+                continue
+            if not gone.intersection(WORD.findall(text)):
+                lost += [f"{name}:{n}" for n, _ in assertion_lines(name, test)]
+    return lost
+
+
+def validate_suppressions(root: Path, base: str | None) -> None:
+    try:
+        added, removed = diff_lines(root, base or branch_point(root))
+    except subprocess.CalledProcessError as error:
+        raise ValueError(
+            "Cannot verify suppression scope; fetch or supply a valid Git --base"
+        ) from error
+    names = sorted(
+        name
+        for name in added.keys() | removed.keys()
+        if not name.startswith(UNOWNED) and switch_off_pattern(name) is not None
+    )
+    skipped = generated_sources(root, names)
+    found: list[str] = []
+    gained = 0
+    blocks: list[tuple[str, list[tuple[int, str]]]] = []
+    for name in names:
+        pattern = switch_off_pattern(name)
+        if name in skipped or pattern is None:
+            continue
+        found += [
+            f"{name}:{number} adds {hit[0].strip()!r}"
+            for number, text in added.get(name, [])
+            if (hit := pattern.search(text))
+        ]
+        if is_test_path(PurePosixPath(name)):
+            gained += len(assertion_lines(name, added.get(name, [])))
+            blocks += [(name, b) for b in removed_blocks(removed.get(name, []))]
+    recorded = recorded_removals(added)
+    lost = lost_assertions(blocks, (set(), set()), recorded)
+    if len(lost) > gained:
+        lost = lost_assertions(blocks, retired_names(root, removed), recorded)
+    if len(lost) > gained:
+        found.append(
+            f"tests lose {len(lost) - gained} assertion lines net "
+            f"({len(lost)} removed, {gained} added); removed at {', '.join(lost)}. "
+            "To remove an unneeded test, add `Removed test: <path> :: <test name> :: "
+            "<what still proves it or why it is unneeded>` to the plan"
+        )
+    if found:
+        raise ValueError(
+            "A change must not switch a check off: fix the cause instead of "
+            "suppressing, skipping or deleting the check. " + "; ".join(found)
         )

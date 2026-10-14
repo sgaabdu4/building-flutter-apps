@@ -1,20 +1,26 @@
 <!-- hard-eng:start -->
 # Agent Rules
 
-- Installed-project startup = when `.hooks/hard-eng-source.json` exists, require the current session's Hard Eng update status before repository work, including read-only investigation. SessionStart reports the last update result and starts or reports a background update that commits locally when verified. If SessionStart supplied no status, first run `curl -fsSL https://raw.githubusercontent.com/sgaabdu4/hard-eng/main/setup.sh | sh` from the repository root. Tell the user whether it updated, found no newer verified release, is still running in the background, or failed; report any failure explicitly and retain the required gates. Missing updater output is a failed attempt even if the pipeline exits 0. Rerun setup only after a failed or stale status, never while an update runs; an installed marker/session file alone is not a successful update.
-- Before editing, state the single change being implemented, which files it will touch, and how it will be verified. Prefer a native command or existing file. Every new file, dependency, wrapper or abstraction must be necessary for that change.
-- Scope = the user's request + accepted constraints; preserve unrelated work.
-- Project instructions = use `AGENTS.md` for Claude and Codex. Preserve unique scoped rules there before retiring legacy `CLAUDE.md` files; do not recreate import wrappers or publish private local instructions.
-- Publication = before recording tracked content or publishing, apply [publication privacy](.agents/skills/he-ship/references/checks.md#publication-privacy) for the destination's audience.
-- YAGNI = ultra always unless the user changes it. Understand the real flow first; reuse existing code, stdlib, native features and installed dependencies before adding code.
-- Additions = before adding a file, dependency, abstraction, configuration or stored state, identify the current agreed requirement it serves and why the existing code or a direct command cannot satisfy it. Without both answers, leave it out. Keep this reasoning in normal updates; create no justification files.
-- Comments = none by default. Add one terse line of why only when naming, types, structure or a test cannot carry a needed non-obvious constraint; `check` fails any changed source file holding a longer comment block, older blocks included.
-- Changes = fix the cause at its existing owner. Optional improvements and extra infrastructure require an explicit user request; do not silently include them under robustness, best practices or future needs.
-- Tests = each added test must prove a named required outcome or catch a specific meaningful failure. Reuse existing tests first; do not add tests that merely mirror implementation details or pad coverage. Identify expected outcomes + relevant failure modes before implementing; tests may follow. Affected journeys need real E2E proof where applicable; keep focused tests that add coverage, speed or diagnosis. Before deleting a test, state what it protects and its replacement proof or why it is unnecessary; E2E overlap alone is not enough. Details: [testing](.agents/skills/he/references/testing.md).
-- Verification = run applicable gates and prove affected behavior; never hide findings, weaken checks to obtain a pass or claim an unrun check succeeded. Repair every reported finding in code, including findings unrelated to the task, as its own committed change before the task continues; never baseline, tolerate or suppress one.
-- Acceptance = before completion, review the actual diff against the latest request, remove unsupported additions and report any remaining expansion. Passing tools does not excuse unnecessary code; automated metrics cannot prove necessity or test quality.
-- Authorization = reuse settled approvals; ask only when missing information changes the result or an unapproved consequential action is necessary.
-- Communication = concise plain English; report actual changes, proof and remaining gaps.
-- Hard Eng defects = a reproduced fault in Hard Eng's own files (`.hooks/`, `.agents/skills/he*`, setup), not in the project → tell the user, search [hard-eng issues](https://github.com/sgaabdu4/hard-eng/issues) for a duplicate, and with their approval file a terse one: Problem, Reproduction, installed revision, Suggestion. Apply publication privacy; keep the required gates.
-- Hard Eng = follow `.agents/skills/he/SKILL.md` when working on this repository; use `python3 .hooks/hard-eng.py --help` for commands.
+- `.hooks/hard-eng-source.json` exists → get session's Hard Eng update status before any repo work (read-only too).
+  - SessionStart reports last result + starts/reports a background update; verified → 1 commit on local `hard-eng/update` from remote base, current branch untouched.
+  - No status → from repo root: `curl -fsSL https://raw.githubusercontent.com/sgaabdu4/hard-eng/main/setup.sh | sh` (prepares that branch).
+  - Prepared branch → `python3 .hooks/hard-eng.py update-pr` (opens/reuses PR, auto-merges after checks, no approval; merge denied → rerun `--no-merge`, give user its printed merge command once checks pass). Exempt from one-PR rules; failing → fix on own branch + worktree first.
+  - Report: updated | no newer verified release | running in background | failed. No updater output = failed (even exit 0); marker/session file alone ≠ success.
+  - Rerun setup only after failed or no status; never mid-update.
+- Before editing: state the single change, files touched + verification.
+- Scope = user request + accepted constraints; preserve unrelated work.
+- Project rules = `AGENTS.md` (Claude + Codex); move unique legacy `CLAUDE.md` rules to the matching one before retiring it; never recreate import wrappers or publish private local instructions.
+- Before recording tracked content or publishing → apply [publication privacy](.agents/skills/he-ship/references/checks.md#publication-privacy) for the audience.
+- YAGNI = ultra unless user changes it. Understand the real flow; reuse existing files/code/stdlib/native commands + installed deps before adding code.
+- New file/dep/wrapper/abstraction/config/stored state → needs current agreed requirement + why existing code/direct command can't; else omit. Explain in updates; no justification files.
+- Comments: none by default; ≤1 terse why-line for a non-obvious constraint names/types/structure/tests can't carry. `check` fails changed source files with longer comment blocks (old ones too).
+- Fix causes at existing owner. Optional improvements + extra infra only on explicit request; never for robustness/best practice/future needs.
+- Tests: each proves a named outcome or catches a specific meaningful failure; reuse first; no implementation mirrors/padding. Name outcomes + failure modes first; tests may follow code, except bug fixes: failing repro test first, expected result from report/contract. Journeys → real E2E where applicable; lower-level tests only for many-case logic + bug repros. Deleting one → state what it protects + replacement proof or why unneeded; E2E overlap alone ≠ enough. [testing](.agents/skills/he/references/testing.md)
+- Verification: run applicable gates + prove affected behavior; never hide findings, weaken checks or claim unrun checks passed. Repair every finding in code (unrelated too) as its own commit before continuing; never baseline/tolerate/suppress. Gates stay required even if Hard Eng/updater fails.
+- Before done: review diff vs latest request; remove unsupported additions + report remaining expansion. Passing tools/metrics ≠ proof of necessity or test quality.
+- Reuse settled approvals; ask only if missing info changes the result or a consequential action lacks approval.
+- Output ~80% ASD-STE100: 1 idea/sentence, ≤20 words, active voice, common words, no jargon/idioms; reports = changes, proof, gaps.
+- Setup prints `Gap:` (missing check/language) → file without asking: `python3 .hooks/hard-eng.py gap-issue "<missing check, generic>"`; no project names/code/paths/data.
+- Reproduced fault in Hard Eng's `.hooks/`, `.agents/skills/he*` or setup → tell user, check [issues](https://github.com/sgaabdu4/hard-eng/issues) for duplicates, then with approval file a terse one: Problem, Reproduction, installed revision, Suggestion; apply publication privacy.
+- Follow `.agents/skills/he/SKILL.md`; commands: `python3 .hooks/hard-eng.py --help`.
 <!-- hard-eng:end -->

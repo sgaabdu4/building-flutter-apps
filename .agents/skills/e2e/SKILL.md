@@ -7,7 +7,7 @@ description: Prove real user journeys across browser, mobile, desktop, API and C
 
 ## Routes
 
-Select by actual surface + explicit browser/device requirements. Reuse the project's runner and fixtures; missing runtime/connection → identify the needed capability before setup.
+Select by actual surface + explicit browser/device requirements. Reuse the project's runner, fixtures and fakes; no fake for an outside service → build one per [test design](../he/references/testing.md); missing runtime/connection → identify the needed capability before setup.
 
 ```mermaid
 flowchart LR
@@ -42,4 +42,4 @@ OS-owned dialogs → platform control beyond the app tree. Browser exploration �
 - Capture the smallest useful evidence set. Ordinary regression work does not require video. When screenshots or video are requested or needed, inspect the actual delivered media and confirm its subject, required steps and final state.
 - Recorded proof follows the selected route's owner; backend readback + repeatable journey assertions stay here and media checks alone cannot prove acceptance. Captures outside an owned pipeline → existing artifacts + direct inspection; do not invent a compatible report.
 - Keep secrets and personal data out of artifacts. Show requested evidence to the user; treat test artifacts as local unless their inclusion as repository assets is authorized.
-- Report tested surfaces, outcomes and exact gaps separately. Assertions, persisted state, deployment identity and visual evidence prove different things. An unavailable device, account or unreviewed artifact remains unproven.
+- Report tested surfaces, outcomes and exact gaps separately. Assertions, persisted state, deployment identity and visual evidence prove different things. An unavailable device, account, real-service run or unreviewed artifact remains unproven.

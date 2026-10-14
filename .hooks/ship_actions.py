@@ -11,6 +11,7 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager, suppress
 from pathlib import Path
 
+from challenge import shipping_note
 from gate_config import Group
 from shipping import (
     PendingCheck,
@@ -22,8 +23,6 @@ from shipping import (
     verify,
 )
 from update import require_current
-
-MUTATION_SECONDS = 180
 
 
 def remote_base(root: Path, branch: str | None) -> str | None:
@@ -214,14 +213,20 @@ def pre_push(root: Path) -> int:
                 )
         environment = snapshot_environment(root)
         with snapshot(root, revision, environment) as checkout:
-            check = ["check", *(["--base", base] if base else [])]
+            runner = (checkout / ".hooks/hard-eng.py").read_text()
+            # A pushed revision older than these options runs its full check.
+            narrow = [
+                option
+                for option in ("--without-dependents", "--related-tests")
+                if option in runner
+            ]
+            check = ["check", *(["--base", base, *narrow] if base else [])]
             if returncode := run_hard_eng(checkout, check, environment):
                 return returncode
             if base is not None:
                 began = time.monotonic()
-                limit = str(MUTATION_SECONDS)
-                arguments = ["mutation", "--base", base, "--seconds", limit]
-                run_hard_eng(checkout, [*arguments, "--in-place"], environment)
+                arguments = ["mutation", "--base", base, "--in-place"]
+                run_hard_eng(checkout, arguments, environment)
                 mutating += time.monotonic() - began
         elapsed = time.monotonic() - started - mutating
         if elapsed > policy["pre_push_seconds"]:
@@ -359,9 +364,38 @@ def cleanup(coordinator: Path, shipment: Shipment) -> None:
     print(f"Removed local task branch {shipment.branch}", flush=True)
 
 
+def merge(target: Path, plan: Path | None, shipment: Shipment, method: str) -> Shipment:
+    """Merge the verified head, then prove the merged revision."""
+    if shipment.delivery_target == "PR":
+        raise ValueError("The plan authorizes PR delivery, not merging")
+    gh(
+        target,
+        "pr",
+        "merge",
+        shipment.pr_url,
+        f"--{method}",
+        *(["--admin"] if shipment.review_bypass else []),
+        "--match-head-commit",
+        shipment.head_sha,
+    )
+    try:
+        return verify(target, plan, shipment.pr_url, "delivered")
+    except PendingCheck as error:
+        raise ShippingError(
+            f"Merged; base-branch CI has not finished ({error}). Run ship "
+            "--stage delivered once it completes; do not retry the merge."
+        ) from error
+    except ShippingError as error:
+        raise ShippingError(
+            "Merge command succeeded; post-merge delivery verification is pending "
+            f"or failed: {error}. Inspect the PR before retrying and do not claim "
+            "that the merge was undone."
+        ) from error
+
+
 def run(
     coordinator: Path,
-    plan: str,
+    plan: str | None,
     pr_url: str,
     stage: str,
     worktree: str | None,
@@ -370,43 +404,32 @@ def run(
     target = Path(worktree).resolve() if worktree else coordinator.resolve()
     if common_directory(coordinator) != common_directory(target):
         raise ValueError("Shipping target belongs to a different repository")
-    plan_path = (target / plan).resolve()
-    if not plan_path.is_relative_to(target):
+    plan_path = (target / plan).resolve() if plan else None
+    if plan_path is not None and not plan_path.is_relative_to(target):
         raise ValueError("Use the selected task's plan inside its worktree")
     if stage not in {"ready", "merge", "delivered", "cleanup"}:
         raise ValueError("Unknown shipping stage")
-    if stage == "merge" and merge_method not in {"merge", "squash", "rebase"}:
-        raise ValueError("Select the repository's merge method with --merge-method")
+    if stage == "merge" and merge_method != "rebase":
+        raise ValueError(
+            "Hard Eng merges by rebase only; squash and merge commits are refused"
+        )
     proof_stage = "ready" if stage in {"ready", "merge"} else "delivered"
     require_current(target)
     shipment = verify(target, plan_path, pr_url, proof_stage)
+    if stage in {"ready", "merge"} and (
+        note := shipping_note(shipment.root, shipment.head_sha)
+    ):
+        print(note)
+    bypassed = shipment.review_bypass
     if stage == "merge":
-        if shipment.delivery_target == "PR":
-            raise ValueError("The plan authorizes PR delivery, not merging")
-        gh(
-            target,
-            "pr",
-            "merge",
-            pr_url,
-            f"--{merge_method}",
-            "--match-head-commit",
-            shipment.head_sha,
-        )
-        try:
-            shipment = verify(target, plan_path, pr_url, "delivered")
-        except PendingCheck as error:
-            raise ShippingError(
-                f"Merged; base-branch CI has not finished ({error}). Run ship "
-                "--stage delivered once it completes; do not retry the merge."
-            ) from error
-        except ShippingError as error:
-            raise ShippingError(
-                "Merge command succeeded; post-merge delivery verification is pending "
-                f"or failed: {error}. Inspect the PR before retrying and do not claim "
-                "that the merge was undone."
-            ) from error
+        shipment = merge(target, plan_path, shipment, str(merge_method))
     if stage == "cleanup":
         cleanup(coordinator, shipment)
     revision = shipment.merged_sha or shipment.head_sha
+    if bypassed:
+        print(
+            "Review bypass: only the author can give the required review, so the "
+            "merge uses admin rights once every other requirement passes."
+        )
     print(f"PASS ship {stage}: {pr_url} at {revision}")
     return 0
