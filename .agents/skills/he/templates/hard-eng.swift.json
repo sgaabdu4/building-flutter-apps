@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "packages": [
+    {
+      "name": "ios",
+      "path": "ios",
+      "language": "swift",
+      "sources": ["Runner"],
+      "checks": [
+        {
+          "name": "format-lint",
+          "role": "format-lint",
+          "parallel": true,
+          "command": ["swift", "format", "lint", "--strict", "--recursive", "--parallel", "Runner", "RunnerTests"]
+        },
+        {
+          "name": "tests",
+          "role": "tests",
+          "command": [
+            "sh",
+            "-c",
+            "set -e; mkdir -p coverage; rm -rf coverage/tests.xcresult; platform=$(basename \"$PWD\"); flutter precache --\"$platform\"; if [ \"$platform\" = macos ]; then files() { git ls-files -z --cached --others --exclude-standard -- . | xargs -0 cat | cksum; }; before=$(files); (cd .. && flutter build macos --config-only --no-pub); [ \"$(files)\" = \"$before\" ] || { echo 'Flutter changed files in macos while preparing the project; review and commit them' >&2; exit 1; }; destination=platform=macOS; else devices=$(xcrun simctl list devices available | grep -E '^ +iPhone' || true); id='[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}'; udid=$(printf '%s\\n' \"$devices\" | grep -F '(Booted)' | grep -Eo \"$id\" | tail -n 1 || true); [ -n \"$udid\" ] || udid=$(printf '%s\\n' \"$devices\" | grep -Eo \"$id\" | tail -n 1 || true); [ -n \"$udid\" ] || { echo 'No iPhone simulator is available' >&2; exit 1; }; destination=id=$udid; fi; xcodebuild test -quiet -workspace Runner.xcworkspace -scheme Runner -configuration Debug -destination \"$destination\" -enableCodeCoverage YES -onlyUsePackageVersionsFromResolvedFile -resultBundlePath coverage/tests.xcresult 'SWIFT_TREAT_WARNINGS_AS_ERRORS=$(HARD_ENG_STRICT_$(PROJECT_NAME))' HARD_ENG_STRICT_Runner=YES; xcrun xcresulttool get test-results summary --path coverage/tests.xcresult > coverage/swift-tests.json; xcrun xccov view --report --json coverage/tests.xcresult > coverage/swift-coverage.json"
+          ],
+          "report": {
+            "type": "xcode-tests",
+            "tests": "coverage/swift-tests.json",
+            "coverage": "coverage/swift-coverage.json"
+          }
+        },
+        {
+          "name": "duplicates",
+          "role": "duplicates",
+          "command": [
+            "jscpd",
+            "Runner",
+            "--format",
+            "swift",
+            "--threshold",
+            "0",
+            "--max-size",
+            "100mb",
+            "--max-lines",
+            "1000000",
+            "--reporters",
+            "json",
+            "--output",
+            "coverage/jscpd"
+          ],
+          "report": { "type": "jscpd", "path": "coverage/jscpd/jscpd-report.json" }
+        },
+        {
+          "name": "security",
+          "role": "security",
+          "parallel": true,
+          "command": [
+            "semgrep",
+            "scan",
+            "--config",
+            ".agents/skills/he/security",
+            "--jobs",
+            "2",
+            "--error",
+            "--strict",
+            "--time",
+            "--json",
+            "--output",
+            "coverage/semgrep.json",
+            "Runner",
+            "RunnerTests"
+          ],
+          "report": { "type": "semgrep", "path": "coverage/semgrep.json" }
+        }
+      ]
+    }
+  ]
+}

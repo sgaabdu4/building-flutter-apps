@@ -1,0 +1,105 @@
+rules:
+  - id: swift-trust-every-server-certificate
+    languages: [swift]
+    severity: ERROR
+    message: Evaluate the server trust before accepting it; this challenge handler accepts every certificate.
+    metadata:
+      cwe:
+        - "CWE-295: Improper Certificate Validation"
+      references:
+        - https://developer.apple.com/documentation/security/performing-manual-server-trust-authentication
+    patterns:
+      - pattern: |
+          func $F(...) {
+            ...
+            $DONE(.useCredential, URLCredential(trust: $TRUST))
+            ...
+          }
+      - pattern-not-regex: SecTrustEvaluate
+  - id: swift-weak-hash
+    languages: [swift]
+    severity: ERROR
+    message: MD5 and SHA-1 are broken; use SHA-256 or stronger.
+    metadata:
+      cwe:
+        - "CWE-328: Use of Weak Hash"
+      references:
+        - https://developer.apple.com/documentation/cryptokit/insecure
+    pattern-either:
+      - pattern: CC_MD5(...)
+      - pattern: CC_SHA1(...)
+      - pattern: Insecure.MD5
+      - pattern: Insecure.SHA1
+  - id: swift-weak-cipher
+    languages: [swift]
+    severity: ERROR
+    message: DES, 3DES, RC4 and ECB mode do not protect data; use AES-GCM.
+    metadata:
+      cwe:
+        - "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+      references:
+        - https://developer.apple.com/documentation/cryptokit/aes/gcm
+    pattern-either:
+      - pattern: kCCAlgorithmDES
+      - pattern: kCCAlgorithm3DES
+      - pattern: kCCAlgorithmRC4
+      - pattern: kCCOptionECBMode
+  - id: swift-hardcoded-secret
+    languages: [swift]
+    severity: ERROR
+    message: Do not ship a secret in source; read it from the Keychain or the server.
+    metadata:
+      cwe:
+        - "CWE-798: Use of Hard-coded Credentials"
+      references:
+        - https://developer.apple.com/documentation/security/keychain-services
+    patterns:
+      - pattern-either:
+          - pattern: 'let $NAME = "$VALUE"'
+          - pattern: 'var $NAME = "$VALUE"'
+          - pattern: 'static let $NAME = "$VALUE"'
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(secret|password|passwd|api_?key|private_?key|access_?token|auth_?token).*
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: '[A-Za-z0-9+/=_.\-]{16,}'
+  - id: swift-secret-in-user-defaults
+    languages: [swift]
+    severity: ERROR
+    message: UserDefaults is not encrypted; store secrets in the Keychain.
+    metadata:
+      cwe:
+        - "CWE-312: Cleartext Storage of Sensitive Information"
+      references:
+        - https://developer.apple.com/documentation/security/keychain-services
+    patterns:
+      - pattern: 'UserDefaults.standard.set(..., forKey: $KEY)'
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: '(?i)"[^"]*(password|passwd|secret|token|api_?key|private_?key)[^"]*"'
+  - id: swift-keychain-always-accessible
+    languages: [swift]
+    severity: ERROR
+    message: Keychain items must not stay readable while the device is locked.
+    metadata:
+      cwe:
+        - "CWE-311: Missing Encryption of Sensitive Data"
+      references:
+        - https://developer.apple.com/documentation/security/keychain-services/item-attribute-keys-and-values
+    pattern-either:
+      - pattern: kSecAttrAccessibleAlways
+      - pattern: kSecAttrAccessibleAlwaysThisDeviceOnly
+  - id: swift-ats-allows-insecure-loads
+    languages: [generic]
+    severity: ERROR
+    message: App Transport Security must not allow plain HTTP loads.
+    metadata:
+      cwe:
+        - "CWE-319: Cleartext Transmission of Sensitive Information"
+      references:
+        - https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity
+    paths:
+      include:
+        - "*.plist"
+    pattern-regex: '<key>(NSAllowsArbitraryLoads|NSAllowsArbitraryLoadsInWebContent|NSAllowsArbitraryLoadsForMedia|NSExceptionAllowsInsecureHTTPLoads)</key>\s*<true\s*/>'

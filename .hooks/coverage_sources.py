@@ -1,4 +1,4 @@
-"""Prove omitted TypeScript has no runtime content without executing it."""
+"""Prove omitted TypeScript and Swift files have no runtime content without executing them."""
 
 import json
 import re
@@ -45,3 +45,26 @@ console.log(JSON.stringify(sources.map(([loader, source]) => {
         for file, output in zip(candidates, outputs, strict=True)
         if isinstance(output, str) and re.fullmatch(empty, output)
     }
+
+
+COUNTER_NODES = ("brace_stmt", "closure_expr", "original_init", "top_level_code_decl")
+
+
+def erased_swift(files: set[Path]) -> set[Path]:
+    """Parse-only proof: no body, closure or initial value, so Xcode lists no counters."""
+    erased = set()
+    for file in sorted(files):
+        if re.search(r"(?m)^\s*#if\b", file.read_text()):
+            continue  # The parse drops code inside conditional compilation.
+        parsed = subprocess.run(
+            ["swiftc", "-frontend", "-dump-parse", str(file)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        if parsed.returncode == 0 and not any(
+            f"({node}" in parsed.stdout for node in COUNTER_NODES
+        ):
+            erased.add(file)
+    return erased

@@ -22,6 +22,7 @@ from shipping import (
     load_policy,
     verify,
 )
+from tool_setup import TOOL_OWNER, temporary_root
 from update import require_current
 
 
@@ -101,7 +102,9 @@ def link_env_files(root: Path, checkout: Path) -> None:
 
 @contextmanager
 def snapshot(root: Path, revision: str, environment: dict[str, str]) -> Generator[Path]:
-    with tempfile.TemporaryDirectory(prefix="hard-eng-push-") as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="hard-eng-push-", dir=temporary_root()
+    ) as temporary:
         checkout = Path(temporary) / "project"
         subprocess.run(
             ["git", "worktree", "add", "--detach", str(checkout), revision],
@@ -110,6 +113,9 @@ def snapshot(root: Path, revision: str, environment: dict[str, str]) -> Generato
             check=True,
         )
         try:
+            environment[TOOL_OWNER] = os.pathsep.join(
+                [str(checkout.resolve()), str(root.resolve())]
+            )
             link_env_files(root, checkout)
             if (checkout / ".gitmodules").is_file():
                 subprocess.run(
@@ -248,7 +254,12 @@ def pre_push(root: Path) -> int:
 def worktrees(root: Path) -> list[dict[str, str]]:
     records = git(root, "worktree", "list", "--porcelain", "-z")
     return [
-        dict(field.partition(" ")[::2] for field in record.split("\0") if field)
+        {
+            key: value
+            for key, _, value in (
+                field.partition(" ") for field in record.split("\0") if field
+            )
+        }
         for record in records.split("\0\0")
         if record
     ]

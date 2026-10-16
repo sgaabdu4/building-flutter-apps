@@ -29,7 +29,7 @@ Measure before and after each CI change: `python3 .hooks/hard-eng.py ci-usage [-
 
 Basic mode (no supported manifest) has no packages: `packages` is empty and `shared` holds secrets-files, secrets-history, security (Semgrep `p/default`, excluding the installed `.agents` and `.hooks`) and, only when a lockfile OSV reads exists, vulnerabilities. Add project-owned checks as gates; CI installs only the bootstrap tools.
 
-Use existing [Python](../templates/hard-eng.python.json), [JavaScript](../templates/hard-eng.javascript.json) or [Dart/Flutter](../templates/hard-eng.dart.json) templates when adapting a new package. Do not copy a template over project-specific contracts.
+Use existing [Python](../templates/hard-eng.python.json), [JavaScript](../templates/hard-eng.javascript.json), [Dart/Flutter](../templates/hard-eng.dart.json) or [Swift](../templates/hard-eng.swift.json) templates when adapting a new package. Setup adds a Swift group per Flutter `ios/` or `macos/` folder with an Xcode project and Swift beyond Flutter's unchanged starter files (compared by text with Flutter's templates), and removes the group when only starter files remain; unchanged starter files are not production files; its tests need macOS, and CI picks the runner from `impact`'s `runner=` line. Measured on a fresh Flutter app on a loaded Mac: iOS `tests` 231 s on the first run and 45-67 s after, macOS `tests` 18 s, every other Swift gate under 5 s; set `shipping.ci_seconds` from your own macOS run, which also downloads Flutter and the iOS engine. Do not copy a template over project-specific contracts.
 
 ## Adopting existing checks
 

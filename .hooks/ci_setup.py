@@ -85,6 +85,12 @@ def impact_tools(root: Path, groups: list[Group]) -> list[str]:
     return list(dict.fromkeys(tools))
 
 
+def impact_runner(groups: list[Group]) -> str:
+    """Xcode runs on macOS; every other selection stays on Linux."""
+    swift = any(group.get("language") == "swift" for group in groups)
+    return "macos-latest" if swift else "ubuntu-latest"
+
+
 def workflow_triggers(source: Path, base: str) -> tuple[str, str]:
     """The template trigger block and its copy for the project's base branch."""
     template = (source / ".github/workflows/hard-eng.yml").read_text()
@@ -110,8 +116,8 @@ def workflow_budget(root: Path, content: str) -> str:
     if policy is None:
         return content
     return re.sub(
-        r"(?m)^    timeout-minutes: \d+$",
-        f"    timeout-minutes: {math.ceil(policy['ci_seconds'] / 60)}",
+        r"(?ms)(^  hard-eng:\n.*?^    timeout-minutes: )\d+$",
+        lambda match: match[1] + str(math.ceil(policy["ci_seconds"] / 60)),
         content,
     )
 
@@ -171,6 +177,71 @@ def migrate_bun(source: Path, content: str) -> str:
         else line
         for line in content.splitlines(keepends=True)
     )
+
+
+LEGACY_PACKAGE = '--package="@jdxcode/mise-linux-${RUNNER_ARCH,,}@latest"'
+MISE_PACKAGE = '--package="$MISE_PACKAGE"'
+RUNNER_JOB = """  impact:
+    name: impact
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      runner: ${{ steps.impact.outputs.runner }}
+    steps:
+%s      - name: Choose the runner
+        id: impact
+        env:
+          BASE_SHA: ${{ inputs.base_sha || github.event.pull_request.base.sha || github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .hooks/hard-eng.py impact --base "$BASE_SHA" >> "$GITHUB_OUTPUT" || echo runner=macos-latest >> "$GITHUB_OUTPUT"
+
+"""
+CHECK_JOB = "  hard-eng:\n    name: hard-eng\n    runs-on: ubuntu-latest\n"
+RUNNER_HEADER = (
+    "    needs: impact\n    if: ${{ !cancelled() }}\n"
+    "    runs-on: ${{ needs.impact.outputs.runner || 'macos-latest' }}\n"
+)
+
+
+def migrate_launcher(source: Path, content: str) -> str:
+    """Bash 3.2 on macOS runners cannot lowercase with ${var,,}; compute the package once."""
+    if LEGACY_PACKAGE not in content and MISE_PACKAGE not in content:
+        return content
+    if 'echo "MISE_PACKAGE=' not in content:
+        template = (source / ".github/workflows/hard-eng.yml").read_text()
+        echo = next(line for line in template.splitlines() if "MISE_PACKAGE=" in line)
+        anchor = re.search(r'(?m)^( *)echo "BUN_INSTALL_CACHE_DIR=[^\n]*\n', content)
+        if anchor is None:
+            print(
+                "CI launcher not updated: add the MISE_PACKAGE line from the Hard Eng "
+                "template to the impact step so mise installs on macOS runners.",
+                file=sys.stderr,
+            )
+            return content
+        line = anchor[1] + echo.strip() + "\n"
+        content = content[: anchor.end()] + line + content[anchor.end() :]
+    return content.replace(LEGACY_PACKAGE, MISE_PACKAGE)
+
+
+def migrate_swift_runner(config: GateConfig, content: str) -> str:
+    """A project with a Swift group runs its check on macOS only when impact selects one."""
+    if impact_runner(config["packages"]) != "macos-latest" or "  impact:\n" in content:
+        return content
+    checkout = re.search(
+        r"(?m)^      - uses: actions/checkout@[^\n]*\n(?:        [^\n]*\n)*", content
+    )
+    if content.count(CHECK_JOB) != 1 or checkout is None:
+        print(
+            "CI runner not added: .github/workflows/hard-eng.yml is customised. "
+            "Add the impact job from the Hard Eng generator and make the hard-eng "
+            "job use its runner output so Swift checks run on macOS.",
+            file=sys.stderr,
+        )
+        return content
+    job = RUNNER_JOB % checkout[0] + CHECK_JOB.replace(
+        "    runs-on: ubuntu-latest\n", RUNNER_HEADER
+    )
+    return content.replace(CHECK_JOB, job, 1)
 
 
 OLD_PERMISSIONS = (
@@ -610,6 +681,7 @@ def configure_ci(
         )
         migrated = migrate_affected_tools(root, source, config, migrated)
         migrated = migrate_docs_token(migrate_impact_token(migrated))
+        migrated = migrate_swift_runner(config, migrate_launcher(source, migrated))
         if "\n  pull-requests:" not in migrated:
             migrated = migrated.replace(
                 OLD_PERMISSIONS, OLD_PERMISSIONS + PERMISSIONS, 1
@@ -662,7 +734,37 @@ def configure_ci(
         )
         .replace(block, triggers, 1)
     )
-    changes[name] = workflow_budget(root, changes[name])
+    changes[name] = workflow_budget(root, migrate_swift_runner(config, changes[name]))
+
+
+def add_workflow_checks(config: GateConfig) -> None:
+    for role, command in (
+        ("workflows", ["actionlint", "-no-color"]),
+        (
+            "ci-security",
+            [
+                "zizmor",
+                "--strict-collection",
+                "--persona=auditor",
+                "--format=plain",
+                ".",
+            ],
+        ),
+    ):
+        if any(
+            gate.get("role") == role
+            or (gate.get("command") and Path(gate["command"][0]).name == command[0])
+            for gate in config["shared"]
+        ):
+            continue
+        config["shared"].append(
+            {
+                "name": command[0],
+                "role": role,
+                "parallel": True,
+                "command": command,
+            }
+        )
 
 
 RUNNER_MULTIPLIERS = {"windows": 2, "macos": 10}

@@ -1,6 +1,7 @@
 """Report changed lines whose tests still pass after a small deliberate bug."""
 
 import ast
+import configparser
 import fnmatch
 import json
 import os
@@ -11,8 +12,9 @@ import subprocess
 import tempfile
 import time
 import tokenize
+import tomllib
 import xml.etree.ElementTree as ET
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import suppress
 from io import StringIO
 from pathlib import Path
@@ -249,6 +251,42 @@ def mutmut_change(diff: str) -> tuple[str, str]:
     return removed[0], added[0] if added else ""
 
 
+def configure_mutmut(directory: Path, files: Iterable[str]) -> None:
+    """Name the changed top-level paths when the project leaves mutmut to guess its layout."""
+    pyproject, setup = directory / "pyproject.toml", directory / "setup.cfg"
+    if pyproject.is_file() and "mutmut" in tomllib.loads(pyproject.read_text()).get(
+        "tool", {}
+    ):
+        return
+    existing = setup.read_text() if setup.is_file() else ""
+    parser = configparser.ConfigParser(interpolation=None, strict=False)
+    try:
+        parser.read_string(existing)
+    except configparser.Error:
+        return
+    if parser.has_section("mutmut"):
+        return
+    sources = {Path(name).parts[0] for name in files}
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=directory,
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.split("\0")
+    # Tests may read any tracked file, and mutmut copies only tests/ and lockfiles.
+    copies = {Path(name).parts[0] for name in tracked if name} - sources
+    settings = {"source_paths": sources, "also_copy": copies}
+    section = "".join(
+        f"{key} =\n" + "".join(f"\t{path}\n" for path in sorted(paths))
+        for key, paths in settings.items()
+        if paths
+    )
+    setup.write_text(
+        f"{existing}\n[mutmut]\n{section}" if existing else f"[mutmut]\n{section}"
+    )
+
+
 def mutmut(manager: str, *arguments: str) -> list[str]:
     return python_gate_command(["mutmut", *arguments], manager)
 
@@ -265,6 +303,7 @@ def python(
         globs |= changed_functions(name, (directory / name).read_text(), lines)
     if not globs:
         return 0, []
+    configure_mutmut(directory, files)
     manager = "poetry" if tests[0] == "poetry" else "uv"
     output, listing = work / "log", work / "results"
     if run(mutmut(manager, "run", *globs), directory, deadline, output) or run(
