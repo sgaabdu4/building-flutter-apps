@@ -10,7 +10,7 @@ from concurrent.futures import Future
 from pathlib import Path
 from typing import TextIO, cast
 
-from coverage_sources import erased_typescript
+from coverage_sources import erased_swift, erased_typescript
 from dart_coverage import erased_dart
 from dart_test_report import dart_events, failure_summary
 from fallow_report import validate_fallow, write_istanbul
@@ -212,6 +212,16 @@ def completed_tests(path: Path, kind: str) -> int:
             and event.get("result") == "success"
             for event in events
         )
+    if kind == "xcode-tests":
+        summary = json.loads(path.read_text())
+        passed = summary.get("passedTests")
+        if (
+            summary.get("result") != "Passed"
+            or summary.get("failedTests") != 0
+            or type(passed) is not int
+        ):
+            raise ValueError("Test report does not contain a successful completed run")
+        return passed
     # Local JUnit only; ElementTree rejects external entities (test_junit_rejects_entities).
     # nosemgrep: python.lang.security.use-defused-xml-parse.use-defused-xml-parse
     tree = ET.parse(path)
@@ -246,6 +256,27 @@ def python_coverage(path: Path, directory: Path) -> dict[Path, tuple[int, int]]:
     return files
 
 
+def xccov_coverage(path: Path, directory: Path) -> dict[Path, tuple[int, int]]:
+    """Per-file counts from `xccov view --report --json`; targets share a file."""
+    report = json.loads(path.read_text())
+    targets = report.get("targets") if isinstance(report, dict) else None
+    if not isinstance(targets, list):
+        raise TypeError("Invalid xccov targets")
+    files: dict[Path, tuple[int, int]] = {}
+    for target in targets:
+        for entry in target["files"]:
+            covered, total = entry["coveredLines"], entry["executableLines"]
+            if type(covered) is not int or type(total) is not int:
+                raise TypeError("Invalid xccov line counts")
+            if not 0 <= covered <= total:
+                raise ValueError("Invalid xccov line counts")
+            file = (directory / entry["path"]).resolve()
+            files[file] = max(
+                files.get(file, (0, 0)), (covered, total), key=lambda c: (c[1], c[0])
+            )
+    return files
+
+
 def lcov_coverage(path: Path, directory: Path) -> dict[Path, tuple[int, int]]:
     files = {}
     lines = {}
@@ -275,12 +306,16 @@ def lcov_coverage(path: Path, directory: Path) -> dict[Path, tuple[int, int]]:
 def line_coverage(
     path: Path, kind: str, directory: Path, expected: set[Path]
 ) -> tuple[int, int]:
-    reader = python_coverage if kind == "python-tests" else lcov_coverage
+    reader = {"python-tests": python_coverage, "xcode-tests": xccov_coverage}.get(
+        kind, lcov_coverage
+    )
     files = reader(path, directory)
     if kind == "lcov-tests" and "\nFN:" not in path.read_text():
         write_istanbul(path, directory)
     if kind == "lcov-tests":
         expected = expected - erased_typescript(expected - files.keys())
+    if kind == "xcode-tests":
+        expected = expected - erased_swift(expected - files.keys())
     if kind == "dart-tests":
         # Dart LCOV omits simple export barrels: they have no executable lines.
         expected = {
@@ -315,7 +350,8 @@ def line_coverage(
     total = sum(files[file][1] for file in expected)
     if not total:
         raise ValueError("Coverage report contains no executable lines")
-    report_branches(path, kind, directory, expected)
+    if kind != "xcode-tests":
+        report_branches(path, kind, directory, expected)
     return covered, total
 
 
@@ -695,10 +731,10 @@ def validate_jscpd(path: Path) -> None:
             raise ValueError("jscpd reports duplicate code or malformed findings")
         stats = report["statistics"]
         formats, total = stats["formats"], stats["total"]
-        if not isinstance(formats, dict) or set(formats) != {"python"}:
-            raise ValueError("jscpd report requires Python analysis")
-        python = formats["python"]
-        for summary in (python, total):
+        if not isinstance(formats, dict) or set(formats) not in ({"python"}, {"swift"}):
+            raise ValueError("jscpd report requires Python or Swift analysis")
+        analysed = next(iter(formats.values()))
+        for summary in (analysed, total):
             for key in (
                 "clones",
                 "duplicatedLines",
@@ -713,7 +749,7 @@ def validate_jscpd(path: Path) -> None:
                     raise ValueError("jscpd reports duplication or invalid counts")
             for key in ("sources", "lines", "tokens"):
                 value = summary[key]
-                if type(value) is not int or value <= 0 or value != python[key]:
+                if type(value) is not int or value <= 0 or value != analysed[key]:
                     raise ValueError("jscpd analysis scope is empty or inconsistent")
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError("jscpd report is incomplete or malformed") from error

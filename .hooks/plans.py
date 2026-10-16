@@ -399,7 +399,7 @@ def _is_test(path: PurePosixPath) -> bool:
     return (
         bool(TEST_DIRECTORIES.intersection(path.parts[:-1]))
         or name.startswith("test_")
-        or name.endswith(("_test.py", "_test.dart"))
+        or name.endswith(("_test.py", "_test.dart", "Tests.swift"))
         or bool(re.search(r"\.(?:test|spec)\.", name))
     )
 

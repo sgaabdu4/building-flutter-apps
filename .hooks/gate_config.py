@@ -195,6 +195,7 @@ def nonproduction_source(relative: Path) -> bool:
         {"test", "tests", "integration_test", "__tests__", "node_modules", "vendor"}
         & set(relative.parts)
         or relative.name.startswith("test_")
+        or relative.name.endswith("Tests.swift")
         or relative.stem.endswith(("_test", ".test", ".spec"))
         or relative.name.endswith((".d.ts", ".d.mts", ".d.cts"))
     )
@@ -293,12 +294,6 @@ def validate_dart_plugins(options: JsonObject) -> None:
         raise ValueError(
             f"Analyzer plugin version is older than the installed canonical profile ({changes}); run the supported Hard Eng updater and verify application compatibility"
         )
-
-
-def validate_dart_exclusions(directory: Path, values: object) -> None:
-    from project_setup import validate_dart_exclusions as validate
-
-    validate(directory, values)
 
 
 def validate_file_sizes(root: Path, exceptions: dict[str, dict[str, str]]) -> None:
@@ -694,7 +689,7 @@ def validate_group(root: Path, group: Group, report_paths: set[Path]) -> int:
         raise ValueError(
             f"Gate directory must exist inside the project: {group['path']}"
         )
-    if group.get("language") not in {None, *LANGUAGES.values()}:
+    if group.get("language") not in {None, "swift", *LANGUAGES.values()}:
         raise ValueError(f"Unsupported package language: {group.get('language')}")
     impact_inputs(group)
     required = {
@@ -718,6 +713,7 @@ def validate_group(root: Path, group: Group, report_paths: set[Path]) -> int:
             "dead-code-duplicates",
         },
         "dart": {"format", "types", "tests", "dead-code-duplicates", "boundaries"},
+        "swift": {"format-lint", "tests", "duplicates"},
     }.get(group.get("language", ""), set())
     roles = {gate.get("role") for gate in group["checks"] if isinstance(gate, dict)}
     if group.get("language") == "dart" and any(
@@ -830,6 +826,9 @@ def validate_required_checks(root: Path, config: GateConfig) -> None:
     files = repository_files(root)
     manifests = package_manifests(root, files)
     validate_manifest_groups(root, config, manifests)
+    from swift_setup import require_swift_groups
+
+    require_swift_groups(root, config, files)
     if not config["packages"] and not manifests:
         return  # Ad-hoc command groups without a supported application manifest.
     shared_roles = {gate.get("role", "") for gate in config["shared"]}
@@ -896,6 +895,7 @@ def validate_package_services(
         workspace_matches,
         workspace_members,
     )
+    from swift_setup import parent_roles
 
     directory = (root / group["path"]).resolve()
     language = group.get("language") or manifests.get(str(Path(group["path"])), "")
@@ -907,6 +907,8 @@ def validate_package_services(
             str(directory.relative_to(owner)), workspace_members(owner, language)
         ):
             inherited.update(gate.get("role", "") for gate in parent["checks"])
+    if language == "swift":
+        inherited |= parent_roles(directory, by_directory)
     require_roles(group["path"], {"lockfiles", "vulnerabilities"}, roles | inherited)
     if language == "python":
         dependency_command(directory, language)  # Raises when no lockfile exists.

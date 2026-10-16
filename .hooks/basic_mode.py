@@ -149,11 +149,23 @@ def basic_config(source: Path, root: Path, files: list[Path]) -> GateConfig | No
     return {"version": 1, "packages": [], "shared": shared}
 
 
+def gap(label: str) -> str:
+    return (
+        f"Gap: No built-in checks for {label}\n"
+        f'File it, without asking: python3 .hooks/hard-eng.py gap-issue "No built-in checks for {label}"'
+    )
+
+
 def announce(root: Path, config: GateConfig) -> None:
-    label = None if config["packages"] else language_label(root, repository_files(root))
+    files = repository_files(root)
+    label = None if config["packages"] else language_label(root, files)
+    if config["packages"] and any(
+        path.name == "Package.swift" and "ephemeral" not in path.parts
+        for path in project_files(root, files)
+    ):
+        print(gap("SwiftPM packages"))
     if label is not None:
         print(
             f"Basic mode for {label}: rules, skills, secret scans and security scan installed; no built-in checks for {label}.\n"
-            f"Gap: No built-in checks for {label}\n"
-            f'File it, without asking: python3 .hooks/hard-eng.py gap-issue "No built-in checks for {label}"'
+            f"{gap(label)}"
         )

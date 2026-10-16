@@ -15,7 +15,7 @@ from plans import _is_test as is_test_path
 
 HASH = {".py", ".pyi", ".sh", ".bash", ".zsh"}
 JAVASCRIPT = {".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"}
-SLASH = {".dart", ".rs", *JAVASCRIPT}
+SLASH = {".dart", ".rs", ".swift", *JAVASCRIPT}
 DIRECTIVE = re.compile(
     r"^(#!|#\s*-\*-|//\s*ignore(_for_file)?:|///\s*<reference|//go:|//\s*\+build"
     r"|//\s*#(region|endregion))|(eslint|prettier|biome|jscpd|istanbul|c8|coverage)[-:]"
@@ -285,7 +285,34 @@ SCRIPT_OFF = re.compile(
     r"|(/\*|//)\s*(istanbul|c8|v8) ignore"
 )
 DART_OFF = re.compile(r"//\s*ignore(_for_file)?:|\bskip:(?=\s*(?!false\b)\S)|@Skip\(")
+SWIFT_OFF = re.compile(
+    r"swift-format-ignore|\bXCTSkip|<(Skipped|Selected)Tests>"
+    r'|"(skipped|selected)Tests"|\bskipped\s*=\s*"YES"'
+)
 UNOWNED = (".hooks/", ".agents/", ".claude/")
+
+
+def disabled_traits(text: str) -> set[int]:
+    """Lines of `.disabled(` inside @Test(...) and @Suite(...), however the formatter wraps them."""
+    lines = set()
+    for attribute in re.finditer(r"@(?:Test|Suite)\s*\(", text):
+        depth, end = 1, attribute.end()
+        while end < len(text) and depth:
+            if text[end] == '"':
+                end = string_end(text, end + 1, '"', False, True)
+                continue
+            depth += (text[end] == "(") - (text[end] == ")")
+            end += 1
+        span = re.sub(
+            r'"(?:\\.|[^"\\\n])*"',
+            lambda string: " " * len(string[0]),
+            text[attribute.start() : end],
+        )
+        lines |= {
+            text.count("\n", 0, attribute.start() + hit.start()) + 1
+            for hit in re.finditer(r"\.disabled\(", span)
+        }
+    return lines
 
 
 def switch_off_pattern(name: str) -> re.Pattern[str] | None:
@@ -294,6 +321,8 @@ def switch_off_pattern(name: str) -> re.Pattern[str] | None:
         return PYTHON_OFF
     if suffix == ".dart":
         return DART_OFF
+    if suffix in {".swift", ".xcscheme", ".xctestplan"}:
+        return SWIFT_OFF
     return SCRIPT_OFF if suffix in JAVASCRIPT else None
 
 
@@ -371,7 +400,11 @@ def diff_lines(
 
 
 def assertion_lines(name: str, lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
-    words = ("assert",) if name.endswith(".py") else ("assert", "expect(")
+    words = (
+        ("assert",)
+        if name.endswith(".py")
+        else ("assert", "expect(", "XCTAssert", "#require(")
+    )
     return [(n, text) for n, text in lines if any(word in text for word in words)]
 
 
@@ -527,6 +560,13 @@ def validate_suppressions(root: Path, base: str | None) -> None:
             for number, text in added.get(name, [])
             if (hit := pattern.search(text))
         ]
+        if name.endswith(".swift") and (root / name).is_file():
+            traits = disabled_traits((root / name).read_text(errors="replace"))
+            found += [
+                f"{name}:{number} adds '.disabled('"
+                for number, _ in added.get(name, [])
+                if number in traits
+            ]
         if is_test_path(PurePosixPath(name)):
             gained += len(assertion_lines(name, added.get(name, [])))
             blocks += [(name, b) for b in removed_blocks(removed.get(name, []))]
