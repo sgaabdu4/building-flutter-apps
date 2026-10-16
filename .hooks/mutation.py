@@ -142,6 +142,8 @@ def javascript(
                 "commandRunner": {"command": shlex.join(tests)},
                 "mutate": mutate,
                 "mutator": {"excludedMutations": ["StringLiteral"]},
+                # Each run is the project's whole test command, which already uses every core.
+                "concurrency": 1,
                 "reporters": ["json"],
                 "jsonReporter": {"fileName": str(report)},
                 "cleanTempDir": True,

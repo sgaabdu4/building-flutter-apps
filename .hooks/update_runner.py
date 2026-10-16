@@ -22,6 +22,7 @@ LOG_FILE = ".hard-eng/update.log"
 FAILURE_FILE = ".hard-eng/update-failure.json"
 LOCAL_INPUTS = (".claude/settings.local.json", "CLAUDE.local.md")
 UPDATE_BRANCH = "hard-eng/update"
+UPDATE_REF = f"refs/heads/{UPDATE_BRANCH}"
 UPDATE_COMMAND = "python3 .hooks/hard-eng.py update-pr"
 NOT_PUBLISHED = "Hard Eng updates start after the project is pushed to a remote with its base branch."
 HEX_REVISION = re.compile(r"[0-9a-f]{40}")
@@ -743,20 +744,23 @@ def landed(root: Path, base: str, branch: str) -> bool:
     return same.returncode == 0
 
 
-def set_update_branch(root: Path, commit: str) -> None:
-    ref = f"refs/heads/{UPDATE_BRANCH}"
+def update_branch_tip(root: Path) -> str:
     found = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", ref],
+        ["git", "rev-parse", "--verify", "--quiet", UPDATE_REF],
         cwd=root,
         capture_output=True,
         text=True,
         check=False,
     )
-    subprocess.run(
-        ["git", "update-ref", ref, commit, found.stdout.strip()],
-        cwd=root,
-        check=True,
-    )
+    return found.stdout.strip()
+
+
+def set_update_branch(root: Path, commit: str, expected: str) -> bool:
+    command = ["git", "update-ref", UPDATE_REF, commit, expected]
+    moved = subprocess.run(command, cwd=root, capture_output=True, check=False)
+    if moved.returncode and update_branch_tip(root) == expected:
+        raise ValueError(moved.stderr.decode().strip())
+    return moved.returncode == 0
 
 
 def published(root: Path, base: str) -> bool:
@@ -805,6 +809,7 @@ def build_update(root: Path, base: str, repair: bool) -> str:
     from update_pr import branch_worktree, unfinished_update
 
     tip = fetch_base(root, base)
+    expected = update_branch_tip(root)
     if unfinished_update(root, tip):
         return (
             f"Hard Eng update branch {UPDATE_BRANCH} holds unfinished work; finish it with "
@@ -849,7 +854,12 @@ def build_update(root: Path, base: str, repair: bool) -> str:
             )
     if landed is None or not isinstance(revision, str):
         return outcome
-    set_update_branch(root, landed[0])
+    # Work committed or checked out on the branch during the build stays.
+    if branch_worktree(root) or not set_update_branch(root, landed[0], expected):
+        return (
+            f"{UPDATE_BRANCH} changed while the update was prepared, so it was kept; "
+            f"rerun `python3 .hooks/hard-eng.py update` once that work is finished."
+        )
     return ready_message(revision)
 
 

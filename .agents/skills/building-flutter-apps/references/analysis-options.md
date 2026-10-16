@@ -34,8 +34,12 @@ feature code needs them.
   `avoid_futureor_return_type`,
   `avoid_nullable_async_or_collection_return_type`,
   `avoid_public_late_final_without_initializer`
-- `prefer_type_over_var` is forbidden in this profile: it conflicts with
-  Effective Dart's preference for inferred initialized local variables.
+- Explicit types, never `var`: declare a mutable variable with its type
+  (`int count = 0;`), not `var`. `final` and `const` without a type stay
+  allowed (`final total = items.length;`). The plugin's default-enabled
+  `prefer_type_over_var` enforces this for locals, fields, top-level
+  variables, loop variables and patterns. Do not enable
+  `always_specify_types`.
 - Do not enable `avoid_types_on_closure_parameters`: `strict-inference`
   sometimes requires explicit closure parameter types at weakly typed APIs
   such as `testWidgets`.
@@ -45,9 +49,8 @@ feature code needs them.
 - Do not enable `one_member_abstracts` for architecture profiles:
   one-method repository/datasource/service contracts are valid dependency
   boundaries.
-- Do not enable `omit_local_variable_types` until the project has removed
-  explicit local types mechanically; this profile no longer enforces the
-  opposite rule.
+- Do not enable `omit_local_variable_types`: it conflicts with the explicit
+  types that `prefer_type_over_var` requires on mutable variables.
 - Do not enable `use_setters_to_change_properties` for async persistence APIs:
   Dart setters cannot be `async`, and these mutation methods must remain
   awaitable.
@@ -65,7 +68,7 @@ Plugin block:
 ```yaml
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.13.0
+  flutter_skill_lints: ^0.13.4
 ```
 
 Match bundled [`references/analysis_options.yaml`](analysis_options.yaml)

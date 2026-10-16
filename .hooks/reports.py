@@ -77,7 +77,6 @@ QUICK_ROLES = frozenset(
         "annotations",
         "typing-style",
         "imports",
-        "tests",
         "focused-tests",
         "secrets-files",
     }

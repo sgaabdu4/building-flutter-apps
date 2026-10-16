@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -326,18 +327,34 @@ def provision_latest(
 
 
 def bun_node(storage: Path, environment: dict[str, str]) -> None:
-    """Run every `#!/usr/bin/env node` tool on Bun, so checks prove the Bun runtime."""
+    """Run `#!/usr/bin/env node` tools on Bun, so checks prove the Bun runtime."""
     bun = shutil.which("bun", path=environment.get("PATH"))
     if bun is None:
         return
     directory = storage / "bun-node"
     directory.mkdir(parents=True, exist_ok=True)
-    link = directory / "node"
-    if not link.is_symlink() or link.readlink() != Path(bun):
+    search = os.pathsep.join(
+        entry
+        for entry in environment.get("PATH", "").split(os.pathsep)
+        if Path(entry) != directory
+    )
+    node = shutil.which("node", path=search)
+    script = "#!/bin/sh\n"
+    if node is not None:
+        # Under Bun, miniflare's typegen fetch reaches a real parked domain, not workerd.
+        script += (
+            'case "$*" in *node_modules/.bin/wrangler*|*node_modules/wrangler/*|'
+            "*node_modules/.bin/miniflare*|*node_modules/miniflare/*) "
+            f'exec {shlex.quote(node)} "$@";; esac\n'
+        )
+    script += f'exec {shlex.quote(bun)} "$@"\n'
+    shim = directory / "node"
+    if shim.is_symlink() or not shim.is_file() or shim.read_text() != script:
         temporary = directory / f".node-{os.getpid()}"
         temporary.unlink(missing_ok=True)
-        temporary.symlink_to(bun)
-        temporary.replace(link)
+        temporary.write_text(script)
+        temporary.chmod(0o755)
+        temporary.replace(shim)
     for target in (environment, os.environ):
         target["PATH"] = os.pathsep.join(
             [str(directory), target.get("PATH", os.defpath)]

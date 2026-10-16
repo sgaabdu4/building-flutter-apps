@@ -550,6 +550,14 @@ def adapt_package(directory: Path, package: Group) -> None:
         elif language == "dart" and manager == "dart" and gate.get("role") == "tests":
             gate["command"] = list(DART_TESTS)
             gate["report"]["stdout"] = False
+        elif manager == "flutter" and gate["command"] == DART_PERFORMANCE:
+            gate["command"] = [
+                "flutter",
+                "test",
+                "--no-pub",
+                "--machine",
+                "test/performance",
+            ]
     if language == "javascript":
         adapt_javascript(directory, package, manager)
     elif language == "python" and not python_roots(directory, package):
@@ -560,20 +568,11 @@ def adapt_package(directory: Path, package: Group) -> None:
 
 
 def adapt_performance(directory: Path, package: Group) -> None:
+    extensions = ("js", "cjs", "json", "yml", "yaml")
     if any(
-        (directory / name).is_file()
-        for name in (
-            "lighthouserc.js",
-            "lighthouserc.cjs",
-            "lighthouserc.json",
-            "lighthouserc.yml",
-            "lighthouserc.yaml",
-            ".lighthouserc.js",
-            ".lighthouserc.cjs",
-            ".lighthouserc.json",
-            ".lighthouserc.yml",
-            ".lighthouserc.yaml",
-        )
+        (directory / f"{dot}lighthouserc.{extension}").is_file()
+        for dot in ("", ".")
+        for extension in extensions
     ):
         for gate in package["checks"]:
             if gate.get("role") == "performance":
@@ -639,6 +638,7 @@ FLUTTER_TESTS = [
     "--coverage",
     "--coverage-path=coverage/lcov.info",
 ]
+DART_PERFORMANCE = ["dart", "test", "test/performance", "--reporter=json"]
 DART_TESTS = [
     "dart",
     "run",
@@ -850,6 +850,8 @@ def javascript_files(directory: Path, excluded: tuple[Path, ...] = ()) -> list[s
         and not {"node_modules", "vendor", ".hooks", ".agents"}
         & set(path.relative_to(directory).parts)
     ]
+    generated = generated_sources(directory, files)
+    files = [name for name in files if name not in generated]
     if not files and not excluded:
         raise ValueError("No JavaScript or TypeScript source files found")
     return files

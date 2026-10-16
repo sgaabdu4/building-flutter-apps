@@ -171,8 +171,16 @@ def new_commits_command(
     command: list[str], repository: Path, base: str | None
 ) -> list[str]:
     """Scan only the commits a known base lacks; earlier ones were scanned on entry."""
-    if base is None or "--log-opts=--all" not in command:
+    if "--log-opts=--all" not in command:
         return command
+    pushable = [
+        "--log-opts=--branches --remotes --tags HEAD"
+        if argument == "--log-opts=--all"
+        else argument
+        for argument in command
+    ]
+    if base is None:
+        return pushable
     resolved = subprocess.run(
         [
             "git",
@@ -189,7 +197,7 @@ def new_commits_command(
     )
     revision = resolved.stdout.strip()
     if resolved.returncode or set(revision) == {"0"}:
-        return command  # Unknown base: keep the full-history scan.
+        return pushable  # Unknown base: scan every commit a push can carry.
     print(f"Secret history scan covers commits since {revision[:7]}.")
     return [
         f"--log-opts={revision}..HEAD" if argument == "--log-opts=--all" else argument
@@ -240,6 +248,22 @@ def run_gate_command(
     return result
 
 
+def private_repository(directory: Path) -> bool:
+    """Outside forks cannot run jobs on a private repository's self-hosted runners."""
+    try:
+        found = subprocess.run(
+            ["gh", "repo", "view", "--json", "visibility", "-q", ".visibility"],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return found.returncode == 0 and found.stdout.strip() == "PRIVATE"
+
+
 def zizmor_config(directory: Path, temporary: Path) -> str:
     """actionlint rejects `$/`, zizmor's only fix for self-repository, so that audit is off."""
     import yaml
@@ -254,6 +278,8 @@ def zizmor_config(directory: Path, temporary: Path) -> str:
     if not isinstance(rules, dict):
         raise TypeError("zizmor configuration must map rules to settings")
     rules["self-repository"] = {"disable": True}
+    if "self-hosted-runner" not in rules and private_repository(directory):
+        rules["self-hosted-runner"] = {"disable": True}
     path = temporary / "zizmor.yml"
     path.write_text(yaml.safe_dump(config))
     return str(path)
