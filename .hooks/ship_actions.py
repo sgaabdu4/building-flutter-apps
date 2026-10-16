@@ -171,7 +171,12 @@ def push_base(
             raise ValueError(
                 "Push a task branch and use a PR; direct base updates are blocked"
             )
-        return remote
+        if set(revision) == {"0"}:
+            return remote
+        # A rewritten branch (a merged update branch reused) owns only its own commits.
+        with suppress(ShippingError):
+            git(root, "merge-base", "--is-ancestor", remote, revision)
+            return remote
     base = remote_base(root, branch)
     if base is None:
         print("The remote has no branches yet; checking everything for its first push.")

@@ -286,6 +286,25 @@ def validate_fallow(path: Path) -> None:
         raise ValueError("Fallow report is incomplete") from error
 
 
+def lcov_counts(
+    lcov: Path, directory: Path
+) -> tuple[dict[Path, dict[int, int]], dict[Path, int]]:
+    """Line hits and called-function totals per source file, summed across records."""
+    hits: dict[Path, dict[int, int]] = {}
+    called: dict[Path, int] = {}
+    source = None
+    for record in lcov.read_text().splitlines():
+        if record.startswith("SF:"):
+            source = (directory / record[3:]).resolve()
+            hits.setdefault(source, {})
+        elif record.startswith("FNH:") and source is not None:
+            called[source] = called.get(source, 0) + int(record[4:])
+        elif record.startswith("DA:") and source is not None:
+            line, count = (int(value) for value in record[3:].split(",")[:2])
+            hits[source][line] = hits[source].get(line, 0) + count
+    return hits, called
+
+
 def write_istanbul(lcov: Path, directory: Path) -> None:
     """Give Fallow the Istanbul map Bun cannot write, with Fallow's own function spans."""
     istanbul = lcov.parent / "coverage-final.json"
@@ -314,15 +333,7 @@ def write_istanbul(lcov: Path, directory: Path) -> None:
         return
     if listing.returncode not in {0, 1} or not isinstance(findings, list):
         return
-    hits: dict[Path, dict[int, int]] = {}
-    source = None
-    for record in lcov.read_text().splitlines():
-        if record.startswith("SF:"):
-            source = (directory / record[3:]).resolve()
-            hits.setdefault(source, {})
-        elif record.startswith("DA:") and source is not None:
-            line, count = (int(value) for value in record[3:].split(",")[:2])
-            hits[source][line] = hits[source].get(line, 0) + count
+    hits, called = lcov_counts(lcov, directory)
     spans_by_path: dict[Path, list[int]] = {}
     for index, finding in enumerate(findings):
         finding_path = (directory / finding["path"]).resolve()
@@ -356,16 +367,10 @@ def write_istanbul(lcov: Path, directory: Path) -> None:
                 }
                 for index, (span, end) in enumerate(zip(spans, ends))
             },
+            # Bun counts body lines of functions it never called; only the entry line shows calls.
             "f": {
-                str(index): max(
-                    (
-                        count
-                        for line, count in lines.items()
-                        if span["line"] <= line <= end
-                    ),
-                    default=0,
-                )
-                for index, (span, end) in enumerate(zip(spans, ends))
+                str(index): lines.get(span["line"], 0) if called.get(path, 1) else 0
+                for index, span in enumerate(spans)
             },
             "branchMap": {},
             "b": {},

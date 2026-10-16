@@ -666,6 +666,32 @@ def saved_session(state: Path | None) -> tuple[str, JsonObject]:
     return base, before
 
 
+def session_scope(root: Path, base: str) -> str:
+    """Commits already on a remote passed pre-push and are not this session's change."""
+    unpushed = subprocess.check_output(
+        ["git", "rev-list", "--first-parent", "HEAD", "--not", "--remotes"],
+        cwd=root,
+        text=True,
+    ).split()
+    pushed = unpushed[-1] + "^" if unpushed else "HEAD"
+    point = subprocess.run(
+        ["git", "rev-parse", "--verify", "-q", pushed],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if not point:
+        return base
+    older = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", point, base],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    return base if older.returncode == 0 else point
+
+
 def with_freshness(root: Path, output: JsonObject) -> JsonObject:
     from update_runner import freshness_note
 
@@ -715,6 +741,7 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
             cwd=root,
             text=True,
         ).strip()
+        base = session_scope(root, base)
         current = dirty_files(root, base)
         changed = "".join(
             f"{name}\n"

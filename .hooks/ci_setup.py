@@ -426,6 +426,21 @@ def migrate_impact_token(content: str) -> str:
     return content[:start] + step + content[end:]
 
 
+DOCS_SCAN = "      - name: Run the secret scan for docs-only changes\n"
+MISE_TOKEN = "          GITHUB_TOKEN: ${{ github.token }}\n"
+
+
+def migrate_docs_token(content: str) -> str:
+    """mise reads GITHUB_TOKEN, not GH_TOKEN; without it runners hit the anonymous limit."""
+    start = content.find(DOCS_SCAN)
+    end = content.find("      - ", start + 1)
+    step = content[start:end]
+    if start < 0 or end < 0 or "GITHUB_TOKEN:" in step or IMPACT_TOKEN not in step:
+        return content
+    step = step.replace(IMPACT_TOKEN, IMPACT_TOKEN + MISE_TOKEN, 1)
+    return content[:start] + step + content[end:]
+
+
 def drop_tool_cache(content: str) -> str:
     """Remove the generated tool cache; measured restores were no faster than installs."""
     start = content.find("      - name: Cache native tool downloads\n")
@@ -532,12 +547,17 @@ def workflow_installed(
     root: Path, base: str, names: set[str], sources: tuple[Path, Path]
 ) -> bool:
     """Whether a changed workflow is what the release's setup writes from the base one."""
+    name = ".github/workflows/hard-eng.yml"
+    return name not in names or name in setup_written(root, base, {name}, sources)
+
+
+def setup_written(
+    root: Path, base: str, names: set[str], sources: tuple[Path, Path]
+) -> set[str]:
+    """The changed paths the release's setup writes exactly when it updates the base tree."""
     from hook_chain import own_hooks_env
     from update import update_plan
 
-    name = ".github/workflows/hard-eng.yml"
-    if name not in names:
-        return True
     with tempfile.TemporaryDirectory(prefix="hard-eng-workflow-check-") as temporary:
         tree = Path(temporary) / "base"
         git = ["git", "-c", "core.hooksPath=/dev/null", "worktree"]
@@ -549,7 +569,7 @@ def workflow_installed(
             timeout=120,
         )
         try:
-            planned = update_plan(tree, *sources, own_hooks_env(tree))[0].get(name)
+            planned = update_plan(tree, *sources, own_hooks_env(tree))[0]
         finally:
             subprocess.run(
                 [*git, "remove", "--force", str(tree)],
@@ -557,7 +577,16 @@ def workflow_installed(
                 check=False,
                 timeout=60,
             )
-    return (root / name).is_file() and planned == (root / name).read_text()
+    return {
+        name
+        for name in names
+        if name in planned
+        and (
+            not (root / name).exists()
+            if planned[name] is None
+            else (root / name).is_file() and planned[name] == (root / name).read_text()
+        )
+    }
 
 
 def configure_ci(
@@ -580,7 +609,7 @@ def configure_ci(
             root, source, migrate_docs_path(source, migrated)
         )
         migrated = migrate_affected_tools(root, source, config, migrated)
-        migrated = migrate_impact_token(migrated)
+        migrated = migrate_docs_token(migrate_impact_token(migrated))
         if "\n  pull-requests:" not in migrated:
             migrated = migrated.replace(
                 OLD_PERMISSIONS, OLD_PERMISSIONS + PERMISSIONS, 1

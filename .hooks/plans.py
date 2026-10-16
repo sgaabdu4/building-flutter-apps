@@ -471,6 +471,23 @@ def configured_packages(root: Path) -> dict[str, Group]:
     return {group["path"]: group for group in config["packages"]}
 
 
+def update_written(root: Path, point: str) -> set[str]:
+    """Paths a verified Hard Eng update in this branch wrote, scaffold and setup edits alike."""
+    import tempfile
+
+    from ci_setup import setup_written
+    from update import fetch_sources, installed_update_paths, update_in_diff
+
+    installed = installed_update_paths(root, point)
+    found = update_in_diff(root, point)
+    if not installed or found is None:
+        return set()
+    revision, previous, names = found
+    with tempfile.TemporaryDirectory(prefix="hard-eng-plan-size-") as temporary:
+        sources = fetch_sources(Path(temporary), revision, previous)
+        return installed | setup_written(root, point, names - installed, sources)
+
+
 def size_verdict(root: Path) -> tuple[bool, str]:
     """Whether the whole branch change, not just this session's, is small, and the first reason."""
     point = default_branch_point(root)
@@ -481,6 +498,9 @@ def size_verdict(root: Path) -> tuple[bool, str]:
     except (subprocess.CalledProcessError, OSError):
         return False, "the change cannot be measured"
     names = {name for name in status[1::2] + untracked if name}
+    names -= update_written(root, point)
+    if not names:
+        return True, "only files the verified Hard Eng update wrote"
     packages = configured_packages(root)
 
     def documentation(name: str) -> bool:
