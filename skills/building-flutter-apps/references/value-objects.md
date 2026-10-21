@@ -1,6 +1,5 @@
 # Value Objects
 
-
 ## Read first
 
 1. Domain-meaning primitives (unit/currency/identity/format) become sealed Freezed VOs in `/domain/values/`.
@@ -17,11 +16,11 @@ Signals: `Distance`, `Money`, `Email`, `Username`, `Slug`, `PhoneNumber`, `Heart
 
 ## Decision
 
-| Scope | Use |
-|---|---|
-| 1 entity, 1 derivation | Entity getter |
+| Scope                               | Use                               |
+| ----------------------------------- | --------------------------------- |
+| 1 entity, 1 derivation              | Entity getter                     |
 | 2+ entities share primitive concept | Value Object in `/domain/values/` |
-| Widget/notifier/repo-only helper | `core/extensions/` |
+| Widget/notifier/repo-only helper    | `core/extensions/`                |
 
 Domain never imports `core/extensions/`; `arch_domain_import` = ERROR.
 
@@ -37,12 +36,12 @@ Both match `/domain/` → both allowed.
 `null` means absence. `''` means a present empty string. Do not use `''` as a
 missing-value sentinel in domain code.
 
-| Situation | Use |
-|---|---|
-| Required ID / slug / email / display name | VO factory that trims and rejects blank |
-| Optional note / bio / description | `String?`, with blank normalized to `null` at data/notifier/import boundary |
-| Search query / form draft | non-domain state field named `query`, `searchQuery`, `draftName`, or `inputText` |
-| No items | non-null collection default `[]` / `{}` |
+| Situation                                 | Use                                                                              |
+| ----------------------------------------- | -------------------------------------------------------------------------------- |
+| Required ID / slug / email / display name | VO factory that trims and rejects blank                                          |
+| Optional note / bio / description         | `String?`, with blank normalized to `null` at data/notifier/import boundary      |
+| Search query / form draft                 | non-domain state field named `query`, `searchQuery`, `draftName`, or `inputText` |
+| No items                                  | non-null collection default `[]` / `{}`                                          |
 
 Boundary normalization:
 
@@ -174,16 +173,16 @@ Lints: `domain_raw_required_string` (required `String` on a domain entity constr
 
 ## Decision matrix
 
-| Situation | Use |
-|---|---|
-| `m / 1000` once in 1 entity | Entity getter |
-| `m → km` in 3 entities | `Distance` VO |
-| `cents / 100` in widget | `cents.asCurrency()` extension |
-| `cents + cents` math in domain | `Money` VO with `operator +` |
-| Email validated at form | `Validators.email` |
-| Email enforced via type | `Email` VO |
-| Date format in widget | `date.formatted()` extension |
-| Date diff in domain | built-in `Duration` (it IS a VO) |
+| Situation                      | Use                              |
+| ------------------------------ | -------------------------------- |
+| `m / 1000` once in 1 entity    | Entity getter                    |
+| `m → km` in 3 entities         | `Distance` VO                    |
+| `cents / 100` in widget        | `cents.asCurrency()` extension   |
+| `cents + cents` math in domain | `Money` VO with `operator +`     |
+| Email validated at form        | `Validators.email`               |
+| Email enforced via type        | `Email` VO                       |
+| Date format in widget          | `date.formatted()` extension     |
+| Date diff in domain            | built-in `Duration` (it IS a VO) |
 
 ## Forbidden
 
@@ -287,7 +286,7 @@ sealed class User with _$User {
 
 ### Hive collision
 
-Disk sacred. `hive_ce_generator` writes `HiveField(N)` indices to `hive_adapters.g.yaml` (committed) from Freezed ctor param order on first run. Wrapping a primitive in a VO on a `@GenerateAdapters`-registered class regenerates that yaml against the new shape — different binary layout from the one on user disks. `dart analyze` blind. Per the [hive_ce docs](https://github.com/IO-Design-Team/hive_ce_docs/blob/master/custom-objects/generate_adapters.md): *"Changing the type of a field is not supported. You should create a new one instead."*
+Disk sacred. `hive_ce_generator` writes `HiveField(N)` indices to `hive_adapters.g.yaml` (committed) from Freezed ctor param order on first run. Wrapping a primitive in a VO on a `@GenerateAdapters`-registered class regenerates that yaml against the new shape — different binary layout from the one on user disks. `dart analyze` blind. Per the [hive_ce docs](https://github.com/IO-Design-Team/hive_ce_docs/blob/master/custom-objects/generate_adapters.md): _"Changing the type of a field is not supported. You should create a new one instead."_
 
 **Option A — entity stays primitive, VO via getter.** Use when entity shipped w/ user data. Its `/// HiveField(N)` markers keep the locked slots out of `domain_raw_required_string` / `domain_unit_primitive`.
 

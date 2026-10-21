@@ -1,6 +1,5 @@
 # Common Patterns — Modals and Navigation
 
-
 ## Read first
 
 1. Modal renders immutable snapshot + returns a typed result.

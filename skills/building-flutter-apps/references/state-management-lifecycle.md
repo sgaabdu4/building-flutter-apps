@@ -1,13 +1,12 @@
 # State Management Lifecycle And Errors
 
-
 ## Read first
 
 Read with [notifier-structure.md](state-management/notifier-structure.md) for initialization/loading and [async-mutations.md](state-management/async-mutations.md) for mutation readiness, async guards, and optimistic updates.
 
 ## State Teardown Belongs in the Notifier
 
-For *save and clear* flows, notifier owns save + clear. Failure preserves retry state. Widgets dispatch method, observe state via `ref.watch` / `onMissing*`, and self-navigate. Do not chain widget-side cleanup after awaited notifier mutation.
+For _save and clear_ flows, notifier owns save + clear. Failure preserves retry state. Widgets dispatch method, observe state via `ref.watch` / `onMissing*`, and self-navigate. Do not chain widget-side cleanup after awaited notifier mutation.
 
 ```dart
 // NEVER — widget owns teardown
@@ -65,7 +64,6 @@ Future<List<Product>> fetchAll() async {
 ### Legitimate `try/catch` in data layer
 
 Default rule has four narrow exception. Each MUST have reason beyond "log + rethrow":
-
 1. **Domain error translation** — map raw SDK exception to typed domain error so notifier matches on sealed types.
 2. **Idempotency recovery** — swallow "already exists" / "not found" on op whose contract is idempotent (e.g. 404 on delete in batch).
 3. **Transaction rollback** — catch, run compensating write, rethrow.

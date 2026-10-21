@@ -1,6 +1,5 @@
 # Common Patterns
 
-
 ## Read first
 
 1. Typed GoRouter helpers only. No raw route strings at call sites.

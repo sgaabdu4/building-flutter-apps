@@ -335,7 +335,7 @@ rule_d5() {
   local skillmd="$SKILL_ROOT/SKILL.md"
 
   if [ -f "$core_stack" ]; then
-    if ! grep -q '| Package | Constraint |' "$core_stack" 2>/dev/null; then
+    if ! grep -Eq '^\| +Package +\| +Constraint +\|' "$core_stack" 2>/dev/null; then
       hits="${hits}${core_stack}:0: Core Stack package table missing"$'\n'
     fi
   else

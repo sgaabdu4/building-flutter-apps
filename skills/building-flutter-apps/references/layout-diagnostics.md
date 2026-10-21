@@ -1,6 +1,5 @@
 # Layout Diagnostics
 
-
 ## Read first
 
 1. Fix the first layout exception; later errors are usually cascades.
@@ -21,13 +20,13 @@ sets position.
 
 ## Error Map
 
-| Error | Check | Fix |
-|---|---|---|
-| `Vertical viewport was given unbounded height` | `ListView`/`GridView` inside unconstrained `Column` | Use `Expanded`, `Flexible`, fixed constraints, or slivers |
-| `InputDecorator cannot have an unbounded width` | `TextField` inside unconstrained `Row` | Wrap field in `Expanded` or `Flexible` |
-| `RenderFlex overflowed` | Row/Column child wider/taller than available space | Constrain the child, allow wrapping, or change layout at breakpoint |
-| `Incorrect use of ParentDataWidget` | `Expanded`, `Flexible`, or `Positioned` under wrong parent | Move it directly under `Row`/`Column`/`Flex` or `Stack` |
-| `RenderBox was not laid out` | Earlier constraint error | Fix first layout error in logs |
+| Error                                           | Check                                                      | Fix                                                                 |
+| ----------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------- |
+| `Vertical viewport was given unbounded height`  | `ListView`/`GridView` inside unconstrained `Column`        | Use `Expanded`, `Flexible`, fixed constraints, or slivers           |
+| `InputDecorator cannot have an unbounded width` | `TextField` inside unconstrained `Row`                     | Wrap field in `Expanded` or `Flexible`                              |
+| `RenderFlex overflowed`                         | Row/Column child wider/taller than available space         | Constrain the child, allow wrapping, or change layout at breakpoint |
+| `Incorrect use of ParentDataWidget`             | `Expanded`, `Flexible`, or `Positioned` under wrong parent | Move it directly under `Row`/`Column`/`Flex` or `Stack`             |
+| `RenderBox was not laid out`                    | Earlier constraint error                                   | Fix first layout error in logs                                      |
 
 ## List in Column
 
@@ -155,11 +154,11 @@ class ProductHomeLayout extends StatelessWidget {
 
 Material 3 width classes:
 
-| Class | Width | Common pattern |
-|---|---:|---|
-| Compact | `< 600` | Single column, bottom navigation |
-| Medium | `600-839` | Two columns, navigation rail |
-| Expanded | `>= 840` | Multi-pane, permanent navigation |
+| Class    |     Width | Common pattern                   |
+| -------- | --------: | -------------------------------- |
+| Compact  |   `< 600` | Single column, bottom navigation |
+| Medium   | `600-839` | Two columns, navigation rail     |
+| Expanded |  `>= 840` | Multi-pane, permanent navigation |
 
 ## Keyboard and Insets
 

@@ -1,6 +1,5 @@
 # Common Patterns — Delta Sync
 
-
 ## Read first
 
 1. Delta sync = pull changed rows + deleted IDs after the last confirmed server cursor.
@@ -113,8 +112,8 @@ Future<void> setTableSyncDate(String key, DateTime date) async {
 
 ### When to Use
 
-| Scenario | Approach |
-|----------|----------|
-| Data rarely changes | Delta sync — fetches nothing when no changes |
-| Frequent small edits | Delta sync — fetches only changed rows |
-| Full data refresh needed | Full pull with `saveAll` |
+| Scenario                 | Approach                                     |
+| ------------------------ | -------------------------------------------- |
+| Data rarely changes      | Delta sync — fetches nothing when no changes |
+| Frequent small edits     | Delta sync — fetches only changed rows       |
+| Full data refresh needed | Full pull with `saveAll`                     |

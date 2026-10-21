@@ -1,6 +1,5 @@
 # Atomic Design
 
-
 ## Read first
 
 1. Use tokens for spacing/colors/radii/type/icon sizes. No raw literals/styles.
@@ -470,15 +469,15 @@ class ProductDashboardScreen extends ConsumerWidget {
 
 ## Placement Rules
 
-| Level | Location | Provider Access |
-|-------|----------|----------------|
-| Tokens | `core/theme/` | No |
-| Atoms | `core/widgets/atoms/` | No |
-| Molecules | `core/widgets/molecules/` | No |
-| Organisms (shared) | `core/widgets/organisms/` | No |
-| Organisms (feature) | `features/<feature>/presentation/widgets/` | No |
-| Templates | `core/widgets/templates/` | No |
-| Pages | `features/<feature>/presentation/screens/` | Yes |
+| Level               | Location                                   | Provider Access |
+| ------------------- | ------------------------------------------ | --------------- |
+| Tokens              | `core/theme/`                              | No              |
+| Atoms               | `core/widgets/atoms/`                      | No              |
+| Molecules           | `core/widgets/molecules/`                  | No              |
+| Organisms (shared)  | `core/widgets/organisms/`                  | No              |
+| Organisms (feature) | `features/<feature>/presentation/widgets/` | No              |
+| Templates           | `core/widgets/templates/`                  | No              |
+| Pages               | `features/<feature>/presentation/screens/` | Yes             |
 
 Folder layout SSOT: [architecture.md → Full Directory Structure](architecture.md#full-directory-structure). Other refs defer.
 
