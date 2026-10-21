@@ -1,6 +1,5 @@
 # Flutter Runtime and E2E Testing
 
-
 ## Read first
 
 1. Use available Dart MCP for development operations; use compatible Dart MCP or Marionette for live app interaction. Durable regression tests remain in the project runner. Use native commands when MCP is unavailable or cannot perform the operation.
@@ -44,19 +43,18 @@ Runtime E2E means real app behavior on a real simulator/device. Static review, s
 
 ## Choose the execution tool
 
-| Need | Route |
-|---|---|
-| Analyze, format, test, launch or inspect development state | Available official Dart and Flutter MCP tools; otherwise the project's native commands. |
-| Explore or smoke-test a running Flutter UI | Existing compatible Dart MCP UI support, or Marionette when its app binding and server are configured. |
-| Repeatable regression or CI proof | Existing `integration_test`/device runner and fixtures. Save the discovered failure there rather than relying on an agent's interaction transcript. |
-| Native OS surface or installed release | Platform automation and the exact requested artifact; Flutter widget inspection alone is insufficient. |
+| Need                                                       | Route                                                                                                                                               |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Analyze, format, test, launch or inspect development state | Available official Dart and Flutter MCP tools; otherwise the project's native commands.                                                             |
+| Explore or smoke-test a running Flutter UI                 | Existing compatible Dart MCP UI support, or Marionette when its app binding and server are configured.                                              |
+| Repeatable regression or CI proof                          | Existing `integration_test`/device runner and fixtures. Save the discovered failure there rather than relying on an agent's interaction transcript. |
+| Native OS surface or installed release                     | Platform automation and the exact requested artifact; Flutter widget inspection alone is insufficient.                                              |
 
 ### Optional Marionette runtime interaction
 
 [Marionette](https://github.com/leancodepl/marionette_mcp) drives a running Flutter
 app, not a pure-Dart CLI or backend. Treat it as optional tooling, not a default
 application dependency or global MCP installation.
-
 - Before setup, check the project's Flutter/package compatibility and align the
   `marionette_flutter` binding with the MCP server version. Binding placement =
   [E2E entrypoints](#e2e-entrypoints) (upstream: [single-binding setup](https://github.com/leancodepl/marionette_mcp/blob/main/docs/flutter-setup.md)).
@@ -78,22 +76,21 @@ application dependency or global MCP installation.
 Names = `dart_mcp_server` tool names; a client may add a prefix (e.g.
 `mcp_dart_`). Discover the connected server's schemas. Not Marionette tool names.
 
-| Goal | Tool | Default |
-|------|------|---------|
-| Manage project roots | `roots` | on |
-| Analyze code | `analyze_files` | on |
-| Connect to a running app | `dtd` (`listDtdUris`, then `connect`) or `vm_service` | on |
-| Hot reload / hot restart | `hot_reload` / `hot_restart` | on |
-| Recent runtime errors | `get_runtime_errors` | on |
-| Widget tree, selected widget, selection mode | `widget_inspector` | on |
-| Flutter Driver command | `flutter_driver_command` | on |
-| Auto-fix, format, run tests | `dart_fix`, `dart_format`, `run_tests` | off (`cli`) |
+| Goal                                                  | Tool                                                                          | Default                       |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------- |
+| Manage project roots                                  | `roots`                                                                       | on                            |
+| Analyze code                                          | `analyze_files`                                                               | on                            |
+| Connect to a running app                              | `dtd` (`listDtdUris`, then `connect`) or `vm_service`                         | on                            |
+| Hot reload / hot restart                              | `hot_reload` / `hot_restart`                                                  | on                            |
+| Recent runtime errors                                 | `get_runtime_errors`                                                          | on                            |
+| Widget tree, selected widget, selection mode          | `widget_inspector`                                                            | on                            |
+| Flutter Driver command                                | `flutter_driver_command`                                                      | on                            |
+| Auto-fix, format, run tests                           | `dart_fix`, `dart_format`, `run_tests`                                        | off (`cli`)                   |
 | List devices, launch/stop app, running apps, app logs | `list_devices`, `launch_app`, `stop_app`, `list_running_apps`, `get_app_logs` | off (`flutter_app_lifecycle`) |
 
 Off by default → enable with a server argument: `dart mcp-server --enable
 flutter_app_lifecycle`, `--enable cli` or `--enable <tool-name>`. Not enabled →
 CLI:
-
 - `flutter devices` → `flutter run --print-dtd -d <device> -t <entrypoint>` →
   printed DTD URI to `dtd` `connect`; stop that `flutter run` process at the end.
 - `dart fix --apply`, `dart format .`, `flutter test`.
@@ -102,15 +99,15 @@ CLI:
 
 Choose the smallest matrix that proves the feature:
 
-| Feature kind | Required runtime proof |
-|---|---|
-| Local-only UI/form | One app instance, create/edit/delete/error/empty, relaunch if persisted |
-| Remote CRUD | One app instance plus source-of-truth verification after create/update/delete |
-| Sync/realtime/cache invalidation | Writer app + observer app, observer updates without manual refresh |
-| Collaboration/team/chat/shared document | Two actors or two app instances minimum; ownership/member/removal/destructive paths |
-| Invite/code/link/token/slug/order generated remotely | Verify generated value in source of truth, then UI shows same value after mutation |
-| Permissions/auth gates | Allowed actor succeeds, denied/revoked actor sees blocked or fallback state |
-| Offline/retry/persistence | Disconnect or simulate failure when feasible, relaunch, retry, and verify no duplicate writes |
+| Feature kind                                         | Required runtime proof                                                                        |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Local-only UI/form                                   | One app instance, create/edit/delete/error/empty, relaunch if persisted                       |
+| Remote CRUD                                          | One app instance plus source-of-truth verification after create/update/delete                 |
+| Sync/realtime/cache invalidation                     | Writer app + observer app, observer updates without manual refresh                            |
+| Collaboration/team/chat/shared document              | Two actors or two app instances minimum; ownership/member/removal/destructive paths           |
+| Invite/code/link/token/slug/order generated remotely | Verify generated value in source of truth, then UI shows same value after mutation            |
+| Permissions/auth gates                               | Allowed actor succeeds, denied/revoked actor sees blocked or fallback state                   |
+| Offline/retry/persistence                            | Disconnect or simulate failure when feasible, relaunch, retry, and verify no duplicate writes |
 
 ## End-to-End Loop
 
@@ -173,7 +170,6 @@ Future<void> main() async {
 ```
 
 Rules:
-
 - Keep test-only overrides out of `main.dart`.
 - Prefer `--dart-define` flags for known app states: signed out, onboarding incomplete, update required, disabled notifications.
 - Do not mock the feature under test in the E2E entrypoint.
@@ -275,10 +271,10 @@ a terminal receipt. Unknown scenario ids fail before execution.
   "scenario": "shared-item",
   "restartState": "preserved",
   "steps": [
-    {"id": "create-parent", "parentId": null, "status": "passed"},
-    {"id": "create-child", "parentId": "create-parent", "status": "passed"}
+    { "id": "create-parent", "parentId": null, "status": "passed" },
+    { "id": "create-child", "parentId": "create-parent", "status": "passed" }
   ],
-  "totals": {"expected": 2, "completed": 2},
+  "totals": { "expected": 2, "completed": 2 },
   "status": "passed",
   "cleanup": "passed"
 }
@@ -297,7 +293,6 @@ callbacks that belong to the scenario before cleanup.
 ## Journey Checklist Template
 
 Copy this per feature.
-
 - Entry route opens from cold launch
 - Auth/account state is known
 - Empty/loading/error states render
@@ -317,7 +312,6 @@ Copy this per feature.
 ## Multi-Actor / Sync Protocol
 
 Use this for teams, squads, chat, shared documents, shared lists, invitations, realtime dashboards, multiplayer, collaborative editing, or any remote state expected to appear elsewhere.
-
 1. Actor A creates parent resource.
 2. Verify parent in source of truth.
 3. Actor B joins/gets access.
@@ -338,7 +332,6 @@ Use this for teams, squads, chat, shared documents, shared lists, invitations, r
 Use the project's real backend/admin read path, local database inspector, CLI, emulator API, or service SDK. Keep this generic; do not bake one vendor into the skill.
 
 Verify:
-
 - IDs used by the app match transport/source-of-truth IDs where required.
 - Generated fields, counters, order indexes, invites, slugs, and membership rows are current.
 - Deleted/revoked records are gone or marked inactive as designed.
@@ -370,13 +363,13 @@ build. Use the existing scenario receipt for this evidence.
 
 Trace only the boundaries involved in the reported failure:
 
-| Boundary | Evidence to obtain |
-|---|---|
-| Packaged configuration | Required native declaration, entitlement or resource exists in the built artifact. |
+| Boundary                        | Evidence to obtain                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Packaged configuration          | Required native declaration, entitlement or resource exists in the built artifact.                                                          |
 | Permission and platform service | Read back the available OS state and perform the requested capability/data operation; a completed permission request alone is insufficient. |
-| Plugin and app owner | Initialization and the smallest relevant call return a value or exact error; trace that result through app state to the UI. |
-| Registration and transport | Current app-instance registration belongs to the expected account/environment; read back the actual provider result. |
-| Device outcome | Native receipt, suppression or rejection, followed by the requested presentation, data change or tap/deep-link behavior. |
+| Plugin and app owner            | Initialization and the smallest relevant call return a value or exact error; trace that result through app state to the UI.                 |
+| Registration and transport      | Current app-instance registration belongs to the expected account/environment; read back the actual provider result.                        |
+| Device outcome                  | Native receipt, suppression or rejection, followed by the requested presentation, data change or tap/deep-link behavior.                    |
 
 Stop at the first failing or unknown prerequisite. Choose one check that
 distinguishes the remaining explanations before resending, rebuilding or

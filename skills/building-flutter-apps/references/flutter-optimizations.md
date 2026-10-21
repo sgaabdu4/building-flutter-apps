@@ -1,6 +1,5 @@
 # Flutter Optimizations
 
-
 ## Read first
 
 1. Never use `shrinkWrap` to fix layout; constrain or use slivers.
@@ -16,13 +15,13 @@ Signals: shrinkWrap, FadeTransition, Sliver, RepaintBoundary, Impeller, Isolate.
 
 ## Keys
 
-| Situation | Key Type | Example |
-|-----------|----------|---------|
-| Reorderable list | `ValueKey` | `ValueKey(item.id)` |
-| Heterogeneous children | `ValueKey` | Items with different types |
-| Multiple similar siblings | `ObjectKey` | `ObjectKey(item)` |
-| Force widget recreation | `UniqueKey` | `UniqueKey()` |
-| Access widget state from parent | `GlobalKey` | Form validation |
+| Situation                       | Key Type    | Example                    |
+| ------------------------------- | ----------- | -------------------------- |
+| Reorderable list                | `ValueKey`  | `ValueKey(item.id)`        |
+| Heterogeneous children          | `ValueKey`  | Items with different types |
+| Multiple similar siblings       | `ObjectKey` | `ObjectKey(item)`          |
+| Force widget recreation         | `UniqueKey` | `UniqueKey()`              |
+| Access widget state from parent | `GlobalKey` | Form validation            |
 
 ```dart
 ListView.builder(
@@ -82,11 +81,11 @@ CustomScrollView(
 
 `shrinkWrap: true` on `ListView`/`GridView` kill lazy load. Measure all children upfront — slow big lists.
 
-| Parent Context | Fix |
-|----------------|-----|
-| Column/Row | Wrap in `Expanded` or fixed-height `SizedBox` |
-| Bottom sheet | `DraggableScrollableSheet` with scroll controller |
-| Nested scroll | `CustomScrollView` + `SliverList` (see [Slivers](#slivers)) |
+| Parent Context | Fix                                                         |
+| -------------- | ----------------------------------------------------------- |
+| Column/Row     | Wrap in `Expanded` or fixed-height `SizedBox`               |
+| Bottom sheet   | `DraggableScrollableSheet` with scroll controller           |
+| Nested scroll  | `CustomScrollView` + `SliverList` (see [Slivers](#slivers)) |
 
 ```dart
 // WRONG — measures all children at once.
@@ -207,13 +206,13 @@ class _MyWidgetState extends State<MyWidget>
 
 ### saveLayer() Triggers
 
-| Widget | Trigger |
-|--------|---------|
-| `Opacity` | Always |
-| `ShaderMask` | Always |
-| `ColorFilter` | Always |
-| `Chip` | When `disabledColorAlpha != 0xff` |
-| `Text` | When using `overflowShader` |
+| Widget        | Trigger                           |
+| ------------- | --------------------------------- |
+| `Opacity`     | Always                            |
+| `ShaderMask`  | Always                            |
+| `ColorFilter` | Always                            |
+| `Chip`        | When `disabledColorAlpha != 0xff` |
+| `Text`        | When using `overflowShader`       |
 
 ### Clipping
 
@@ -249,13 +248,13 @@ final products = await Isolate.run(
 );
 ```
 
-| Task | Use Isolate? |
-|------|-------------|
-| Parse <100 items | No |
-| Parse 1000+ items | Yes |
-| Image processing | Yes |
-| Cryptographic hashing | Yes |
-| Simple math / File I/O | No |
+| Task                   | Use Isolate? |
+| ---------------------- | ------------ |
+| Parse <100 items       | No           |
+| Parse 1000+ items      | Yes          |
+| Image processing       | Yes          |
+| Cryptographic hashing  | Yes          |
+| Simple math / File I/O | No           |
 
 Isolate no access `ref`, providers, Flutter widgets. Pass only simple or serializable objects.
 
@@ -336,13 +335,13 @@ semantic labels, form labels, and visible accessibility copy come from
 
 ### Checklist
 
-| Requirement | Target |
-|-------------|--------|
-| Tap targets | Min 48x48 logical pixels |
-| Contrast ratio | Min 4.5:1 (text vs background) |
-| Color dependence | Never rely on color alone |
-| Screen reader | Every interactive widget has a localized label/tooltip |
-| Scale factors | UI legible at 200% text scale |
+| Requirement      | Target                                                 |
+| ---------------- | ------------------------------------------------------ |
+| Tap targets      | Min 48x48 logical pixels                               |
+| Contrast ratio   | Min 4.5:1 (text vs background)                         |
+| Color dependence | Never rely on color alone                              |
+| Screen reader    | Every interactive widget has a localized label/tooltip |
+| Scale factors    | UI legible at 200% text scale                          |
 
 Test with TalkBack (Android) + VoiceOver (iOS) on real devices.
 
@@ -385,11 +384,11 @@ LayoutBuilder(
 
 Follow Material 3 window size classes:
 
-| Class | Width | UI |
-|-------|-------|-----|
-| Compact | < 600 | Single column, bottom nav |
-| Medium | 600–839 | Two columns, rail nav |
-| Expanded | 840+ | Multi-pane, permanent nav |
+| Class    | Width   | UI                        |
+| -------- | ------- | ------------------------- |
+| Compact  | < 600   | Single column, bottom nav |
+| Medium   | 600–839 | Two columns, rail nav     |
+| Expanded | 840+    | Multi-pane, permanent nav |
 
 Name the thresholds once as tokens; never compare widths to raw numbers:
 
@@ -403,11 +402,11 @@ abstract final class Breakpoints {
 
 ## Build Modes
 
-| Mode | Use | Optimizations |
-|------|-----|---------------|
-| Debug | Development | Hot reload, asserts, no tree shaking |
-| Profile | Performance testing | Optimized + profiling |
-| Release | Production | Full AOT, tree shaking, no asserts |
+| Mode    | Use                 | Optimizations                        |
+| ------- | ------------------- | ------------------------------------ |
+| Debug   | Development         | Hot reload, asserts, no tree shaking |
+| Profile | Performance testing | Optimized + profiling                |
+| Release | Production          | Full AOT, tree shaking, no asserts   |
 
 Profile in **profile mode**, not debug.
 
@@ -418,9 +417,9 @@ Flutter render engine (default iOS 3.29+, Android API 29+ in 3.27+). Pre-compile
 ## Frame Budget
 
 | Display | Budget | Build + Render |
-|---------|--------|----------------|
-| 60Hz | 16ms | 8ms + 8ms |
-| 120Hz | 8ms | 4ms + 4ms |
+| ------- | ------ | -------------- |
+| 60Hz    | 16ms   | 8ms + 8ms      |
+| 120Hz   | 8ms    | 4ms + 4ms      |
 
 Frame exceed budget: profile DevTools, check rebuild count, look for intrinsic pass + `saveLayer()`, move heavy work to isolate.
 

@@ -1,6 +1,5 @@
 # Dart Patterns & Records
 
-
 ## Read first
 
 1. Multiple return values → Records, not `Map<String, dynamic>` or parallel lists.
@@ -12,16 +11,16 @@
 
 ## Class modifiers
 
-| Modifier | Extend outside lib | Implement outside lib | Instantiate | Mixin |
-|---|:---:|:---:|:---:|:---:|
-| `abstract class` | yes | yes | no | no |
-| `abstract interface class` | no | yes | no | no |
-| `abstract final class` | no | no | no | no |
-| `sealed class` | no | no | no | no |
-| `base class` | yes | no | yes | no |
-| `interface class` | no | yes | yes | no |
-| `final class` | no | no | yes | no |
-| `mixin class` | yes | yes | yes | yes |
+| Modifier                   | Extend outside lib | Implement outside lib | Instantiate | Mixin |
+| -------------------------- | :----------------: | :-------------------: | :---------: | :---: |
+| `abstract class`           |        yes         |          yes          |     no      |  no   |
+| `abstract interface class` |         no         |          yes          |     no      |  no   |
+| `abstract final class`     |         no         |          no           |     no      |  no   |
+| `sealed class`             |         no         |          no           |     no      |  no   |
+| `base class`               |        yes         |          no           |     yes     |  no   |
+| `interface class`          |         no         |          yes          |     yes     |  no   |
+| `final class`              |         no         |          no           |     yes     |  no   |
+| `mixin class`              |        yes         |          yes          |     yes     |  yes  |
 
 Contract = `abstract interface class`; Freezed union = `sealed class`; helper namespace = `abstract final class`.
 
@@ -161,6 +160,8 @@ return switch (state) {
 ```
 
 ### Object & list destructuring
+
+Destructure an object or `MapEntry` when it unpacks 3+ fields used across statements, iterates `map.entries` as `MapEntry(:key, :value)`, or promotes nullable fields (`:device!`). Keep plain property access for one field, a 1–2 field short method, or fields passed straight into one call.
 
 ```dart
 // Object pattern with guard

@@ -7,12 +7,12 @@
 
 ## Ownership
 
-| Owner | Contract |
-|---|---|
-| `presentation/widgets/` | Render immutable view inputs + emit typed callbacks + own UI lifecycle objects only. |
-| `presentation/screens/` | Bind providers + map domain state to view data + branch visible workflow + coordinate callbacks. |
-| Typed route | Own page navigation + route arguments + route results. |
-| Generated notifier/provider | Own domain selection + workflow/mutation state + repository/service calls. |
+| Owner                       | Contract                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `presentation/widgets/`     | Render immutable view inputs + emit typed callbacks + own UI lifecycle objects only.             |
+| `presentation/screens/`     | Bind providers + map domain state to view data + branch visible workflow + coordinate callbacks. |
+| Typed route                 | Own page navigation + route arguments + route results.                                           |
+| Generated notifier/provider | Own domain selection + workflow/mutation state + repository/service calls.                       |
 
 Widget `State` allowed = text/scroll/page/tab/animation controllers + focus nodes + cancellable UI timers/debouncers.
 

@@ -17,12 +17,12 @@ Signals = Crashlytics + FirebaseCrashlytics + Sentry + sentry_flutter + DSN + `C
 
 ## Provider branch
 
-| Repository evidence | Action |
-|---|---|
-| Firebase Crashlytics only | Keep direct Firebase calls inside `Crash`; initialize Firebase once. |
-| Sentry only | Initialize with `SentryFlutter.init(..., appRunner: ...)`; `Crash.error` calls `Sentry.captureException`. |
-| Explicitly accepted dual reporting | Initialize Firebase before Sentry; Sentry owns `appRunner`; each manual event reaches each provider once. |
-| No provider + no accepted telemetry decision | Stop at provider/data/environment decision; do not install a default. |
+| Repository evidence                          | Action                                                                                                    |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Firebase Crashlytics only                    | Keep direct Firebase calls inside `Crash`; initialize Firebase once.                                      |
+| Sentry only                                  | Initialize with `SentryFlutter.init(..., appRunner: ...)`; `Crash.error` calls `Sentry.captureException`. |
+| Explicitly accepted dual reporting           | Initialize Firebase before Sentry; Sentry owns `appRunner`; each manual event reaches each provider once. |
+| No provider + no accepted telemetry decision | Stop at provider/data/environment decision; do not install a default.                                     |
 
 Dual reporting = requested migration/coverage only; redundancy alone does not justify two providers.
 

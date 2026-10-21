@@ -1,6 +1,5 @@
 # Networking
 
-
 ## Read first
 
 1. HTTP calls live only in datasources/infra services. Widgets/notifiers never call clients.

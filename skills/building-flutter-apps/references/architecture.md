@@ -1,6 +1,5 @@
 # Architecture
 
-
 ## Read first
 
 1. Data models != domain entities. Domain has no JSON, Flutter, storage, or SDK imports.
@@ -454,11 +453,11 @@ Dialogs and sheets stay local semantic helpers; dismiss them with
 
 ## Complexity Tiers
 
-| Tier | Data | Auth | Example | Implementation |
-|------|------|------|---------|----------------|
-| 1 | Simple, no PII | None | To-do lists, notes | Single repo + local Hive datasource, no remote |
-| 2 | Public data | Basic | Social, catalogs | Remote + local datasources, HTTP |
-| 3 | PII, financial | Full | Banking, health | Full arch, domain errors |
+| Tier | Data           | Auth  | Example            | Implementation                                 |
+| ---- | -------------- | ----- | ------------------ | ---------------------------------------------- |
+| 1    | Simple, no PII | None  | To-do lists, notes | Single repo + local Hive datasource, no remote |
+| 2    | Public data    | Basic | Social, catalogs   | Remote + local datasources, HTTP               |
+| 3    | PII, financial | Full  | Banking, health    | Full arch, domain errors                       |
 
 Default Tier 2. Drop to Tier 1 only for trivial apps. Tier 3 for regulated industries.
 

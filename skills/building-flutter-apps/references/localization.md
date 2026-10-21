@@ -1,6 +1,5 @@
 # Localization
 
-
 ## Read first
 
 1. All user-visible production copy uses gen-l10n ARB, never ad hoc UI strings.

@@ -15,23 +15,23 @@ This is a tested floor, not a floating "latest" policy. Projects below it must
 upgrade their SDK constraint, CI image, and local toolchain together; do not add
 legacy branches. Re-run the compatibility fixture before raising the floor.
 
-| Package | Constraint | Purpose |
-|---|---:|---|
-| `flutter_riverpod` | `3.4.3` | State management |
-| `riverpod_annotation` | `4.0.7` | Provider annotations |
-| `riverpod_generator` | `4.0.9` | Provider generation |
-| `freezed_annotation` | `3.1.0` | Immutable models |
-| `freezed` | `4.0.2` | Immutable-model generation |
-| `json_annotation` | `^4.12.0` | JSON annotations |
-| `json_serializable` | `6.14.1` | JSON generation |
-| `go_router` | `^18.0.1` | Routing |
-| `go_router_builder` | `4.5.0` | Typed-route generation |
-| `hive_ce` | `^2.20.0` | Local persistence |
-| `hive_ce_flutter` | `^2.3.4` | Flutter persistence integration |
-| `hive_ce_generator` | `1.11.3` | Hive adapter generation |
-| `build_runner` | `2.16.1` | Build orchestration |
-| `analyzer` | `14.4.0` | Analyzer |
-| `flutter_lints` | `6.0.0` | Base Flutter lints |
+| Package               | Constraint | Purpose                         |
+| --------------------- | ---------: | ------------------------------- |
+| `flutter_riverpod`    |    `3.4.3` | State management                |
+| `riverpod_annotation` |    `4.0.7` | Provider annotations            |
+| `riverpod_generator`  |    `4.0.9` | Provider generation             |
+| `freezed_annotation`  |    `3.1.0` | Immutable models                |
+| `freezed`             |    `4.0.2` | Immutable-model generation      |
+| `json_annotation`     |  `^4.12.0` | JSON annotations                |
+| `json_serializable`   |   `6.14.1` | JSON generation                 |
+| `go_router`           |  `^18.0.1` | Routing                         |
+| `go_router_builder`   |    `4.5.0` | Typed-route generation          |
+| `hive_ce`             |  `^2.20.0` | Local persistence               |
+| `hive_ce_flutter`     |   `^2.3.4` | Flutter persistence integration |
+| `hive_ce_generator`   |   `1.11.3` | Hive adapter generation         |
+| `build_runner`        |   `2.16.1` | Build orchestration             |
+| `analyzer`            |   `14.4.0` | Analyzer                        |
+| `flutter_lints`       |    `6.0.0` | Base Flutter lints              |
 
 ## Analyzer plugins
 

@@ -1,6 +1,5 @@
 # Widget Previews
 
-
 ## Read first
 
 1. Import `package:flutter/widget_previews.dart` only in preview files/preview blocks.
@@ -138,15 +137,15 @@ class FakeProductRepository implements IProductRepository {
 
 For reusable widgets, add enough previews to catch real UI states:
 
-| State | Required preview |
-|---|---|
-| Empty/null | Empty state surface |
-| Loading | Skeleton/spinner state if visible |
-| Data | Typical content |
-| Long text | Longest likely localized string |
-| Error | Non-sensitive failure message |
-| Theme | Light and dark when supported |
-| Width | Compact and expanded when layout changes |
+| State      | Required preview                         |
+| ---------- | ---------------------------------------- |
+| Empty/null | Empty state surface                      |
+| Loading    | Skeleton/spinner state if visible        |
+| Data       | Typical content                          |
+| Long text  | Longest likely localized string          |
+| Error      | Non-sensitive failure message            |
+| Theme      | Light and dark when supported            |
+| Width      | Compact and expanded when layout changes |
 
 ## Limitations
 

@@ -1,6 +1,5 @@
 # Common Patterns — Lists, Forms, and Workflows
 
-
 ## Read first
 
 1. Use Freezed state plus `@Riverpod` codegen for pagination, search, and forms.

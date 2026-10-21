@@ -1,6 +1,5 @@
 # Riverpod 3.x Codegen
 
-
 ## Read first
 
 1. Every provider shape uses `@riverpod`/`@Riverpod(keepAlive: true)` codegen. No manual providers.
@@ -47,17 +46,17 @@ Add `package:flutter_riverpod/flutter_riverpod.dart` only when the file also use
 
 Riverpod 3.x strip "Notifier" suffix from class-based provider names:
 
-| Class | Generated Provider |
-|---|---|
-| `CartNotifier` | `cartProvider` |
-| `ProductNotifier` | `productProvider` |
-| `AuthNotifier` | `authProvider` |
+| Class             | Generated Provider |
+| ----------------- | ------------------ |
+| `CartNotifier`    | `cartProvider`     |
+| `ProductNotifier` | `productProvider`  |
+| `AuthNotifier`    | `authProvider`     |
 
 Functional providers keep full name:
-| Function | Generated Provider |
-|---|---|
+| Function                 | Generated Provider          |
+| ------------------------ | --------------------------- |
 | `productRepository(Ref)` | `productRepositoryProvider` |
-| `cartTotal(Ref)` | `cartTotalProvider` |
+| `cartTotal(Ref)`         | `cartTotalProvider`         |
 
 Never write `xxxNotifierProvider` — not exist in codegen output.
 
@@ -374,19 +373,18 @@ Execution order:
 3. Choose startup mode (`persist(...)` or `await persist(...).future`).
 4. Add in-memory persistence tests.
 
-1. **One owner per feature state**: use repository/data persistence or notifier persistence, never both.
-2. **Cache policy**: default retention 2 days; set `StorageOptions(cacheTime: ...)` when needed; use `unsafe_forever` only with cleanup.
-3. **Persist keys**: keys must be unique, stable across restarts, include family params.
-4. **Versioned reset**: use `StorageOptions(destroyKey: ...)` when cached provider state must be hard-reset after a shape change.
-5. **Startup mode**: use `persist(...)` for network-first init, or `await persist(...).future` to hydrate state first.
-6. **UI signal**: use `AsyncValue.isFromCache` for cached/offline indicators.
-7. **Tests**: override storage with `Storage.inMemory()` in unit/widget tests.
-8. **Codegen**: use `@JsonPersist()` when JSON-serializable models available.
+5. **One owner per feature state**: use repository/data persistence or notifier persistence, never both.
+6. **Cache policy**: default retention 2 days; set `StorageOptions(cacheTime: ...)` when needed; use `unsafe_forever` only with cleanup.
+7. **Persist keys**: keys must be unique, stable across restarts, include family params.
+8. **Versioned reset**: use `StorageOptions(destroyKey: ...)` when cached provider state must be hard-reset after a shape change.
+9. **Startup mode**: use `persist(...)` for network-first init, or `await persist(...).future` to hydrate state first.
+10. **UI signal**: use `AsyncValue.isFromCache` for cached/offline indicators.
+11. **Tests**: override storage with `Storage.inMemory()` in unit/widget tests.
+12. **Codegen**: use `@JsonPersist()` when JSON-serializable models available.
 
 ## Pause/Resume
 
 Riverpod 3.0 pause providers when listeners not visible:
-
 - Widgets off-screen (based on `TickerMode`) pause their providers
 - If provider only used by paused providers, it pauses too
 - When provider rebuilds, previous subscriptions stay until rebuild completes

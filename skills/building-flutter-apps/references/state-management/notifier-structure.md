@@ -26,7 +26,6 @@ class CartNotifier extends _$CartNotifier {
 ```
 
 Rules:
-
 - Use generated refs from the base class; do not store a `Ref` field.
 - Do not use `StateNotifier`, `StateNotifierProvider`, `StateProvider`, manual `Provider`, or manual `AsyncNotifierProvider`.
 - State is a sealed Freezed class when it carries meaningful state.
@@ -74,7 +73,6 @@ For app state with explicit flags, keep a Freezed state object behind a sync not
 ## Loading and progress
 
 Keep initial loading, background refresh, and load-more state distinct:
-
 - `isLoading`: first load only.
 - `isRefreshing`: already-rendered data is being refreshed.
 - `isLoadingMore`: paginated append.
