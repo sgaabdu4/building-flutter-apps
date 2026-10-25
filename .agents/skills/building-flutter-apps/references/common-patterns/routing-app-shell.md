@@ -1,6 +1,5 @@
 # Common Patterns — Routing and App Shell
 
-
 ## Read first
 
 1. Use `go_router_builder` typed route classes as the navigation API; route definitions own paths.
@@ -98,7 +97,6 @@ Create GoRouter once. Use `ref.listen()` + `refreshListenable` to trigger redire
 Keep redirect decisions pure. The GoRouter closure should read providers, call a pure resolver, and return the result. Matrix-test the resolver.
 
 **Redirect rules for apps with multi-step setup (profile completion, roles):**
-
 - **During loading, MUST stay put.** Return `null` — NEVER bounce to splash. On web refresh, redirecting `/chat` → `/` → `/home` loses URL. One exception: authenticated users on login/signup redirect to splash.
 - **Initial sync MUST NOT hold splash.** Once auth/setup state is known, redirect from splash to the shell and keep sync/data refresh running in the background. A cover screen that waits on `InitialSyncStatus.syncing` blocks startup on network, remote query, and local merge latency. Lint: `router_splash_waits_for_initial_sync`.
 - **Auth pages MUST navigate explicitly.** Add `ref.listen(authProvider)` in login/signup pages, navigate on auth success. `refreshListenable` timing unreliable; explicit nav guarantees transition.
@@ -303,15 +301,15 @@ Same-flow children = auth/login/signup, onboarding step, destructive confirm, im
 
 **Forbidden (lint enforced)** — every form below has a typed-route replacement above:
 
-| Anti-pattern | Lint |
-|---|---|
-| String route path from feature code | `router_string_nav` |
-| Direct `GoRouter.of(context)` usage | `router_gorouter_of` |
-| Injected router or `context.go(route.location)` usage | `router_direct_route_call` |
-| Raw `GoRouter` / `GoRoute` definitions outside the router boundary or shared test router helper | `router_raw_route_definition` |
-| Direct `Navigator` page route usage | `router_untyped_navigator_push` |
-| Splash/cover waits for initial sync | `router_splash_waits_for_initial_sync` |
-| Extra navigation wrapper around typed routes | navigation SSOT lints |
+| Anti-pattern                                                                                    | Lint                                   |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------- |
+| String route path from feature code                                                             | `router_string_nav`                    |
+| Direct `GoRouter.of(context)` usage                                                             | `router_gorouter_of`                   |
+| Injected router or `context.go(route.location)` usage                                           | `router_direct_route_call`             |
+| Raw `GoRouter` / `GoRoute` definitions outside the router boundary or shared test router helper | `router_raw_route_definition`          |
+| Direct `Navigator` page route usage                                                             | `router_untyped_navigator_push`        |
+| Splash/cover waits for initial sync                                                             | `router_splash_waits_for_initial_sync` |
+| Extra navigation wrapper around typed routes                                                    | navigation SSOT lints                  |
 
 ### StatefulShellRoute Tabs
 

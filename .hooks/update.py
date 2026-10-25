@@ -14,8 +14,10 @@ from collections.abc import Callable
 from operator import itemgetter
 from pathlib import Path
 
+import agent_hooks
 import hook_chain
 from mcp_setup import retired_settings
+from release_history import StaleRelease, ordered
 from update_runner import (
     commit_update,
     current_head,
@@ -169,12 +171,7 @@ def fetch_sources(temporary: Path, revision: str, previous: str) -> tuple[Path, 
         check=True,
         timeout=60,
     )
-    subprocess.run(
-        ["git", "merge-base", "--is-ancestor", previous, revision],
-        cwd=source,
-        check=True,
-        timeout=30,
-    )
+    ordered(source, revision, previous)
     subprocess.run(
         ["git", "worktree", "add", "--quiet", "--detach", str(old), previous],
         cwd=source,
@@ -674,10 +671,11 @@ def validate_gates(root: Path, source: Path, changes: dict[str, str | None]) -> 
 
 
 def repair_current_hook(root: Path, previous: str) -> str:
+    worktree = hook_chain.install_worktree_hook(root)
     if not pre_push_missing(root) and not hook_chain.foreign_hook(
         root, hook_chain.locate(root)[1]
     ):
-        return "No newer CI-verified Hard Eng revision is available."
+        return f"No newer CI-verified Hard Eng revision is available{worktree}."
     with tempfile.TemporaryDirectory(prefix="hard-eng-update-") as temporary:
         source, old = fetch_sources(Path(temporary), previous, previous)
         _, _, hook, _ = update_plan(root, source, old)
@@ -711,6 +709,7 @@ def repair_installation(root: Path, previous: str) -> str:
     status = "No newer CI-verified Hard Eng revision is available"
     if install_planned_hook(root, hook):
         status += "; installed the missing pre-push hook"
+    status += hook_chain.install_worktree_hook(root)
     names = sorted({*missing, *added})
     clean = bool(names) and not local_state(root, names)
     moved = {name for name in missing if retired_parent(root, name)}
@@ -852,6 +851,8 @@ INSTALLED_FILES = {
     "AGENTS.override.md",
     ".husky/pre-push",
     ".github/workflows/hard-eng.yml",
+    ".github/workflows/pr-text.yml",
+    *agent_hooks.HOOK_FILES.values(),
 }
 
 
@@ -911,7 +912,8 @@ def release_installed(
     root: Path, base: str, names: set[str], revision: str, previous: str
 ) -> bool:
     """Whether these paths hold exactly what the verified release installs."""
-    from ci_setup import workflow_installed
+    from agent_hooks import preserved_instructions
+    from ci_setup import setup_installed
 
     with tempfile.TemporaryDirectory(prefix="hard-eng-scaffold-check-") as temporary:
         source, old = fetch_sources(Path(temporary), revision, previous)
@@ -934,7 +936,7 @@ def release_installed(
                 for name in scaffold_files(old) - scaffold_files(source)
             )
             or not preserved_instructions(root, base, names)
-            or not workflow_installed(root, base, names, (source, old))
+            or not setup_installed(root, base, names, (source, old))
         ):
             return False
         validate_gates(root, source, {})
@@ -950,7 +952,10 @@ def check_scaffold_update(root: Path, base: str) -> bool:
         raise ValueError(
             "Scaffold update does not identify a successful upstream hard-eng check"
         )
-    if not release_installed(root, base, names, revision, previous):
+    try:
+        if not release_installed(root, base, names, revision, previous):
+            return False
+    except (subprocess.CalledProcessError, StaleRelease):
         return False
     print(
         "Scaffold-only update: source CI verified and the gate configuration accepted.",
@@ -973,22 +978,3 @@ def installed_update_paths(root: Path, base: str) -> set[str]:
     except (OSError, ValueError, TypeError, subprocess.SubprocessError):
         return set()
     return installed if proven else set()
-
-
-def preserved_instructions(root: Path, base: str, names: set[str]) -> bool:
-    from agent_hooks import instruction_suffix
-
-    for name in names & {"AGENTS.md", "CLAUDE.md", "AGENTS.override.md"}:
-        blob = f"{base}:{name}"
-        original = subprocess.run(
-            ["git", "show", blob],
-            cwd=root,
-            text=True,
-            capture_output=True,
-            check=False,
-        ).stdout
-        if not (root / name).is_file() or instruction_suffix(
-            original
-        ) != instruction_suffix((root / name).read_text()):
-            return False
-    return True

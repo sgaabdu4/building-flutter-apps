@@ -1,6 +1,5 @@
 # Freezed Sealed Classes
 
-
 ## Read first
 
 1. `@freezed` classes use `sealed class`, never `abstract class`.
@@ -33,7 +32,7 @@ Signals: Freezed, sealed class, @freezed, build.yaml, explicit_to_json, copyWith
 ```yaml
 # pubspec.yaml — see core-stack.md for canonical versions
 environment:
-  sdk: '>=3.13.0 <4.0.0'  # core-stack.md SDK floor
+  sdk: ">=3.13.0 <4.0.0" # core-stack.md SDK floor
 
 dependencies:
   freezed_annotation: <version>
@@ -370,7 +369,7 @@ targets:
     builders:
       freezed:
         options:
-          format: false          # faster builds
+          format: false # faster builds
           copy_with: true
           equal: true
           union_key: type
@@ -404,13 +403,13 @@ sealed class Order with _$Order {
 }
 ```
 
-| Belongs on model | Goes elsewhere |
-|-----------------|---------------|
-| Computed getters (`total`, `isExpired`) | Needs external deps (API, DB) → Repository |
-| Boolean checks (`inStock`, `isOverdue`) | Reads multiple unrelated models → Repository |
-| Collection flattening (`allResults`) | Needs Ref/providers → Notifier |
-| Transform to another type (`toClaims()`) | Side effects (HTTP, I/O) → Datasource |
-| Format for API (`toFormFields()`) | |
+| Belongs on model                         | Goes elsewhere                               |
+| ---------------------------------------- | -------------------------------------------- |
+| Computed getters (`total`, `isExpired`)  | Needs external deps (API, DB) → Repository   |
+| Boolean checks (`inStock`, `isOverdue`)  | Reads multiple unrelated models → Repository |
+| Collection flattening (`allResults`)     | Needs Ref/providers → Notifier               |
+| Transform to another type (`toClaims()`) | Side effects (HTTP, I/O) → Datasource        |
+| Format for API (`toFormFields()`)        |                                              |
 
 Data models follow same rule: `toEntity()`, `toRequestBody()`, `toCsvRow()` all belong on model.
 
@@ -434,9 +433,9 @@ targets:
 
 ### Quick Reference
 
-| Setting | What it does | When needed |
-|---|---|---|
-| `@freezed` + `fromJson` factory | Generates both `fromJson` and `toJson` | Always — standard Freezed pattern |
-| `build.yaml explicit_to_json` | Calls `.toJson()` on nested objects | Always — set once, forget |
-| `@Freezed(toJson: true)` | Forces `toJson` generation | Only if class has NO `fromJson` factory (rare) |
-| `@JsonSerializable(explicitToJson: true)` | Per-class deep serialization | NEVER — use build.yaml |
+| Setting                                   | What it does                           | When needed                                    |
+| ----------------------------------------- | -------------------------------------- | ---------------------------------------------- |
+| `@freezed` + `fromJson` factory           | Generates both `fromJson` and `toJson` | Always — standard Freezed pattern              |
+| `build.yaml explicit_to_json`             | Calls `.toJson()` on nested objects    | Always — set once, forget                      |
+| `@Freezed(toJson: true)`                  | Forces `toJson` generation             | Only if class has NO `fromJson` factory (rare) |
+| `@JsonSerializable(explicitToJson: true)` | Per-class deep serialization           | NEVER — use build.yaml                         |

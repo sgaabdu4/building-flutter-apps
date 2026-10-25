@@ -5,7 +5,6 @@ Load for a new video, or when a script line changes.
 ## Brief
 
 Collect before writing:
-
 - audience + goal: buyers (marketing, default 2–2.5 min) or users learning the product (explainer, as long as every function needs, typically 3–4 min);
 - where it plays; sound off likely → `subtitles: true`;
 - brand owner's display font file, logos for every party, colours;
@@ -16,16 +15,16 @@ Collect before writing:
 
 ## Scene types
 
-| Type | Fields | Use |
-| --- | --- | --- |
-| `intro` | `title` + `kicker` (one brand), or none (logo `a` × `b`) | Opening |
-| `statement` | `title`, optional `sub`, `cards` `[{tag, text}]`, `bands` | Problem, offer, why |
-| `title` | `text`, optional `card: true` + `kicker` | Bridge or section title |
-| `app` | `num`, `label`, optional `who`, `clips` or `groups` | One chapter per journey |
-| `flow` | `text`, `nodes` `[{name, note, hero, logo, rows, badge}]` | How data or work moves (2–4 nodes) |
-| `loop` | `text`, `nodes` (strings), `you` (index), `badge` | Repeating cycle |
-| `collage` | `text`, `shots` (paths relative to the work folder) | Recap |
-| `outro` | `title` + `kicker` or logos; `text`, `cta` | Close |
+| Type        | Fields                                                    | Use                                |
+| ----------- | --------------------------------------------------------- | ---------------------------------- |
+| `intro`     | `title` + `kicker` (one brand), or none (logo `a` × `b`)  | Opening                            |
+| `statement` | `title`, optional `sub`, `cards` `[{tag, text}]`, `bands` | Problem, offer, why                |
+| `title`     | `text`, optional `card: true` + `kicker`                  | Bridge or section title            |
+| `app`       | `num`, `label`, optional `who`, `clips` or `groups`       | One chapter per journey            |
+| `flow`      | `text`, `nodes` `[{name, note, hero, logo, rows, badge}]` | How data or work moves (2–4 nodes) |
+| `loop`      | `text`, `nodes` (strings), `you` (index), `badge`         | Repeating cycle                    |
+| `collage`   | `text`, `shots` (paths relative to the work folder)       | Recap                              |
+| `outro`     | `title` + `kicker` or logos; `text`, `cta`                | Close                              |
 
 ## Shape + wording
 

@@ -66,18 +66,14 @@ def open_pull(root: Path) -> dict[str, JsonValue] | None:
             "--state",
             "open",
             "--json",
-            "url,title,statusCheckRollup,headRefOid",
-            "--limit",
-            "1",
+            "url,title,statusCheckRollup,headRefOid,isCrossRepository",
         )
     )
     if not isinstance(rows, list):
         raise ShippingError("update PR query must return a list")
-    if not rows:
-        return None
-    if not isinstance(rows[0], dict):
+    if not all(isinstance(row, dict) for row in rows):
         raise ShippingError("update PR must be an object")
-    return rows[0]
+    return next((row for row in rows if row.get("isCrossRepository") is False), None)
 
 
 def check_state(pull: dict[str, JsonValue], required: list[str] | None = None) -> str:

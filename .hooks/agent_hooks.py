@@ -33,6 +33,23 @@ def instruction_suffix(content: str) -> str:
     return content.split(end + "\n", 1)[-1]
 
 
+def preserved_instructions(root: Path, base: str, names: set[str]) -> bool:
+    for name in names & {"AGENTS.md", "CLAUDE.md", "AGENTS.override.md"}:
+        blob = f"{base}:{name}"
+        original = subprocess.run(
+            ["git", "show", blob],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+        ).stdout
+        if not (root / name).is_file() or instruction_suffix(
+            original
+        ) != instruction_suffix((root / name).read_text()):
+            return False
+    return True
+
+
 def configure_instructions(
     root: Path, source: Path, previous: Path | None, changes: dict[str, str]
 ) -> list[str]:
@@ -181,13 +198,13 @@ def project_pre_push(root: Path, hook: Path) -> Path:
             owner, hook = common.parent, directory / hook.name
     shim = '#!/usr/bin/env sh\n. "$(dirname "$0")/h"'
     if (
-        hook == owner / ".husky/_/pre-push"
+        hook == owner / ".husky/_" / hook.name
         and not hook.is_symlink()
         and hook.is_file()
         and hook.read_text().rstrip("\n") == shim
         and (hook.parent / "h").is_file()
     ):
-        return root / ".husky/pre-push"
+        return root / ".husky" / hook.name
     return hook
 
 
@@ -220,6 +237,11 @@ def owned_hook_entry(
 
 
 HOOK_TIMEOUTS = {"session": 60, "stop": 3600}
+POLL_COMMAND = 'python3 "$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/polling.py" 2>/dev/null || true'
+POLL_HOOK: JsonObject = {
+    "matcher": "Bash",
+    "hooks": [{"type": "command", "command": POLL_COMMAND, "timeout": 5}],
+}
 CODEX_HOOK_STATUS = {
     "session": "Hard Eng: updating project setup",
     "stop": "Hard Eng: verifying changes",
@@ -269,6 +291,49 @@ HOOK_FILES = {
     "claude": ".claude/settings.json",
     "codex": ".codex/hooks.json",
 }
+
+
+CLAUDE_ATTRIBUTION = re.compile(
+    r"^(?:Co-Authored-By:.*noreply@anthropic\.com|Claude-Session:.*"
+    r"|[ \t]*(?:🤖[ \t]*|_)?Generated (?:with|by) \[Claude Code\]\(.*|https://claude\.ai/code/session_\S+)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def attribution_off(root: Path, kind: str) -> bool:
+    try:
+        settings = json.loads((root / HOOK_FILES["claude"]).read_text())
+    except (OSError, ValueError):
+        return False
+    attribution = settings.get("attribution") if isinstance(settings, dict) else None
+    return isinstance(attribution, dict) and attribution.get(kind) == ""
+
+
+def without_attribution_footer(text: str) -> str:
+    """The cloud GitHub proxy appends this footer to every PR body it writes."""
+    lines = text.rstrip().splitlines()
+    end = len(lines)
+    while end and (
+        CLAUDE_ATTRIBUTION.search(lines[end - 1])
+        or lines[end - 1].strip() in {"", "---"}
+    ):
+        end -= 1
+    if not any(CLAUDE_ATTRIBUTION.search(line) for line in lines[end:]):
+        return text
+    return "\n".join(lines[:end]) + "\n"
+
+
+def reject_attribution(
+    root: Path, kind: str, text: str, where: str, error: type[ValueError] = ValueError
+) -> None:
+    """Enforce the committed Claude setting that turns this attribution off."""
+    if not attribution_off(root, kind):
+        return
+    if found := CLAUDE_ATTRIBUTION.search(text):
+        raise error(
+            f"{where} has Claude attribution, which .claude/settings.json turns off: "
+            f"{found.group().strip()}"
+        )
 
 
 def retired_copilot_entry(native: str, entry: JsonValue, command: str) -> bool:
@@ -444,6 +509,7 @@ def gate_status(root: Path) -> str:
                     ".agents/skills",
                     "hard-eng.gates.json",
                     ".husky/pre-push",
+                    ".husky/post-checkout",
                 ],
                 cwd=root,
                 text=True,
@@ -558,6 +624,13 @@ def passed_notice(
     return {"systemMessage": notice} if notice else completion_notice(agent, output)
 
 
+def bounded(text: str, *, tail: bool = False) -> str:
+    if len(text) <= GATE_OUTPUT_LIMIT:
+        return text
+    note = "\n[gate output cut; rerun check for the full log]\n"
+    return note + text[-GATE_OUTPUT_LIMIT:] if tail else text[:GATE_OUTPUT_LIMIT] + note
+
+
 def failure_summary(log: str) -> str:
     """Failed gate names, then the first failing gate's output from its start."""
     failures = re.findall(
@@ -565,18 +638,49 @@ def failure_summary(log: str) -> str:
         log,
     )
     if not failures:
-        return log[-GATE_OUTPUT_LIMIT:]
+        return bounded(log, tail=True)
     heading = "Failed gates: " + ", ".join(dict.fromkeys(n for n, _ in failures)) + "\n"
     name, package = failures[0]
     owner = re.escape(f"{package}/" if package else "") or r"(?:\S*/)?"
     start = re.search(rf"OUTPUT {owner}{re.escape(name)}[^\n]*\n", log)
     if start is None:
-        return heading + log[-GATE_OUTPUT_LIMIT:]
+        return heading + bounded(log, tail=True)
     body = log[start.end() :]
     tail = f"[^\n]* @ {re.escape(package)}(?!\\S)" if package else ""
     finished = re.escape(name) + r"(?: \(exit|:)" + tail
     end = re.search(rf"(?m)^(?:CHECK|OUTPUT) \S*/\S+|(?:PASS|FAIL) {finished}", body)
-    return heading + body[: end.start() if end else None][:GATE_OUTPUT_LIMIT]
+    return heading + bounded(body[: end.start() if end else None])
+
+
+def repeat_note(root: Path, output: str) -> str:
+    """Counts each failure by its failing lines with numbers masked; a second sighting is a repeat."""
+    lines = {
+        re.sub(r"\d+(?:\.\d+)?", "#", line.strip())
+        for line in output.splitlines()
+        if re.search(r"(?i)fail|error", line)
+    }
+    key = hashlib.sha256("\n".join(sorted(lines)).encode()).hexdigest()[:16]
+    path = root / ".hard-eng/failures.json"
+    try:
+        loaded: JsonValue = json.loads(path.read_text())
+    except (OSError, ValueError):
+        loaded = None
+    seen: dict[str, int] = (
+        {name: value for name, value in loaded.items() if isinstance(value, int)}
+        if isinstance(loaded, dict)
+        else {}
+    )
+    count = seen.pop(key, 0) + 1
+    seen[key] = count
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps(dict(list(seen.items())[-100:])))
+    if count < 2:
+        return ""
+    return (
+        f"\n\nRepeat failure: seen {count} times in this checkout. Before another similar try, "
+        "follow .agents/skills/he-learn/SKILL.md: find the shared cause and every place it occurs, "
+        "then record them on the plan's Same cause line."
+    )
 
 
 def show_decisions(root: Path, names: list[str], state: Path | None) -> str:
@@ -729,7 +833,7 @@ def paused_turn(payload: JsonObject) -> JsonObject | None:
 
 
 def completion(root: Path, payload: JsonObject, agent: str | None = None) -> JsonObject:
-    from plans import build_in_progress, planning_feedback, planning_only
+    from plans import planning_feedback, planning_only
 
     if (paused := paused_turn(payload)) is not None:
         return paused
@@ -763,41 +867,58 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
                 root,
                 {"systemMessage": notice + ". Planning-only; no code checks run."},
             )
-        claim = str(
-            payload.get("last_assistant_message", payload.get("lastAssistantMessage"))
+        return checked_changes(
+            root, payload, state, agent, (base, current, changed, notice)
         )
-        # HE Build keeps a plan Ready until its final gate; only its handoff needs Complete.
-        building = not SHIP_CLAIM.search(claim) and build_in_progress(
-            root, set(changed.splitlines())
-        )
-        verified: JsonObject = {
-            "base": base,
-            "files": dict(current),
-            "building": building,
-        }
-        if last_pass(state) == verified:
-            return with_freshness(
-                root,
-                {
-                    "systemMessage": "Hard Eng: unchanged since last passing check; not rerun."
-                },
-            )
-        returncode, output = run_check(root, base, building)
-        decisions = show_decisions(root, changed.splitlines(), state)
-        if returncode == 0:
-            remember_pass(state, verified)
-            if decisions:
-                return {"decision": "block", "reason": decisions.strip()}
-            return with_freshness(root, passed_notice(building, notice, agent, output))
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
         return {
             "decision": "block",
             "reason": f"Verification could not run: {error}. Report it; repair only within the authorized task. No new authority.",
         }
+
+
+def checked_changes(
+    root: Path,
+    payload: JsonObject,
+    state: Path | None,
+    agent: str | None,
+    scope: tuple[str, dict[str, str], str, str],
+) -> JsonObject:
+    """Run the check on the session's changes; a split keeps Semgrep's taint analysis bounded."""
+    from plans import build_in_progress
+
+    base, current, changed, notice = scope
+    claim = str(
+        payload.get("last_assistant_message", payload.get("lastAssistantMessage"))
+    )
+    # HE Build keeps a plan Ready until its final gate; only its handoff needs Complete.
+    building = not SHIP_CLAIM.search(claim) and build_in_progress(
+        root, set(changed.splitlines())
+    )
+    verified: JsonObject = {
+        "base": base,
+        "files": dict(current),
+        "building": building,
+    }
+    if last_pass(state) == verified:
+        return with_freshness(
+            root,
+            {
+                "systemMessage": "Hard Eng: unchanged since last passing check; not rerun."
+            },
+        )
+    returncode, output = run_check(root, base, building)
+    decisions = show_decisions(root, changed.splitlines(), state)
+    if returncode == 0:
+        remember_pass(state, verified)
+        if decisions:
+            return {"decision": "block", "reason": decisions.strip()}
+        return with_freshness(root, passed_notice(building, notice, agent, output))
     return {
         "decision": "block",
         "reason": output.rstrip("\n")
         + decisions
+        + repeat_note(root, output)
         + "\n\nVerification failed; don't claim done. Fix every finding (unrelated too) as its own commit, then reverify. Edits/commits not allowed → report + stop. "
         + learning_context("failed verification"),
     }

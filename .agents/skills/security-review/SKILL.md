@@ -21,8 +21,9 @@ flowchart LR
 |---|---|
 | Identity / sessions | Caller-selected identity, role or tenant; login, recovery, expiry + revocation boundaries. |
 | Data / privilege | Actor + tenant enforcement for object, field, list/export + mutation; alternate entry points. |
-| Input / files | Query, markup, URL, path, upload/archive → normalization + downstream parser, fetch, storage or execution. |
-| Secrets / artifacts | Source, logs, client bundle, generated config + packaged output exposure; inspect the actual in-scope artifact. Internal address alone ≠ secret. |
+| Input / files | Query, markup, URL, path, upload/archive → normalization + downstream parser, fetch, storage or execution. Path built from input or config before delete/overwrite → resolved path stays inside the intended root. |
+| Secrets / artifacts | Source, logs, client bundle, generated config + packaged output exposure; inspect the actual in-scope artifact. Internal address alone ≠ secret. Exposed live secret → rotate/revoke first; history rewrite alone ≠ fix. |
+| Personal data | Collection → storage, logs, analytics, exports + backups → retention + deletion; each copy has an owner + delete path. |
 | LLM / tools | Untrusted content influencing privileged actions; permissions + validated arguments outside the model; required approval at the action boundary. |
 | Dependencies | Resolved lockfile/image/SBOM/runtime version + existing scan + primary advisory ranges. Trace production/build/dev/transitive use; manifest range ≠ resolved version. Confirmed vulnerable version ≠ proven exploitability; unknown reachability never waives a required gate. |
 

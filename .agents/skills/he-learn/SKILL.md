@@ -31,9 +31,12 @@ flowchart TD
 ## Repeated failure → prevention
 
 - Recurrence = as defined in [troubleshooting](../research/references/troubleshooting.md), including its distinguishing evidence before another similar retry. A first confirmed false-pass/protected-boundary defect still warrants immediate repair through its current owner.
+- Repeat signal = the Stop hook counts each failed check in `.hard-eng/failures.json` (failing lines, numbers masked) and names a second sighting as a repeat; treat it as recurrence evidence, not proof of one cause.
+- Same cause = before a fix, search for earlier fixes of this cause and every other place it can occur; fix them together and record them on the plan's `Same cause:` line. `check` fails a Ready plan or a changed Complete plan without it.
 - Preference = remove the cause → repair existing invariant/type/test/checker/lint/hook/CI → add the smallest missing deterministic check. Reuse project-native tools. A new script needs repeated fragile logic or a required boundary existing commands cannot check; no checker per incident.
 - Proof = the real violating case must fail before repair and pass after it; a nearby valid case must remain valid. Put the check where recurrence would be caught, retain required gates, and name coverage limits. Do not weaken a check or turn a passing command into proof without inspecting its result.
 - Skill = last resort for the part executable prevention cannot adequately cover. State that limitation from evidence; reuse/repair an existing skill before adding one. Follow [Writing Great Skills](../writing-great-skills/SKILL.md), including its [repair route](../writing-great-skills/references/repair.md). Canonical location = `.agents/skills/<name>/SKILL.md`; only needed references/scripts belong beside it.
+- Attribution = give each tried fix one verdict against the original failure: helped, hurt, no effect or confounded. Confounded = several changes in one run, or one run alone behind the difference. Keep a lesson only from helped fixes; narrow a confounded one to what the evidence shows, or record nothing. Write the trigger as the shape of the situation, not one task's facts.
 - Behavioral proof = exercise the original request + nearby valid/non-trigger case. Material trigger, authority, action-order or completion changes need actual agent execution; a wording/metadata check alone is insufficient. Verify the future consumer reaches the rule when relevant. Failed/unknown proof stays unfinished; never promise universal non-recurrence.
 
 ## Apply + continue

@@ -32,4 +32,5 @@ flowchart LR
 | Resource | Script = repeated fragile logic; reference = conditional knowledge; asset = copied output. Each needs a current consumer; no mandatory file count. |
 | Ownership | Rule + definition + caveat = one owner. Inspect package + relevant siblings/project instructions; consolidate duplicates + remove stale rules. |
 | Steering | State target action + observable completion; likely mistake → replacement action. |
+| Reader | After new or rewritten prose, a subagent that did not write it compares the old and new text. It quotes each sentence it had to reread and each sentence whose meaning changed. Fix each quoted sentence by rewording it or moving it to a reference. Do not cut more words: here clarity beats minimum tokens. The subagent reads each changed sentence with its paragraph or table row, and reads each restructured file in full. |
 | Validation | Available native validator + changed links/tools/skills exist + metadata agrees. Substantial/risky change → representative trigger/non-trigger prompts + actual outcome proof. Run changed scripts; wording tests ≠ behavior proof. |

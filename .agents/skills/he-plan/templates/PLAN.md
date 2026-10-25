@@ -9,6 +9,7 @@ Status: Draft
 ## Repository context
 
 Owners: [TODO: Relevant paths + decisive evidence links]
+Same cause: [TODO: Fix → earlier fixes of this cause (plan/issue + helped, hurt, no effect or confounded) + every other place it can occur, searched + fixed; else N/A — reason]
 
 ## Decisions + authorization
 
@@ -18,7 +19,7 @@ Authority: [TODO: Task mode + user's actual scope/approval; pending if absent]
 
 ## Acceptance + steps
 
-- [ ] [TODO: Observable behavior → check + expected result; repeat only for distinct requirements.]
+- [ ] [TODO: Observable behavior → `path::test name` or requirement ID + expected result, or N/A — why no test can prove it; repeat only for distinct requirements.]
 
 ## Baseline + execution
 

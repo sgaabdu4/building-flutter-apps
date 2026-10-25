@@ -1,5 +1,6 @@
 {
   "root": false,
   "formatter": { "indentStyle": "space", "lineWidth": 140 },
-  "javascript": { "formatter": { "quoteStyle": "single" } }
+  "javascript": { "formatter": { "quoteStyle": "single" } },
+  "overrides": [{ "includes": ["**/SKILL.md"], "formatter": { "enabled": false } }]
 }

@@ -74,7 +74,7 @@ rules:
       references:
         - https://developer.apple.com/documentation/security/keychain-services
     patterns:
-      - pattern: 'UserDefaults.standard.set(..., forKey: $KEY)'
+      - pattern: "UserDefaults.standard.set(..., forKey: $KEY)"
       - metavariable-regex:
           metavariable: $KEY
           regex: '(?i)"[^"]*(password|passwd|secret|token|api_?key|private_?key)[^"]*"'

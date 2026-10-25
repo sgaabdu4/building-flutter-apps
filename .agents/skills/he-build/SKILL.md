@@ -31,8 +31,9 @@ flowchart TD
 
 - Behavior = required connected callers, persistence, API and interface work; a skeleton or file checklist is not an accepted outcome. Keep changes at existing owners; apply relevant stack/design/security guidance only for the changed boundary.
 - Proof = [test quality](../he/references/testing.md) + [actual-diff review](../code-review/SKILL.md); outside service → fake at its boundary from real responses, tests never call the real one; required runtime journeys, visual evidence and applicable accessibility states → [E2E](../e2e/SKILL.md). PR evidence selection → [HE Ship](../he-ship/references/checks.md#ui-evidence-in-the-pr). Reuse these owners for regression, defect reopening and review findings; no duplicate checker or mandatory test/agent count.
+- Focused checks = only the tests, analyzer and lint for the touched files or package; full suites run once, in the final gate. A long run → HE-NO-FOREGROUND-POLL.
 - Direct test/build/check runs = limit ≈3× normal, ≥15 min (macOS: `perl -e 'alarm shift; exec @ARGV' <s> <cmd>`); hit → read log, kill leftover children, rerun.
-- Progress = same plan + remaining work. Retain the actual starting-baseline outcome + evidence; record later build results in Verification. Keep Status Ready and Verification Pending during an unblocked feature build; baseline repair follows HE Plan's Draft route above. A material decision or unavailable prerequisite → Draft + exact blocker/resume condition; preserve completed steps and continue independent authorized work. Never replace missing proof with a pass or N/A.
+- Progress = same plan + remaining work. Retain the actual starting-baseline outcome + evidence; record later build results in Verification, in the commit that changes the proved code. No commit only records a result. Keep Status Ready and Verification Pending during an unblocked feature build; baseline repair follows HE Plan's Draft route above. A material decision or unavailable prerequisite → Draft + exact blocker/resume condition; preserve completed steps and continue independent authorized work. Never replace missing proof with a pass or N/A.
 
 ## Parallel work + integration
 

@@ -1,6 +1,5 @@
 # Testing
 
-
 ## Read first
 
 1. Mock interfaces, never concrete implementations.
@@ -124,7 +123,6 @@ test/helpers/test_fakes.dart
 ```
 
 It owns:
-
 - `createTestContainer(...)`
 - fake services and repositories
 - mock classes for interfaces
@@ -138,7 +136,6 @@ Do not redefine common fakes in every test file. Feature-specific fakes may live
 ## Cross-Runtime Contract Drift Tests
 
 If Flutter shares constants with another runtime, test the contract:
-
 - table/collection/bucket/function IDs
 - field names and relationship names
 - enum/string wire values
@@ -259,7 +256,6 @@ await tester.tap(find.byKey(const ValueKey(AppWidgetKeys.productCloseButton)));
 ```
 
 Rules:
-
 - One registry file per app unless the project already has a namespaced equivalent.
 - Prefer feature-prefixed names: `profile.avatar.edit`, `checkout.payment.submit`.
 - No inline `ValueKey('...')` in widgets or tests.
@@ -320,7 +316,6 @@ test('deleteItem removes from state', () async {
 Stream, realtime, push, subscription, callback, poller, cache-invalidation or source-of-truth refresh path = notifier/widget reaction test: emit a representative event → assert the resulting state or visible UI (update, refetch, clear/fallback).
 
 Cover each event family the feature consumes; skip families it does not:
-
 - create/add/join
 - update/rename/status/order
 - delete/remove/leave/revoke
@@ -370,23 +365,22 @@ test('refetches source of truth after remote update event', () async {
 ```
 
 Generated values and read-your-writes:
-
 - If create/update/delete can return stale, partial, or derived values, assert the notifier refreshes from the source of truth before success UI/navigation.
 - If a code/token/link/slug/order/index is generated remotely, mutate it in the fake source first, then assert UI/notifier state eventually shows that exact generated value.
 - If a selected item is deleted or the actor loses access, assert selected state clears and the list/detail route falls back without throwing.
 
 ## Lifecycle regression matrix
 
-| Risk | Required red-capable proof |
-|---|---|
-| Async startup before listener ownership | Register durable owner/listener, start once, and assert the first result appears once |
-| Route covered or provider listener paused | Emit the first update while covered, resume, and assert current state/pending event is not lost |
-| Computed-provider chain | Compare direct base-provider projection and fail if pause/resume misses the first update |
-| Login/signup/reset mode change | Seed a server/validation error, switch mode, and assert error + pending state clear |
-| Native/custom link drift | Build URI from producer contract and parse through the Flutter typed-route ingress for Android + iOS fixtures |
-| E2E harness false positive | Unknown scenario fails; critical log fails; screenshot is taken only after asserted target state |
-| Modal key reuse | Close the old modal, wait for its key to be absent, open the new modal, and assert the new route state |
-| Native prompt boundary | Complete the platform prompt and assert the returned app state, not only a widget-tree change |
+| Risk                                      | Required red-capable proof                                                                                    |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Async startup before listener ownership   | Register durable owner/listener, start once, and assert the first result appears once                         |
+| Route covered or provider listener paused | Emit the first update while covered, resume, and assert current state/pending event is not lost               |
+| Computed-provider chain                   | Compare direct base-provider projection and fail if pause/resume misses the first update                      |
+| Login/signup/reset mode change            | Seed a server/validation error, switch mode, and assert error + pending state clear                           |
+| Native/custom link drift                  | Build URI from producer contract and parse through the Flutter typed-route ingress for Android + iOS fixtures |
+| E2E harness false positive                | Unknown scenario fails; critical log fails; screenshot is taken only after asserted target state              |
+| Modal key reuse                           | Close the old modal, wait for its key to be absent, open the new modal, and assert the new route state        |
+| Native prompt boundary                    | Complete the platform prompt and assert the returned app state, not only a widget-tree change                 |
 
 ## Testing Repository Layer
 
@@ -459,15 +453,15 @@ test('auth state transitions', () async {
 
 ## Common Pitfalls
 
-| Issue | Fix |
-|-------|-----|
-| `pumpAndSettle` hangs | Explicit `pump()` + bounded `pump(Duration(...))`; `pumpAndSettle` with positional timeout (rule 4) finite anim only |
-| State not updated after async | `await provider.future` (AsyncValue) or `await pumpEventQueue()` sealed-state |
-| Provider not found | Wrap `UncontrolledProviderScope` |
-| Mock not applied | Verify override matches provider type |
-| Container disposed early | `ProviderContainer.test()` — auto-manages |
-| Inline `ValueKey('close')` strings drift from E2E | Put key strings in `AppWidgetKeys`, use constants in widgets/tests |
-| Realtime join/create not observed | Emit the join/create event the feature consumes; assert the resulting state or visible UI |
-| Delete/remove leaves stale detail UI | Emit delete/remove event and assert selected state clears or route fallback appears |
-| Generated code/token stale after mutation | Fake source generates new value; notifier must refetch and expose source-of-truth value |
-| Event test passes but real app does not sync | Add writer/observer Dart MCP E2E from [dart-mcp-e2e-testing.md](dart-mcp-e2e-testing.md) |
+| Issue                                             | Fix                                                                                                                  |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `pumpAndSettle` hangs                             | Explicit `pump()` + bounded `pump(Duration(...))`; `pumpAndSettle` with positional timeout (rule 4) finite anim only |
+| State not updated after async                     | `await provider.future` (AsyncValue) or `await pumpEventQueue()` sealed-state                                        |
+| Provider not found                                | Wrap `UncontrolledProviderScope`                                                                                     |
+| Mock not applied                                  | Verify override matches provider type                                                                                |
+| Container disposed early                          | `ProviderContainer.test()` — auto-manages                                                                            |
+| Inline `ValueKey('close')` strings drift from E2E | Put key strings in `AppWidgetKeys`, use constants in widgets/tests                                                   |
+| Realtime join/create not observed                 | Emit the join/create event the feature consumes; assert the resulting state or visible UI                            |
+| Delete/remove leaves stale detail UI              | Emit delete/remove event and assert selected state clears or route fallback appears                                  |
+| Generated code/token stale after mutation         | Fake source generates new value; notifier must refetch and expose source-of-truth value                              |
+| Event test passes but real app does not sync      | Add writer/observer Dart MCP E2E from [dart-mcp-e2e-testing.md](dart-mcp-e2e-testing.md)                             |

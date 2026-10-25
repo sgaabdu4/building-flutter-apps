@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Run native gate commands and handle the three agreed hook events."""
 
-import configparser
 import fcntl
 import json
 import os
 import shlex
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +20,7 @@ from typing import IO, TYPE_CHECKING, TypedDict, cast
 from urllib.parse import unquote, urljoin, urlparse
 
 import swift_setup
+from debt import OUTPUTS, remember
 from gate_config import (
     Gate,
     Group,
@@ -34,6 +33,7 @@ from gate_config import (
 )
 from project_setup import package_script_arguments as test_arguments
 from project_setup import validate_dart_exclusions
+from python_setup import pytest_options
 from tool_setup import managed_command, provision_tools
 from untrusted_input import (
     next_route_types,
@@ -62,6 +62,8 @@ DartOptions = TypedDict(
 
 
 ROOT = Path(__file__).resolve().parents[1]
+FAILED_GATES: list[str] = []
+RECORDING = threading.Event()
 TEST_REPORTS = {"python-tests", "lcov-tests", "dart-tests", "xcode-tests"}
 DART_TYPING: dict[str, dict[str, dict[str, bool] | list[str]]] = {
     "analyzer": {
@@ -255,58 +257,6 @@ def reject_test_filters(
             )
 
 
-def pytest_options(directory: Path) -> list[str]:
-    for root in (directory, *directory.parents):
-        for name in (
-            "pytest.toml",
-            ".pytest.toml",
-            "pytest.ini",
-            ".pytest.ini",
-            "pyproject.toml",
-            "tox.ini",
-            "setup.cfg",
-        ):
-            path = root / name
-            if path.is_file():
-                options = pytest_config(path)
-                if options is not None:
-                    return shlex.split(options) if isinstance(options, str) else options
-        if (root / ".git").exists():
-            break
-    return []
-
-
-def pytest_config(path: Path) -> str | list[str] | None:
-    if path.suffix == ".toml":
-        config = tomllib.loads(path.read_text())
-        if path.name == "pyproject.toml" and "pytest" not in config.get("tool", {}):
-            return None
-        section = (
-            config.get("tool", {}).get("pytest", {})
-            if path.name == "pyproject.toml"
-            else config.get("pytest", {})
-        )
-        section = section.get("ini_options", section)
-        value = section.get("addopts", [])
-    else:
-        parser = configparser.ConfigParser(interpolation=None)
-        parser.read(path)
-        section = "tool:pytest" if path.name == "setup.cfg" else "pytest"
-        if not parser.has_section(section) and path.name not in {
-            "pytest.ini",
-            ".pytest.ini",
-        }:
-            return None
-        value = parser.get(section, "addopts", fallback="")
-    if value is not None and not (
-        isinstance(value, str)
-        or isinstance(value, list)
-        and all(isinstance(arg, str) for arg in value)
-    ):
-        raise TypeError("pytest addopts must be text or a list of arguments")
-    return value
-
-
 def production_files(
     directory: Path, group: Group, *, include_tests: bool = False
 ) -> set[Path]:
@@ -358,10 +308,13 @@ def production_files(
 def prepare_command(
     group: Group, gate: Gate, timeout: float, groups: list[Group] | None = None
 ) -> list[str]:
-    command = managed_command(gate["command"], ROOT / group["path"])
-    lockfile = ROOT / group["path"] / "bun.lock"
-    if "--lockfile=bun.lock" in command and not lockfile.exists():
-        command = [value for value in command if value != "--lockfile=bun.lock"]
+    from reports import osv_lockfiles
+
+    command = osv_lockfiles(
+        managed_command(gate["command"], ROOT / group["path"]), ROOT / group["path"]
+    )
+    if not command:
+        return []
     if gate.get("role") == "security" and "p/python" in command:
         index = command.index("p/python") + 1
         command = [
@@ -461,6 +414,14 @@ def prepare_reports(
         raise ValueError("Import Linter must run all configured contracts")
     if scanner in {"performance-junit", "performance-dart"}:
         reject_test_filters(command, directory, group.get("language"))
+        for suite in command:
+            if Path(suite).name == "performance" and not (directory / suite).is_dir():
+                raise ValueError(
+                    f"HE-PERFORMANCE-SUITE: {suite} does not exist; add a test there "
+                    "with a real workload and a time budget, or, after review, record a "
+                    "performance_exception and remove this check (he/references/gates.md). "
+                    "A new project starts without one: the first code change adds it"
+                )
     for path in paths:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.unlink(missing_ok=True)
@@ -476,13 +437,21 @@ def run_gate(
     related_base: str | None = None,
 ) -> bool:
     """Run a gate under its own limit and record how long a pass took."""
-    from shipping import gate_limit, record_gate_time
+    from gate_times import gate_limit, record_gate_time
 
     key = f"{group['path']}/{gate['name']}" + ("@related" if related_base else "")
     started = time.monotonic()
     limit = gate_limit(ROOT, key, timeout)
+    name = f"{group['path']}/{gate['name']}"
+    OUTPUTS.pop(name, None)
     failed = run_limited_gate(group, gate, limit, output_lock, groups, related_base)
-    if not failed:
+    if not RECORDING.is_set():
+        from debt import judge
+
+        failed = judge(ROOT, group, gate, failed, OUTPUTS.get(name, ""))
+    if failed:
+        FAILED_GATES.append(key)
+    else:
         record_gate_time(ROOT, key, time.monotonic() - started)
     return failed
 
@@ -516,6 +485,26 @@ def run_projects(
     return next((result for result in results if result.returncode), results[-1])
 
 
+def gate_scanner(group: Group, gate: Gate, scanner: str | None) -> str | None:
+    scanner = {
+        "secrets-files": "gitleaks",
+        "secrets-history": "gitleaks",
+        "security": "semgrep",
+        "vulnerabilities": "osv",
+        "container-vulnerabilities": "osv-image",
+        "react": "react-doctor",
+        "deployment": "trivy",
+    }.get(gate.get("role", ""), scanner)
+    return {
+        ("python", "imports"): "import-linter",
+        ("python", "dependencies"): "deptry",
+        ("python", "duplicates"): "jscpd",
+        ("swift", "duplicates"): "jscpd",
+        ("dart", "dead-code-duplicates"): "dart-decimate",
+        ("javascript", "dead-code-duplicates"): "fallow",
+    }.get((group.get("language", ""), gate.get("role", "")), scanner)
+
+
 def run_limited_gate(
     group: Group,
     gate: Gate,
@@ -532,37 +521,27 @@ def run_limited_gate(
         expected_sources: set[Path] = set()
         command = prepare_command(group, gate, timeout, groups)
         if not command:
+            reason = (
+                ": uv.lock locks no third-party package to scan"
+                if gate.get("role") == "vulnerabilities"
+                else " by selected child checks"
+            )
             print(
-                f"COVERED {gate['name']} by selected child checks; elapsed {time.monotonic() - started:.3f}s"
+                f"COVERED {gate['name']}{reason}; elapsed {time.monotonic() - started:.3f}s"
             )
             return False
         from reports import (
             SCANNERS,
             emit_dart_test_failure,
             related_command,
+            scanner_result,
             validate_scanner_log,
         )
 
         report = gate.get("report", {})
         kind = report.get("type", "")
         tests = gate.get("role") == "tests"
-        scanner = {
-            "secrets-files": "gitleaks",
-            "secrets-history": "gitleaks",
-            "security": "semgrep",
-            "vulnerabilities": "osv",
-            "container-vulnerabilities": "osv-image",
-            "react": "react-doctor",
-            "deployment": "trivy",
-        }.get(gate.get("role", ""), kind if kind in SCANNERS else None)
-        scanner = {
-            ("python", "imports"): "import-linter",
-            ("python", "dependencies"): "deptry",
-            ("python", "duplicates"): "jscpd",
-            ("swift", "duplicates"): "jscpd",
-            ("dart", "dead-code-duplicates"): "dart-decimate",
-            ("javascript", "dead-code-duplicates"): "fallow",
-        }.get((group.get("language", ""), gate.get("role", "")), scanner)
+        scanner = gate_scanner(group, gate, kind if kind in SCANNERS else None)
         if tests or scanner:
             report_path, coverage_path, directory, expected_sources = prepare_reports(
                 group, report, kind, tests, scanner, command
@@ -596,16 +575,12 @@ def run_limited_gate(
                 with output_lock:
                     print(f"OUTPUT {group['path']}/{gate['name']}", flush=True)
                     log.seek(0)
-                    shutil.copyfileobj(log, sys.stdout)
+                    sys.stdout.write(remember(group, gate, log.read()))
                     emit_dart_test_failure(result, tests, kind, report_path)
             validate_scanner_log(scanner, log)
-        if result.returncode == 0 and scanner and report_path is not None:
-            if scanner == "osv" and "--lockfile=bun.lock" in gate["command"]:
-                from reports import validate_osv
-
-                validate_osv(report_path, empty_bun=directory)
-            else:
-                SCANNERS[scanner](report_path)
+        if scanner and report_path is not None:
+            report_args = (gate, report_path, command, directory, timeout)
+            scanner_result(result.returncode == 0, scanner, *report_args)
         from reports import completed_tests, line_coverage, parallel_hint
 
         if (
@@ -624,7 +599,7 @@ def run_limited_gate(
                 f"Line coverage: {covered}/{total} ({100 * covered / total:.2f}%; minimum 70%)"
             )
             if covered * 100 < total * 70:
-                raise ValueError("Line coverage is below the required 70%")
+                raise ValueError("HE-COVERAGE-MIN: Line coverage is below 70%")
         print(
             f"{'PASS' if result.returncode == 0 else 'FAIL'} {gate['name']} "
             f"(exit {result.returncode}; elapsed {time.monotonic() - started:.3f}s)"
@@ -642,8 +617,8 @@ def run_limited_gate(
         subprocess.CalledProcessError,
     ) as error:
         print(
-            f"FAIL {gate['name']}: {error}; elapsed {time.monotonic() - started:.3f}s"
-            f" @ {group['path']}"
+            f"FAIL {gate['name']}: {remember(group, gate, str(error))}; "
+            f"elapsed {time.monotonic() - started:.3f}s @ {group['path']}"
         )
         return True
 
@@ -734,6 +709,7 @@ def run_gates(groups: list[Group], timeout: float, related: str | None) -> bool 
     failed = False
     pending: set[Future[bool]] = set()
     scans: dict[Future[bool], str] = {}
+    FAILED_GATES.clear()
     checks = [(group, gate) for group in groups for gate in group["checks"]]
     ordered = gate_order(checks)
     workers = os.cpu_count() or 2
@@ -778,12 +754,13 @@ def check(
     related_tests: bool = False,
     quick: bool = False,
 ) -> int:
-    from ci_setup import require_ci_base
+    from ci_setup import push_base, require_ci_base
     from gate_config import load_groups, parse_config
     from reports import quick_groups
     from shipping import gate_budget
 
     require_ci_base(base)
+    base = push_base(ROOT, base)
     parse_config((ROOT / "hard-eng.gates.json").read_text())
     if proven_elsewhere(base):
         return 0
@@ -791,20 +768,23 @@ def check(
     with check_lock(ROOT):
         groups = load_groups(ROOT, plan_base(base, plan_stage), dependents=dependents)
         groups = quick_groups(groups, quick)
+        from debt import require_shrink
+
+        require_shrink(ROOT, base)
         timeout = timeout or gate_budget(ROOT)
+        import plans
         from comments import validate_comments, validate_suppressions
-        from plans import report_stage, validate_decisions, validate_plans
 
         if verify_plan:
-            plan_stage = validate_plans(ROOT, base, plan_stage)
+            plan_stage = plans.validate_plans(ROOT, base, plan_stage)
         validate_comments(ROOT, base)
         validate_suppressions(ROOT, base)
-        validate_decisions(ROOT, base)
+        plans.validate_records(ROOT, base)
         provision_tools(ROOT, groups, timeout)
         related = base if related_tests else None
-
-        failed = run_gates(groups, timeout, related) is not False
-        report_stage(failed, plan_stage)
+        started, failed = time.time(), run_gates(groups, timeout, related) is not False
+        failed |= verify_plan and plans.plan_skips(ROOT, base, groups, int(started))
+        plans.report_stage(failed, plan_stage, FAILED_GATES)
         return int(failed)
 
 
@@ -812,10 +792,11 @@ def impact(base: str) -> int:
     """Tell CI whether the check will run only the secret scan, before tools."""
     from contextlib import redirect_stdout, suppress
 
-    from ci_setup import impact_runner, impact_tools, require_ci_base
+    from ci_setup import impact_runner, impact_tools, push_base, require_ci_base
     from gate_config import affected_groups, parse_config
 
     require_ci_base(base)
+    base = push_base(ROOT, base) or base
     proven = False
     with redirect_stdout(sys.stderr), suppress(OSError, subprocess.SubprocessError):
         proven = proven_elsewhere(base)
@@ -843,6 +824,8 @@ def pre_push() -> int:
 
 
 def deliver(args: "Namespace") -> int:
+    if args.command == "adopt":
+        return adopt()
     if args.command == "gap-issue":
         from gap_issue import file_gap
 
@@ -856,18 +839,34 @@ def deliver(args: "Namespace") -> int:
     return run(ROOT, args.plan, args.pr, args.stage, args.worktree, args.merge_method)
 
 
+def adopt() -> int:
+    """Record the findings the existing code fails with as shrink-only debt."""
+    from debt import record
+    from gate_config import load_groups
+    from shipping import gate_budget
+
+    with check_lock(ROOT):
+        groups = load_groups(ROOT)
+        timeout = gate_budget(ROOT)
+        provision_tools(ROOT, groups, timeout)
+        RECORDING.set()
+        try:
+            run_gates(groups, timeout, None)
+        finally:
+            RECORDING.clear()
+        return record(ROOT, groups, set(FAILED_GATES), OUTPUTS)
+
+
 def main() -> int:
     import argparse
 
-    if Path(sys.argv[0]).name == "pre-push":
+    if "pre-push" in (Path(sys.argv[0]).name, *sys.argv[1:2]):
         return pre_push()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.set_defaults(apply=False, merge=True)
     commands = parser.add_subparsers(dest="command", required=True)
     checks = commands.add_parser("check", help="Run applicable native checks")
-    checks.add_argument(
-        "--base", help="Git comparison base; unknown impact runs all checks"
-    )
+    checks.add_argument("--base", help="Git base; unknown impact runs all checks")
     checks.add_argument("--plan-stage", choices=("Draft", "Ready", "Complete"))
     checks.add_argument(
         "--without-dependents",
@@ -889,6 +888,7 @@ def main() -> int:
     )
     impacts.add_argument("--base", required=True)
     commands.add_parser("pre-push", help="Verify the actual commits being pushed")
+    commands.add_parser("adopt", help="Record old findings once as shrink-only debt")
     usage = commands.add_parser(
         "ci-usage", help="Report billed GitHub Actions minutes by workflow and job"
     )
@@ -960,8 +960,6 @@ def main() -> int:
         )
     if args.command == "impact":
         return impact(args.base)
-    if args.command == "pre-push":
-        return pre_push()
     if args.command == "ci-usage":
         from ci_setup import ci_usage
 
@@ -974,7 +972,7 @@ def main() -> int:
         from update_runner import update_main
 
         return update_main(ROOT, args.command == "update-pr", args.apply, args.merge)
-    if args.command in {"challenge", "ship", "gap-issue"}:
+    if args.command in {"adopt", "challenge", "ship", "gap-issue"}:
         return deliver(args)
     from agent_hooks import handle_event
 

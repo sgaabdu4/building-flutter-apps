@@ -198,14 +198,17 @@ def committed_matches(root: Path, commit: str, expected: dict[str, str | None]) 
     planned = {name for name, content in expected.items() if content is not None}
     if set(filter(None, listing.split("\0"))) - planned:
         return False
-    request = "".join(f"{commit}:{name}\n" for name in expected).encode()
-    output = subprocess.run(
-        ["git", "cat-file", "--batch"],
-        input=request,
-        cwd=root,
-        capture_output=True,
-        check=True,
-    ).stdout
+    # Stdin from a file: writing and reading git's pipes in one call deadlocked on macOS.
+    with tempfile.TemporaryFile() as request:
+        request.write("".join(f"{commit}:{name}\n" for name in expected).encode())
+        request.seek(0)
+        output = subprocess.run(
+            ["git", "cat-file", "--batch"],
+            stdin=request,
+            cwd=root,
+            capture_output=True,
+            check=True,
+        ).stdout
     for content in expected.values():
         header, _, output = output.partition(b"\n")
         fields = header.split()

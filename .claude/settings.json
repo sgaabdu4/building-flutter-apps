@@ -32,6 +32,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/polling.py\" 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   },
   "enabledMcpjsonServers": ["dart"],

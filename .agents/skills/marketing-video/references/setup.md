@@ -30,16 +30,16 @@ uv tool install mlx-whisper
 
 One per video, outside this skill + out of version control (outside the repository or git-ignored): it holds footage, audio and renders.
 
-| Path | Owner | Content |
-| --- | --- | --- |
-| `storyboard.json` | you | Brand, options, scenes; shape = [storyboard.example.json](../assets/storyboard.example.json) |
-| `lines.json` | you | `[["01", "Voice line"], …]`; key = scene id, scene `line` or group `line` |
-| `brand/` | brand owner | Display font (+ optional body font), logos `a` (+ partner `b`) |
-| `footage/` | recordings | Source MP4s (recordings route) |
-| `shots/` | staging | Screen PNGs + optional `manifest.json` (staged route) |
-| `music/` | human | Licensed track |
-| `render/` | template | `build.mjs` copies the template on first run; customise only for approved designs |
-| `clips/ vo/ audio/ out/ stills/ audit/` | scripts | Generated |
+| Path                                    | Owner       | Content                                                                                      |
+| --------------------------------------- | ----------- | -------------------------------------------------------------------------------------------- |
+| `storyboard.json`                       | you         | Brand, options, scenes; shape = [storyboard.example.json](../assets/storyboard.example.json) |
+| `lines.json`                            | you         | `[["01", "Voice line"], …]`; key = scene id, scene `line` or group `line`                    |
+| `brand/`                                | brand owner | Display font (+ optional body font), logos `a` (+ partner `b`)                               |
+| `footage/`                              | recordings  | Source MP4s (recordings route)                                                               |
+| `shots/`                                | staging     | Screen PNGs + optional `manifest.json` (staged route)                                        |
+| `music/`                                | human       | Licensed track                                                                               |
+| `render/`                               | template    | `build.mjs` copies the template on first run; customise only for approved designs            |
+| `clips/ vo/ audio/ out/ stills/ audit/` | scripts     | Generated                                                                                    |
 
 ## Commands
 

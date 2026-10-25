@@ -266,7 +266,7 @@ def validate_typescript(
         resolved = {(base / str(name)).resolve() for name in names}
         if (root / DECLARATIONS).resolve() not in resolved:
             raise ValueError(
-                f"TypeScript configuration omits {DECLARATIONS}; rerun the Hard Eng installer"
+                f"HE-UNTRUSTED-JSON: TypeScript configuration omits {DECLARATIONS}; rerun the Hard Eng installer"
             )
         files |= resolved
     if not {(directory / name).resolve() for name in expected} <= files:

@@ -1,6 +1,7 @@
 # External evidence
 
 - Bind the claim to its product, version, date and environment where relevant. Browse for changing facts and whenever the user requests online research.
+- Search with public terms only: no repository code, private names, paths, personal data or secrets in queries.
 - Follow specific user-supplied sources and inspect the parts relevant to the decision. Search snippets help locate evidence; inspect the underlying source for decisive claims.
 - Prefer official documentation, source, specifications and changelogs for capability and contract claims. Check whether a page describes a released feature, preview or unreleased branch.
 - Use issues, Reddit and other community sources to uncover limitations, competing explanations and practical experience. Identify author/vendor claims and anecdotal reports; verify technical conclusions against primary evidence or an authorized probe.

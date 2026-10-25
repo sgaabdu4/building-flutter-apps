@@ -14,7 +14,6 @@ Load once scenes + lines exist, and after every revision.
 ## Review
 
 On the exact file to deliver:
-
 1. `audit.mjs` → open every contact sheet (1 frame/s). Look for sign-in or secret screens, spinners, cropped content, overlaps, typed logos, zooms cutting off the named thing.
 2. Flat-frame runs = deliberate only (first ~0.25 s of a scene before its text reveals).
 3. Stills at every click, zoom + graphic scene: nothing cut off, headings clear, logos crisp.
