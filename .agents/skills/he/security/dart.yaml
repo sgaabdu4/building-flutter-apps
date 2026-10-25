@@ -17,6 +17,6 @@ rules:
       references:
         - https://api.dart.dev/dart-io/Process/run.html
     pattern-either:
-      - pattern: 'Process.run(..., runInShell: true, ...)'
-      - pattern: 'Process.runSync(..., runInShell: true, ...)'
-      - pattern: 'Process.start(..., runInShell: true, ...)'
+      - pattern: "Process.run(..., runInShell: true, ...)"
+      - pattern: "Process.runSync(..., runInShell: true, ...)"
+      - pattern: "Process.start(..., runInShell: true, ...)"

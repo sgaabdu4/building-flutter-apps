@@ -99,17 +99,17 @@ function slab(root, box, n, caption, speed, at, out) {
   );
 }
 
-function fit([w, h], maxW, maxH) {
+function fitBox([w, h], maxW, maxH) {
   const k = Math.min(maxW / w, maxH / h);
   return { width: w * k, height: h * k };
 }
 
 function screenBox(size, maxW, maxH, top) {
   if (size[0] / size[1] >= 0.8) {
-    const f = fit(size, maxW, maxH);
+    const f = fitBox(size, maxW, maxH);
     return { left: (1920 - f.width) / 2, top, ...f, tall: false };
   }
-  const f = fit(size, 760, 940);
+  const f = fitBox(size, 760, 940);
   return { left: 1920 - f.width - 280, top: 40, ...f, tall: true };
 }
 

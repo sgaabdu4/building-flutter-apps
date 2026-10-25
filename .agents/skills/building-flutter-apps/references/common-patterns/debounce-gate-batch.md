@@ -1,6 +1,5 @@
 # Common Patterns — Debounce, Gate, and Batch
 
-
 ## Read first
 
 1. Use this for high-frequency UI/network/storage boundaries and destructive remote reconciliation.

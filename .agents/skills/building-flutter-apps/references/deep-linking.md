@@ -1,6 +1,5 @@
 # Deep Linking
 
-
 ## Read first
 
 1. Typed routes + generated helpers for every in-app nav call.
@@ -169,10 +168,7 @@ file extension:
     "details": [
       {
         "appIDs": ["TEAMID.com.example.app"],
-        "components": [
-          { "/": "/products/*" },
-          { "/": "/invite/*" }
-        ]
+        "components": [{ "/": "/products/*" }, { "/": "/invite/*" }]
       }
     ]
   }
@@ -197,14 +193,14 @@ xcrun simctl openurl booted https://example.com/products/123
 
 ## E2E Matrix
 
-| Case | Expected proof |
-|---|---|
+| Case                  | Expected proof                                                                         |
+| --------------------- | -------------------------------------------------------------------------------------- |
 | Cold start signed out | Link opens login or public page, then resumes intended path after sign-in if supported |
-| Cold start signed in | Link opens target screen after loading gates settle |
-| Setup incomplete | Resolver sends user to setup without losing intended target when required |
-| Missing resource | Fallback/empty screen, no build throw |
-| Revoked permission | Blocked or fallback state; no stale detail data |
-| Web refresh | Current path survives loading state |
+| Cold start signed in  | Link opens target screen after loading gates settle                                    |
+| Setup incomplete      | Resolver sends user to setup without losing intended target when required              |
+| Missing resource      | Fallback/empty screen, no build throw                                                  |
+| Revoked permission    | Blocked or fallback state; no stale detail data                                        |
+| Web refresh           | Current path survives loading state                                                    |
 
 ## Checklist
 

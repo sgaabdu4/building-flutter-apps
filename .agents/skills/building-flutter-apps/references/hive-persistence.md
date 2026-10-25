@@ -1,6 +1,5 @@
 # Hive CE Persistence
 
-
 ## Read first
 
 1. TypeIds + HiveField indexes are permanent after release. Never reuse/reorder; append/retire only.
@@ -157,7 +156,6 @@ Future<void> initializeStorage() async {
 TypeIds unique + stable. Change TypeId = break existing data.
 
 Allocation = `hive_ce_generator`, no per-feature ranges:
-
 - `firstTypeId` seeds only a new `hive_adapters.g.yaml`.
 - New `AdapterSpec` → schema's next free typeId, skipping `reservedTypeIds`; the committed yaml keeps every assigned id.
 - Append specs to the [central list](#step-1-create-adapter-specification); manual `@HiveType` ids + retired ids → `reservedTypeIds`.
@@ -430,27 +428,27 @@ Field retirement same rule: remove field from class + keep index in `nextIndex` 
 
 ## Failure signatures
 
-| Error | Fix |
-|-------|-----|
-| `type 'String' is not a subtype of type 'List<dynamic>'` | Check field index/typeId reuse |
-| `HiveError: Cannot read, unknown typeId: N` | Register/retire adapter id correctly |
-| `RangeError: value not in range` on enum | Do not reorder/remove encoded enum cases |
+| Error                                                    | Fix                                      |
+| -------------------------------------------------------- | ---------------------------------------- |
+| `type 'String' is not a subtype of type 'List<dynamic>'` | Check field index/typeId reuse           |
+| `HiveError: Cannot read, unknown typeId: N`              | Register/retire adapter id correctly     |
+| `RangeError: value not in range` on enum                 | Do not reorder/remove encoded enum cases |
 
 Upgrade-only failure = binary incompat. Check typeId / HiveField changes.
 
 ## Evolution cheat sheet
 
-| Change | Safe? | How |
-|--------|-------|-----|
-| Add new field | ✅ | New ctor param at end; nullable OR default value (required for non-nullable) |
-| Remove field | ✅ | Delete ctor param; retired index recorded in `hive_adapters.g.yaml` |
-| Rename class | ⚠️ | Manually edit `hive_adapters.g.yaml` |
-| Rename field | ⚠️ | Manually edit field key in `hive_adapters.g.yaml` (per official docs) |
-| Change field type | ❌ | Per official docs: not supported. Retire old field, add new with new type |
-| Reorder ctor params | ❌ | Append only |
-| Delete class | ✅ | Retire typeId into `reservedTypeIds` |
-| Replace class (rename + restructure) | ❌ (if typeId reused) | New typeId, retire old |
-| Reorder enum cases | ❌ | Enum encoded by index — retire adapter, new one |
+| Change                               | Safe?                 | How                                                                          |
+| ------------------------------------ | --------------------- | ---------------------------------------------------------------------------- |
+| Add new field                        | ✅                    | New ctor param at end; nullable OR default value (required for non-nullable) |
+| Remove field                         | ✅                    | Delete ctor param; retired index recorded in `hive_adapters.g.yaml`          |
+| Rename class                         | ⚠️                    | Manually edit `hive_adapters.g.yaml`                                         |
+| Rename field                         | ⚠️                    | Manually edit field key in `hive_adapters.g.yaml` (per official docs)        |
+| Change field type                    | ❌                    | Per official docs: not supported. Retire old field, add new with new type    |
+| Reorder ctor params                  | ❌                    | Append only                                                                  |
+| Delete class                         | ✅                    | Retire typeId into `reservedTypeIds`                                         |
+| Replace class (rename + restructure) | ❌ (if typeId reused) | New typeId, retire old                                                       |
+| Reorder enum cases                   | ❌                    | Enum encoded by index — retire adapter, new one                              |
 
 ## File Structure
 

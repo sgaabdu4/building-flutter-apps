@@ -7,13 +7,13 @@ import math
 import os
 import re
 import subprocess
-import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypedDict, cast
 from urllib.parse import urlparse
 
+from agent_hooks import reject_attribution
 from gate_config import JsonValue
 from ship_evidence import attachment_urls
 
@@ -27,6 +27,7 @@ ShippingPolicy = TypedDict(
         "ui_paths": list[str],
         "ci_seconds": float,
         "pre_push_seconds": float,
+        "pre_push_mutation_seconds": float,
         "delivery": list[Delivery],
     },
 )
@@ -64,6 +65,7 @@ _CONFIG_KEYS = {
     "pre_push_seconds",
     "delivery",
 }
+_OPTIONAL_KEYS = {"pre_push_mutation_seconds"}  # policies older than the key still load
 _DELIVERY_KEYS = {"name", "command"}
 _BRANCH_PARTS = re.compile(r"^[A-Za-z0-9._/-]+$")
 _SHA = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -77,7 +79,6 @@ _REVIEW_QUERY = (
     "query($owner:String!,$name:String!,$number:Int!){viewer{login} "
     "repository(owner:$owner,name:$name){pullRequest(number:$number){"
     "viewerDidAuthor viewerCanMergeAsAdmin reviewDecision isMergeQueueEnabled "
-    "reviewThreads(first:100){totalCount nodes{isResolved}} "
     "baseRef{branchProtectionRule{"
     "requiresCommitSignatures requiresDeployments lockBranch requiresStrictStatusChecks "
     "requiredStatusCheckContexts} rules(first:100){totalCount nodes{type parameters{"
@@ -86,6 +87,11 @@ _REVIEW_QUERY = (
     "commits(last:1){nodes{commit{oid statusCheckRollup{state contexts(first:100){"
     "totalCount nodes{...on CheckRun{name conclusion} ...on StatusContext{context state}}"
     "}}}}}}}}"
+)
+_THREADS_QUERY = (
+    "query($owner:String!,$name:String!,$number:Int!){"
+    "repository(owner:$owner,name:$name){pullRequest(number:$number){"
+    "reviewThreads(first:100){totalCount nodes{isResolved}}}}}"
 )
 _PASSED = {"SUCCESS", "NEUTRAL", "SKIPPED"}
 _BYPASSABLE_RULES = {
@@ -223,14 +229,14 @@ def _branch(value: str, description: str) -> str:
     return value
 
 
-def _number(value: JsonValue, description: str) -> float:
+def _number(value: JsonValue, description: str, zero: bool = False) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ShippingError(f"{description} must be a positive number")
     try:
         number = float(value)
     except OverflowError as error:
         raise ShippingError(f"{description} must be a positive number") from error
-    if not math.isfinite(number) or number <= 0:
+    if not math.isfinite(number) or number < 0 or (number == 0 and not zero):
         raise ShippingError(f"{description} must be a positive number")
     return number
 
@@ -279,7 +285,7 @@ def _delivery_entries(value: JsonValue) -> list[Delivery]:
 
 
 def _policy(raw: dict[str, JsonValue]) -> ShippingPolicy:
-    if set(raw) != _CONFIG_KEYS:
+    if not _CONFIG_KEYS <= set(raw) <= _CONFIG_KEYS | _OPTIONAL_KEYS:
         raise ShippingError("shipping policy has unknown or missing keys")
     base = raw["base"]
     if not isinstance(base, str):
@@ -293,12 +299,12 @@ def _policy(raw: dict[str, JsonValue]) -> ShippingPolicy:
         "pre_push_seconds": _number(
             raw["pre_push_seconds"], "shipping pre_push_seconds"
         ),
+        # Zero skips pre-push mutation; the default caps it at two minutes.
+        "pre_push_mutation_seconds": _number(
+            raw.get("pre_push_mutation_seconds", 120), "pre_push_mutation_seconds", True
+        ),
         "delivery": _delivery_entries(raw["delivery"]),
     }
-
-
-GATE_FLOOR_SECONDS = 600
-GATE_TIMES_LOCK = threading.Lock()
 
 
 def gate_budget(root: Path) -> float:
@@ -307,39 +313,6 @@ def gate_budget(root: Path) -> float:
     if policy is None:
         return 600
     return policy["ci_seconds" if os.environ.get("CI") else "pre_push_seconds"]
-
-
-def gate_times(root: Path) -> Path:
-    common = subprocess.check_output(
-        ["git", "rev-parse", "--git-common-dir"], cwd=root, text=True
-    ).strip()
-    return root / common / "hard-eng-gate-times.json"
-
-
-def gate_limit(root: Path, key: str, budget: float) -> float:
-    """A hung gate stops at three times its last passing time, not the whole budget."""
-    try:
-        times = json.loads(gate_times(root).read_text())
-    except (OSError, ValueError, subprocess.CalledProcessError):
-        return budget
-    last = times.get(key) if isinstance(times, dict) else None
-    if not isinstance(last, int | float):
-        return budget
-    return min(budget, max(GATE_FLOOR_SECONDS, 3 * last))
-
-
-def record_gate_time(root: Path, key: str, seconds: float) -> None:
-    path = gate_times(root)
-    with GATE_TIMES_LOCK:
-        try:
-            loaded = json.loads(path.read_text())
-        except (OSError, ValueError):
-            loaded = None
-        times: dict[str, JsonValue] = loaded if isinstance(loaded, dict) else {}
-        times[key] = round(seconds, 3)
-        temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-        temporary.write_text(json.dumps(times))
-        temporary.replace(path)
 
 
 def load_policy(root: Path, required: bool = True) -> ShippingPolicy | None:
@@ -580,12 +553,12 @@ def reused_pull_request(root: Path, base: str) -> str | None:
 
 def passed_branch_point(root: Path) -> str | None:
     """The shipping-base commit HEAD left, when its required checks passed in CI."""
-    from comments import branch_point
+    from plans import default_branch_point
 
     try:
         policy = load_policy(root, required=False)
-        point = branch_point(root)
-        if policy is None or point == "HEAD":
+        point = default_branch_point(root)
+        if policy is None or point is None:
             return None
         remote = git(root, "remote", "get-url", "origin").strip()
         _checks(root, origin_repository(remote), point, policy)
@@ -721,7 +694,7 @@ def _plan_target(root: Path, plan: Path) -> tuple[Path, str]:
 def _delivery_scope(root: Path, plan: Path | None) -> tuple[Path | None, str]:
     if plan is not None:
         return _plan_target(root, plan)
-    from plans import size_verdict
+    from change_size import size_verdict
 
     small, reason = size_verdict(root)
     if not small:
@@ -797,9 +770,6 @@ def _other_merge_requirement(
     """Why something besides the review may block; admin merge would bypass it too."""
     if pull.get("isMergeQueueEnabled") is not False:
         return "the base branch may require a merge queue"
-    threads = _complete_nodes(pull.get("reviewThreads"))
-    if threads is None or any(node.get("isResolved") is not True for node in threads):
-        return "a review conversation is unresolved"
     base = pull.get("baseRef")
     rules = _complete_nodes(base.get("rules") if isinstance(base, dict) else None)
     if not isinstance(base, dict) or rules is None:
@@ -838,30 +808,24 @@ def _other_merge_requirement(
     return None
 
 
+def _graphql_pull(
+    root: Path, owner: str, name: str, number: int, query: str
+) -> tuple[dict[str, JsonValue], dict[str, JsonValue]]:
+    """The query's data and its pull request object."""
+    fields = [f"owner={owner}", f"name={name}", f"number={number}"]
+    flags = [part for field in fields for part in ("-F", field)]
+    value = _json(gh(root, "api", "graphql", *flags, "-f", f"query={query}"), "query")
+    data = _object(_object(value, "review response").get("data"), "review data")
+    repository = _object(data.get("repository"), "review repository")
+    return data, _object(repository.get("pullRequest"), "review PR")
+
+
 def _review_bypass_problem(
     root: Path, owner: str, name: str, number: int, head_sha: str
 ) -> str | None:
     """Why a blocked PR is not blocked solely by a review only its author could give."""
-    value = _json(
-        gh(
-            root,
-            "api",
-            "graphql",
-            "-F",
-            f"owner={owner}",
-            "-F",
-            f"name={name}",
-            "-F",
-            f"number={number}",
-            "-f",
-            f"query={_REVIEW_QUERY}",
-        ),
-        "review query",
-    )
-    data = _object(_object(value, "review response").get("data"), "review data")
+    data, pull = _graphql_pull(root, owner, name, number, _REVIEW_QUERY)
     viewer = _text(_object(data.get("viewer"), "viewer"), "login", "viewer")
-    repository = _object(data.get("repository"), "review repository")
-    pull = _object(repository.get("pullRequest"), "review PR")
     nodes = _object(pull.get("commits"), "review commits").get("nodes")
     commit = (
         _object(_object(nodes[0], "review commit").get("commit"), "review commit")
@@ -913,6 +877,11 @@ def _ready_state(
         raise ShippingError("local task branch or HEAD does not match PR")
     if branch == policy["base"]:
         raise ShippingError("shipping requires a task branch distinct from base")
+    threads = _complete_nodes(
+        _graphql_pull(root, *identity, _THREADS_QUERY)[1].get("reviewThreads")
+    )
+    if threads is None or any(node.get("isResolved") is not True for node in threads):
+        raise ShippingError("a review conversation is unresolved or uncounted")
     bypass = pull.mergeable is True and pull.mergeable_state == "blocked"
     if bypass:
         problem = _review_bypass_problem(root, *identity, pull.head_sha)
@@ -956,6 +925,7 @@ def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
     if target == "Deploy" and not policy["delivery"]:
         raise ShippingError("Deploy target requires configured delivery checks")
     pull = _pull(resolved_root, owner, name, number)
+    reject_attribution(resolved_root, "pr", pull.body, "PR body", ShippingError)
     if pull.base_ref != policy["base"]:
         raise ShippingError("PR base branch does not match shipping policy")
     if pull.base_repository != repository or pull.head_repository != repository:

@@ -240,7 +240,11 @@ async function run() {
         });
         const actionEndMs = clock();
         const [visibleText, formValues] = await Promise.all([
-          page.locator('body').innerText({ timeout: 3000 }),
+          page
+            .locator('body')
+            .waitFor({ state: 'attached', timeout: 3000 })
+            .then(() => page.locator('body').allInnerTexts())
+            .then((texts) => texts.join('\n')),
           page.locator('input, textarea').evaluateAll((elements) =>
             elements.map((element) => {
               if (element instanceof HTMLInputElement && element.type.toLowerCase() === 'password') return '';

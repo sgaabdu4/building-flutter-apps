@@ -1,6 +1,5 @@
 # Performance
 
-
 ## Read first
 
 1. Bind providers in the smallest screen/subscreen boundary; `.select()` only the field needed. Never use `.select((value) => value)` (`riverpod_select_identity_forbidden`); use a field/record select, or watch a generated computed projection provider directly when the entire provider value is already the render projection.
@@ -60,7 +59,6 @@ MaterialApp(
 ```
 
 Fix the widget:
-
 - allow wrapping
 - use `Flexible`/`Expanded`
 - avoid fixed heights around text
@@ -156,12 +154,12 @@ return const Padding(padding: EdgeInsets.all(Spacing.s16), child: SizedBox.shrin
 
 ### keepAlive vs Auto-Dispose
 
-| `@Riverpod(keepAlive: true)` | `@riverpod` |
-|------------------------------|-------------|
-| Repositories, datasources, services | Computed values, derived data |
-| Feature notifiers | One-time fetches |
+| `@Riverpod(keepAlive: true)`                        | `@riverpod`                                  |
+| --------------------------------------------------- | -------------------------------------------- |
+| Repositories, datasources, services                 | Computed values, derived data                |
+| Feature notifiers                                   | One-time fetches                             |
 | Computed providers whose **all** deps are keepAlive | Computed providers with mixed dep lifecycles |
-| Lives until app terminates | Disposes when no widget watches |
+| Lives until app terminates                          | Disposes when no widget watches              |
 
 Auto-dispose in all-keepAlive chain can break pause/resume subscription counting. Match lifecycle.
 
@@ -348,6 +346,7 @@ Relevant lints: `modal_high_frequency_watch_not_leaf`, `build_calls_mutating_ins
 ## Checklist
 
 ### Widget Rebuilds
+
 - Bind providers in the smallest screen/subscreen Consumer boundary
 - Pass minimal immutable view data + typed callbacks to reusable widgets
 - Use `.select()` for specific fields
@@ -360,11 +359,13 @@ Relevant lints: `modal_high_frequency_watch_not_leaf`, `build_calls_mutating_ins
 - Id lookups in hot paths use `Map` indexes, not `firstWhere` / `indexWhere` / manual loops
 
 ### State Management
+
 - `@Riverpod(keepAlive: true)` for repos, datasources, services, notifiers
 - `@riverpod` for computed values, one-time fetches
 - `if (!ref.mounted) return;` after every `await`
 
 ### Data Loading
+
 - Cache remote data locally (remote → local fallback)
 - Paginate large lists
 - Debounce search inputs at <=150ms
@@ -377,6 +378,7 @@ Relevant lints: `modal_high_frequency_watch_not_leaf`, `build_calls_mutating_ins
 - Use `Future.wait()` for parallel ops
 
 ### Memory
+
 - Dispose timers/controllers/subscriptions in `ref.onDispose()`
 - No raw API responses in state
 - Auto-dispose for temporary state

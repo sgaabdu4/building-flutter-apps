@@ -1,6 +1,5 @@
 # Mixin vs Interface vs Extension
 
-
 ## Read first
 
 1. Same behavior in 2+ classes → `mixin XxxMixin on Y`; no copy-paste sharing.
@@ -29,22 +28,22 @@ Signals: mixin, ConnectivityMixin, RetryMixin, on ConsumerState, abstract interf
 
 ## Quick Reference
 
-| Tool | Keyword | Purpose | Multiple? | Constructors? |
-|------|---------|---------|-----------|---------------|
-| Mixin | `mixin` | Add capabilities ("can do") | Yes — `with A, B, C` | No |
-| Interface | `abstract interface class` | Define contract ("must do") | Yes — `implements A, B` | Yes |
-| Extension | `extension on Type` | Add methods to existing types | N/A | N/A |
-| Abstract class | `abstract class` | Base impl ("is-a") | No — single `extends` | Yes |
-| Mixin class | `mixin class` | Both class and mixin (rare) | One `with`, one `extends` | Limited |
+| Tool           | Keyword                    | Purpose                       | Multiple?                 | Constructors? |
+| -------------- | -------------------------- | ----------------------------- | ------------------------- | ------------- |
+| Mixin          | `mixin`                    | Add capabilities ("can do")   | Yes — `with A, B, C`      | No            |
+| Interface      | `abstract interface class` | Define contract ("must do")   | Yes — `implements A, B`   | Yes           |
+| Extension      | `extension on Type`        | Add methods to existing types | N/A                       | N/A           |
+| Abstract class | `abstract class`           | Base impl ("is-a")            | No — single `extends`     | Yes           |
+| Mixin class    | `mixin class`              | Both class and mixin (rare)   | One `with`, one `extends` | Limited       |
 
 ## Common Flutter Mixins
 
-| Mixin | `on` Constraint | Use Case |
-|-------|----------------|----------|
-| `SingleTickerProviderStateMixin` | `State` | One `AnimationController` — provides `vsync` |
-| `TickerProviderStateMixin` | `State` | Multiple `AnimationController`s |
-| `AutomaticKeepAliveClientMixin` | `State` | Keep tab/page alive in `PageView`/`TabBarView` |
-| `WidgetsBindingObserver` | — | App lifecycle events (`didChangeAppLifecycleState`) |
+| Mixin                            | `on` Constraint | Use Case                                            |
+| -------------------------------- | --------------- | --------------------------------------------------- |
+| `SingleTickerProviderStateMixin` | `State`         | One `AnimationController` — provides `vsync`        |
+| `TickerProviderStateMixin`       | `State`         | Multiple `AnimationController`s                     |
+| `AutomaticKeepAliveClientMixin`  | `State`         | Keep tab/page alive in `PageView`/`TabBarView`      |
+| `WidgetsBindingObserver`         | —               | App lifecycle events (`didChangeAppLifecycleState`) |
 
 ## Custom Mixin Example
 

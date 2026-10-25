@@ -4,8 +4,10 @@ import json
 import math
 import re
 import subprocess
+import tempfile
 import tomllib
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from concurrent.futures import Future
 from pathlib import Path
 from typing import TextIO, cast
@@ -232,6 +234,47 @@ def completed_tests(path: Path, kind: str) -> int:
     return sum(test.find("skipped") is None for test in tree.iter("testcase"))
 
 
+def reported_skips(path: Path, kind: str) -> set[str]:
+    if kind == "dart-tests":
+        events = dart_events(path)
+        names = {
+            test.get("id"): test.get("name")
+            for event in events
+            if event.get("type") == "testStart"
+            and isinstance(test := event.get("test"), dict)
+        }
+        return {
+            str(names.get(event.get("testID")))
+            for event in events
+            if event.get("type") == "testDone" and event.get("skipped") is True
+        }
+    if kind == "xcode-tests":
+        return set()
+    # nosemgrep: python.lang.security.use-defused-xml-parse.use-defused-xml-parse
+    tree = ET.parse(path)
+    return {
+        test.get("name", "").split("[", 1)[0]
+        for test in tree.iter("testcase")
+        if test.find("skipped") is not None
+    }
+
+
+def skipped_tests(root: Path, groups: list[Group], since: float) -> set[str]:
+    """Skips in the test reports that this run wrote."""
+    names: set[str] = set()
+    for group in groups:
+        for gate in group["checks"]:
+            report = gate.get("report", {})
+            path = root / group["path"] / report.get("tests", "")
+            if (
+                gate.get("role") == "tests"
+                and path.is_file()
+                and path.stat().st_mtime >= since
+            ):
+                names |= reported_skips(path, report["type"])
+    return names
+
+
 def python_coverage(path: Path, directory: Path) -> dict[Path, tuple[int, int]]:
     files = {}
     report = json.loads(path.read_text())
@@ -396,7 +439,11 @@ def validate_osv_package(
     ):
         raise ValueError("OSV report is missing package identity")
     if item.get("vulnerabilities", []) != [] or item.get("groups", []) != []:
-        raise ValueError("OSV reports vulnerable packages")
+        found = item.get("vulnerabilities")
+        entries = found if isinstance(found, list) else []
+        ids = [str(entry.get("id")) for entry in entries if isinstance(entry, dict)]
+        name = f"{package.get('name') or commit}@{package.get('version')}"
+        raise ValueError(f"OSV reports vulnerable packages: {name}: " + ", ".join(ids))
     if image:
         origin = package["image_origin_details"]
         if not isinstance(origin, dict):
@@ -724,13 +771,34 @@ def validate_dart_decimate(path: Path) -> None:
         raise ValueError("Dart Decimate report is incomplete or malformed") from error
 
 
-def validate_jscpd(path: Path) -> None:
+def jscpd_scanned(path: Path) -> bool:
+    try:
+        formats = json.loads(path.read_text())["statistics"]["formats"]
+        return set(formats) in ({"python"}, {"swift"}) and all(
+            type(summary["sources"]) is int and summary["sources"] > 0
+            for summary in formats.values()
+        )
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return False
+
+
+def validate_jscpd(path: Path, below_minimum: Callable[[], bool] | None = None) -> None:
     try:
         report = json.loads(path.read_text())
         if report["duplicates"] != []:
             raise ValueError("jscpd reports duplicate code or malformed findings")
         stats = report["statistics"]
         formats, total = stats["formats"], stats["total"]
+        if (
+            formats == {}
+            and total["sources"] == 0
+            and below_minimum
+            and below_minimum()
+        ):
+            print(
+                "jscpd: every file is below jscpd's --min-tokens, so no clone can exist"
+            )
+            return
         if not isinstance(formats, dict) or set(formats) not in ({"python"}, {"swift"}):
             raise ValueError("jscpd report requires Python or Swift analysis")
         analysed = next(iter(formats.values()))
@@ -753,6 +821,75 @@ def validate_jscpd(path: Path) -> None:
                     raise ValueError("jscpd analysis scope is empty or inconsistent")
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError("jscpd report is incomplete or malformed") from error
+
+
+def osv_lockfiles(command: list[str], directory: Path) -> list[str]:
+    """Leave out lockfiles that hold no package OSV can scan; [] when none is left."""
+    from python_setup import locks_nothing
+
+    if "--lockfile=bun.lock" in command and not (directory / "bun.lock").exists():
+        command = [value for value in command if value != "--lockfile=bun.lock"]
+    if "--lockfile=uv.lock" in command and locks_nothing(directory):
+        command = [value for value in command if value != "--lockfile=uv.lock"]
+        if not any(value.startswith("--lockfile=") for value in command):
+            return []
+    return command
+
+
+def jscpd_below_minimum(command: list[str], directory: Path, timeout: float) -> bool:
+    """An empty jscpd scope is real only if the smallest --min-tokens still scans nothing."""
+    options = {"--min-tokens", "-k", "--output", "-o"}
+    rescan = [
+        argument
+        for index, argument in enumerate(command)
+        if argument.split("=", 1)[0] not in options
+        and (index == 0 or command[index - 1] not in options)
+    ]
+    with tempfile.TemporaryDirectory(prefix="hard-eng-jscpd-") as output:
+        subprocess.run(
+            [*rescan, "--min-tokens", "1", "--output", output],
+            cwd=directory,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+            check=False,
+        )
+        return jscpd_scanned(Path(output) / "jscpd-report.json")
+
+
+def validate_scanner_report(
+    scanner: str,
+    gate: Gate,
+    path: Path,
+    command: list[str],
+    directory: Path,
+    timeout: float,
+) -> None:
+    if scanner == "osv" and "--lockfile=bun.lock" in gate["command"]:
+        validate_osv(path, empty_bun=directory)
+    elif scanner == "jscpd":
+        validate_jscpd(path, lambda: jscpd_below_minimum(command, directory, timeout))
+    else:
+        SCANNERS[scanner](path)
+
+
+def scanner_result(
+    passed: bool,
+    scanner: str,
+    gate: Gate,
+    path: Path,
+    command: list[str],
+    directory: Path,
+    timeout: float,
+) -> None:
+    """OSV writes findings only to its report, so a failed scan shows them from there."""
+    if passed:
+        validate_scanner_report(scanner, gate, path, command, directory, timeout)
+    elif scanner == "osv" and path.is_file():
+        try:
+            validate_scanner_report(scanner, gate, path, command, directory, timeout)
+        except ValueError as error:
+            print(error)
 
 
 def validate_gitleaks(path: Path) -> None:

@@ -1,6 +1,5 @@
 # Services, Singletons, Fire-and-Forget
 
-
 ## Read first
 
 1. Singletons and static service facades are allowed only for fire-and-forget infrastructure.
@@ -19,13 +18,13 @@ Signals: abstract final class, singleton, unawaited, fire-and-forget, static fac
 
 ## Decision
 
-| Need | Use |
-|---|---|
-| Pure stateless helper | `abstract final class` static namespace |
-| Tiny fire-and-forget SDK/service facade | `abstract final class` with direct SDK calls and `void` / `Future<void>` API |
-| Fire-and-forget app singleton | `final class` + private constructor + `static final instance` + no returned data/state |
-| Non-fire-and-forget service needing `Ref`, config reactivity, dispose, state, returned data, or test override | `@Riverpod(keepAlive: true)` provider |
-| Async side effect | `unawaited(foo())` + internal catch |
+| Need                                                                                                          | Use                                                                                    |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Pure stateless helper                                                                                         | `abstract final class` static namespace                                                |
+| Tiny fire-and-forget SDK/service facade                                                                       | `abstract final class` with direct SDK calls and `void` / `Future<void>` API           |
+| Fire-and-forget app singleton                                                                                 | `final class` + private constructor + `static final instance` + no returned data/state |
+| Non-fire-and-forget service needing `Ref`, config reactivity, dispose, state, returned data, or test override | `@Riverpod(keepAlive: true)` provider                                                  |
+| Async side effect                                                                                             | `unawaited(foo())` + internal catch                                                    |
 
 Default: boring code. Do not build indirection before the product needs it.
 
@@ -157,7 +156,6 @@ flags stateful/data-returning/debug/fake/backend singleton seams.
 ## 3. Fire-and-Forget
 
 Future intentionally no `await`. Five rules:
-
 1. Mark `unawaited(foo())` — explicit intent, satisfy `unawaited_futures` + `discarded_futures` lints.
 2. `Future<void>` signature, never `void async` (`avoid_void_async`).
 3. Catch internally. Uncaught async errors become unhandled runtime/test failures.

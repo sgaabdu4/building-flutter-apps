@@ -4,10 +4,8 @@ import ast
 import configparser
 import fnmatch
 import json
-import os
 import re
 import shlex
-import signal
 import subprocess
 import tempfile
 import time
@@ -20,7 +18,8 @@ from io import StringIO
 from pathlib import Path
 
 from gate_config import Group, parse_config
-from project_setup import python_gate_command
+from process_group import run_in_group
+from python_setup import python_gate_command
 
 GLOB = re.compile(r"[?*()[\]]")
 HUNK = re.compile(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
@@ -65,24 +64,18 @@ def run(
     output: Path,
 ) -> int:
     """Run in its own group so the cap stops every runner the tool started."""
+    remaining = None if deadline is None else deadline - time.monotonic()
     with output.open("a") as log:
-        process = subprocess.Popen(
-            command,
-            cwd=directory,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
         try:
-            remaining = None if deadline is None else deadline - time.monotonic()
-            return process.wait(timeout=remaining)
+            return run_in_group(
+                command,
+                cwd=directory,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                timeout=remaining,
+            ).returncode
         except subprocess.TimeoutExpired:
             raise Capped from None
-        finally:
-            if process.poll() is None:
-                with suppress(ProcessLookupError):
-                    os.killpg(process.pid, signal.SIGKILL)
-                process.wait()
 
 
 def failed(tool: str, output: Path) -> ValueError:

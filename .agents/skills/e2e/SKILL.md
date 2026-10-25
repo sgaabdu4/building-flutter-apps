@@ -30,7 +30,7 @@ OS-owned dialogs â†’ platform control beyond the app tree. Browser exploration â
 
 ## Prove the journey
 
-- Establish requested behavior, environment/build, actors, permissions and starting data. Exercise the real user path with stable semantic selectors and observable state waits.
+- Establish requested behavior, environment/build, actors, permissions and starting data. A reused server or app must run this checkout's current build. Exercise the real user path with stable semantic selectors and observable state waits.
 - Choose the smallest cases covering the changed behavior and meaningful failures. Shared state needs independent writer/observer proof; persisted changes need source-of-truth readback. Cover denied/revoked access, retries or relaunch when the requirement depends on them.
 - Keep cases isolated and repeatable using existing fixtures and cleanup. Do not substitute a mock, direct API mutation or test-only shortcut for the interaction being proved.
 - Assert the visible result and relevant durable effects. A completed click, successful request, clean log or zero exit alone is insufficient. Investigate unexpected app/native/network errors and retries that only pass intermittently.

@@ -1,6 +1,5 @@
 """Adapt native template commands to the target project's existing stack."""
 
-import configparser
 import json
 import os
 import re
@@ -298,8 +297,8 @@ def javascript_manager(directory: Path) -> tuple[str, list[str], str]:
     return "bun", ["bun", "install", "--frozen-lockfile"], lockfile
 
 
-def adapt_sources(root: Path, package: Group, files: list[Path]) -> None:
-    directory = root / package["path"]
+def source_roots(directory: Path, language: str, files: list[Path]) -> set[str]:
+    """Top-level names that hold a package's production code."""
     extensions = {
         "python": {".py"},
         "javascript": {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"},
@@ -309,7 +308,7 @@ def adapt_sources(root: Path, package: Group, files: list[Path]) -> None:
     for path in files:
         if (
             not path.is_relative_to(directory)
-            or path.suffix not in extensions[package["language"]]
+            or path.suffix not in extensions[language]
         ):
             continue
         relative = path.relative_to(directory)
@@ -318,6 +317,23 @@ def adapt_sources(root: Path, package: Group, files: list[Path]) -> None:
         ):
             continue
         sources.add(relative.parts[0])
+    return sources
+
+
+def owned_files(
+    root: Path, packages: list[Group], files: list[Path]
+) -> dict[Path, list[Path]]:
+    """Each file belongs to the package nearest to it."""
+    owned: dict[Path, list[Path]] = {root / package["path"]: [] for package in packages}
+    for path in files:
+        owner = next((parent for parent in path.parents if parent in owned), None)
+        if owner is not None:
+            owned[owner].append(path)
+    return owned
+
+
+def adapt_sources(root: Path, package: Group, files: list[Path]) -> None:
+    sources = source_roots(root / package["path"], package["language"], files)
     if sources:
         previous = package["sources"]
         package["sources"] = sorted(sources)
@@ -381,14 +397,8 @@ def dependency_command(directory: Path, language: str) -> tuple[str, list[str], 
 
 
 def adapt_packages(root: Path, config: GateConfig) -> None:
-    owned: dict[Path, list[Path]] = {
-        root / package["path"]: [] for package in config["packages"]
-    }
     files = repository_files(root)
-    for path in files:
-        owner = next((parent for parent in path.parents if parent in owned), None)
-        if owner is not None:
-            owned[owner].append(path)
+    owned = owned_files(root, config["packages"], files)
     typescript = typescript_packages(root, files)
     for package in config["packages"]:
         directory = root / package["path"]
@@ -531,6 +541,8 @@ def adapt_workspaces(root: Path, config: GateConfig) -> None:
 
 
 def adapt_package(directory: Path, package: Group) -> None:
+    from python_setup import python_gate_command, python_roots
+
     language = package["language"]
     manager, install, lockfile = dependency_command(directory, language)
     for gate in package["checks"]:
@@ -592,21 +604,6 @@ def adapt_performance(directory: Path, package: Group) -> None:
     package["checks"] = [
         gate for gate in checks if gate.get("role") != "performance"
     ] + [gate for gate in checks if gate.get("role") == "performance"]
-
-
-def python_gate_command(command: list[str], manager: str) -> list[str]:
-    packages = {
-        "pytest": ["pytest", "pytest-cov"],
-        "deptry": ["deptry"],
-        "lint-imports": ["import-linter"],
-        "mutmut": ["pytest", "mutmut"],
-    }[command[0]]
-    prefix = ["uv", "run", "--no-sync"]
-    if manager == "poetry":
-        prefix = ["poetry", "run", "uv", "run", "--no-project", "--active"]
-    for package in packages:
-        prefix.extend(["--with", package, "--upgrade-package", package])
-    return [*prefix, *command]
 
 
 def strict_scanner_flags(package: Group) -> None:
@@ -790,34 +787,6 @@ def outside_lib_coverage(package: Group) -> None:
             gate["command"] = rewrites[command]
 
 
-def parallel_pytest(package: Group) -> None:
-    """Run a generated pytest gate on every core; `-n 0` keeps a suite serial."""
-    for gate in package["checks"]:
-        command = gate["command"]
-        runners = [
-            index
-            for index, argument in enumerate(command)
-            if argument == "pytest"
-            and command[index - 1] not in {"--with", "--upgrade-package"}
-        ]
-        if gate.get("role") != "tests" or not runners or "--with" not in command:
-            continue
-        options = command[runners[0] + 1 :]
-        if "no:xdist" in options or any(
-            option.startswith(("-n", "--numprocesses", "--dist")) for option in options
-        ):
-            continue
-        xdist = ["--with", "pytest-xdist", "--upgrade-package", "pytest-xdist"]
-        gate["command"] = [
-            *command[: runners[0]],
-            *([] if "pytest-xdist" in command else xdist),
-            "pytest",
-            "-n",
-            "auto",
-            *options,
-        ]
-
-
 def python_interpreter(directory: Path, timeout: float) -> str:
     from tool_setup import managed_command
 
@@ -905,96 +874,3 @@ def adapt_javascript(directory: Path, package: Group, manager: str) -> None:
             package["checks"].append(
                 {"name": script, "role": role, "command": [manager, "run", script]}
             )
-
-
-def python_roots(directory: Path, package: Group) -> list[str]:
-    roots = set()
-    for name in package["sources"]:
-        path = directory / name
-        if not path.is_dir():
-            continue
-        if (path / "__init__.py").exists() and name.isidentifier():
-            roots.add(name)
-        elif name == "src":
-            roots.update(
-                child.name
-                for child in path.iterdir()
-                if child.is_dir()
-                and child.name.isidentifier()
-                and (child / "__init__.py").exists()
-            )
-    return sorted(roots)
-
-
-def import_linter_owner(
-    directory: Path,
-) -> tuple[Path, configparser.ConfigParser] | None:
-    for name in ("setup.cfg", ".importlinter"):
-        owner = directory / name
-        if not owner.is_file():
-            continue
-        parser = configparser.ConfigParser()
-        parser.read(owner)
-        if parser.has_section("importlinter"):
-            return owner, parser
-    return None
-
-
-def has_recursive_import_contract(
-    parser: configparser.ConfigParser, roots: list[str]
-) -> bool:
-    root_option = (
-        "root_packages"
-        if parser.has_option("importlinter", "root_packages")
-        else "root_package"
-    )
-    configured_roots = {
-        value.strip()
-        for value in parser.get("importlinter", root_option, fallback="").splitlines()
-        if value.strip()
-    }
-    if not set(roots).issubset(configured_roots):
-        return False
-    contracts = [
-        parser[section]
-        for section in parser.sections()
-        if section.startswith("importlinter:")
-    ]
-    ancestors = set()
-    for contract in contracts:
-        if (
-            contract.get("name", "").strip()
-            and contract.get("type", "").strip() == "acyclic_siblings"
-            and contract.get("depth", "").strip() == "0"
-        ):
-            ancestors.update(
-                value.strip()
-                for value in contract.get("ancestors", "").splitlines()
-                if value.strip()
-            )
-    return all({root, root + ".**"} <= ancestors for root in roots)
-
-
-def import_configuration(directory: Path, package: Group, content: str) -> str:
-    roots = python_roots(directory, package)
-    if not roots:
-        return content
-    configured = import_linter_owner(directory)
-    if configured is not None:
-        owner, parser = configured
-        if has_recursive_import_contract(parser, roots):
-            return content
-        raise ValueError(
-            f"Import Linter prioritizes {owner.name}; preserve its existing contracts "
-            "and add a depth-zero acyclic_siblings contract covering each root and its descendants there"
-        )
-    if "importlinter" in tomllib.loads(content).get("tool", {}):
-        return content
-    ancestors = [value for root in roots for value in (root, root + ".**")]
-    return content + (
-        "\n[tool.importlinter]\nroot_packages = " + json.dumps(roots) + "\n"
-        '\n[[tool.importlinter.contracts]]\nname = "No sibling dependency cycles"\n'
-        'type = "acyclic_siblings"\nancestors = '
-        + json.dumps(ancestors)
-        + "\ndepth = 0\n"
-    )

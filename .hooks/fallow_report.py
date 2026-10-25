@@ -238,10 +238,36 @@ def validate_fallow_audit(report: JsonObject) -> None:
             raise ValueError("Fallow audit lacks a valid analysis scope")
 
 
+def empty_audit(report: JsonObject) -> bool:
+    """Fallow omits every analysis section when no file changed since the base."""
+    count = report.get("changed_files_count")
+    if type(count) is not int or count != 0:
+        return False
+    if {"dead_code", "duplication", "complexity"} & report.keys():
+        return False
+    summary = report["summary"]
+    keys = (
+        "dead_code_issues",
+        "dead_code_has_errors",
+        "complexity_findings",
+        "duplication_clone_groups",
+    )
+    if (
+        report["command"] != "audit"
+        or report["verdict"] != "pass"
+        or not isinstance(summary, dict)
+        or any(summary[key] for key in keys)
+    ):
+        raise ValueError("Fallow audit of no changed files reports findings")
+    return True
+
+
 def validate_fallow(path: Path) -> None:
     try:
         report = json.loads(path.read_text())
         audit = report["kind"] == "audit"
+        if audit and empty_audit(report):
+            return
         if audit:
             validate_fallow_audit(report)
             report = {

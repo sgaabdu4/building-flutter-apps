@@ -95,7 +95,9 @@ def workflow_triggers(source: Path, base: str) -> tuple[str, str]:
     """The template trigger block and its copy for the project's base branch."""
     template = (source / ".github/workflows/hard-eng.yml").read_text()
     block = template[template.index("on:\n") : template.index("\n\npermissions:") + 1]
-    return block, block.replace("      - main\n", f"      - {base}\n", 1)
+    # Only this source repository releases from develop.
+    project = block.replace("      - develop\n", "", 1)
+    return block, project.replace("      - main\n", f"      - {base}\n", 1)
 
 
 def migrate_workflow_triggers(root: Path, source: Path, content: str) -> str:
@@ -204,23 +206,30 @@ RUNNER_HEADER = (
 
 
 def migrate_launcher(source: Path, content: str) -> str:
-    """Bash 3.2 on macOS runners cannot lowercase with ${var,,}; compute the package once."""
+    """Bash 3.2 on macOS runners cannot lowercase with ${var,,}; compute the package once per job."""
     if LEGACY_PACKAGE not in content and MISE_PACKAGE not in content:
         return content
-    if 'echo "MISE_PACKAGE=' not in content:
-        template = (source / ".github/workflows/hard-eng.yml").read_text()
-        echo = next(line for line in template.splitlines() if "MISE_PACKAGE=" in line)
-        anchor = re.search(r'(?m)^( *)echo "BUN_INSTALL_CACHE_DIR=[^\n]*\n', content)
-        if anchor is None:
-            print(
-                "CI launcher not updated: add the MISE_PACKAGE line from the Hard Eng "
-                "template to the impact step so mise installs on macOS runners.",
-                file=sys.stderr,
-            )
-            return content
-        line = anchor[1] + echo.strip() + "\n"
-        content = content[: anchor.end()] + line + content[anchor.end() :]
-    return content.replace(LEGACY_PACKAGE, MISE_PACKAGE)
+    template = (source / ".github/workflows/hard-eng.yml").read_text()
+    echo = next(line for line in template.splitlines() if "MISE_PACKAGE=" in line)
+    # Each job runs on its own runner, so every job that launches mise sets the package.
+    jobs = re.split(r"(?m)^(?=  [A-Za-z0-9_-]+:\n)", content)
+    for index, job in enumerate(jobs):
+        if (
+            LEGACY_PACKAGE in job or MISE_PACKAGE in job
+        ) and 'echo "MISE_PACKAGE=' not in job:
+            anchor = re.search(r'(?m)^( *)echo "BUN_INSTALL_CACHE_DIR=[^\n]*\n', job)
+            if anchor is None:
+                name = job.split(":", 1)[0].strip()
+                print(
+                    f"CI launcher not updated in job {name}: add the MISE_PACKAGE line "
+                    "from the Hard Eng template to its first step so mise installs on "
+                    "every runner.",
+                    file=sys.stderr,
+                )
+                continue
+            line = anchor[1] + echo.strip() + "\n"
+            jobs[index] = job[: anchor.end()] + line + job[anchor.end() :]
+    return "".join(jobs).replace(LEGACY_PACKAGE, MISE_PACKAGE)
 
 
 def migrate_swift_runner(config: GateConfig, content: str) -> str:
@@ -614,12 +623,14 @@ def integrated(workflows: list[Path]) -> bool:
     return found and complete
 
 
-def workflow_installed(
+def setup_installed(
     root: Path, base: str, names: set[str], sources: tuple[Path, Path]
 ) -> bool:
-    """Whether a changed workflow is what the release's setup writes from the base one."""
-    name = ".github/workflows/hard-eng.yml"
-    return name not in names or name in setup_written(root, base, {name}, sources)
+    """Whether changed setup-owned files are what the release's setup writes from the base."""
+    from agent_hooks import HOOK_FILES
+
+    owned = names & {".github/workflows/hard-eng.yml", *HOOK_FILES.values()}
+    return not owned or setup_written(root, base, owned, sources) == owned
 
 
 def setup_written(
@@ -686,6 +697,9 @@ def configure_ci(
             migrated = migrated.replace(
                 OLD_PERMISSIONS, OLD_PERMISSIONS + PERMISSIONS, 1
             )
+        migrated = migrated.replace(
+            "MISE_MINIMUM_RELEASE_AGE: 0s\n", "MISE_MINIMUM_RELEASE_AGE: 2d\n"
+        )
         if migrated != original:
             changes[name] = migrated
         integrated(workflows)
@@ -888,3 +902,53 @@ def require_ci_base(base: str | None) -> None:
             "pass github.event.pull_request.base.sha || github.event.before. "
             "Manual full checks may omit --base."
         )
+
+
+def push_base(root: Path, base: str | None) -> str | None:
+    """A force push names a base outside the new history; compare with HEAD's parent."""
+    if (
+        os.environ.get("GITHUB_ACTIONS") != "true"
+        or os.environ.get("GITHUB_EVENT_NAME") != "push"
+        or not base
+        or subprocess.run(
+            ["git", "cat-file", "-e", base + "^{commit}"],
+            cwd=root,
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    ):
+        return base
+    parent = subprocess.run(
+        ["git", "rev-parse", "--verify", "-q", "HEAD^"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if parent.returncode:
+        return base
+    print(
+        f"Push base {base[:12]} is not in this history (force push); "
+        "checking changes since HEAD's parent.",
+        file=sys.stderr,
+    )
+    return parent.stdout.strip()
+
+
+PR_TEXT = ".github/workflows/pr-text.yml"
+
+
+def configure_github_ci(
+    root: Path, source: Path, config: GateConfig, changes: dict[str, str]
+) -> None:
+    workflow = ".github/workflows/hard-eng.yml"
+    configure_ci(root, source, config, changes)
+    if workflow in changes:
+        add_workflow_checks(config)
+    if workflow not in changes and not (root / workflow).is_file():
+        return
+    # The cloud GitHub proxy adds a Claude footer to PR bodies; this workflow removes it.
+    content = (source / PR_TEXT).read_text()
+    if not (root / PR_TEXT).is_file() or (root / PR_TEXT).read_text() != content:
+        changes[PR_TEXT] = content

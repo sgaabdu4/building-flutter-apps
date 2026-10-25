@@ -365,7 +365,8 @@ async function runStep(page, step, config, outputDir, index, pointer, runtime = 
   }
   if (action === 'assertText') {
     const locator = step.target || step.selector ? getTarget(page, step) : page.locator('body');
-    const actual = await locator.innerText({ timeout });
+    await locator.waitFor({ state: 'attached', timeout });
+    const actual = (await locator.allInnerTexts()).join('\n');
     if (!actual.includes(String(step.text))) {
       throw new Error(`Expected visible text was not found: ${redactedMessage(step.text)}`);
     }

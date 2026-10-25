@@ -25,7 +25,6 @@ Add YAML tokens only when actual token values are established in the project. --
 [TODO: Describe existing UI composition using the levels below. For a nonvisual
 product, replace this list with its actual interface and state that visual
 Atomic Design does not apply. Do not create components just to fill a level.]
-
 - Atoms: [TODO: Basic elements and their existing implementations.]
 - Molecules: [TODO: Small combinations of elements.]
 - Organisms: [TODO: Larger interface sections.]

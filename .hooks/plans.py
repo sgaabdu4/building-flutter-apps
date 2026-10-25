@@ -4,8 +4,7 @@ import re
 import subprocess
 from pathlib import Path, PurePosixPath
 
-from dependency_graph import owner_language
-from gate_config import Group, changed_files, parse_config, repository_files
+from gate_config import Group, changed_files, repository_files
 from shipping import ShippingError, load_policy
 
 SECTIONS = (
@@ -62,9 +61,10 @@ def is_documentation(path: Path, owner_language: str | None = None) -> bool:
     return is_plan_path(path) or (markdown and not site)
 
 
-def report_stage(failed: bool, stage: str | None) -> None:
+def report_stage(failed: bool, stage: str | None, gates: list[str]) -> None:
     if failed:
-        print("Hard Eng: verification failed; the next stage is blocked.")
+        where = f" in {', '.join(sorted(gates))}" if gates else ""
+        print(f"Hard Eng: verification failed{where}; the next stage is blocked.")
     elif stage == "Ready":
         print(
             "Hard Eng: planning checks passed — ready for build within the authorized scope."
@@ -317,11 +317,13 @@ def validate_plan(path: Path, *, changed: bool = True) -> str:
         return status
     if not no_blockers(field(sections["Decisions + authorization"], "Blockers")):
         raise ValueError("ready/complete plan has unresolved Blockers")
-    errors = readiness_errors(
-        sections, status, legacy=status == "Complete" and not changed
-    )
+    legacy = status == "Complete" and not changed
+    errors = readiness_errors(sections, status, legacy=legacy)
     if errors:
         raise ValueError("; ".join(errors))
+    if not legacy:
+        field(sections["Repository context"], "Same cause")
+        acceptance_tests(sections)
     if status == "Complete":
         markers = re.findall(
             r"(?m)^\s*(?:[-*+]|\d+[.)])\s+\[([^]\n]*)\](?:\s|$)", content
@@ -333,6 +335,58 @@ def validate_plan(path: Path, *, changed: bool = True) -> str:
         except ValueError as error:
             raise ValueError(f"Verification: {error}") from error
     return status
+
+
+def acceptance_tests(
+    sections: dict[str, str],
+) -> tuple[list[tuple[str, str]], set[str]]:
+    """Each acceptance checkbox names its `path::test` or requirement ID, or N/A — reason."""
+    references: list[tuple[str, str]] = []
+    requirements: set[str] = set()
+    for line in re.findall(
+        r"(?m)^\s*(?:[-*+]|\d+[.)])\s+\[[^]\n]*\](.*)$",
+        sections["Acceptance + steps"],
+    ):
+        found = re.findall(r"`([^`\s]+?)::(?:[^`\n]*::)?([^`\n]+)`", line)
+        named = set(REQUIREMENT_ID.findall(line))
+        if not found and not named and not re.search(r"\bN/A — \S", line):
+            raise ValueError(
+                "Acceptance + steps line needs a `path::test name` reference, "
+                f"a requirement ID or N/A — reason:{line[:80]}"
+            )
+        references.extend((path, name.split("[", 1)[0]) for path, name in found)
+        requirements |= named
+    return references, requirements
+
+
+def untested_requirements(root: Path, requirements: set[str]) -> list[str]:
+    entries, _ = registry_entries(root)
+    tests = requirement_tests(root)
+    return sorted(
+        requirement
+        for requirement in requirements
+        if entries.get(requirement, ("retired",))[0] == "retired"
+        or requirement not in tests
+    )
+
+
+def missing_tests(root: Path, references: list[tuple[str, str]]) -> list[str]:
+    missing = []
+    for path, name in references:
+        file = (root / path).resolve()
+        definition = (
+            rf"\bdef\s+{re.escape(name)}\s*\("
+            if file.suffix == ".py"
+            else rf"[\"'`]{re.escape(name)}[\"'`]"
+        )
+        if not (
+            file.is_relative_to(root.resolve())
+            and _is_test(PurePosixPath(path))
+            and file.is_file()
+            and re.search(definition, file.read_text())
+        ):
+            missing.append(f"{path}::{name}")
+    return missing
 
 
 def _validate_shipping(root: Path, path: Path, status: str) -> None:
@@ -354,44 +408,27 @@ def _validate_shipping(root: Path, path: Path, status: str) -> None:
 
 def plan_stage(root: Path, path: Path, changed: set[str]) -> str:
     try:
-        status = validate_plan(path, changed=str(path.relative_to(root)) in changed)
+        edited = str(path.relative_to(root)) in changed
+        status = validate_plan(path, changed=edited)
+        if status == "Complete" and edited:
+            sections = plan_sections(path.read_text())
+            references, requirements = acceptance_tests(sections)
+            if missing := missing_tests(root, references):
+                raise ValueError(
+                    "acceptance names tests that do not exist: " + ", ".join(missing)
+                )
+            if untested := untested_requirements(root, requirements):
+                raise ValueError(
+                    "acceptance names unknown, retired or untested requirements: "
+                    + ", ".join(untested)
+                )
         _validate_shipping(root, path, status)
     except ValueError as error:
         raise ValueError(f"{path.relative_to(root)}: {error}") from error
     return status
 
 
-MAX_SMALL_LINES = 20
-MAX_SMALL_FILES = 3
-PROTECTED_NAMES = {
-    "pyproject.toml",
-    "uv.lock",
-    "poetry.lock",
-    "package.json",
-    "pnpm-lock.yaml",
-    "package-lock.json",
-    "yarn.lock",
-    "pubspec.yaml",
-    "pubspec.lock",
-    "hard-eng.gates.json",
-    "AGENTS.md",
-    "AGENTS.override.md",
-    "schema.prisma",
-    "appwrite.json",
-    "appwrite.config.json",
-}
-PROTECTED_DIRECTORIES = {".github", ".hooks", ".agents", ".claude", "migrations"}
 TEST_DIRECTORIES = {"tests", "test", "__tests__"}
-
-
-def _is_protected(path: PurePosixPath) -> bool:
-    return (
-        path.name in PROTECTED_NAMES
-        or (path.name.startswith("requirements") and path.suffix == ".txt")
-        or path.name.startswith("bun.lock")
-        or path.suffix == ".sql"
-        or bool(PROTECTED_DIRECTORIES.intersection(path.parts[:-1]))
-    )
 
 
 def _is_test(path: PurePosixPath) -> bool:
@@ -410,24 +447,22 @@ def _git_output(root: Path, *args: str) -> str:
     )
 
 
-def _file_reason(name: str, added: str, removed: str) -> str | None:
-    path = PurePosixPath(name)
-    if added == "-":
-        return f"it changes the binary file {name}"
-    if _is_protected(path):
-        return f"it changes {name}, which always needs a plan"
-    if _is_test(path) and int(removed):
-        return f"it removes lines from the test file {name}"
-    return None
-
-
-def default_branch_point(root: Path) -> str | None:
+def release_references(root: Path) -> tuple[str, ...]:
     try:
         policy = load_policy(root, required=False)
     except ShippingError:
         policy = None
-    name = policy["base"] if policy else "main"
-    for reference in (f"origin/{name}", name):
+    if policy:
+        return f"origin/{policy['base']}", policy["base"]
+    try:
+        local = _git_output(root, "config", "--get", "init.defaultBranch").strip()
+    except (subprocess.CalledProcessError, OSError):
+        local = "master"  # Git's own default when init.defaultBranch is unset.
+    return "origin/main", "main", "origin/HEAD", local
+
+
+def default_branch_point(root: Path) -> str | None:
+    for reference in release_references(root):
         try:
             return _git_output(root, "merge-base", "HEAD", reference).strip()
         except (subprocess.CalledProcessError, OSError):
@@ -435,130 +470,90 @@ def default_branch_point(root: Path) -> str | None:
     return None
 
 
-def _branch_change(root: Path, point: str) -> tuple[list[str], list[str], list[str]]:
-    status = _git_output(
-        root, "diff", "--name-status", "--no-renames", "-z", point, "--"
-    ).split("\0")
-    counts = _git_output(
-        root, "diff", "--numstat", "--no-renames", "-z", point, "--"
-    ).split("\0")
-    untracked = _git_output(
-        root, "ls-files", "--others", "--exclude-standard", "-z"
-    ).split("\0")
-    return status, counts, untracked
+def applicable_plans(root: Path, paths: list[Path], changed: set[str]) -> list[Path]:
+    applicable = [path for path in paths if str(path.relative_to(root)) in changed]
+    return applicable or [
+        path
+        for path in paths
+        if plan_status(path.read_text()) not in {None, "Complete"}
+    ]
 
 
-def _counted_lines(counts: list[str], names: set[str]) -> int | str:
-    """Changed lines in the counted files, or the first reason one of them needs a plan."""
-    total = 0
-    for entry in filter(None, counts):
-        added, removed, name = entry.split("\t", 2)
-        if name not in names:
-            continue
-        if reason := _file_reason(name, added, removed):
-            return reason
-        total += int(added) + int(removed)
-    return total
-
-
-def configured_packages(root: Path) -> dict[str, Group]:
+def _revision(root: Path, reference: str) -> str | None:
     try:
-        config = parse_config(
-            (root / "hard-eng.gates.json").read_text(), require_impact_review=False
+        return _git_output(
+            root, "rev-parse", "--verify", "-q", f"{reference}^{{commit}}"
         )
-    except (OSError, ValueError, TypeError):
-        return {}
-    return {group["path"]: group for group in config["packages"]}
-
-
-def update_written(root: Path, point: str) -> set[str]:
-    """Paths a verified Hard Eng update in this branch wrote, scaffold and setup edits alike."""
-    import tempfile
-
-    from ci_setup import setup_written
-    from update import fetch_sources, installed_update_paths, update_in_diff
-
-    installed = installed_update_paths(root, point)
-    found = update_in_diff(root, point)
-    if not installed or found is None:
-        return set()
-    revision, previous, names = found
-    with tempfile.TemporaryDirectory(prefix="hard-eng-plan-size-") as temporary:
-        sources = fetch_sources(Path(temporary), revision, previous)
-        return installed | setup_written(root, point, names - installed, sources)
-
-
-def size_verdict(root: Path) -> tuple[bool, str]:
-    """Whether the whole branch change, not just this session's, is small, and the first reason."""
-    point = default_branch_point(root)
-    if point is None:
-        return False, "the branch point with the default branch cannot be found"
-    try:
-        status, counts, untracked = _branch_change(root, point)
     except (subprocess.CalledProcessError, OSError):
-        return False, "the change cannot be measured"
-    names = {name for name in status[1::2] + untracked if name}
-    names -= update_written(root, point)
-    if not names:
-        return True, "only files the verified Hard Eng update wrote"
-    packages = configured_packages(root)
+        return None
 
-    def documentation(name: str) -> bool:
-        return is_documentation(Path(name), owner_language(packages, name))
 
-    if all(documentation(name) for name in names):
-        return True, "documentation only"
-
-    names = {
-        name
-        for name in names
-        if not documentation(name) or _is_protected(PurePosixPath(name))
+def released_plans(root: Path, base: str | None) -> set[str]:
+    """Plans changed since the release base, so a feature check sees what the release checks."""
+    tips = {_revision(root, reference) for reference in release_references(root)}
+    point = default_branch_point(root)
+    if point is None or _revision(root, base or "HEAD") in tips:
+        return set()
+    return {
+        name for name in changed_files(root, point) or () if is_plan_path(Path(name))
     }
-    if any(
-        kind[:1] in {"A", "D", "T"} and name in names
-        for kind, name in zip(status[0::2], status[1::2], strict=False)
-    ) or any(name in names for name in untracked):
-        return False, "it adds, deletes or renames a file"
-    counted = _counted_lines(counts, names)
-    if isinstance(counted, str):
-        return False, counted
-    total = counted
-    if len(names) > MAX_SMALL_FILES:
-        return False, f"it changes {len(names)} files, more than {MAX_SMALL_FILES}"
-    if total > MAX_SMALL_LINES:
-        return False, f"it changes {total} lines, more than {MAX_SMALL_LINES}"
-    plural = "file" if len(names) == 1 else "files"
-    return True, f"{len(names)} {plural}, {total} changed lines"
 
 
-def plan_not_needed(root: Path) -> bool:
-    small, reason = size_verdict(root)
-    if small:
-        print(f"Size: small ({reason}); no plan needed.")
-    else:
-        print(f"Size: big, because {reason}; a plan is needed.")
-    return small
+def plan_tests(root: Path, base: str | None) -> set[str]:
+    """Test names that the active plans' acceptance lines depend on."""
+    changed = (changed_files(root, base or "HEAD") or set()) | released_plans(
+        root, base
+    )
+    paths = [
+        path for path in repository_files(root) if is_plan_path(path.relative_to(root))
+    ]
+    names = set()
+    for path in applicable_plans(root, paths, changed):
+        content = path.read_text()
+        if plan_status(content) in {"Ready", "Complete"}:
+            sections = plan_sections(content, allow_placeholders=True)
+            references, requirements = acceptance_tests(sections)
+            names.update(name for _, name in references)
+            tests = requirement_tests(root) if requirements else {}
+            for requirement in requirements:
+                names.update(name for _, _, name in tests.get(requirement, []))
+    return names
+
+
+def plan_skips(root: Path, base: str | None, groups: list[Group], since: float) -> bool:
+    from reports import skipped_tests
+
+    skipped = sorted(plan_tests(root, base) & skipped_tests(root, groups, since))
+    if skipped:
+        print("FAIL plan acceptance tests were skipped: " + ", ".join(skipped))
+    return bool(skipped)
 
 
 def validate_plans(
     root: Path, base: str | None = None, stage: str | None = None
 ) -> str:
+    from change_size import plan_not_needed
+
     explicit_stage = stage is not None
     changed = changed_files(root, base or "HEAD")
     if changed is None:
         raise ValueError("Cannot verify plan scope; fetch or supply a valid Git --base")
     if stage is None:
         stage = "Draft" if planning_only(root, changed) else "Complete"
+    if base is not None and not explicit_stage and changed:
+        from change_size import update_written
+
+        # Unrelated open plans must not block a verified Hard Eng update branch.
+        if not changed - update_written(root, base):
+            print(
+                "Plan: only files the verified Hard Eng update wrote; no plan needed."
+            )
+            return stage
+    changed |= released_plans(root, base)
     paths = [
         path for path in repository_files(root) if is_plan_path(path.relative_to(root))
     ]
-    applicable = [path for path in paths if str(path.relative_to(root)) in changed]
-    if not applicable:
-        applicable = [
-            path
-            for path in paths
-            if plan_status(path.read_text()) not in {None, "Complete"}
-        ]
+    applicable = applicable_plans(root, paths, changed)
     if not applicable and explicit_stage:
         applicable = paths
     if (
@@ -662,4 +657,214 @@ def validate_decisions(root: Path, base: str | None = None) -> None:
             and not any(file.startswith(prefix) for file in now)
         ]
     if found:
-        raise ValueError("Decision records are out of date: " + "; ".join(found))
+        raise ValueError(
+            "HE-ADR-SCOPE: Decision records are out of date: " + "; ".join(found)
+        )
+
+
+def validate_attribution(root: Path, base: str | None = None) -> None:
+    from agent_hooks import attribution_off, reject_attribution
+
+    if (
+        not attribution_off(root, "commit")
+        or subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", "HEAD"],
+            cwd=root,
+            stdout=subprocess.DEVNULL,
+            check=False,
+        ).returncode
+    ):
+        return
+    point = base or default_branch_point(root) or "HEAD"
+    span = "HEAD" if re.fullmatch(r"0{40}|0{64}", point) else f"{point}..HEAD"
+    try:
+        log = _git_output(root, "log", "--format=%x1e%h%x1f%ae%x1f%ce%n%B", span)
+    except subprocess.CalledProcessError as error:
+        raise ValueError(
+            "Cannot verify commit attribution; fetch or supply a valid Git --base"
+        ) from error
+    for entry in filter(None, log.split("\x1e")):
+        header, _, text = entry.partition("\n")
+        revision, *emails = header.split("\x1f")
+        if any(CLAUDE_EMAIL.fullmatch(email) for email in emails):
+            raise ValueError(f"Commit {revision} has a Claude author or committer")
+        reject_attribution(root, "commit", text, f"Commit {revision}")
+
+
+CLAUDE_EMAIL = re.compile(r"noreply@anthropic\.com", re.IGNORECASE)
+REQUIREMENT_FILES = (
+    ".agents/skills/he/references/requirements.md",
+    "docs/requirements.md",
+)
+REQUIREMENT_ID = re.compile(r"\b(?:HE|REQ)-[A-Z0-9]+(?:-[A-Z0-9]+)+\b")
+TEST_CALL = re.compile(r"""\b(?:test|it|testWidgets)\(\s*(['"])(.+?)\1""")
+PYTHON_TEST = re.compile(r"^\s*(?:async\s+)?def\s+(test\w*)")
+Reference = tuple[str, int, str]
+
+
+def registry_entries(root: Path) -> tuple[dict[str, tuple[str, str]], list[str]]:
+    """Requirement ID to its proof kind ('retired' when retired) and definition."""
+    entries: dict[str, tuple[str, str]] = {}
+    errors = []
+    for name in REQUIREMENT_FILES:
+        path = root / name
+        chunks = f"\n{path.read_text()}".split("\n## ") if path.is_file() else []
+        for chunk in chunks[1:]:
+            heading, _, body = chunk.partition("\n")
+            requirement = heading.split(" — ", 1)[0].strip()
+            if not REQUIREMENT_ID.fullmatch(requirement):
+                continue
+            if requirement in entries:
+                errors.append(f"{requirement} is defined more than once")
+                continue
+            if re.search(r"(?m)^Status: Retired\b", body):
+                entries[requirement] = ("retired", "")
+                continue
+            proof = re.search(r"(?m)^Proof: (check|guidance) *$", body)
+            definition = " ".join(
+                line.strip()
+                for line in body.splitlines()
+                if line.strip() and not line.startswith(("Proof:", "Status:"))
+            )
+            if not proof or not definition:
+                errors.append(
+                    f"{requirement} needs a definition and a 'Proof: check' or "
+                    "'Proof: guidance' line"
+                )
+            entries[requirement] = (proof[1] if proof else "", definition)
+    return entries, errors
+
+
+def requirement_references(root: Path) -> list[tuple[str, int, str]]:
+    """Each tracked or new file line that names a requirement ID: path, line, text."""
+    try:
+        output = _git_output(
+            root,
+            "grep",
+            "--untracked",
+            "-I",
+            "-n",
+            "-z",
+            "-E",
+            r"(HE|REQ)-[A-Z0-9]+(-[A-Z0-9]+)+",
+        )
+    except subprocess.CalledProcessError as error:
+        if error.returncode == 1:
+            return []
+        raise
+    found = []
+    for row in output.splitlines():
+        path, line, text = row.split("\0", 2)
+        heading = path in REQUIREMENT_FILES and text.startswith("## ")
+        if not heading:
+            found.append((path, int(line), text))
+    return found
+
+
+def covering_test(root: Path, path: str, line: int, text: str) -> str | None:
+    """The test whose name, or Python docstring first line, holds the reference."""
+    if not _is_test(PurePosixPath(path)):
+        return None
+    called = TEST_CALL.search(text)
+    if called:
+        return called[2]
+    if not text.strip().startswith(('"""', 'r"""')):
+        return None
+    lines = (root / path).read_text(errors="replace").splitlines()
+    for previous in reversed(lines[max(0, line - 6) : line - 1]):
+        defined = PYTHON_TEST.match(previous)
+        if defined:
+            return defined[1]
+    return None
+
+
+def requirement_tests(root: Path) -> dict[str, list[Reference]]:
+    """Requirement ID to each covering test: path, line, test name as reported."""
+    tests: dict[str, list[Reference]] = {}
+    for path, line, text in requirement_references(root):
+        name = covering_test(root, path, line, text)
+        if name is None:
+            continue
+        for requirement in REQUIREMENT_ID.findall(text):
+            tests.setdefault(requirement, []).append((path, line, name))
+    return tests
+
+
+def unproven_requirements(
+    root: Path, entries: dict[str, tuple[str, str]], references: list[Reference]
+) -> list[str]:
+    installed = (root / ".hooks/hard-eng-source.json").is_file() or not (
+        root / "setup.py"
+    ).is_file()
+    tests = requirement_tests(root)
+    enforced: set[str] = set()
+    linked: set[str] = set()
+    for path, _, text in references:
+        named = set(REQUIREMENT_ID.findall(text))
+        if path.endswith(".md"):
+            skill = path.startswith(".agents/skills/") or path.endswith("AGENTS.md")
+            linked |= named if skill else set()
+        elif path not in REQUIREMENT_FILES and not _is_test(PurePosixPath(path)):
+            enforced |= named
+    errors = []
+    for requirement, (proof, _) in entries.items():
+        if installed and requirement.startswith("HE-"):
+            continue
+        if proof == "check" and requirement not in tests:
+            errors.append(f"{requirement} has no test naming it")
+        if proof == "check" and requirement not in enforced:
+            errors.append(f"{requirement} has no enforcing source that names it")
+        if proof == "guidance" and requirement not in linked:
+            errors.append(f"{requirement} has no skill or AGENTS.md link")
+    return errors
+
+
+def normalized_words(text: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9%]+", text.lower()))
+
+
+def copied_requirements(root: Path, entries: dict[str, tuple[str, str]]) -> list[str]:
+    sentences = [
+        (requirement, normalized_words(sentence))
+        for requirement, (_, definition) in entries.items()
+        for sentence in re.split(r"(?<=[.!?])\s+", definition)
+        if len(sentence.split()) >= 8
+    ]
+    errors: list[str] = []
+    for path in repository_files(root):
+        name = path.relative_to(root).as_posix()
+        if path.suffix.lower() != ".md" or name in REQUIREMENT_FILES:
+            continue
+        content = f" {normalized_words(path.read_text(errors='replace'))} "
+        errors += [
+            f"{name} copies {requirement}; link the ID instead"
+            for requirement in sorted(
+                {found for found, sentence in sentences if f" {sentence} " in content}
+            )
+        ]
+    return errors
+
+
+def validate_requirements(root: Path) -> None:
+    entries, errors = registry_entries(root)
+    if not entries and not errors:
+        return
+    references = requirement_references(root)
+    for path, line, text in references:
+        for requirement in REQUIREMENT_ID.findall(text):
+            proof = entries.get(requirement, ("unknown", ""))[0]
+            if proof in {"unknown", "retired"}:
+                errors.append(f"{path}:{line} names {proof} {requirement}")
+    errors += unproven_requirements(root, entries, references)
+    errors += copied_requirements(root, entries)
+    if errors:
+        raise ValueError(
+            "HE-REQUIREMENT-REGISTRY: Requirement registry is out of date: "
+            + "; ".join(errors)
+        )
+
+
+def validate_records(root: Path, base: str | None) -> None:
+    validate_decisions(root, base)
+    validate_attribution(root, base)
+    validate_requirements(root)
