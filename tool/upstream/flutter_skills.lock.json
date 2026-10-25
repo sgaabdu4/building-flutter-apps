@@ -2,8 +2,8 @@
   "version": 1,
   "source": "https://github.com/flutter/skills.git",
   "branch": "main",
-  "commit": "6e590650bb4bab87f33187423dc10113d04d4836",
-  "checked_at": "2026-10-21T14:15:09Z",
+  "commit": "f813a46b18456a20f37eb5784c091b7d945c3b4b",
+  "checked_at": "2026-10-25T13:55:02Z",
   "skill_count": 25,
   "skills": {
     "dart-add-unit-test": {
@@ -98,7 +98,7 @@
     },
     "flutter-add-widget-preview": {
       "path": "skills/flutter-add-widget-preview/SKILL.md",
-      "sha256": "88cfeb7084e798714f5ac59cff62e5441759bcbe096c0fdc37abd21111b20212",
+      "sha256": "da257f97d23bb0ff4d5f1d1a0da48d78db7d056ccd11c0a51d3ff37c80beb54b",
       "last_modified": "Tue, 21 Apr 2026 20:05:23 GMT",
       "model": "models/gemini-3.1-pro-preview"
     },
