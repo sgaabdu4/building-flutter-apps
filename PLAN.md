@@ -21,7 +21,7 @@ Authority: The user authorized synchronization, required tooling updates and nec
 
 - [x] Preview guidance matches the official constructor, theme and transform contracts. N/A — prose semantics need source comparison; no executable example changed. Independent review verified `super.transform().toBuilder()` and `build()` against the SDK.
 - [x] The snapshot retains all 25 official skills and matches current content. N/A — live upstream state requires the existing native comparison command, not a synthetic behavior test; that comparison passed.
-- [x] Retain all checks and safety boundaries → `tool/check_drift_test.sh::d5: clean.md (no inline version pin) passes rule`; all 28 drift fixtures, 48 smoke assertions and 12 required native gates passed.
+- [x] Retain all checks and safety boundaries. N/A — the native plan parser does not discover shell test names; the existing `tool/check_drift_test.sh` suite passed all 28 drift fixtures, alongside 48 smoke assertions and 12 required native gates.
 
 ## Baseline + execution
 
