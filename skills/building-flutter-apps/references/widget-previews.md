@@ -147,9 +147,18 @@ For reusable widgets, add enough previews to catch real UI states:
 | Theme      | Light and dark when supported            |
 | Width      | Compact and expanded when layout changes |
 
+## Preview Parameters
+
+Use `name` and `group` to organize previews. Set `size`, `textScaleFactor`, and `brightness` for the required display states. Supply `wrapper`, `theme`, and `localizations` callbacks when the preview needs those environments; annotation callbacks must be public constant references.
+
+Custom themes extend `PreviewThemeData` and implement `apply(BuildContext context, Widget child)`. For runtime configuration, override `Preview.transform()`, call `super.transform().toBuilder()`, change the builder, then call `build()`. Use `MultiPreview` for shared sets of configurations. Keep the existing fake-dependency and preview-placement rules.
+
+These APIs match the [upstream preview guidance](https://github.com/flutter/skills/blob/f813a46b18456a20f37eb5784c091b7d945c3b4b/skills/flutter-add-widget-preview/SKILL.md).
+
 ## Limitations
 
 - Previewer runs in a web-like environment. Native plugins and file/database APIs can fail.
+- Preview builds are cached in `.widget_preview/`; this generated directory is not source.
 - Previewer is visual feedback. Keep widget/unit/E2E tests for behavior.
 - If preview setup needs many overrides, the widget is likely too coupled. Move platform or data work behind interfaces.
 
