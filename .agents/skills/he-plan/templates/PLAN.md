@@ -35,7 +35,7 @@ Execution: [TODO: Builder/reviewer + first slice; dependencies if parallel]
 
 Result: Pending
 Evidence: [TODO: Preview shown + inspected; nonvisual work replaces this section body with N/A — reason]
-Surface: [TODO: Mock, Existing or New — actual route/design-system owners]
+Surface: [TODO: Existing, New or Mock — actual route/design-system owners]
 Before: [TODO: Markdown image; only Mock or no-prior-UI New may explain N/A — reason]
 Proposed: [TODO: Markdown image of rendered proposal]
 Capture: [TODO: Rendering/capture method + observed result]

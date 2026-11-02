@@ -8,7 +8,6 @@ import tempfile
 import tomllib
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
-from concurrent.futures import Future
 from pathlib import Path
 from typing import TextIO, cast
 
@@ -17,10 +16,12 @@ from dart_coverage import erased_dart
 from dart_test_report import dart_events, failure_summary
 from fallow_report import validate_fallow, write_istanbul
 from gate_config import Gate, Group, JsonObject
+from gate_schedule import QUICK_ROLES
 from project_setup import (
     dependency_free,
     package_script_invocation,
 )
+from react_report import incomplete_reason
 
 
 def dart_test_failure(
@@ -51,85 +52,6 @@ def parallel_hint(code: int, tests: bool, command: list[str]) -> str:
         "\nThese tests ran in parallel (-n auto). If they pass serially, isolate "
         "the state they share, or set -n 0 in this gate's command."
     )
-
-
-SCAN_ROLES = frozenset(
-    {
-        "secrets-files",
-        "secrets-history",
-        "security",
-        "vulnerabilities",
-        "workflows",
-        "ci-security",
-        "shell",
-    }
-)
-
-
-def early_scan(gate: Gate) -> bool:
-    return gate.get("role") in SCAN_ROLES and gate.get("parallel", False) is True
-
-
-QUICK_ROLES = frozenset(
-    {
-        "format",
-        "lint",
-        "format-lint",
-        "types",
-        "annotations",
-        "typing-style",
-        "imports",
-        "focused-tests",
-        "secrets-files",
-    }
-)
-
-
-READ_ONLY_ROLES = (
-    QUICK_ROLES
-    | SCAN_ROLES
-    | {
-        "tests",
-        "performance",
-        "complexity",
-        "dead-code",
-        "duplicates",
-        "dead-code-duplicates",
-        "dependencies",
-        "types-lint",
-        "react",
-        "shipped-format",
-    }
-)
-
-
-def gate_order(checks: list[tuple[Group, Gate]]) -> list[tuple[Group, Gate]]:
-    """Setup first; scans start after the last gate that may write files they read,
-    and after performance suites, which must run alone."""
-    setup = [item for item in checks if item[1].get("role") == "lockfiles"]
-    scans = [item for item in checks if early_scan(item[1])]
-    others = [item for item in checks if item not in setup and item not in scans]
-    producers = [
-        index
-        for index, (_, gate) in enumerate(others)
-        if gate.get("role") not in READ_ONLY_ROLES
-    ]
-    cut = producers[-1] + 1 if producers else 0
-    later = others[cut:]
-    timed = [item for item in later if item[1].get("role") == "performance"]
-    return setup + others[:cut] + timed + scans + [i for i in later if i not in timed]
-
-
-def scan_blockers(
-    group: Group, gate: Gate, scans: dict[Future[bool], str]
-) -> set[Future[bool]]:
-    """Scans a serial gate waits for: all before timing, and same-folder ones before
-    JavaScript tests, whose runners clear coverage/ where scan reports live."""
-    if gate.get("role") == "performance":
-        return set(scans)
-    if group.get("language") == "javascript" and gate.get("role") == "tests":
-        return {future for future, path in scans.items() if path == group["path"]}
-    return set()
 
 
 def quick_groups(groups: list[Group], quick: bool = True) -> list[Group]:
@@ -673,7 +595,7 @@ def validate_react_project(project: JsonObject) -> None:
         or project.get("skippedCheckReasons", {}) != {}
         or project["diagnostics"] != []
     ):
-        raise ValueError("React Doctor reports incomplete checks or diagnostics")
+        raise ValueError(incomplete_reason(project))
     files = project["analyzedFiles"]
     if (
         not isinstance(files, list)
@@ -869,6 +791,10 @@ def validate_scanner_report(
         validate_osv(path, empty_bun=directory)
     elif scanner == "jscpd":
         validate_jscpd(path, lambda: jscpd_below_minimum(command, directory, timeout))
+    elif scanner == "freshness":
+        from freshness import validate_freshness
+
+        validate_freshness(path, gate)
     else:
         SCANNERS[scanner](path)
 

@@ -374,11 +374,11 @@ def missing_tests(root: Path, references: list[tuple[str, str]]) -> list[str]:
     missing = []
     for path, name in references:
         file = (root / path).resolve()
-        definition = (
-            rf"\bdef\s+{re.escape(name)}\s*\("
-            if file.suffix == ".py"
-            else rf"[\"'`]{re.escape(name)}[\"'`]"
-        )
+        quoted = rf"[\"'`]{re.escape(name)}[\"'`]"
+        definition = {
+            ".py": rf"\bdef\s+{re.escape(name)}\s*\(",
+            ".swift": rf"\bfunc\s+{re.escape(name)}\s*\(|{quoted}",
+        }.get(file.suffix, quoted)
         if not (
             file.is_relative_to(root.resolve())
             and _is_test(PurePosixPath(path))

@@ -14,7 +14,7 @@ flowchart LR
   S{Surface} -->|Web UI| B[Existing browser E2E]
   B -->|Recorded proof needed| V[Product Walkthrough: recorded E2E]
   S -->|Polished web video requested| D[Product Walkthrough: video delivery]
-  S -->|Flutter + Riverpod| F[Building Flutter Apps]
+  S -->|Flutter + Riverpod| F[building-flutter-apps skill]
   S -->|Other Flutter| I[Existing Flutter integration + device tools]
   F -->|Recorded proof needed| G[Recorded proof: references/flutter.md]
   I -->|Recorded proof needed| G
@@ -22,7 +22,6 @@ flowchart LR
   S -->|API / worker / CLI / pure Dart| A[Real request / event / command boundary]
   click V "../product-walkthrough-video/SKILL.md"
   click D "../product-walkthrough-video/SKILL.md"
-  click F "../building-flutter-apps/SKILL.md"
   click G "references/flutter.md"
 ```
 

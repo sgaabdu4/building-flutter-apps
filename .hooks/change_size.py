@@ -57,9 +57,14 @@ def _branch_change(root: Path, point: str) -> tuple[list[str], list[str], list[s
     counts = _git_output(
         root, "diff", "--numstat", "--no-renames", "-z", point, "--"
     ).split("\0")
-    untracked = _git_output(
-        root, "ls-files", "--others", "--exclude-standard", "-z"
-    ).split("\0")
+    # The Linux sandbox binds /dev/null over missing protected paths; Git lists them but cannot add them.
+    untracked = [
+        name
+        for name in _git_output(
+            root, "ls-files", "--others", "--exclude-standard", "-z"
+        ).split("\0")
+        if (root / name).is_file() or (root / name).is_symlink()
+    ]
     return status, counts, untracked
 
 
@@ -88,19 +93,16 @@ def configured_packages(root: Path) -> dict[str, Group]:
 
 def update_written(root: Path, point: str) -> set[str]:
     """Paths a verified Hard Eng update in this branch wrote, scaffold and setup edits alike."""
-    import tempfile
-
     from ci_setup import setup_written
-    from update import fetch_sources, installed_update_paths, update_in_diff
+    from update import installed_update_paths, shared_sources, update_in_diff
 
     installed = installed_update_paths(root, point)
     found = update_in_diff(root, point)
     if not installed or found is None:
         return set()
     revision, previous, names = found
-    with tempfile.TemporaryDirectory(prefix="hard-eng-plan-size-") as temporary:
-        sources = fetch_sources(Path(temporary), revision, previous)
-        return installed | setup_written(root, point, names - installed, sources)
+    sources = shared_sources(revision, previous)
+    return installed | setup_written(root, point, names - installed, sources)
 
 
 def size_verdict(root: Path) -> tuple[bool, str]:

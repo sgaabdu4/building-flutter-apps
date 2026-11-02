@@ -100,6 +100,7 @@ Gate = TypedDict(
         "role": NotRequired[str],
         "parallel": NotRequired[bool],
         "report": NotRequired[Report],
+        "holds": NotRequired[list[JsonObject]],
     },
 )
 Group = TypedDict(
@@ -405,6 +406,9 @@ def validate_gate(gate: Gate, directory: Path, report_paths: set[Path]) -> None:
         raise ValueError(
             f"{gate['name']}: put the executable in command; separate tool fields are unsupported"
         )
+    from freshness import validate_gate_holds
+
+    validate_gate_holds(gate)
     from gitleaks_scan import validate_current_files_gate
 
     validate_current_files_gate(gate.get("role"), command)
@@ -632,6 +636,25 @@ def affected_groups(
     return selected_services(root, packages, selected) + [groups[-1]]
 
 
+def without_freshness_for_update(
+    root: Path, base: str | None, groups: list[Group]
+) -> list[Group]:
+    """The Hard Eng update that adds the freshness check must not fail on it."""
+    from update import installed_update_paths
+
+    if (
+        base is None
+        or not any(g.get("role") == "freshness" for x in groups for g in x["checks"])
+        or not installed_update_paths(root, base)
+    ):
+        return groups
+    print("Hard Eng update matches its verified release; skipping freshness.")
+    return [
+        {**x, "checks": [g for g in x["checks"] if g.get("role") != "freshness"]}
+        for x in groups
+    ]
+
+
 def selected_services(
     root: Path, packages: list[Group], selected: set[str]
 ) -> list[Group]:
@@ -645,7 +668,9 @@ def selected_services(
         here = (root / group["path"]).resolve()
         holds = any(path.is_relative_to(here) for path in chosen)
         nested = here in dart and any(here.is_relative_to(p) for p in chosen & dart)
-        roles = {"lockfiles", "vulnerabilities"} if holds else {"lockfiles"}
+        roles = (
+            {"lockfiles", "vulnerabilities", "freshness"} if holds else {"lockfiles"}
+        )
         services = [gate for gate in group["checks"] if gate.get("role") in roles]
         if group["path"] in selected:
             affected.append(group)
@@ -782,46 +807,12 @@ def has_workflows(root: Path, files: list[Path]) -> bool:
     )
 
 
-def unlisted_shell_scripts(
-    root: Path, files: list[Path], shared: list[Gate]
-) -> list[str]:
-    """Scripts absent from explicit shellcheck lists; custom shell gates own inputs."""
-    from project_setup import is_shell_script
-
-    gates = [
-        gate
-        for gate in shared
-        if gate.get("role") == "shell" or Path(gate["command"][0]).name == "shellcheck"
-    ]
-    if not gates or any(
-        Path(gate["command"][0]).name != "shellcheck" or "--" not in gate["command"]
-        for gate in gates
-    ):
-        return []
-    listed = {
-        argument
-        for gate in gates
-        for argument in gate["command"][gate["command"].index("--") + 1 :]
-    }
-    return sorted(
-        str(path.relative_to(root))
-        for path in files
-        if is_shell_script(path) and str(path.relative_to(root)) not in listed
-    )
-
-
-def require_listed_shell_scripts(
-    root: Path, files: list[Path], shared: list[Gate]
-) -> None:
-    if unlisted := unlisted_shell_scripts(root, files, shared):
-        raise ValueError(
-            f"shared: shellcheck omits {', '.join(unlisted)}; rerun setup or list "
-            "them after `--`"
-        )
-
-
 def validate_required_checks(root: Path, config: GateConfig) -> None:
-    from project_setup import is_deployment_file, is_shell_script
+    from project_setup import (
+        is_deployment_file,
+        is_shell_script,
+        require_listed_shell_scripts,
+    )
 
     files = repository_files(root)
     manifests = package_manifests(root, files)
@@ -911,7 +902,10 @@ def validate_package_services(
             inherited.update(gate.get("role", "") for gate in parent["checks"])
     if language == "swift":
         inherited |= parent_roles(directory, by_directory)
-    require_roles(group["path"], {"lockfiles", "vulnerabilities"}, roles | inherited)
+    required = {"lockfiles", "vulnerabilities"}
+    if language in LANGUAGES.values():
+        required.add("freshness")
+    require_roles(group["path"], required, roles | inherited)
     if language == "python":
         dependency_command(directory, language)  # Raises when no lockfile exists.
     if not group.get("language"):
@@ -996,4 +990,7 @@ def load_groups(
     for gate in config["shared"]:
         if gate.get("role") == "secrets-history":
             gate["command"] = new_commits_command(gate["command"], root, base)
-    return affected_groups(root, groups, base, prove_update=True, dependents=dependents)
+    selected = affected_groups(
+        root, groups, base, prove_update=True, dependents=dependents
+    )
+    return without_freshness_for_update(root, base, selected)

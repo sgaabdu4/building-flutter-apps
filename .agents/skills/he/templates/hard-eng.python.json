@@ -170,6 +170,13 @@
       "report": { "type": "osv", "path": "coverage/osv.json" }
     },
     {
+      "name": "freshness",
+      "role": "freshness",
+      "parallel": true,
+      "command": ["uv", "tree", "--frozen", "--outdated", "--all-groups", "--depth", "1"],
+      "report": { "type": "freshness", "path": "coverage/freshness-python.txt", "stdout": true }
+    },
+    {
       "name": "security",
       "role": "security",
       "parallel": true,

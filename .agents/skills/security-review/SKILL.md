@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: Review authorized application code, configuration, designs or artifacts for concrete authorization, data exposure, injection, secret, dependency and LLM/tool security risks. Use for a requested security review or a change affecting a trust boundary.
+description: Review authorized code, configuration, designs or artifacts for authorization, data exposure, injection, secret, dependency and LLM/tool risks. Use for a requested security review or a trust-boundary change such as sign-in, permissions, API keys, payments, uploads or personal data.
 ---
 
 # Security Review

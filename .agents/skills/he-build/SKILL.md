@@ -29,7 +29,7 @@ flowchart TD
   click I "../he/references/gates.md#plan-checks"
 ```
 
-- Behavior = required connected callers, persistence, API and interface work; a skeleton or file checklist is not an accepted outcome. Keep changes at existing owners; apply relevant stack/design/security guidance only for the changed boundary.
+- Behavior = required connected callers, persistence, API and interface work; a skeleton or file checklist is not an accepted outcome. Keep changes at existing owners; apply relevant stack/design guidance only for the changed boundary. Diff touches sign-in, permissions, API keys, payments, uploads or personal data → [Security Review](../security-review/SKILL.md) before Ready for ship.
 - Proof = [test quality](../he/references/testing.md) + [actual-diff review](../code-review/SKILL.md); outside service → fake at its boundary from real responses, tests never call the real one; required runtime journeys, visual evidence and applicable accessibility states → [E2E](../e2e/SKILL.md). PR evidence selection → [HE Ship](../he-ship/references/checks.md#ui-evidence-in-the-pr). Reuse these owners for regression, defect reopening and review findings; no duplicate checker or mandatory test/agent count.
 - Focused checks = only the tests, analyzer and lint for the touched files or package; full suites run once, in the final gate. A long run → HE-NO-FOREGROUND-POLL.
 - Direct test/build/check runs = limit ≈3× normal, ≥15 min (macOS: `perl -e 'alarm shift; exec @ARGV' <s> <cmd>`); hit → read log, kill leftover children, rerun.

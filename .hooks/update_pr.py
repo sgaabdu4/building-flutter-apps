@@ -40,7 +40,8 @@ MERGE_METHODS = (
     ("squashMergeAllowed", "--squash"),
     ("mergeCommitAllowed", "--merge"),
 )
-GENERATED = re.compile(r"Update Hard Eng to [0-9a-f]+")
+GENERATED = re.compile(r"Update Hard Eng to [0-9a-f]+|Install Hard Eng")
+REPAIR_TITLE = "Repair the Hard Eng installation"
 
 
 def merge_method(root: Path) -> str:
@@ -138,6 +139,20 @@ def unfinished_update(root: Path, tip: str) -> bool:
     if ahead.returncode != 0 or int(ahead.stdout) <= 1:
         return False
     return not landed(root, tip, f"refs/heads/{UPDATE_BRANCH}")
+
+
+def merged_update(root: Path, tip: str) -> bool:
+    """The update branch holds nothing the base lacks, so it is left over from a merged update."""
+    branch = f"refs/heads/{UPDATE_BRANCH}"
+    ahead = git_lines(
+        root,
+        "rev-list",
+        "--count",
+        "--right-only",
+        "--cherry-pick",
+        f"{tip}...{branch}",
+    )
+    return ahead == ["0"] or landed(root, tip, branch)
 
 
 def fix_steps(root: Path) -> str:
@@ -269,12 +284,16 @@ def settle(root: Path, url: str, head: str, state: str, merge: bool) -> int:
 def publish(root: Path, merge: bool = True) -> int:
     base = update_base(root)
     tip = fetch_base(root, base)
-    landed = revision_at(root, tip)
+    current = revision_at(root, tip)
     revision = revision_at(root, f"refs/heads/{UPDATE_BRANCH}")
-    if revision is None or (
-        revision != landed
-        and not unfinished_update(root, tip)
-        and not branch_current(root, tip)
+    if (
+        revision is None
+        or (revision == current and merged_update(root, tip))
+        or (
+            revision != current
+            and not unfinished_update(root, tip)
+            and not branch_current(root, tip)
+        )
     ):
         print(locked_update(root))
         revision = revision_at(root, f"refs/heads/{UPDATE_BRANCH}")
@@ -282,7 +301,21 @@ def publish(root: Path, merge: bool = True) -> int:
             unfinished_update(root, tip) or branch_current(root, tip)
         ):
             revision = None
-    if revision is None or revision == landed:
+    branch = f"refs/heads/{UPDATE_BRANCH}"
+    subjects = git_lines(
+        root, "log", "--format=%s", "--right-only", "--cherry-pick", f"{tip}...{branch}"
+    )
+    # A merged repair is neither built on the current base nor still open.
+    repair = (
+        revision == current
+        and "Install Hard Eng" in (subjects or [])
+        and not landed(root, tip, branch)
+        and (
+            git_lines(root, "merge-base", "--is-ancestor", tip, branch) is not None
+            or open_pull(root) is not None
+        )
+    )
+    if revision is None or (revision == current and not repair):
         print(
             f"Nothing to publish: Hard Eng is current on {base}. Last update result: {last_result(root)}"
         )
@@ -296,7 +329,7 @@ def publish(root: Path, merge: bool = True) -> int:
         cwd=root,
         check=True,
     )
-    title = f"Update Hard Eng to {revision[:12]}"
+    title = REPAIR_TITLE if repair else f"Update Hard Eng to {revision[:12]}"
     pull = open_pull(root)
     if pull is None:
         created = gh(

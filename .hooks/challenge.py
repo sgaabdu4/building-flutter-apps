@@ -37,7 +37,18 @@ def reviewer_for(host: str | None) -> str:
 
 def command(reviewer: str, prompt: str, root: Path) -> list[str]:
     if reviewer == "codex":
-        return ["codex", "exec", "--sandbox", "read-only", "--cd", str(root), prompt]
+        # User plugins bring skills, MCP tools and hooks; `-c` stays valid on Codex releases without this key.
+        return [
+            "codex",
+            "exec",
+            "--sandbox",
+            "read-only",
+            "-c",
+            "features.plugins=false",
+            "--cd",
+            str(root),
+            prompt,
+        ]
     # A Bash(git diff *) rule would also allow --output=<file>; built-in read-only git forms refuse it.
     return [
         "claude",

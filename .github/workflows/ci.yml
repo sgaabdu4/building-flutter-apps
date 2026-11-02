@@ -44,10 +44,10 @@ jobs:
       - name: Use the shared native tool cache
         run: |
           {
-            echo "MISE_DATA_DIR=$RUNNER_TEMP/hard-eng-tools/mise/data"
-            echo "MISE_CACHE_DIR=$RUNNER_TEMP/hard-eng-tools/mise/cache"
-            echo "MISE_STATE_DIR=$RUNNER_TEMP/hard-eng-tools/mise/state"
-            echo "BUN_INSTALL_CACHE_DIR=$RUNNER_TEMP/hard-eng-tools/bun/cache"
+            echo "MISE_DATA_DIR=${MISE_DATA_DIR:-$RUNNER_TEMP/hard-eng-tools/mise/data}"
+            echo "MISE_CACHE_DIR=${MISE_CACHE_DIR:-$RUNNER_TEMP/hard-eng-tools/mise/cache}"
+            echo "MISE_STATE_DIR=${MISE_STATE_DIR:-$RUNNER_TEMP/hard-eng-tools/mise/state}"
+            echo "BUN_INSTALL_CACHE_DIR=${BUN_INSTALL_CACHE_DIR:-$RUNNER_TEMP/hard-eng-tools/bun/cache}"
           } >> "$GITHUB_ENV"
 
       - name: Provide ripgrep with PCRE2

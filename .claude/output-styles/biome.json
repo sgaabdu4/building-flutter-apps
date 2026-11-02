@@ -1,0 +1,5 @@
+{
+  "root": false,
+  "formatter": { "indentStyle": "space", "lineWidth": 140 },
+  "overrides": [{ "includes": ["**/*.md"], "formatter": { "enabled": false } }]
+}

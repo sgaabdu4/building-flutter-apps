@@ -181,7 +181,7 @@ def landed_commit(root: Path, head: str, message: str) -> tuple[str, str] | None
     for line in found.stdout.splitlines():
         identities, _, subject = line.partition("\x1f")
         commit, *parents = identities.split()
-        if subject == message:
+        if subject in (message, "Install Hard Eng"):
             return commit, parents[0] if parents else ""
     return None
 
