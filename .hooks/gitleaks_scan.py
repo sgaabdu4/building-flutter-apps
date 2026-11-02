@@ -219,6 +219,8 @@ def run_gate_command(
     if role == "secrets-files":
         return run_current_files(command, directory, timeout, stdout, stderr)
     environment = {**os.environ, "PNPM_CONFIG_DLX_CACHE_MAX_AGE": "0"}
+    if role == "freshness":
+        environment["POETRY_SOLVER_MIN_RELEASE_AGE"] = "2"
     with tempfile.TemporaryDirectory(prefix="hard-eng-gate-") as temporary:
         if role == "ci-security":
             from update import github_token

@@ -36,7 +36,7 @@ Proof: check
 
 ## HE-COMMENT-LINES
 
-A changed source file holds no comment block longer than one line. Generated output and scaffold paths are exempt.
+A changed source file holds no comment block longer than one line. Generated output and scaffold paths are exempt, and so are blocks a file already held before the change that installs Hard Eng.
 
 Proof: check
 
@@ -67,6 +67,12 @@ Proof: guidance
 ## HE-NO-FOREGROUND-POLL
 
 An agent starts a long job in the background and waits for the host's exit notice; it never waits in a foreground sleep loop or a long sleep. In Claude Code, a hook denies a main-session shell command that sleeps at least 1 second inside a `while` or `until` loop, or at least 30 seconds at once. A subagent may wait in the foreground, because nothing watches its background job after its turn ends. Codex returns a long command early and waits on that command's session, not on a sleep loop.
+
+Proof: check
+
+## HE-REAL-APP-PREVIEW
+
+A proposed change to a screen that exists is shown as before and after captures of the real app, rendered in an isolated checkout, never as a hand-made mock. In Claude Code, a hook adds this note to every Artifact publish or quickstart call; the call always proceeds, because an artifact can be the right way to show other things. Codex has no Artifact tool.
 
 Proof: check
 

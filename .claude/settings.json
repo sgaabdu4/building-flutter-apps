@@ -1,16 +1,5 @@
 {
   "hooks": {
-    "PostToolUseFailure": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.hooks/hard-eng.py\" failure claude",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [
@@ -43,6 +32,27 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Artifact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/previews.py\" 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/failures.py\" 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
       }
     ]
   },
@@ -53,5 +63,11 @@
     "commit": "",
     "pr": "",
     "sessionUrl": false
+  },
+  "autoCompactWindow": 500000,
+  "bashOutputMaxChars": 10000,
+  "subagentPromptCacheTtl": "1h",
+  "env": {
+    "CLAUDE_CODE_FORK_SUBAGENT": "0"
   }
 }

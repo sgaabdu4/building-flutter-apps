@@ -11,6 +11,8 @@ from pathlib import Path
 
 from fallow_report import fallow_report_path, validate_scanner_command
 from gate_config import (
+    LANGUAGES,
+    LOCKFILES,
     Gate,
     GateConfig,
     Group,
@@ -22,6 +24,7 @@ from gate_config import (
     repository_files,
     typescript_packages,
 )
+from hook_chain import is_own
 
 PACKAGE_MANAGERS = {"npm", "npx", "pnpm", "yarn", "yarnpkg", "bun", "bunx"}
 FLUTTER_PLATFORM_ROOTS = {"android", "ios", "web", "windows", "macos", "linux"}
@@ -143,6 +146,44 @@ def is_shell_script(path: Path) -> bool:
         return False
     with path.open("rb") as source:
         return bool(re.match(rb"^#![^\n]*\b(?:bash|sh)(?:\s|$)", source.readline(4096)))
+
+
+def unlisted_shell_scripts(
+    root: Path, files: list[Path], shared: list[Gate]
+) -> list[str]:
+    """Scripts absent from explicit shellcheck lists; custom shell gates own inputs."""
+    gates = [
+        gate
+        for gate in shared
+        if gate.get("role") == "shell" or Path(gate["command"][0]).name == "shellcheck"
+    ]
+    if not gates or any(
+        Path(gate["command"][0]).name != "shellcheck" or "--" not in gate["command"]
+        for gate in gates
+    ):
+        return []
+    listed = {
+        argument
+        for gate in gates
+        for argument in gate["command"][gate["command"].index("--") + 1 :]
+    }
+    return sorted(
+        str(path.relative_to(root))
+        for path in files
+        if is_shell_script(path)
+        and str(path.relative_to(root)) not in listed
+        and not is_own(root, path)
+    )
+
+
+def require_listed_shell_scripts(
+    root: Path, files: list[Path], shared: list[Gate]
+) -> None:
+    if unlisted := unlisted_shell_scripts(root, files, shared):
+        raise ValueError(
+            f"shared: shellcheck omits {', '.join(unlisted)}; rerun setup or list "
+            "them after `--`"
+        )
 
 
 def is_deployment_file(path: Path) -> bool:
@@ -513,8 +554,10 @@ def adapt_workspaces(root: Path, config: GateConfig) -> None:
                 child["checks"] = [
                     gate
                     for gate in child["checks"]
-                    if gate.get("role") not in {"lockfiles", "vulnerabilities"}
+                    if gate.get("role")
+                    not in {"lockfiles", "vulnerabilities", "freshness"}
                 ]
+        recurse_into_workspaces(owner["checks"])
         if language == "python":
             for gate in owner["checks"]:
                 if gate.get("role") == "lockfiles" and gate["command"][:2] == [
@@ -530,6 +573,7 @@ def adapt_workspaces(root: Path, config: GateConfig) -> None:
                 in {
                     "lockfiles",
                     "vulnerabilities",
+                    "freshness",
                     "build",
                     "integration",
                     "ui",
@@ -538,6 +582,67 @@ def adapt_workspaces(root: Path, config: GateConfig) -> None:
             ]
             owner.pop("language")
             owner.pop("sources")
+
+
+FRESHNESS_COMMANDS = {
+    "poetry": ["poetry", "show", "--outdated", "--top-level", "--format", "json"],
+    "flutter": ["flutter", "pub", "outdated", "--json"],
+}
+
+
+def recurse_into_workspaces(checks: list[Gate]) -> None:
+    for gate in checks:
+        command = gate["command"]
+        if (
+            gate.get("role") == "freshness"
+            and command[0] == "bun"
+            and "-r" not in command
+        ):
+            command.append("-r")
+
+
+def adapt_freshness(gate: Gate, manager: str) -> None:
+    if manager in FRESHNESS_COMMANDS:
+        gate["command"] = list(FRESHNESS_COMMANDS[manager])
+        path = Path(gate["report"]["path"]).with_suffix(".json")
+        gate["report"] = {**gate["report"], "path": str(path)}
+
+
+def add_freshness(root: Path, source: Path, package: Group) -> None:
+    """Give an older configuration the freshness check the templates now carry."""
+    directory = root / package["path"]
+    checks = package["checks"]
+    anchor = next(
+        (i for i, g in enumerate(checks) if g.get("role") == "vulnerabilities"), None
+    )
+    if anchor is None:
+        return
+    scanned = " ".join(checks[anchor]["command"])
+    language = (
+        package.get("language")
+        or next(
+            (n for n, files in LOCKFILES.items() if any(f in scanned for f in files)),
+            "",
+        )
+        or next((n for f, n in LANGUAGES.items() if (directory / f).is_file()), "")
+    )
+    if language not in LANGUAGES.values():
+        return
+    if any(gate.get("role") == "freshness" for gate in checks):
+        return
+    template = json.loads(
+        (source / f".agents/skills/he/templates/hard-eng.{language}.json").read_text()
+    )
+    gate = next(g for g in template["shared"] if g["role"] == "freshness")
+    manager = (
+        "bun"
+        if language == "javascript"
+        else dependency_command(directory, language)[0]
+    )
+    adapt_freshness(gate, manager)
+    if workspace_members(directory, language):
+        recurse_into_workspaces([gate])
+    checks.insert(anchor + 1, gate)
 
 
 def adapt_package(directory: Path, package: Group) -> None:
@@ -553,6 +658,8 @@ def adapt_package(directory: Path, package: Group) -> None:
                 f"--lockfile={lockfile}" if arg.startswith("--lockfile=") else arg
                 for arg in gate["command"]
             ]
+        elif gate.get("role") == "freshness":
+            adapt_freshness(gate, manager)
         elif language == "python" and gate["command"][0] in {
             "pytest",
             "deptry",

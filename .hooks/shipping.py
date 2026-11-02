@@ -536,17 +536,25 @@ def reused_pull_request(root: Path, base: str) -> str | None:
             or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("GITHUB_EVENT_NAME") != "push"
             or os.environ.get("GITHUB_REF") != f"refs/heads/{policy['base']}"
-            or git(root, "status", "--porcelain")
         ):
             return None
+    except ShippingError:
+        return None
+    try:
+        if git(root, "status", "--porcelain"):
+            raise ShippingError("the checkout has uncommitted changes")
         repository = _repo(os.environ.get("GITHUB_REPOSITORY"), "workflow")
         head, tree = _pull_request_head(
             root, repository, _sha(base, "push base"), policy["base"]
         )
         if tree != git(root, "rev-parse", "HEAD^{tree}").strip():
-            return None
+            raise ShippingError("the merged PR tested a different tree")
         _checks(root, repository, head, policy)
-    except ShippingError:
+    except ShippingError as error:
+        print(
+            f"Running the checks again; the merged PR's checks do not cover this push: {error}",
+            flush=True,
+        )
         return None
     return head
 
@@ -862,6 +870,24 @@ def _review_bypass_problem(
     return None
 
 
+_UNDO_LINE = re.compile(r"^[ \t]*Undo:[ \t]*\S", re.MULTILINE)
+
+
+def _current_with_base(
+    root: Path, identity: tuple[str, str, int], base: str, head: str
+) -> None:
+    owner, name, _ = identity
+    endpoint = f"repos/{owner}/{name}/compare/{base}...{head}"
+    comparison = _object(_json(gh(root, "api", endpoint), "base comparison"), "base")
+    behind = comparison.get("behind_by")
+    if type(behind) is not int:
+        raise ShippingError("PR comparison with its base is invalid")
+    if behind:
+        raise ShippingError(
+            f"PR is {behind} commit(s) behind {base}; rebase on it, push and rerun the checks"
+        )
+
+
 def _ready_state(
     root: Path,
     pull: _PullRequest,
@@ -882,6 +908,11 @@ def _ready_state(
     )
     if threads is None or any(node.get("isResolved") is not True for node in threads):
         raise ShippingError("a review conversation is unresolved or uncounted")
+    if not _UNDO_LINE.search(pull.body):
+        raise ShippingError(
+            "PR body needs a line that starts `Undo:` and lists the undo steps"
+        )
+    _current_with_base(root, identity, pull.base_ref, pull.head_sha)
     bypass = pull.mergeable is True and pull.mergeable_state == "blocked"
     if bypass:
         problem = _review_bypass_problem(root, *identity, pull.head_sha)

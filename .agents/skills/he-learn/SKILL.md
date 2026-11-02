@@ -1,6 +1,6 @@
 ---
 name: he-learn
-description: Prevent verified repeated failures and preserve lasting decisions in terse ADRs. Use when failures recur, prevention needs strengthening, or accepted decisions and steering need durable capture; skip ordinary one-off fixes and routine task updates.
+description: Prevent verified repeated failures and preserve lasting decisions in terse ADRs. Use when failures recur, a bug is found on the base branch, prevention needs strengthening, or accepted decisions and steering need durable capture; skip one-off fixes to unmerged work and routine task updates.
 ---
 
 # Hard Eng Learn
@@ -12,6 +12,7 @@ description: Prevent verified repeated failures and preserve lasting decisions i
 flowchart TD
   E[Current evidence] --> T{What changed?}
   T -->|Repeated failure| R[Research: confirm common cause]
+  T -->|Escaped bug| P
   T -->|Lasting decision or steering| A[Decision capture]
   T -->|No durable gap| N[Continue without new files]
   R --> P[Repair cause and existing deterministic prevention]
@@ -31,6 +32,7 @@ flowchart TD
 ## Repeated failure → prevention
 
 - Recurrence = as defined in [troubleshooting](../research/references/troubleshooting.md), including its distinguishing evidence before another similar retry. A first confirmed false-pass/protected-boundary defect still warrants immediate repair through its current owner.
+- Escaped bug = a defect found on the base branch (user report, revert or failing base check), so it passed every gate on its PR. Learn starts at its first sighting; no repeat is needed. Name the gate that should have caught it (test, type, lint, E2E or ship check). Before the fix, add a case at that gate that fails on the revision with the bug. Fix already merged → run the case on the revision before the fix; state a gap only if that revision cannot run. No gate can catch it → state why in the plan, then apply Skill below.
 - Repeat signal = the Stop hook counts each failed check in `.hard-eng/failures.json` (failing lines, numbers masked) and names a second sighting as a repeat; treat it as recurrence evidence, not proof of one cause.
 - Same cause = before a fix, search for earlier fixes of this cause and every other place it can occur; fix them together and record them on the plan's `Same cause:` line. `check` fails a Ready plan or a changed Complete plan without it.
 - Preference = remove the cause → repair existing invariant/type/test/checker/lint/hook/CI → add the smallest missing deterministic check. Reuse project-native tools. A new script needs repeated fragile logic or a required boundary existing commands cannot check; no checker per incident.

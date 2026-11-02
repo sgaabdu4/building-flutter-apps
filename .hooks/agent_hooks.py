@@ -211,14 +211,7 @@ def project_pre_push(root: Path, hook: Path) -> Path:
 def hook_events(agent: str) -> dict[str, str]:
     if agent not in HOOK_FILES:
         raise ValueError("Unsupported native agent; use Claude or Codex")
-    events = {
-        "session": "SessionStart",
-        "failure": "PostToolUseFailure",
-        "stop": "Stop",
-    }
-    if agent == "codex":
-        del events["failure"]
-    return events
+    return {"session": "SessionStart", "stop": "Stop"}
 
 
 def owned_hook_entry(
@@ -242,6 +235,17 @@ POLL_HOOK: JsonObject = {
     "matcher": "Bash",
     "hooks": [{"type": "command", "command": POLL_COMMAND, "timeout": 5}],
 }
+PREVIEW_COMMAND = 'python3 "$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/previews.py" 2>/dev/null || true'
+PREVIEW_HOOK: JsonObject = {
+    "matcher": "Artifact",
+    "hooks": [{"type": "command", "command": PREVIEW_COMMAND, "timeout": 5}],
+}
+CLAUDE_TOOL_HOOKS = [POLL_HOOK, PREVIEW_HOOK]
+# Its own script: the hard-eng.py entry point loads every gate module first.
+FAILURE_COMMAND = 'python3 "$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/failures.py" 2>/dev/null || true'
+FAILURE_HOOK: JsonObject = {
+    "hooks": [{"type": "command", "command": FAILURE_COMMAND, "timeout": 5}]
+}
 CODEX_HOOK_STATUS = {
     "session": "Hard Eng: updating project setup",
     "stop": "Hard Eng: verifying changes",
@@ -263,7 +267,11 @@ def remove_routine_hooks(current: JsonObject, agent: str, command: str) -> None:
     hooks = current.get("hooks", {})
     if not isinstance(hooks, dict):
         raise TypeError("Conflicting hooks: expected an object")
-    for event, native in (("prompt", "UserPromptSubmit"), ("tool", "PostToolUse")):
+    for event, native in (
+        ("prompt", "UserPromptSubmit"),
+        ("tool", "PostToolUse"),
+        ("failure", "PostToolUseFailure"),
+    ):
         call = f"{command} {event} {agent}"
         owned: JsonObject = {
             "hooks": [{"type": "command", "command": call, "timeout": 10}]
@@ -556,6 +564,18 @@ def session_context(root: Path, payload: JsonObject) -> str:
     if note := restore_note(root):
         messages.append(note)
     messages.append(gate_status(root))
+    if os.name == "posix":
+        from process_group import stop_idle_codex_brokers
+
+        try:
+            brokers, processes = stop_idle_codex_brokers()
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            messages.append(f"Idle Codex broker cleanup failed: {error}")
+            brokers = processes = 0
+        if brokers:
+            messages.append(
+                f"Stopped {brokers} idle Codex brokers ({processes} processes)."
+            )
     messages.append(
         "Open the task's skill first: he-plan, he-build, he-ship or code-review. "
         "Tests fail before your edits → fix only that and stop; the feature waits until that fix merges."
@@ -596,6 +616,8 @@ def integrated_services(root: Path) -> list[str]:
             continue
         if path.name == "pubspec.yaml":
             found.add("Dart")
+        if path.name in {"appwrite.json", "appwrite.config.json"}:
+            found.add("Appwrite")
         if path.suffix in {
             ".py",
             ".js",
@@ -650,37 +672,6 @@ def failure_summary(log: str) -> str:
     finished = re.escape(name) + r"(?: \(exit|:)" + tail
     end = re.search(rf"(?m)^(?:CHECK|OUTPUT) \S*/\S+|(?:PASS|FAIL) {finished}", body)
     return heading + bounded(body[: end.start() if end else None])
-
-
-def repeat_note(root: Path, output: str) -> str:
-    """Counts each failure by its failing lines with numbers masked; a second sighting is a repeat."""
-    lines = {
-        re.sub(r"\d+(?:\.\d+)?", "#", line.strip())
-        for line in output.splitlines()
-        if re.search(r"(?i)fail|error", line)
-    }
-    key = hashlib.sha256("\n".join(sorted(lines)).encode()).hexdigest()[:16]
-    path = root / ".hard-eng/failures.json"
-    try:
-        loaded: JsonValue = json.loads(path.read_text())
-    except (OSError, ValueError):
-        loaded = None
-    seen: dict[str, int] = (
-        {name: value for name, value in loaded.items() if isinstance(value, int)}
-        if isinstance(loaded, dict)
-        else {}
-    )
-    count = seen.pop(key, 0) + 1
-    seen[key] = count
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(json.dumps(dict(list(seen.items())[-100:])))
-    if count < 2:
-        return ""
-    return (
-        f"\n\nRepeat failure: seen {count} times in this checkout. Before another similar try, "
-        "follow .agents/skills/he-learn/SKILL.md: find the shared cause and every place it occurs, "
-        "then record them on the plan's Same cause line."
-    )
 
 
 def show_decisions(root: Path, names: list[str], state: Path | None) -> str:
@@ -838,6 +829,7 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
     if (paused := paused_turn(payload)) is not None:
         return paused
     state = session_state(root, payload)
+    recorded = state is not None and state.exists()
     base, before = saved_session(state)
     try:
         base = subprocess.check_output(
@@ -860,7 +852,7 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
                 "reason": notice
                 + ". Only authorized planning/verification; ask real blockers. No authority to implement, expand scope or edit read-only work → report + stop.",
             }
-        if not changed.strip() and state is not None and state.exists():
+        if not changed.strip() and recorded:
             return unchanged_notice(root, notice)
         if notice and planning_only(root, set(changed.splitlines())):
             return with_freshness(
@@ -910,10 +902,16 @@ def checked_changes(
     returncode, output = run_check(root, base, building)
     decisions = show_decisions(root, changed.splitlines(), state)
     if returncode == 0:
+        if state is not None and not state.exists():
+            # A session that began outside this project passes once, then compares later turns.
+            state.parent.mkdir(parents=True, exist_ok=True)
+            state.write_text(json.dumps({"base": base, "dirty": {}}))
         remember_pass(state, verified)
         if decisions:
             return {"decision": "block", "reason": decisions.strip()}
         return with_freshness(root, passed_notice(building, notice, agent, output))
+    from failures import repeat_note
+
     return {
         "decision": "block",
         "reason": output.rstrip("\n")
@@ -935,23 +933,14 @@ def handle_event(root: Path, event: str, agent: str) -> int:
         if event == "stop":
             output = completion(root, payload, agent)
         else:
-            message = (
-                session_context(root, payload)
-                if event == "session"
-                else learning_context(event)
-            )
+            message = session_context(root, payload)
             # Codex loads AGENTS.override.md natively; Claude loads only AGENTS.md.
-            if (
-                event == "session"
-                and agent == "claude"
-                and (root / "AGENTS.override.md").is_file()
-            ):
+            if agent == "claude" and (root / "AGENTS.override.md").is_file():
                 message += "\nProject rules also in AGENTS.override.md → read it now + follow it."
             output = context_output(native, message)
-            if event == "session":
-                output["systemMessage"] = "Hard Eng startup: " + " ".join(
-                    message.splitlines()[:2]
-                )
+            output["systemMessage"] = "Hard Eng startup: " + " ".join(
+                message.splitlines()[:2]
+            )
     except (OSError, ValueError, TypeError) as error:
         message = (
             f"Hard Eng hook failed: {error}. Continue; don't claim verification passed."

@@ -1,6 +1,6 @@
 ---
 name: research
-description: Investigate a codebase, compare tools or approaches, verify current external or library facts, and research failures before making a substantive technical recommendation. Use for sufficiency and gap reviews; ordinary edits with settled requirements do not need a research stage.
+description: Investigate a codebase, compare tools, vendors or versions, look online for current facts, and research failures before a substantive technical recommendation. Use for stack choices, sufficiency or gap reviews; settled edits need no research.
 ---
 
 # Research

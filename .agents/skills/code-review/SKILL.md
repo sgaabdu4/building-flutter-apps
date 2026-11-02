@@ -10,6 +10,8 @@ Load the review method; load the independent-challenge branch only when requeste
 ```mermaid
 flowchart LR
   R[references/review.md] -->|Independent / adversarial review requested| C[references/challenge.md]
+  R -->|Diff touches sign-in, permissions, API keys, payments, uploads or personal data| S[Security Review]
   click R "references/review.md"
   click C "references/challenge.md"
+  click S "../security-review/SKILL.md"
 ```

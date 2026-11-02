@@ -16,8 +16,10 @@ from pathlib import Path
 
 import agent_hooks
 import hook_chain
+import source_trees
 from mcp_setup import retired_settings
 from release_history import StaleRelease, ordered
+from submodules import update_submodules
 from update_runner import (
     commit_update,
     current_head,
@@ -178,16 +180,14 @@ def fetch_sources(temporary: Path, revision: str, previous: str) -> tuple[Path, 
         check=True,
         timeout=60,
     )
-    for tree in (source, old):
-        if (tree / ".gitmodules").is_file():
-            subprocess.run(
-                ["git", "submodule", "update", "--init", "--recursive", "--depth=1"],
-                cwd=tree,
-                stdout=sys.stderr,
-                check=True,
-                timeout=120,
-            )
+    update_submodules(source, stdout=sys.stderr, timeout=120)
+    update_submodules(old, source, stdout=sys.stderr, timeout=120)
     return source, old
+
+
+def shared_sources(revision: str, previous: str) -> tuple[Path, Path]:
+    """The source and previous trees, fetched once per run and cleaned up when it exits."""
+    return source_trees.shared(REPOSITORY, revision, previous, fetch_sources)
 
 
 def revision_follows(revision: str, reference: str) -> bool:
@@ -248,6 +248,7 @@ def scaffold_files(source: Path) -> set[str]:
                 ".agents/biome.json",
                 ".claude/rules/*.md",
                 ".claude/output-styles/*.md",
+                ".claude/output-styles/biome.json",
             )
             for path in source.glob(pattern)
         }
@@ -292,7 +293,11 @@ def pre_push_missing(root: Path) -> bool:
 
 
 def update_plan(
-    root: Path, source: Path, previous: Path, env: dict[str, str] | None = None
+    root: Path,
+    source: Path,
+    previous: Path,
+    env: dict[str, str] | None = None,
+    replace: bool = False,
 ) -> tuple[dict[str, str | None], dict[str, str | None], tuple[str, str], list[str]]:
     planned = subprocess.run(
         [
@@ -311,6 +316,7 @@ def update_plan(
             "--plan",
             "--previous-source",
             str(previous),
+            *(["--replace-scaffold"] if replace else []),
         ],
         cwd=root,
         env=env,
@@ -339,7 +345,7 @@ def update_plan(
     ):
         target = root / name
         if target.exists():
-            if (
+            if not replace and (
                 target.is_symlink()
                 or target.read_bytes() != (previous / name).read_bytes()
             ):
@@ -697,7 +703,8 @@ def repair_installation(root: Path, previous: str) -> str:
         and (
             not (root / name).exists()
             or retired_parent(root, name)
-            or name in {"AGENTS.md", "CLAUDE.md", "AGENTS.override.md"}
+            or name
+            in {"AGENTS.md", "CLAUDE.md", "AGENTS.override.md", "hard-eng.gates.json"}
             or any(old in (root / name).read_text(errors="replace") for old in retired)
             or OLD_GENERATION_SCRIPT.search((root / name).read_text(errors="replace"))
         )
@@ -894,13 +901,17 @@ def update_in_diff(root: Path, base: str) -> tuple[str, str, set[str]] | None:
                 text=True,
             ).split("\0")
         ) - {""}
+        subjects = subprocess.check_output(
+            ["git", "log", "--format=%s", f"{base}..HEAD"], cwd=root, text=True
+        ).splitlines()
     except (subprocess.CalledProcessError, ValueError, AttributeError):
         return None
+    repair = revision == previous and set(subjects) == {"Install Hard Eng"}
     if (
-        SOURCE_FILE not in names
+        (SOURCE_FILE not in names or revision == previous)
+        and not repair
         or not isinstance(previous, str)
         or not isinstance(revision, str)
-        or revision == previous
         or not re.fullmatch(r"[0-9a-f]{40}", previous)
         or not re.fullmatch(r"[0-9a-f]{40}", revision)
     ):
@@ -915,31 +926,30 @@ def release_installed(
     from agent_hooks import preserved_instructions
     from ci_setup import setup_installed
 
-    with tempfile.TemporaryDirectory(prefix="hard-eng-scaffold-check-") as temporary:
-        source, old = fetch_sources(Path(temporary), revision, previous)
-        allowed = scaffold_files(source) | scaffold_files(old) | INSTALLED_FILES
-        allowed |= {
-            ".claude/skills/" + path.name
-            for tree in (source, old)
-            for path in (tree / ".agents/skills").iterdir()
-            if path.is_dir()
-        }
-        env = hook_chain.own_hooks_env(root)
-        changes, links, _, _ = update_plan(root, source, source, env)
-        if (
-            not names <= allowed
-            or (env is not None and ".husky/pre-push" in names)
-            or changes
-            or links
-            or any(
-                (root / name).exists()
-                for name in scaffold_files(old) - scaffold_files(source)
-            )
-            or not preserved_instructions(root, base, names)
-            or not setup_installed(root, base, names, (source, old))
-        ):
-            return False
-        validate_gates(root, source, {})
+    source, old = shared_sources(revision, previous)
+    allowed = scaffold_files(source) | scaffold_files(old) | INSTALLED_FILES
+    allowed |= {
+        ".claude/skills/" + path.name
+        for tree in (source, old)
+        for path in (tree / ".agents/skills").iterdir()
+        if path.is_dir()
+    }
+    env = hook_chain.own_hooks_env(root)
+    changes, links, _, _ = update_plan(root, source, source, env)
+    if (
+        not names <= allowed
+        or (env is not None and ".husky/pre-push" in names)
+        or changes
+        or links
+        or any(
+            (root / name).exists()
+            for name in scaffold_files(old) - scaffold_files(source)
+        )
+        or not preserved_instructions(root, base, names)
+        or not setup_installed(root, base, names, (source, old))
+    ):
+        return False
+    validate_gates(root, source, {})
     return True
 
 

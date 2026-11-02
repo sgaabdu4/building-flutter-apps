@@ -3,6 +3,7 @@
 import json
 import re
 import sys
+from collections.abc import Callable
 
 LOOP = re.compile(r"\b(?:while|until)\b")
 SHELL_SLEEP = re.compile(r"\bsleep\s+(\d+(?:\.\d+)?)([smhd]?)\b")
@@ -44,9 +45,9 @@ def decision(payload: object) -> dict[str, object] | None:
     }
 
 
-def main() -> int:
+def respond(decide: Callable[[object], dict[str, object] | None]) -> int:
     try:
-        output = decision(json.load(sys.stdin))
+        output = decide(json.load(sys.stdin))
     except ValueError:
         return 0
     if output is not None:
@@ -55,4 +56,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(respond(decision))

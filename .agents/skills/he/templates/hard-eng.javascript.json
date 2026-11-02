@@ -139,6 +139,13 @@
       "report": { "type": "osv", "path": "coverage/osv.json" }
     },
     {
+      "name": "freshness",
+      "role": "freshness",
+      "parallel": true,
+      "command": ["bun", "outdated", "--minimum-release-age=172800"],
+      "report": { "type": "freshness", "path": "coverage/freshness-javascript.txt", "stdout": true }
+    },
+    {
       "name": "security",
       "role": "security",
       "parallel": true,

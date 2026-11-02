@@ -1,6 +1,6 @@
 # Flutter recorded proof
 
-Load when a Flutter journey needs recorded video evidence. Selector, configuration and entrypoint rules (rule 12 `lib/main_dev.dart`, optional runtime interaction, release/native limits) stay in [Flutter runtime E2E](../../building-flutter-apps/references/dart-mcp-e2e-testing.md). Journey assertions, durable-state readback and evidence reporting stay in [E2E](../SKILL.md#prove-the-journey).
+Load when a Flutter journey needs recorded video evidence. Selector, configuration and entrypoint rules (rule 12 `lib/main_dev.dart`, optional runtime interaction, release/native limits) stay in `.agents/skills/building-flutter-apps/references/dart-mcp-e2e-testing.md`. Journey assertions, durable-state readback and evidence reporting stay in [E2E](../SKILL.md#prove-the-journey).
 
 Marionette taps and reads the running app; it never records. The recorder is a separate OS process capturing the device screen while Marionette drives.
 
