@@ -639,13 +639,17 @@ def affected_groups(
 def without_freshness_for_update(
     root: Path, base: str | None, groups: list[Group]
 ) -> list[Group]:
-    """The Hard Eng update that adds the freshness check must not fail on it."""
+    """The Hard Eng update branch, judged from the default branch as CI does, skips freshness."""
+    from plans import default_branch_point
     from update import installed_update_paths
 
-    if (
-        base is None
-        or not any(g.get("role") == "freshness" for x in groups for g in x["checks"])
-        or not installed_update_paths(root, base)
+    if base is None or not any(
+        g.get("role") == "freshness" for x in groups for g in x["checks"]
+    ):
+        return groups
+    point = default_branch_point(root)
+    if not installed_update_paths(root, base) and (
+        point is None or point == base or not installed_update_paths(root, point)
     ):
         return groups
     print("Hard Eng update matches its verified release; skipping freshness.")
