@@ -12,7 +12,6 @@
 
 Signals: layout exception, unbounded height, viewport, LayoutBuilder, Expanded, Flexible
 
-
 ## Core Rule
 
 Flutter layout is constraints-first: constraints go down, sizes go up, parent

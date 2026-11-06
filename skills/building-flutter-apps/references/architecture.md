@@ -12,7 +12,6 @@
 
 Signals: clean architecture, four layers, dependency inversion, domain entity, repository interface
 
-
 ## Scope
 
 In: state, nav, deep links, persistence, HTTP boundaries, models/JSON, DI,
@@ -50,6 +49,7 @@ Mixin vs interface vs extension: see [mixins.md](mixins.md).
 ## Full Directory Structure
 
 **SSOT.** Canonical layout. Other refs link here, no redefine.
+
 - `features/<x>/data/` — datasources, models, repo impls
 - `features/<x>/domain/` — entities, `IRepository` ifaces (pure Dart)
 - `features/<x>/repositories/` — concrete repo wiring (sibling = loud boundary, see [Repository Layer](#repository-layer))
@@ -181,11 +181,13 @@ abstract final class ApiPaths {
 **MUST be pure Dart.** Allowed imports: `freezed_annotation` + `/domain/` paths only. NEVER `core/extensions/`, `package:flutter`, `dart:ui`. Enforced by `arch_domain_import` (ERROR). Models own behavior derived from own fields (see [freezed-sealed.md](freezed-sealed.md#rich-models)).
 
 Boundary integrity (all ERROR — see [value-objects.md](value-objects.md)):
+
 - `vo_public_raw_constructor` — VO raw redirects must be private (`._meters`/`._raw`); only validated factories public.
 - `domain_entity_primitive_factory` — `@freezed` entities outside `/domain/values/` must not own named factories. Convert primitives in data/notifier/import boundaries only.
 - `domain_custom_copy_with` — no hand-written `copyWith` in `/domain/`; let Freezed generate it.
 
 Domain derivations:
+
 - 1 entity, 1 derivation → entity getter
 - Same primitive in 2+ entities → Value Object in `/domain/values/` (see [value-objects.md](value-objects.md))
 - Never `core/extensions/` from domain — outer dep, Dependency Rule
@@ -217,6 +219,7 @@ Entities NEVER contain `fromJson`/`toJson`. Serialization = Data layer.
 Models mirror entities, add serialization. Models own formatting: `toEntity()`, `toNameOnlyRequestBody()`, etc. MUST define `abstract interface class` for every datasource. Provider MUST return interface type, NEVER concrete class.
 
 Backend identity contract rule:
+
 - Never assume domain `id` == backend row/document key.
 - If backend uses internal transport IDs, datasource `update/delete` resolves backend key first (query stable business key), then writes with transport ID.
 
@@ -444,6 +447,7 @@ final created = await const ProductCreateRoute().push<bool>(context);
 ```
 
 Allowed raw router boundary:
+
 - generated `*.g.dart` route helpers
 - shared test router helpers
 

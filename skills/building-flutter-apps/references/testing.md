@@ -15,7 +15,6 @@
 
 Signals: ProviderContainer.test, UncontrolledProviderScope, mocktail, widget tests, event contract
 
-
 ## Rules
 
 1. Mock interfaces (`IProductRepository`), not concrete classes (`ProductRepository`) → doubles honour the provider's contract; implementation changes do not break tests.
@@ -123,6 +122,7 @@ test/helpers/test_fakes.dart
 ```
 
 It owns:
+
 - `createTestContainer(...)`
 - fake services and repositories
 - mock classes for interfaces
@@ -136,6 +136,7 @@ Do not redefine common fakes in every test file. Feature-specific fakes may live
 ## Cross-Runtime Contract Drift Tests
 
 If Flutter shares constants with another runtime, test the contract:
+
 - table/collection/bucket/function IDs
 - field names and relationship names
 - enum/string wire values
@@ -256,6 +257,7 @@ await tester.tap(find.byKey(const ValueKey(AppWidgetKeys.productCloseButton)));
 ```
 
 Rules:
+
 - One registry file per app unless the project already has a namespaced equivalent.
 - Prefer feature-prefixed names: `profile.avatar.edit`, `checkout.payment.submit`.
 - No inline `ValueKey('...')` in widgets or tests.
@@ -316,6 +318,7 @@ test('deleteItem removes from state', () async {
 Stream, realtime, push, subscription, callback, poller, cache-invalidation or source-of-truth refresh path = notifier/widget reaction test: emit a representative event → assert the resulting state or visible UI (update, refetch, clear/fallback).
 
 Cover each event family the feature consumes; skip families it does not:
+
 - create/add/join
 - update/rename/status/order
 - delete/remove/leave/revoke
@@ -365,6 +368,7 @@ test('refetches source of truth after remote update event', () async {
 ```
 
 Generated values and read-your-writes:
+
 - If create/update/delete can return stale, partial, or derived values, assert the notifier refreshes from the source of truth before success UI/navigation.
 - If a code/token/link/slug/order/index is generated remotely, mutate it in the fake source first, then assert UI/notifier state eventually shows that exact generated value.
 - If a selected item is deleted or the actor loses access, assert selected state clears and the list/detail route falls back without throwing.

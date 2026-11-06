@@ -156,6 +156,7 @@ flags stateful/data-returning/debug/fake/backend singleton seams.
 ## 3. Fire-and-Forget
 
 Future intentionally no `await`. Five rules:
+
 1. Mark `unawaited(foo())` — explicit intent, satisfy `unawaited_futures` + `discarded_futures` lints.
 2. `Future<void>` signature, never `void async` (`avoid_void_async`).
 3. Catch internally. Uncaught async errors become unhandled runtime/test failures.

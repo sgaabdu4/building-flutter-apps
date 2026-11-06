@@ -12,7 +12,6 @@
 
 Signals: @riverpod, @Riverpod(keepAlive), Notifier, AsyncNotifier, riverpod_annotation, riverpod_generator
 
-
 Generate all providers with annotations. Never write providers manually. Never import `package:riverpod/legacy.dart`.
 
 Hard rule: this applies to every provider shape: state, computed value, repository, datasource, service/client, family, future, stream, and notifier. Manual `Provider(...)`, `FutureProvider(...)`, `StreamProvider(...)`, `StateProvider(...)`, `NotifierProvider(...)`, `AsyncNotifierProvider(...)`, `StateNotifierProvider(...)`, and `ChangeNotifierProvider(...)` are banned.
@@ -53,6 +52,7 @@ Riverpod 3.x strip "Notifier" suffix from class-based provider names:
 | `AuthNotifier`    | `authProvider`     |
 
 Functional providers keep full name:
+
 | Function                 | Generated Provider          |
 | ------------------------ | --------------------------- |
 | `productRepository(Ref)` | `productRepositoryProvider` |
@@ -368,6 +368,7 @@ During `await`, persisted value shown. After network response, server state take
 Keep all points below when using persistence:
 
 Execution order:
+
 1. Choose persistence owner (repo/data or notifier).
 2. Define key + cache policy.
 3. Choose startup mode (`persist(...)` or `await persist(...).future`).
@@ -385,6 +386,7 @@ Execution order:
 ## Pause/Resume
 
 Riverpod 3.0 pause providers when listeners not visible:
+
 - Widgets off-screen (based on `TickerMode`) pause their providers
 - If provider only used by paused providers, it pauses too
 - When provider rebuilds, previous subscriptions stay until rebuild completes

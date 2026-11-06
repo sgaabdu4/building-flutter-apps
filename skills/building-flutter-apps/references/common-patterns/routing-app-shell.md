@@ -97,6 +97,7 @@ Create GoRouter once. Use `ref.listen()` + `refreshListenable` to trigger redire
 Keep redirect decisions pure. The GoRouter closure should read providers, call a pure resolver, and return the result. Matrix-test the resolver.
 
 **Redirect rules for apps with multi-step setup (profile completion, roles):**
+
 - **During loading, MUST stay put.** Return `null` — NEVER bounce to splash. On web refresh, redirecting `/chat` → `/` → `/home` loses URL. One exception: authenticated users on login/signup redirect to splash.
 - **Initial sync MUST NOT hold splash.** Once auth/setup state is known, redirect from splash to the shell and keep sync/data refresh running in the background. A cover screen that waits on `InitialSyncStatus.syncing` blocks startup on network, remote query, and local merge latency. Lint: `router_splash_waits_for_initial_sync`.
 - **Auth pages MUST navigate explicitly.** Add `ref.listen(authProvider)` in login/signup pages, navigate on auth success. `refreshListenable` timing unreliable; explicit nav guarantees transition.
@@ -349,6 +350,7 @@ class AppShellScaffold extends StatelessWidget {
 `ShellRoute`/`StatefulShellRoute` notify root `NavigatorObserver`s by default.
 Most want this (analytics on shell push). Root `RouteObserver` should fire
 **only** for top-level nav? Pass `notifyRootObserver: false` on `ShellRoute`.
+
 - Use typed route `.go(context)` to enter shell from outside, or `goBranch()`
   when the shell is already available.
 

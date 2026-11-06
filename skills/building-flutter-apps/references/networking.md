@@ -15,7 +15,6 @@
 
 Signals: IHttpService, datasource, HTTP, auth token, background parsing, Isolate.run
 
-
 ## Rules
 
 1. **MUST** keep all HTTP calls in datasources or infrastructure services. Widgets and notifiers never call HTTP clients directly.
