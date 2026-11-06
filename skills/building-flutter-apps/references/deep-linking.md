@@ -119,14 +119,14 @@ Host `https://example.com/.well-known/assetlinks.json`:
 
 ```json
 [
-	{
-		"relation": ["delegate_permission/common.handle_all_urls"],
-		"target": {
-			"namespace": "android_app",
-			"package_name": "com.example.app",
-			"sha256_cert_fingerprints": ["YOUR_SHA256_CERT_FINGERPRINT"]
-		}
-	}
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.app",
+      "sha256_cert_fingerprints": ["YOUR_SHA256_CERT_FINGERPRINT"]
+    }
+  }
 ]
 ```
 
@@ -162,15 +162,15 @@ file extension:
 
 ```json
 {
-	"applinks": {
-		"apps": [],
-		"details": [
-			{
-				"appIDs": ["TEAMID.com.example.app"],
-				"components": [{ "/": "/products/*" }, { "/": "/invite/*" }]
-			}
-		]
-	}
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["TEAMID.com.example.app"],
+        "components": [{ "/": "/products/*" }, { "/": "/invite/*" }]
+      }
+    ]
+  }
 }
 ```
 

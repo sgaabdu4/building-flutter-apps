@@ -269,16 +269,16 @@ a terminal receipt. Unknown scenario ids fail before execution.
 
 ```json
 {
-	"runId": "run-<unique-id>",
-	"scenario": "shared-item",
-	"restartState": "preserved",
-	"steps": [
-		{ "id": "create-parent", "parentId": null, "status": "passed" },
-		{ "id": "create-child", "parentId": "create-parent", "status": "passed" }
-	],
-	"totals": { "expected": 2, "completed": 2 },
-	"status": "passed",
-	"cleanup": "passed"
+  "runId": "run-<unique-id>",
+  "scenario": "shared-item",
+  "restartState": "preserved",
+  "steps": [
+    { "id": "create-parent", "parentId": null, "status": "passed" },
+    { "id": "create-child", "parentId": "create-parent", "status": "passed" }
+  ],
+  "totals": { "expected": 2, "completed": 2 },
+  "status": "passed",
+  "cleanup": "passed"
 }
 ```
 

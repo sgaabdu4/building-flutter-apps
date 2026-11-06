@@ -113,10 +113,10 @@ Base template:
 
 ```json
 {
-	"productsEmptyTitle": "No products yet",
-	"@productsEmptyTitle": {
-		"description": "Empty-state title on the product list screen"
-	}
+  "productsEmptyTitle": "No products yet",
+  "@productsEmptyTitle": {
+    "description": "Empty-state title on the product list screen"
+  }
 }
 ```
 
@@ -124,16 +124,16 @@ Placeholder:
 
 ```json
 {
-	"welcomeUser": "Welcome, {name}",
-	"@welcomeUser": {
-		"description": "Greeting shown after sign in",
-		"placeholders": {
-			"name": {
-				"type": "String",
-				"example": "Amira"
-			}
-		}
-	}
+  "welcomeUser": "Welcome, {name}",
+  "@welcomeUser": {
+    "description": "Greeting shown after sign in",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Amira"
+      }
+    }
+  }
 }
 ```
 
@@ -141,16 +141,16 @@ Plural:
 
 ```json
 {
-	"cartItemCount": "{count, plural, =0{No items} =1{1 item} other{{count} items}}",
-	"@cartItemCount": {
-		"description": "Number of items in the cart",
-		"placeholders": {
-			"count": {
-				"type": "num",
-				"format": "compact"
-			}
-		}
-	}
+  "cartItemCount": "{count, plural, =0{No items} =1{1 item} other{{count} items}}",
+  "@cartItemCount": {
+    "description": "Number of items in the cart",
+    "placeholders": {
+      "count": {
+        "type": "num",
+        "format": "compact"
+      }
+    }
+  }
 }
 ```
 
@@ -158,15 +158,15 @@ Select:
 
 ```json
 {
-	"inviteStatus": "{status, select, pending{Pending} accepted{Accepted} declined{Declined} other{Unknown}}",
-	"@inviteStatus": {
-		"description": "Invite status label",
-		"placeholders": {
-			"status": {
-				"type": "String"
-			}
-		}
-	}
+  "inviteStatus": "{status, select, pending{Pending} accepted{Accepted} declined{Declined} other{Unknown}}",
+  "@inviteStatus": {
+    "description": "Invite status label",
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  }
 }
 ```
 
