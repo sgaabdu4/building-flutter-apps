@@ -14,7 +14,6 @@
 
 Signals: Freezed, sealed class, @freezed, build.yaml, explicit_to_json, copyWith, union types
 
-
 ## Rules — NEVER Violate
 
 1. **MUST** use `sealed class` with `@freezed` — NEVER `abstract class`.

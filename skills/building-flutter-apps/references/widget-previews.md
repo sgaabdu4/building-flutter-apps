@@ -12,7 +12,6 @@
 
 Signals: @Preview, AppPreviewShell, widget_previews, provider overrides, preview fakes
 
-
 ## Rules
 
 1. **MUST** import `package:flutter/widget_previews.dart` only in preview files or preview-only blocks.

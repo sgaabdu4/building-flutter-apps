@@ -13,7 +13,6 @@
 
 Signals: `Distance`, `Money`, `Email`, `Username`, `Slug`, `PhoneNumber`, `HeartRate`, `Weight`, `Pace`, unit conversion in domain, currency math in domain, bare `double distanceMeters` / `int amountCents` / `String email` at entity boundary, `arch_domain_import` fighting `core/extensions/` import.
 
-
 ## Decision
 
 | Scope                               | Use                               |
@@ -84,6 +83,7 @@ sealed class Distance with _$Distance {
 ```
 
 Entity:
+
 ```dart
 @freezed
 sealed class WorkoutSet with _$WorkoutSet {
@@ -116,6 +116,7 @@ sealed class Money with _$Money {
 ```
 
 Display = widget calls extension on the unwrapped value:
+
 ```dart
 Text(order.total.asDouble.asCurrency(symbol: '\$'))
 ```

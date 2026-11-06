@@ -17,7 +17,6 @@
 
 Signals: ref.watch, Consumer boundary, .select(), ListView.builder, computed provider, ref.onDispose
 
-
 Flutter rendering/animations/slivers/isolates/app-size → see [flutter-optimizations.md](flutter-optimizations.md).
 
 ## Rules — NEVER Violate
@@ -59,6 +58,7 @@ MaterialApp(
 ```
 
 Fix the widget:
+
 - allow wrapping
 - use `Flexible`/`Expanded`
 - avoid fixed heights around text

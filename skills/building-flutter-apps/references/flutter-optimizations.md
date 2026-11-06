@@ -12,7 +12,6 @@
 
 Signals: shrinkWrap, FadeTransition, Sliver, RepaintBoundary, Impeller, Isolate.run, AnimationController
 
-
 ## Keys
 
 | Situation                       | Key Type    | Example                    |
@@ -34,6 +33,7 @@ ListView.builder(
 ```
 
 Rules:
+
 - Never make key inside `build()` — defeat purpose
 - Key only when state preservation matter
 - Prefer `ValueKey` > `ObjectKey` > `UniqueKey` > `GlobalKey`
@@ -274,6 +274,7 @@ Keep debug info dir for crash symbolication.
 ### Tree Shaking
 
 Help Dart compiler drop dead code:
+
 - Import specific files, not barrel export
 - Use `show` to import only needed symbols
 - Remove unused deps from `pubspec.yaml`

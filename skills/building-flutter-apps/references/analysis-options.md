@@ -11,7 +11,6 @@
 
 Signals: analysis_options, dart analyze, flutter_skill_lints, riverpod_lint
 
-
 Copy `references/analysis_options.yaml` to every Flutter project root. For new Flutter apps,
 also copy `templates/flutter/lib/core/extensions/` to `lib/core/extensions/`
 so shared context primitives such as `context.isCurrentModalRoute` exist before
@@ -114,6 +113,7 @@ CI/scripts: `dart analyze`. Never `flutter analyze lib`.
 ## Edit loop
 
 A full or cold run costs minutes (114-150 s on a ~1,100-file app under load). Do not run it after each small fix; run focused tests per fix.
+
 1. Dart MCP `analyze_files` when available: `roots: [{"root": "file:///abs/package/", "paths": ["lib/x.dart", "test/x_test.dart"]}]`. The root URI must end with `/`; without it `paths` resolve one folder too high and the tool reports "No errors" for files it never read.
 2. The first result after a cold start (server stops after 10 idle minutes) or a new root can say "No errors" before plugin lints arrive (5 s on a tiny package, up to 260 s on a large one under load). Treat it as not covering `riverpod_lint` / `flutter_skill_lints`. Warm, it answers in about 1.5 s with plugin lints.
 3. No MCP tool: from package root run `dart analyze --fatal-infos <file1> <file2> ...`, naming each edited file. A file list loads plugins (14 s cold for one file). Never pass a folder: it skips plugin lints and still prints "No issues found!" (Dart 3.13.4, dart-lang/sdk#61481).
