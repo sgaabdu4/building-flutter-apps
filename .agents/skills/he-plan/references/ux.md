@@ -1,7 +1,19 @@
 # Repository-grounded UX reference
 
 Apply to visible changes; preview only the flow and states needed for the decision.
+
 - Grounding = inspect the actual website/screen, affected flow and token/theme/component owners in `DESIGN.md` + production code. A dashboard shell alone cannot support decisions about unseen workflows. Missing relevant context → expose the gap; never invent a baseline.
+- Usability = judge every proposal, mockup and review against these; send back a design that fails one:
+  - Mistake-proof: risky choices blocked, right answer prefilled; ask "how could a rushed person get this wrong?".
+  - Least effort: the app acts when sure and shows a person only what needs them, with a prefilled suggestion. Count the clicks per journey; remove any that are not essential.
+  - One-tap Undo instead of "Are you sure?"; delete, cancel, refund, access removal and reversing money always ask twice.
+  - Calm screens: one focus, clear hierarchy, few elements and colours, labels with one meaning, no unneeded subtitles.
+  - Messages say what happened and what to do next, in plain words, without blame, in the `PRODUCT.md` tone. A confused user means the screen changes, not the user.
+  - States: empty and first-use screens say what to do next; loading never shows 0 or stale numbers; a slow or failed connection keeps typed input and says so; one press saves once; an automatic job that stops, pauses or falls behind tells a person at once, with what to do.
+  - Times show in the user's local time; time logic gets time-zone and clock-change tests. In an app with staff or admin roles, each of their actions writes an audit row (who, when, what).
+  - Accessibility: targets at least 24 × 24 px (WCAG 2.5.8), larger for main controls and the platform's own size on native apps; strong contrast; screen-reader labels.
+  - Check each width the app supports.
+  - Performance: name the screen's data reads, payload size and what loads lazily, per [efficiency](../../he/references/efficiency.md).
 - Pick the first surface below that fits ([HE-REAL-APP-PREVIEW](../../he/references/requirements.md#he-real-app-preview)). Planning may build the proposal in an isolated checkout; production implementation still waits for Ready + authorization. No mandatory video or extra visual-testing platform.
 
 | Surface                                           | Preview + baseline                                                                                                                                                                                                                                                                                                                   |

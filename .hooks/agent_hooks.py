@@ -13,6 +13,15 @@ from pathlib import Path
 
 from gate_config import JsonObject, JsonValue, nonproduction_source, repository_files
 
+HOOK_IDENTIFIER = re.compile(r"[A-Za-z0-9_-]{1,200}")
+FAILED_COMMAND_LINE = re.compile(
+    r"FAIL (\S+?)(?: \(exit \d+;|: [^\n]*; elapsed)(?:[^\n]*? @ (\S+))?"
+)
+COPILOT_HOOK_COMMAND = re.compile(
+    r'(?:bash|sh) (?:"\$\((?:env -u GIT_DIR )?git rev-parse --show-toplevel\)/)?'
+    r'\.hard-eng/(?:bootstrap|hook)\.sh"? copilot(?: [a-z]+)?'
+)
+
 GATE_OUTPUT_LIMIT = 8000
 # The HE Build handoff line, not a quoted or negated mention of it.
 SHIP_CLAIM = re.compile(r"^[*_ ]*Ready for ship[*_]*\s*[—–-]", re.MULTILINE)
@@ -363,12 +372,7 @@ def retired_copilot_entry(native: str, entry: JsonValue, command: str) -> bool:
         and entry.keys() <= {"type", "bash", "timeoutSec"}
         and entry.get("type") == "command"
         and isinstance(call := entry.get("bash"), str)
-        and re.fullmatch(
-            r'(?:bash|sh) (?:"\$\((?:env -u GIT_DIR )?git rev-parse --show-toplevel\)/)?'
-            r'\.hard-eng/(?:bootstrap|hook)\.sh"? copilot(?: [a-z]+)?',
-            call,
-        )
-        is not None
+        and COPILOT_HOOK_COMMAND.fullmatch(call) is not None
     )
 
 
@@ -464,9 +468,7 @@ def context_output(native: str, message: str) -> JsonObject:
 
 def session_state(root: Path, payload: JsonObject) -> Path | None:
     identifier = payload.get("session_id", payload.get("sessionId"))
-    if not isinstance(identifier, str) or not re.fullmatch(
-        r"[A-Za-z0-9_-]{1,200}", identifier
-    ):
+    if not isinstance(identifier, str) or not HOOK_IDENTIFIER.fullmatch(identifier):
         return None
     return root / ".hard-eng/sessions" / (identifier + ".json")
 
@@ -607,7 +609,7 @@ def integrated_services(root: Path) -> list[str]:
         "Appwrite": r"(?:from\s+['\"](?:node-)?appwrite['\"]|require\(['\"](?:node-)?appwrite['\"]|from\s+appwrite\b|import\s+appwrite\b|package:(?:dart_)?appwrite/)",
         "Dart": r"\b(?:import|export)\s+['\"](?:dart:|package:)",
     }
-    found = set()
+    found = {"Trello"} if (root / "trello.json").is_file() else set()
     for path in repository_files(root):
         relative = path.relative_to(root)
         if nonproduction_source(relative) or {".agents", ".claude", ".hooks"} & set(
@@ -655,10 +657,7 @@ def bounded(text: str, *, tail: bool = False) -> str:
 
 def failure_summary(log: str) -> str:
     """Failed gate names, then the first failing gate's output from its start."""
-    failures = re.findall(
-        r"FAIL (\S+?)(?: \(exit \d+;|: [^\n]*; elapsed)(?:[^\n]*? @ (\S+))?",
-        log,
-    )
+    failures = FAILED_COMMAND_LINE.findall(log)
     if not failures:
         return bounded(log, tail=True)
     heading = "Failed gates: " + ", ".join(dict.fromkeys(n for n, _ in failures)) + "\n"

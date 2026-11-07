@@ -9,6 +9,9 @@ from pathlib import Path
 
 from gate_config import JSONC, Group, JsonObject, JsonValue, json_file
 
+OPENING_BRACE = re.compile(r"\{(\s*)")
+TRAILING_COMMA = re.compile(r",(\s*[}\]])")
+
 DECLARATIONS = Path(".hooks/untrusted-input.d.ts")
 CAST_RULE = "--only=nursery/noUnsafeTypeAssertion"
 
@@ -26,7 +29,7 @@ def strict_typing_rules(package: Group) -> None:
 def jsonc_config(name: str, text: str) -> dict[str, object]:
     stripped = JSONC.sub(lambda match: match[1] or "", text)
     try:
-        config = json.loads(re.sub(r",(\s*[}\]])", r"\1", stripped))
+        config = json.loads(TRAILING_COMMA.sub(r"\1", stripped))
     except json.JSONDecodeError as error:
         raise ValueError(f"{name} is not valid JSON: {error}") from error
     if not isinstance(config, dict):
@@ -51,7 +54,7 @@ def json_listed(
             f'"{value}",{opening[1] or " "}' if opening and current else f'"{value}"'
         )
     else:
-        opening = re.search(r"\{(\s*)", text)
+        opening = OPENING_BRACE.search(text)
         listed = json.dumps([*current, value])
         insert = (
             f'"{key}": {listed}{"," if config else ""}{opening[1] if opening else ""}'

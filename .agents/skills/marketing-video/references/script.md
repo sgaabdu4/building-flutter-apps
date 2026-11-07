@@ -5,6 +5,7 @@ Load for a new video, or when a script line changes.
 ## Brief
 
 Collect before writing:
+
 - audience + goal: buyers (marketing, default 2–2.5 min) or users learning the product (explainer, as long as every function needs, typically 3–4 min);
 - where it plays; sound off likely → `subtitles: true`;
 - brand owner's display font file, logos for every party, colours;

@@ -114,6 +114,7 @@ See also: [State Teardown Belongs in the Notifier](../state-management-lifecycle
 **Rule.** Sheet pops with a result; the screen that opened it awaits the result, then pushes the route.
 
 **NEVER:**
+
 ```dart
 Navigator.of(context).pop();
 await const CreateExerciseRoute().push<String>(context);

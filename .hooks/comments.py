@@ -11,9 +11,21 @@ import tokenize
 from pathlib import Path, PurePosixPath
 
 from debt import git_file
-from gate_config import changed_files, generated_sources, initial_base
+from gate_config import (
+    ALL_ZERO_OBJECT_ID,
+    changed_files,
+    generated_sources,
+    initial_base,
+)
 from plans import _is_test as is_test_path
 from plans import default_branch_point
+
+DISABLED_CALL = re.compile(r"\.disabled\(")
+QUOTE_OR_BACKSLASH = re.compile(r"[\\'\"]")
+TEST_ATTRIBUTE = re.compile(r"@(?:Test|Suite)\s*\(")
+DIFF_HUNK_HEADER = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)")
+CONTROL_KEYWORD_BEFORE = re.compile(r"\b(if|while|for|with)\s*$")
+STRING_LITERAL = re.compile(r'"(?:\\.|[^"\\\n])*"')
 
 HASH = {".py", ".pyi", ".sh", ".bash", ".zsh"}
 JAVASCRIPT = {".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"}
@@ -98,9 +110,7 @@ def regex_allowed(text: str, index: int) -> bool:
     for position in range(len(before) - 1, -1, -1):
         depth += {")": 1, "(": -1}.get(before[position], 0)
         if depth == 0:
-            return (
-                re.search(r"\b(if|while|for|with)\s*$", before[:position]) is not None
-            )
+            return CONTROL_KEYWORD_BEFORE.search(before[:position]) is not None
     return False
 
 
@@ -196,7 +206,7 @@ def hash_comment_lines(lines: list[str]) -> dict[int, str]:
         code, quoted, quote = shell_code(line, quote)
         quoted |= {i for m in ARITHMETIC.finditer(code) for i in range(*m.span())}
         heredocs = [
-            (re.sub(r"[\\'\"]", "", opened.group(2)), opened.group(1) == "-")
+            (QUOTE_OR_BACKSLASH.sub("", opened.group(2)), opened.group(1) == "-")
             for opened in HEREDOC.finditer(code)
             if opened.start() not in quoted
         ]
@@ -302,7 +312,7 @@ UNOWNED = (".hooks/", ".agents/", ".claude/")
 def disabled_traits(text: str) -> set[int]:
     """Lines of `.disabled(` inside @Test(...) and @Suite(...), however the formatter wraps them."""
     lines = set()
-    for attribute in re.finditer(r"@(?:Test|Suite)\s*\(", text):
+    for attribute in TEST_ATTRIBUTE.finditer(text):
         depth, end = 1, attribute.end()
         while end < len(text) and depth:
             if text[end] == '"':
@@ -310,14 +320,12 @@ def disabled_traits(text: str) -> set[int]:
                 continue
             depth += (text[end] == "(") - (text[end] == ")")
             end += 1
-        span = re.sub(
-            r'"(?:\\.|[^"\\\n])*"',
-            lambda string: " " * len(string[0]),
-            text[attribute.start() : end],
+        span = STRING_LITERAL.sub(
+            lambda string: " " * len(string[0]), text[attribute.start() : end]
         )
         lines |= {
             text.count("\n", 0, attribute.start() + hit.start()) + 1
-            for hit in re.finditer(r"\.disabled\(", span)
+            for hit in DISABLED_CALL.finditer(span)
         }
     return lines
 
@@ -341,7 +349,7 @@ def diff_base(root: Path, base: str) -> str:
         check=False,
     )
     unborn = base == "HEAD" and head.returncode == 1
-    return initial_base(root) if unborn or re.fullmatch("0{40}|0{64}", base) else base
+    return initial_base(root) if unborn or ALL_ZERO_OBJECT_ID.fullmatch(base) else base
 
 
 def header_path(text: str) -> str:
@@ -377,7 +385,7 @@ def diff_lines(
     removed: dict[str, list[tuple[int, str]]] = {}
     name, old, new, in_hunk = "", 0, 0, False
     for line in diff.splitlines():
-        hunk = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)", line)
+        hunk = DIFF_HUNK_HEADER.match(line)
         if line.startswith("diff --git "):
             in_hunk = False
         elif hunk:
@@ -420,6 +428,8 @@ LITERAL = re.compile(r"\"(\\.|[^\"\\\n])*\"|'(\\.|[^'\\\n])*'|`(\\.|[^`\\\n])*`"
 TEST_START = re.compile(
     r"^\s*((async\s+)?def\s|class\s|(it|test|testWidgets|describe|group)(\.\w+)?\()"
 )
+PYTHON_FUNCTION = re.compile(r"^\s*(?:async\s+)?def\s")
+PYTHON_BLOCK = re.compile(r"^\s*(?:(?:async\s+)?def|class)\s")
 IMPORT = re.compile(r"^\s*(import|from|export|use)\b|\brequire\(")
 SYNTAX = {"import", "from", "as", "export", "use", "require", "const", "let", "var"}
 DEFINITION = re.compile(
@@ -480,9 +490,17 @@ def retired_names(
 
 def split_tests(block: list[tuple[int, str]]) -> list[list[tuple[int, str]]]:
     tests: list[list[tuple[int, str]]] = [[]]
+    function: int | None = None
     for number, text in block:
-        if TEST_START.match(text) and tests[-1]:
-            tests.append([])
+        level = len(text) - len(text.lstrip())
+        code = text.strip() and not text.lstrip().startswith(("#", ")", "]", "}"))
+        if code and function is not None and level <= function:
+            function = None
+        helper = function is not None and level > function and PYTHON_BLOCK.match(text)
+        if TEST_START.match(text) and not helper:
+            if tests[-1]:
+                tests.append([])
+            function = level if PYTHON_FUNCTION.match(text) else None
         tests[-1].append((number, text))
     return tests
 

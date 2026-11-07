@@ -16,7 +16,6 @@
 
 Signals: pagination, search debounce, form validation, GoRouter redirect, typed routes
 
-
 ## Rules — NEVER Violate
 
 1. **MUST** use generated typed GoRouter route helpers as the navigation SSOT. Call `SomeRoute(...).go(context)` / `.push<T>(context)` directly. Route definitions own paths and params. Local sheet/dialog helpers own modal presentation and dismissal.

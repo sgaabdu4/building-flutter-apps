@@ -12,7 +12,6 @@
 
 Signals: gen-l10n, ARB, AppLocalizations, plural, select, l10n.yaml
 
-
 ## Rules
 
 1. **MUST** use Flutter gen-l10n for user-visible copy in production UI.

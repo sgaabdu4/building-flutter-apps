@@ -29,6 +29,9 @@ from submodules import update_submodules
 from tool_setup import TOOL_OWNER, temporary_root
 from update import require_current
 
+OBJECT_ID = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+GITHUB_SSH_PREFIX = re.compile(r"(?:ssh://)?git@github\.com[:/]")
+
 DERIVED_DATA = Path.home() / "Library/Developer/Xcode/DerivedData"
 
 
@@ -42,7 +45,7 @@ def remote_base(root: Path, branch: str | None) -> str | None:
     if (
         len(advertised) != 2
         or advertised[1] != reference
-        or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", advertised[0]) is None
+        or OBJECT_ID.fullmatch(advertised[0]) is None
     ):
         raise ValueError("Cannot resolve the current remote base")
     revision = advertised[0]
@@ -241,9 +244,8 @@ def pre_push(root: Path) -> int:
         if set(revision) == {"0"}:
             continue
         with suppress(ShippingError):
-            if re.match(
-                r"(?:ssh://)?git@github\.com[:/]",
-                git(root, "remote", "get-url", "--push", "origin"),
+            if GITHUB_SSH_PREFIX.match(
+                git(root, "remote", "get-url", "--push", "origin")
             ):
                 print(
                     "Hard Eng: origin pushes to GitHub over SSH, which can drop the idle "

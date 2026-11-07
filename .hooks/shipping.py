@@ -17,6 +17,14 @@ from agent_hooks import reject_attribution
 from gate_config import JsonValue
 from ship_evidence import attachment_urls
 
+REPOSITORY_NAME_PART = re.compile(r"[A-Za-z0-9_.-]+")
+HTTP_STATUS_LINE = re.compile(r"(?im)^HTTP/\S+\s+(\d{3})\b")
+CONTENT_TYPE_HEADER = re.compile(r"(?im)^content-type:\s*([^\r\n]+)")
+CONTENT_LENGTH_HEADER = re.compile(r"(?im)^content-length:\s*([^\r\n]+)")
+DELIVERY_TARGET_LINE = re.compile(
+    r"(?im)^\s*(?:[-*+]\s+)?Delivery target:\s*(PR|Merge|Deploy)\s*$"
+)
+
 Delivery = TypedDict("Delivery", {"name": str, "command": list[str]})
 
 ShippingPolicy = TypedDict(
@@ -180,8 +188,8 @@ def _repo(value: JsonValue, description: str) -> str:
         or not owner
         or not name
         or "/" in name
-        or not re.fullmatch(r"[A-Za-z0-9_.-]+", owner)
-        or not re.fullmatch(r"[A-Za-z0-9_.-]+", name)
+        or not REPOSITORY_NAME_PART.fullmatch(owner)
+        or not REPOSITORY_NAME_PART.fullmatch(name)
     ):
         raise ShippingError(f"{description} has an invalid repository")
     return f"{owner}/{name}".lower()
@@ -583,14 +591,14 @@ def _check_attachment(root: Path, url: str) -> None:
     # Signed attachment redirects can reject HEAD; keep binary data out of stdout.
     request = ("api", "--method", "GET", "--include", "--silent")
     response = gh(root, *request, "-H", "Range: bytes=0-0", url)
-    statuses = re.findall(r"(?im)^HTTP/\S+\s+(\d{3})\b", response)
+    statuses = HTTP_STATUS_LINE.findall(response)
     if not statuses or not 200 <= int(statuses[-1]) < 300:
         raise ShippingError("UI evidence attachment is unavailable")
-    content_types = re.findall(r"(?im)^content-type:\s*([^\r\n]+)", response)
+    content_types = CONTENT_TYPE_HEADER.findall(response)
     content_type = content_types[-1].lower() if content_types else ""
     if not content_type.startswith(("image/", "video/")):
         raise ShippingError("UI evidence attachment is not image or video")
-    lengths = re.findall(r"(?im)^content-length:\s*([^\r\n]+)", response)
+    lengths = CONTENT_LENGTH_HEADER.findall(response)
     if lengths:
         try:
             if int(lengths[-1]) <= 0:
@@ -666,10 +674,7 @@ def _plan_target(root: Path, plan: Path) -> tuple[Path, str]:
         raise ShippingError(
             "shipping plan failed native Complete validation"
         ) from error
-    targets = re.findall(
-        r"(?im)^\s*(?:[-*+]\s+)?Delivery target:\s*(PR|Merge|Deploy)\s*$",
-        sections["Verification"],
-    )
+    targets = DELIVERY_TARGET_LINE.findall(sections["Verification"])
     if len(targets) != 1:
         raise ShippingError(
             "Verification needs one Delivery target: PR, Merge or Deploy"
@@ -677,7 +682,17 @@ def _plan_target(root: Path, plan: Path) -> tuple[Path, str]:
     return resolved_plan, targets[0]
 
 
-def _delivery_scope(root: Path, plan: Path | None) -> tuple[Path | None, str]:
+def target_problem(target: str, delivery: list[Delivery]) -> str | None:
+    if target.lower() == "deploy" and not delivery:
+        return "Deploy target requires configured delivery checks"
+    if target.lower() == "merge" and delivery:
+        return "configured delivery checks need Delivery target: Deploy"
+    return None
+
+
+def _delivery_scope(
+    root: Path, plan: Path | None, delivery: list[Delivery]
+) -> tuple[Path | None, str]:
     if plan is not None:
         return _plan_target(root, plan)
     from change_size import size_verdict
@@ -685,7 +700,7 @@ def _delivery_scope(root: Path, plan: Path | None) -> tuple[Path | None, str]:
     small, reason = size_verdict(root)
     if not small:
         raise ShippingError(f"a big change needs a plan: {reason}")
-    return None, "Merge"
+    return None, "Deploy" if delivery else "Merge"
 
 
 def _remote_sha(root: Path, base: str, remote_url: str) -> str:
@@ -827,9 +842,9 @@ def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
     url = f"https://github.com/{owner}/{name}/pull/{number}"
     if repository != f"{owner}/{name}".lower():
         raise ShippingError("PR URL repository does not match origin")
-    resolved_plan, target = _delivery_scope(resolved_root, plan)
-    if target == "Deploy" and not policy["delivery"]:
-        raise ShippingError("Deploy target requires configured delivery checks")
+    resolved_plan, target = _delivery_scope(resolved_root, plan, policy["delivery"])
+    if problem := target_problem(target, policy["delivery"]):
+        raise ShippingError(problem)
     pull = _pull(resolved_root, owner, name, number)
     reject_attribution(resolved_root, "pr", pull.body, "PR body", ShippingError)
     if pull.base_ref != policy["base"]:

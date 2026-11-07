@@ -5,6 +5,8 @@ import re
 import subprocess
 from pathlib import Path
 
+IF_DIRECTIVE = re.compile(r"(?m)^\s*#if\b")
+
 
 def erased_typescript(files: set[Path]) -> set[Path]:
     candidates = sorted(
@@ -54,7 +56,7 @@ def erased_swift(files: set[Path]) -> set[Path]:
     """Parse-only proof: no body, closure or initial value, so Xcode lists no counters."""
     erased = set()
     for file in sorted(files):
-        if re.search(r"(?m)^\s*#if\b", file.read_text()):
+        if IF_DIRECTIVE.search(file.read_text()):
             continue  # The parse drops code inside conditional compilation.
         parsed = subprocess.run(
             ["swiftc", "-frontend", "-dump-parse", str(file)],

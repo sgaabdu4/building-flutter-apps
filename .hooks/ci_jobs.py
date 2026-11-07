@@ -15,6 +15,11 @@ from typing import NamedTuple
 
 from gate_config import LANGUAGES, GateConfig, Group, JsonObject
 
+JOB_BOUNDARY = re.compile(r"(?m)^(?=  [A-Za-z0-9_-]+:\n)")
+CHECK_BASE_COMMAND = re.compile(
+    r'(\.hooks/hard-eng\.py (?:impact|check) --base "\$BASE_SHA")'
+)
+
 FILTER_LANGUAGES = sorted({*LANGUAGES.values(), "swift"})
 
 
@@ -238,11 +243,7 @@ CHECK_COMMAND = '.hooks/hard-eng.py check --base "$BASE_SHA"'
 
 
 def with_language(body: str, flag: str) -> str:
-    return re.sub(
-        r'(\.hooks/hard-eng\.py (?:impact|check) --base "\$BASE_SHA")',
-        lambda match: f"{match[1]} {flag}",
-        body,
-    )
+    return CHECK_BASE_COMMAND.sub(lambda match: f"{match[1]} {flag}", body)
 
 
 def migrate_swift_runner(config: GateConfig, content: str) -> str:
@@ -292,7 +293,7 @@ BUN_VERSION = "${{ steps.impact.outputs.bun || 'latest' }}"
 
 def migrate_bun_version(content: str) -> str:
     """Ask setup-bun for the exact version the impact step resolved, in every job that has that step."""
-    jobs = re.split(r"(?m)^(?=  [A-Za-z0-9_-]+:\n)", content)
+    jobs = JOB_BOUNDARY.split(content)
     return "".join(
         BUN_LATEST.sub(lambda match: match[1] + BUN_VERSION, job)
         if "        id: impact\n" in job

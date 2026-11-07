@@ -7,6 +7,10 @@ import re
 import sys
 from pathlib import Path
 
+FAILURE_WORD = re.compile(r"(?i)fail|error")
+EXIT_CODE_OR_SPACE_OR_DIGIT = re.compile(r"(?i)exit code|[\d\s]")
+NUMBER = re.compile(r"\d+(?:\.\d+)?")
+
 ROOT = Path(__file__).resolve().parents[1]
 SESSION_ID = re.compile(r"[A-Za-z0-9_-]{1,200}")
 NOT_A_MISTAKE = re.compile(
@@ -23,15 +27,11 @@ ERROR_NOISE = (
 def repeat_note(root: Path, output: str) -> str:
     """Counts each failure by its failing lines, else all lines, with numbers masked; a second sighting is a repeat."""
     masked = [
-        re.sub(r"\d+(?:\.\d+)?", "#", line.strip())
-        for line in output.splitlines()
-        if line.strip()
+        NUMBER.sub("#", line.strip()) for line in output.splitlines() if line.strip()
     ]
     if not masked:
         return ""
-    lines = {line for line in masked if re.search(r"(?i)fail|error", line)} or set(
-        masked
-    )
+    lines = {line for line in masked if FAILURE_WORD.search(line)} or set(masked)
     key = hashlib.sha256("\n".join(sorted(lines)).encode()).hexdigest()[:16]
     path = root / ".hard-eng/failures.json"
     try:
@@ -65,7 +65,7 @@ def failure_context(root: Path, payload: dict[str, object]) -> str:
         or not isinstance(identifier, str)
         or not SESSION_ID.fullmatch(identifier)
         or NOT_A_MISTAKE.search(error)
-        or not re.sub(r"(?i)exit code|[\d\s]", "", error)
+        or not EXIT_CODE_OR_SPACE_OR_DIGIT.sub("", error)
     ):
         return ""
     state = root / ".hard-eng/sessions" / (identifier + ".json")

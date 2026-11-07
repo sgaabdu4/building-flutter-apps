@@ -16,7 +16,6 @@
 
 Signals: hive_ce, hive_ce_flutter, TypeAdapter, @GenerateAdapters, IsolatedHive, HiveField
 
-
 ## Core Stack
 
 `hive_ce`, `hive_ce_flutter`, `hive_ce_generator`. Constraints: see [core-stack.md](core-stack.md).
@@ -136,6 +135,7 @@ dart run build_runner build
 ```
 
 Generates:
+
 - `hive_adapters.g.dart` — TypeAdapter implementations
 - `hive_registrar.g.dart` — Extension method for registration
 
@@ -156,6 +156,7 @@ Future<void> initializeStorage() async {
 TypeIds unique + stable. Change TypeId = break existing data.
 
 Allocation = `hive_ce_generator`, no per-feature ranges:
+
 - `firstTypeId` seeds only a new `hive_adapters.g.yaml`.
 - New `AdapterSpec` → schema's next free typeId, skipping `reservedTypeIds`; the committed yaml keeps every assigned id.
 - Append specs to the [central list](#step-1-create-adapter-specification); manual `@HiveType` ids + retired ids → `reservedTypeIds`.
@@ -193,6 +194,7 @@ final all = await box.values; // async — crosses isolate boundary
 ```
 
 Caveats:
+
 - TypeAdapter register on isolate. Registrar same; call from spawn callback per package docs.
 - All reads/writes async — no sync `get`. Update repo signatures.
 - `box.watch()` works, events on port — debounce before rebuild.
@@ -399,6 +401,7 @@ extension WorkoutSetToModel on WorkoutSet {
 **Shipped domain class:** keep primitive ctor slots; expose VOs via getters. Do not change disk shape.
 
 **Forbidden:**
+
 - Reorder ctor params on `@GenerateAdapters` class (silent slot shift).
 - Change param type at existing position.
 - Renumber/reuse `HiveField(N)`.
@@ -407,6 +410,7 @@ extension WorkoutSetToModel on WorkoutSet {
 Constructor signature = append-only schema.
 
 **Lint (ERROR):**
+
 - `use_hive_ce_flutter_import` — production Flutter `lib/` files import Hive through `package:hive_ce_flutter/hive_ce_flutter.dart`, not `package:hive_ce/hive_ce.dart`. Test helpers may use manual temp-dir setup.
 - `hive_field_no_vo_type` — `/data/models/` `@freezed` ctor: no VO types. Hard-coded set: `Distance`/`Money`/`Email`/`Slug`/`PhoneNumber`/`HeartRate`/`Weight`/`Pace`/`Username`. Auto-extends w/ types imported from `*/domain/values/<name>.dart` (PascalCase filename heuristic) + `show` clause names.
 

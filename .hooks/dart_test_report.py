@@ -7,6 +7,8 @@ from typing import cast
 
 from gate_config import JsonObject
 
+WHITESPACE_RUN = re.compile(r"\s+")
+
 
 def dart_events(path: Path) -> list[JsonObject]:
     """Return reporter events, skipping raw test output that shares the stream."""
@@ -53,5 +55,5 @@ def failure_summary(path: Path) -> str | None:
     name = names.get(identifier, f"test {identifier}")
     if (error := errors.get(identifier)) is None:
         return f"Dart test failure: {name}"
-    detail = re.sub(r"\s+", " ", error).strip()
+    detail = WHITESPACE_RUN.sub(" ", error).strip()
     return f"Dart test failure: {name}: {detail[:300]}"

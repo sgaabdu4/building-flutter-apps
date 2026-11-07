@@ -23,6 +23,22 @@ from project_setup import (
 )
 from react_report import incomplete_reason
 
+SHELL_OPERATOR = re.compile(r"[;&|]")
+WARNINGS_LINE = re.compile(r"^Warnings$", re.MULTILINE)
+SHA256_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+SCAN_PROGRESS_LINE = re.compile(r"Scanning [1-9][0-9]* files?\.\.\.")
+DART_DECIMATE_VERSION = re.compile(r"dart-decimate( \d+\.\d+\.\d+\S*)?")
+KEPT_OR_BROKEN_OUTCOME = re.compile(
+    r"^.*\b(KEPT|BROKEN)(?: \([^\n]*\))?$", re.MULTILINE
+)
+CONTRACTS_SUMMARY = re.compile(
+    r"^Contracts: ([0-9]+) kept, ([0-9]+) broken\.$", re.MULTILINE
+)
+ANALYZED_SUMMARY = re.compile(
+    r"^Analyzed ([0-9]+) files, ([0-9]+) dependencies\.$", re.MULTILINE
+)
+EXPORT_PREFIX = re.compile(r"""(?:\s*export\s+(?:'[^'\r\n$]*'|"[^"\r\n$]*")\s*;\s*)+""")
+
 
 def dart_test_failure(
     result: subprocess.CompletedProcess[bytes] | None,
@@ -83,7 +99,7 @@ def related_test_flags(
     ):
         return []
     arguments, directory = package_script_invocation(gate["command"], directory)
-    if any(re.search(r"[;&|]", argument) for argument in arguments):
+    if any(SHELL_OPERATOR.search(argument) for argument in arguments):
         return []
     runner = Path(arguments[0]).name
     if arguments[:2] == ["bun", "test"]:
@@ -286,11 +302,7 @@ def line_coverage(
         expected = {
             file
             for file in expected
-            if file in files
-            or not re.fullmatch(
-                r"""(?:\s*export\s+(?:'[^'\r\n$]*'|"[^"\r\n$]*")\s*;\s*)+""",
-                file.read_text(),
-            )
+            if file in files or not EXPORT_PREFIX.fullmatch(file.read_text())
         }
         expected = expected - erased_dart(expected - files.keys())
     missing = expected - files.keys()
@@ -394,7 +406,7 @@ def osv_layers(report: JsonObject) -> list[JsonObject]:
             not layer["is_empty"]
             and (
                 not isinstance(layer["diff_id"], str)
-                or not re.fullmatch(r"sha256:[0-9a-f]{64}", layer["diff_id"])
+                or not SHA256_DIGEST.fullmatch(layer["diff_id"])
             )
         ):
             raise ValueError("OSV image report has invalid layer metadata")
@@ -454,8 +466,17 @@ def validate_osv_image(path: Path) -> None:
 def validate_semgrep(path: Path) -> None:
     try:
         report = json.loads(path.read_text())
-        if report["results"] != [] or report["errors"] != []:
-            raise ValueError("Semgrep reports findings or scan errors")
+        if results := report["results"]:
+            raise ValueError(
+                f"Semgrep reports {len(results)} findings; fix each as its message says: "
+                + "; ".join(
+                    f"{item['path']}:{item['start']['line']} {item['extra']['message']}"
+                    for item in results[:30]
+                )
+            )
+        from hot_paths import require_parsed
+
+        require_parsed(report["errors"])
         if report["skipped_rules"] != [] or report["paths"].get("skipped", []) != []:
             raise ValueError("Semgrep reports skipped analysis")
         scanned, timing = report["paths"]["scanned"], report["time"]
@@ -488,13 +509,9 @@ def validate_semgrep(path: Path) -> None:
 
 def validate_import_linter(path: Path) -> None:
     content = path.read_text()
-    graphs = re.findall(
-        r"^Analyzed ([0-9]+) files, ([0-9]+) dependencies\.$", content, re.MULTILINE
-    )
-    contracts = re.findall(
-        r"^Contracts: ([0-9]+) kept, ([0-9]+) broken\.$", content, re.MULTILINE
-    )
-    outcomes = re.findall(r"^.*\b(KEPT|BROKEN)(?: \([^\n]*\))?$", content, re.MULTILINE)
+    graphs = ANALYZED_SUMMARY.findall(content)
+    contracts = CONTRACTS_SUMMARY.findall(content)
+    outcomes = KEPT_OR_BROKEN_OUTCOME.findall(content)
     if (
         len(graphs) != 1
         or int(graphs[0][0]) == 0
@@ -503,7 +520,7 @@ def validate_import_linter(path: Path) -> None:
         or int(contracts[0][1]) != 0
         or len(outcomes) != int(contracts[0][0])
         or any(outcome != "KEPT" for outcome in outcomes)
-        or re.search(r"^Warnings$", content, re.MULTILINE)
+        or WARNINGS_LINE.search(content)
     ):
         raise ValueError(
             "Import Linter requires a nonempty analysed graph and kept contracts without failures or warnings"
@@ -521,7 +538,7 @@ def validate_deptry_log(log: TextIO) -> None:
     for line in log:
         if "Warning: Skipping processing of " in line:
             raise ValueError("Deptry skipped source analysis; see command diagnostics")
-        if re.fullmatch(r"Scanning [1-9][0-9]* files?\.\.\.", line.strip()):
+        if SCAN_PROGRESS_LINE.fullmatch(line.strip()):
             scanned = True
     if not scanned:
         raise ValueError("Deptry requires diagnostics showing a nonempty source scan")
@@ -661,7 +678,7 @@ def validate_dart_decimate(path: Path) -> None:
             "verdict": "pass",
         }
         if any(report[key] != value for key, value in envelope.items()) or not (
-            re.fullmatch(r"dart-decimate( \d+\.\d+\.\d+\S*)?", report["tool"])
+            DART_DECIMATE_VERSION.fullmatch(report["tool"])
         ):
             raise ValueError("Expected a passing combined Dart Decimate check")
         if report["findings"] != [] or report["clone_groups"] != []:
@@ -792,9 +809,9 @@ def validate_scanner_report(
     elif scanner == "jscpd":
         validate_jscpd(path, lambda: jscpd_below_minimum(command, directory, timeout))
     elif scanner == "freshness":
-        from freshness import validate_freshness
+        from freshness import bun_waiting, validate_freshness
 
-        validate_freshness(path, gate)
+        validate_freshness(path, gate, waiting=bun_waiting(directory))
     else:
         SCANNERS[scanner](path)
 

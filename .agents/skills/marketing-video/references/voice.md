@@ -1,6 +1,7 @@
 # Voice
 
 Load after the script is approved, or when a line's text changes.
+
 1. `takes.mjs <work> 01` → send that one take to the human; wait for their verdict on voice, pace + name pronunciation.
 2. All lines: six seeds each, whole line per generation, at `storyboard.voice` (default `{ "exaggeration": 0.7, "cfg": 0.4 }`). Change settings only after the human hears a sample.
 3. `pick.mjs <work>` = Whisper per take → lowest word-error take per line (tie → take that fits its scene). `REGENERATE` = no clean take: check the wording, then `takes.mjs <work> <id> 7` (seeds 7–12) and pick again.

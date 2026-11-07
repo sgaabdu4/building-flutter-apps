@@ -1,3 +1,19 @@
 {
-  "revision": "35e5841ffa6565e1599791b1fd8d535b3432ea15"
+  "revision": "abf6a2ef3be9516313f44871d8ef48c44caed8d4",
+  "skills": [
+    "building-flutter-apps",
+    "code-review",
+    "codebase-design",
+    "e2e",
+    "he",
+    "he-build",
+    "he-learn",
+    "he-plan",
+    "he-ship",
+    "marketing-video",
+    "product-walkthrough-video",
+    "research",
+    "security-review",
+    "writing-great-skills"
+  ]
 }

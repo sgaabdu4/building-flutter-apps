@@ -2,6 +2,7 @@
 
 import json
 import re
+import subprocess
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
@@ -9,6 +10,10 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from gate_config import Gate, JsonObject
+
+VERSION_LINE = re.compile(r"\S+ v\S+")
+DIGIT_RUN = re.compile(r"\d+")
+RELEASE_VERSION = re.compile(r"(\d+(?:\.\d+)*)(?:\.post(\d+))?")
 
 WAIT = timedelta(days=2)
 MAX_HOLD_DAYS = 14
@@ -27,10 +32,10 @@ def fetch_json(url: str) -> object:
 def version_key(version: str, *, strict: bool) -> tuple[tuple[int, ...], int] | None:
     """Release numbers, then post number; strict allows no suffix except `.postN`."""
     release = version.partition("+")[0]
-    match = re.fullmatch(r"(\d+(?:\.\d+)*)(?:\.post(\d+))?", release)
+    match = RELEASE_VERSION.fullmatch(release)
     if strict and match is None:
         return None
-    numbers = [int(part) for part in re.findall(r"\d+", match[1] if match else release)]
+    numbers = [int(part) for part in DIGIT_RUN.findall(match[1] if match else release)]
     while numbers and numbers[-1] == 0:
         numbers.pop()
     return tuple(numbers), int(match[2]) if match and match[2] else -1
@@ -134,7 +139,7 @@ UV_ROW = re.compile(
 
 
 def uv_rows(text: str) -> list[tuple[str, str]]:
-    if not re.match(r"\S+ v\S+", text):
+    if not VERSION_LINE.match(text):
         raise ValueError("uv tree printed no dependency tree")
     return [
         (match["name"], match["current"])
@@ -180,6 +185,25 @@ def stale_dependencies(
     return behind(uv_rows(text), lambda name: pypi_eligible(name, fetch, cutoff))
 
 
+def bun_waiting(directory: Path) -> Callable[[str], bool]:
+    """A release Bun cannot install yet, because a dependency it pins is younger than the wait."""
+
+    def waiting(name: str) -> bool:
+        age = f"--minimum-release-age={int(WAIT.total_seconds())}"
+        done = subprocess.run(
+            ["bun", "update", "--latest", name, "--dry-run", age],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=600,
+        )
+        blocked = "blocked by minimum-release-age"
+        return done.returncode != 0 and blocked in done.stdout + done.stderr
+
+    return waiting
+
+
 def held(stale: Stale, holds: list[JsonObject], today: date) -> bool:
     name, _, target = stale
     return any(
@@ -220,6 +244,7 @@ def validate_freshness(
     gate: Gate,
     fetch: Fetch = fetch_json,
     now: datetime | None = None,
+    waiting: Callable[[str], bool] | None = None,
 ) -> None:
     now = now or datetime.now(UTC)
     tool = Path(gate["command"][0]).name
@@ -231,6 +256,11 @@ def validate_freshness(
         raise ValueError(f"{tool} output is unreadable: {error!r}") from error
     holds: list[JsonObject] = gate.get("holds", [])
     stale = [item for item in stale if not held(item, holds, now.date())]
+    if tool == "bun" and waiting is not None:
+        early = [item for item in stale if waiting(item[0])]
+        for name, _, target in early:
+            print(f"{name} {target} needs a dependency that is not 2 days old yet")
+        stale = [item for item in stale if item not in early]
     if stale:
         names = " ".join(name for name, _, _ in stale)
         latest = " ".join(f"{name}@latest" for name, _, _ in stale)
