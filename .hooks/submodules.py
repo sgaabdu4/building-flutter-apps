@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import TextIO
 
+SUBMODULE_PIN_LINE = re.compile(r"-([0-9a-f]{40}|[0-9a-f]{64}) (.+)")
+
 
 def query(
     environment: dict[str, str] | None, directory: Path, *arguments: str
@@ -49,7 +51,7 @@ def donor_rewrites(
     copies: dict[str, Path] = {}
     paths: list[str] = []
     for line in (query(environment, tree, "submodule", "status") or "").splitlines():
-        pinned = re.fullmatch(r"-([0-9a-f]{40}|[0-9a-f]{64}) (.+)", line)
+        pinned = SUBMODULE_PIN_LINE.fullmatch(line)
         if (
             pinned is None
             or pinned[2] not in names

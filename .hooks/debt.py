@@ -9,6 +9,9 @@ from pathlib import Path
 
 from gate_config import Gate, Group, JsonObject
 
+WORD_CHARACTER = re.compile(r"\w")
+DIGIT_RUN = re.compile(r"\d+")
+
 DEBT_FILE = "hard-eng.debt.json"
 # Failing tests, broken installs and leaked secrets are never old findings to keep.
 NEVER = {"tests", "lockfiles", "secrets-files", "secrets-history"}
@@ -65,6 +68,7 @@ REPORT_FINDINGS: dict[str, Callable[[Path], list[str]]] = {
 }
 OUTPUT_REPORTS = {None, "import-linter", "performance-junit"}
 OUTPUTS: dict[str, str] = {}
+UNREADABLE = "unreadable report"
 
 
 def remember(group: Group, gate: Gate, text: str) -> str:
@@ -90,7 +94,7 @@ def fingerprints(root: Path, group: Group, gate: Gate, output: str) -> Counter[s
         lines += path.read_text().splitlines()
     found: Counter[str] = Counter()
     for line in lines:
-        line = re.sub(r"\d+", "N", ANSI.sub("", line).replace(str(root), ".")).strip()
+        line = DIGIT_RUN.sub("N", ANSI.sub("", line).replace(str(root), ".")).strip()
         if line and not RUNNER_LINES.match(line):
             found[line] += 1
     extract = REPORT_FINDINGS.get(str(report.get("type")))
@@ -98,7 +102,7 @@ def fingerprints(root: Path, group: Group, gate: Gate, output: str) -> Counter[s
         try:
             found.update(extract(path))
         except (ValueError, KeyError, TypeError, AttributeError):
-            found["unreadable report"] += 1
+            found[UNREADABLE] += 1
     return found
 
 
@@ -131,7 +135,7 @@ def judge(root: Path, group: Group, gate: Gate, failed: bool, output: str) -> bo
     current = fingerprints(root, group, gate, output) if failed else Counter()
     if new := current - debt:
         print(f"FAIL {gate['name']}: findings beyond {DEBT_FILE}:")
-        shown = sorted(new.elements(), key=lambda line: not re.search(r"\w", line))
+        shown = sorted(new.elements(), key=lambda line: not WORD_CHARACTER.search(line))
         print("".join(f"  {line}\n" for line in shown[:20]), end="")
         return True
     if fixed := debt - current:
@@ -179,10 +183,10 @@ def record(
             key = f"{group['path']}/{gate['name']}"
             if key not in failed:
                 continue
-            if not recordable(gate):
+            current = fingerprints(root, group, gate, outputs.get(key, ""))
+            if not recordable(gate) or not current or UNREADABLE in current:
                 refused.append(key)
                 continue
-            current = fingerprints(root, group, gate, outputs.get(key, ""))
             if old is not None:
                 current &= old.get(key, Counter())
             if current:

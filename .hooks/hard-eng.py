@@ -321,16 +321,9 @@ def prepare_command(
     )
     if not command:
         return []
-    if gate.get("role") == "security" and "p/python" in command:
-        index = command.index("p/python") + 1
-        command = [
-            *command[:index],
-            "--config",
-            str(ROOT / ".agents/skills/he/semgrep/python.yaml"),
-            "--exclude-rule",
-            "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
-            *command[index:],
-        ]
+    from hot_paths import semgrep_options
+
+    command = semgrep_options(ROOT, group, gate, command)
     if command[0] == "biome" and "." in command:
         from project_setup import javascript_files
 
@@ -623,8 +616,10 @@ def run_limited_gate(
         subprocess.TimeoutExpired,
         subprocess.CalledProcessError,
     ) as error:
+        unrun = isinstance(error, (ImportError, OSError, subprocess.TimeoutExpired))
+        text = str(error) if unrun else remember(group, gate, str(error))
         print(
-            f"FAIL {gate['name']}: {remember(group, gate, str(error))}; "
+            f"FAIL {gate['name']}: {text}; "
             f"elapsed {time.monotonic() - started:.3f}s @ {group['path']}"
         )
         return True
@@ -781,6 +776,14 @@ def pre_push() -> int:
 def deliver(args: "Namespace") -> int:
     if args.command == "adopt":
         return adopt()
+    if args.command == "ci-usage":
+        from ci_usage import ci_usage
+
+        return ci_usage(ROOT, args.repo, args.days, args.runs)
+    if args.command == "hot-paths":
+        from hot_paths import scan_all
+
+        return scan_all(ROOT)
     if args.command == "gap-issue":
         from gap_issue import file_gap
 
@@ -799,7 +802,9 @@ def adopt() -> int:
     from debt import record, settled_run
     from gate_config import load_groups
     from shipping import gate_budget
+    from tool_setup import ensure_python_runtime
 
+    ensure_python_runtime()
     with check_lock(ROOT):
         groups = load_groups(ROOT)
         timeout = gate_budget(ROOT)
@@ -854,6 +859,12 @@ def main() -> int:
     )
     usage.add_argument("--repo", help="owner/name; defaults to origin")
     usage.add_argument("--days", type=int, default=14)
+    usage.add_argument(
+        "--runs", type=int, help="Use the newest N runs instead of --days"
+    )
+    commands.add_parser(
+        "hot-paths", help="List known slow patterns across the whole repository"
+    )
     mutating = commands.add_parser(
         "mutation",
         help="Report changed lines whose tests miss small deliberate bugs",
@@ -921,10 +932,6 @@ def main() -> int:
         )
     if args.command == "impact":
         return impact(args.base, language_filter(args))
-    if args.command == "ci-usage":
-        from ci_setup import ci_usage
-
-        return ci_usage(ROOT, args.repo, args.days)
     if args.command == "mutation":
         from ship_actions import mutate
 
@@ -933,7 +940,14 @@ def main() -> int:
         from update_runner import update_main
 
         return update_main(ROOT, args.command == "update-pr", args.apply, args.merge)
-    if args.command in {"adopt", "challenge", "ship", "gap-issue"}:
+    if args.command in {
+        "adopt",
+        "challenge",
+        "ship",
+        "gap-issue",
+        "ci-usage",
+        "hot-paths",
+    }:
         return deliver(args)
     from agent_hooks import handle_event
 

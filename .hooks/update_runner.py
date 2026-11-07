@@ -51,7 +51,7 @@ def update_blocker(root: Path) -> str | None:
     if not isinstance(metadata, dict):
         raise TypeError("Installed source metadata must be an object")
     previous = metadata.get("revision")
-    if not isinstance(previous, str) or not re.fullmatch(r"[0-9a-f]{40}", previous):
+    if not isinstance(previous, str) or not HEX_REVISION.fullmatch(previous):
         return "Installed from an uncommitted copy; publish a verified revision to enable auto-updates."
     return None
 

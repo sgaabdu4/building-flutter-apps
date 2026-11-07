@@ -5,6 +5,8 @@ import re
 import sys
 from pathlib import Path
 
+VARIABLE_OR_SELF_HOSTED_CONDITION = re.compile(r"vars\.|self-hosted")
+
 TOOL_DIRECTORIES = (
     "MISE_DATA_DIR",
     "MISE_CACHE_DIR",
@@ -48,8 +50,8 @@ def browser_cache_messages(relative: str, text: str) -> list[str]:
         return []
     messages = []
     for job_name, job in (jobs if isinstance(jobs, dict) else {}).items():
-        if not isinstance(job, dict) or not re.search(
-            r"vars\.|self-hosted", json.dumps(job.get("runs-on"))
+        if not isinstance(job, dict) or not VARIABLE_OR_SELF_HOSTED_CONDITION.search(
+            json.dumps(job.get("runs-on"))
         ):
             continue
         for step in job.get("steps") or []:

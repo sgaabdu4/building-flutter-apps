@@ -14,7 +14,6 @@
 
 Signals = Crashlytics + FirebaseCrashlytics + Sentry + sentry_flutter + DSN + `Crash.error` + symbolication + crash reporting.
 
-
 ## Provider branch
 
 | Repository evidence                          | Action                                                                                                    |

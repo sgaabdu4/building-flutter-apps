@@ -62,6 +62,8 @@ def json_text(
 
 
 JSONC = re.compile(r'("(?:\\.|[^"\\])*")|//[^\n]*|/\*.*?\*/', re.DOTALL)
+TRAILING_COMMA = re.compile(r",(\s*[}\]])")
+ALL_ZERO_OBJECT_ID = re.compile(r"0{40}|0{64}")
 
 
 def json_layout(root: Path) -> tuple[str, int, int]:
@@ -70,7 +72,7 @@ def json_layout(root: Path) -> tuple[str, int, int]:
         if (root / name).is_file():
             text = JSONC.sub(lambda match: match[1] or "", (root / name).read_text())
             try:
-                config = json.loads(re.sub(r",(\s*[}\]])", r"\1", text))
+                config = json.loads(TRAILING_COMMA.sub(r"\1", text))
             except ValueError:
                 return "\t", 2, 80
             options = {
@@ -342,35 +344,6 @@ def validate_file_sizes(root: Path, exceptions: dict[str, dict[str, str]]) -> No
         )
 
 
-def validate_documents(root: Path) -> None:
-    for name, required in (
-        ("PRODUCT.md", ("Users", "Problem", "Product Purpose", "Boundaries")),
-        ("DESIGN.md", ("Overview", "Components", "Do's and Don'ts")),
-    ):
-        path = root / name
-        if not path.is_file():
-            raise ValueError(f"{name} is required; fill it from the actual project")
-        content = path.read_text().strip()
-        if not content:
-            raise ValueError(f"{name} is empty; fill it from the actual project")
-        if "[todo:" in content.lower():
-            raise ValueError(f"{name} contains unfilled template prompts")
-        if not re.search(r"(?m)^# \S[^\n]*$", content):
-            raise ValueError(f"{name} needs a document title using '# Title'")
-        parts = re.split(r"(?m)^##[ \t]+([^\n]+)\n", content + "\n")
-        sections = dict(zip((heading.strip() for heading in parts[1::2]), parts[2::2]))
-        for heading in required:
-            if not sections.get(heading, "").strip():
-                raise ValueError(f"{name} needs a filled '## {heading}' section")
-        order = [
-            heading.strip() for heading in parts[1::2] if heading.strip() in required
-        ]
-        if order != list(required):
-            raise ValueError(
-                f"{name} sections must follow the template order without duplicates"
-            )
-
-
 def validate_gate(gate: Gate, directory: Path, report_paths: set[Path]) -> None:
     if (
         not isinstance(gate, dict)
@@ -486,7 +459,7 @@ def initial_base(root: Path) -> str:
 
 def changed_files(root: Path, base: str) -> set[str] | None:
     try:
-        if re.fullmatch(r"0{40}|0{64}", base) or (
+        if ALL_ZERO_OBJECT_ID.fullmatch(base) or (
             base == "HEAD"
             and subprocess.run(
                 ["git", "rev-parse", "--verify", "--quiet", "HEAD"],
@@ -648,9 +621,16 @@ def without_freshness_for_update(
     ):
         return groups
     point = default_branch_point(root)
-    if not installed_update_paths(root, base) and (
-        point is None or point == base or not installed_update_paths(root, point)
-    ):
+    judged = base
+    installed = installed_update_paths(root, base)
+    if not installed and point is not None and point != base:
+        judged = point
+        installed = installed_update_paths(root, point)
+    if not installed:
+        return groups
+    names = changed_files(root, judged)
+    manifests = set(LANGUAGES) | {name for v in LOCKFILES.values() for name in v}
+    if names is None or any(Path(name).name in manifests for name in names - installed):
         return groups
     print("Hard Eng update matches its verified release; skipping freshness.")
     return [
@@ -967,6 +947,8 @@ def parse_config(content: str, *, require_impact_review: bool = True) -> GateCon
 def load_groups(
     root: Path, base: str | None = None, *, dependents: bool = True
 ) -> list[Group]:
+    from plans import validate_documents
+
     validate_documents(root)
     config = parse_config((root / "hard-eng.gates.json").read_text())
     if type(config.get("scan_git_history", True)) is not bool:

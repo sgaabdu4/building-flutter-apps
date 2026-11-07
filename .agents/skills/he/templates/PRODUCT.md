@@ -23,7 +23,7 @@ and remove irrelevant sections. Do not invent facts to fill a heading. -->
 
 ## Brand Personality / Tone
 
-[TODO: The established voice and communication style.]
+[TODO: The established voice and communication style. None established → write "Calm, positive and blame-free (default)" and change it when the product needs another voice.]
 
 ## Boundaries
 

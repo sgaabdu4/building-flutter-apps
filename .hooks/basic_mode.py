@@ -106,8 +106,6 @@ def basic_config(source: Path, root: Path, files: list[Path]) -> GateConfig | No
                 "scan",
                 "--config",
                 "p/default",
-                "--exclude=.agents",
-                "--exclude=.hooks",
                 "--jobs",
                 "2",
                 "--error",

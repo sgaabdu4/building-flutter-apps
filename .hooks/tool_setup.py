@@ -22,6 +22,13 @@ from fallow_report import native_scanner_command
 from gate_config import Group
 from project_setup import package_script_invocation
 
+DIGIT_RUN = re.compile(r"\d+")
+TOOL_VERSION = re.compile(r"\d[\w.+-]*")
+VERSION_NUMBER = re.compile(r"\d+(?:\.\d+)+")
+TOOL_BRACKETS_OR_LATEST = re.compile(r"\[[^\]]*\]|@latest$")
+MISSING_MODULE_NAME = re.compile(r"Cannot find module '([^']+)'")
+NPM_LATEST_PACKAGE = re.compile(r"^(npm:[^\[]+?)(@latest)$")
+
 NATIVE_SCANNERS = {
     "dart-decimate": "dart-decimate",
     "react-doctor": "React Doctor",
@@ -201,7 +208,7 @@ def scanner_version(name: str, offline: bool, timeout: float) -> str | None:
         )
     except (subprocess.SubprocessError, OSError):
         return None
-    found = re.search(r"\d+(?:\.\d+)+", done.stdout)
+    found = VERSION_NUMBER.search(done.stdout)
     return found[0] if found else ""
 
 
@@ -220,16 +227,14 @@ def pin_python_scanners(names: list[str], timeout: float) -> None:
 
 def bun_age(tool: str, seconds: int) -> str:
     """Bun ignores MISE_MINIMUM_RELEASE_AGE, so an npm tool also passes its own."""
-    return re.sub(
-        r"^(npm:[^\[]+?)(@latest)$",
-        rf'\1[bun_args="--minimum-release-age={seconds}"]\2',
-        tool,
+    return NPM_LATEST_PACKAGE.sub(
+        rf'\1[bun_args="--minimum-release-age={seconds}"]\2', tool
     )
 
 
 def tool_name(tool: str) -> str:
     """The tool without its install options or version, as mise names it."""
-    return re.sub(r"\[[^\]]*\]|@latest$", "", tool)
+    return TOOL_BRACKETS_OR_LATEST.sub("", tool)
 
 
 def provision_batch(batch: list[str], timeout: float) -> None:
@@ -316,7 +321,7 @@ def newest_launcher(launchers: Path) -> Path | None:
     ]
     return max(
         found,
-        key=lambda path: [int(part) for part in re.findall(r"\d+", path.name)],
+        key=lambda path: [int(part) for part in DIGIT_RUN.findall(path.name)],
         default=None,
     )
 
@@ -376,7 +381,7 @@ def broken_tools(
             error = probe.communicate()[1] + "\nno answer to --version"
         if probe.returncode == 0:
             continue
-        missing = re.search(r"Cannot find module '([^']+)'", error)
+        missing = MISSING_MODULE_NAME.search(error)
         reason = (
             "missing " + missing[1]
             if missing
@@ -567,7 +572,7 @@ def mise_launcher(
             check=True,
         ).stdout
     )
-    if not isinstance(version, str) or not re.fullmatch(r"\d[\w.+-]*", version):
+    if not isinstance(version, str) or not TOOL_VERSION.fullmatch(version):
         raise TypeError("Bun did not return a usable latest mise version")
     installation = launchers / version
     with (launchers / f"{version}.lock").open("a") as use:

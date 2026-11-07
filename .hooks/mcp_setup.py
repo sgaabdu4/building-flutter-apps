@@ -11,6 +11,23 @@ from urllib.parse import urlparse
 
 from gate_config import JsonObject, json_file, repository_files
 
+PATH_SEPARATOR = r"""(?:[/\\]+|['"]\s*/\s*['"])"""
+RETIRED_APPWRITE_REFERENCE = re.compile(
+    r"\.(?:agents|claude)"
+    + PATH_SEPARATOR
+    + PATH_SEPARATOR.join(
+        re.escape(part)
+        for part in (
+            "skills",
+            "appwrite-backend",
+            "scripts",
+            "appwrite-schema-guard.mjs",
+        )
+    )
+)
+
+MCP_SECTION_HEADER = re.compile(r"(?m)^\[[^\n]+\][ \t]*(?:#.*)?$")
+
 APPWRITE_CLOUD_MCP_URL = "https://mcp.appwrite.io/"
 RETIRED_INTEGRATIONS = re.compile(
     r"(?<![a-z0-9-])(?:context-mode|codebase-memory(?:-mcp)?)(?![a-z0-9-])",
@@ -36,20 +53,6 @@ def retire_appwrite_cli(root: Path, source: Path, previous: Path | None) -> list
         return []
     owned = scaffold_files(source) | set(retired)
     owned |= scaffold_files(previous) if previous is not None else set()
-    separator = r"""(?:[/\\]+|['"]\s*/\s*['"])"""
-    reference = re.compile(
-        r"\.(?:agents|claude)"
-        + separator
-        + separator.join(
-            re.escape(part)
-            for part in (
-                "skills",
-                "appwrite-backend",
-                "scripts",
-                "appwrite-schema-guard.mjs",
-            )
-        )
-    )
     for path in repository_files(root) if APPWRITE_CLI_FILES[1] in retired else []:
         name = path.relative_to(root).as_posix()
         if (
@@ -79,7 +82,9 @@ def retire_appwrite_cli(root: Path, source: Path, previous: Path | None) -> list
             }
         ):
             continue
-        if reference.search(path.read_text(errors="replace").replace(r"\.", ".")):
+        if RETIRED_APPWRITE_REFERENCE.search(
+            path.read_text(errors="replace").replace(r"\.", ".")
+        ):
             raise ValueError(
                 f"Appwrite CLI migration required: {name} references the retiring installed schema guard; "
                 "move the required guard and its callers to project-owned scripts before setup."
@@ -343,7 +348,7 @@ def detected_servers(root: Path) -> dict[str, JsonObject]:
     return {
         service.lower(): settings
         for service in services
-        if (settings := optional[service]) is not None
+        if (settings := optional.get(service)) is not None
     }
 
 
@@ -453,7 +458,7 @@ def retire_codex_servers(config: str, removed: set[str]) -> str:
     expected = tomllib.loads(config)
     for name in removed:
         del expected["mcp_servers"][name]
-    headers = list(re.finditer(r"(?m)^\[[^\n]+\][ \t]*(?:#.*)?$", config))
+    headers = list(MCP_SECTION_HEADER.finditer(config))
     for index in reversed(range(len(headers))):
         header = headers[index]
         if any(

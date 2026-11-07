@@ -49,6 +49,7 @@ The scripts in this directory implement these rules. Do not replace them with an
 ## Required inputs
 
 Determine these by inspecting the repository and the user's request:
+
 - repository path;
 - existing command that starts the application;
 - local base URL;
@@ -67,6 +68,7 @@ Never record credentials, tokens, real customer data, private payloads, or an un
 Read the package manifest, existing test and preview scripts, routes, application entry points, relevant feature code, existing Playwright tests, fixtures, and seed data.
 
 Build the journey from the real product:
+
 1. Start state.
 2. Meaningful user action.
 3. Visible product response.
@@ -87,6 +89,7 @@ bun scripts/scaffold.mjs \
 ```
 
 Replace the generated examples. Keep:
+
 - `strictE2E: true`;
 - a first `goto` step;
 - a product-specific `readySelector`;
@@ -106,6 +109,7 @@ Strict preflight must remain enabled. Do not weaken the gate to make a broken co
 ## Phase 3: establish safety boundaries
 
 Set:
+
 - `allowedOrigins` to the local app and only the APIs needed by the journey;
 - `allowedHttpResponses` only for deliberate, asserted negative-path responses, matched by exact status and narrow URL substring;
 - `blockExternalRequests: true`;
@@ -124,6 +128,7 @@ Use `textFromEnv` only for a browser-masked password field. A visible field must
 Use an existing repository command. Do not modify product code merely to make the recorder pass.
 
 Confirm:
+
 - the base URL returns successfully;
 - the configured ready selector becomes visible;
 - required local APIs respond;
@@ -141,6 +146,7 @@ bun scripts/run-walkthrough.mjs \
 ```
 
 The recorder must produce:
+
 - `<name>.webm`;
 - `<name>-run-report.json`;
 - `<name>-timeline.json`;
@@ -164,6 +170,7 @@ bun scripts/review-video.mjs \
 Exit code `2` with `status: "review-required"` means automated checks passed but visual review + approval remain; it is not completion. Any `failed` status requires root-cause repair and another attempt.
 
 The reviewer enforces (pointer-specific checks apply when enabled):
+
 - complete decode;
 - monotonic frame timestamps;
 - no blank opening and no single near-white or near-black frame;
@@ -183,6 +190,7 @@ The reviewer enforces (pointer-specific checks apply when enabled):
 ## Phase 7: inspect the complete attempt
 
 Do all of the following:
+
 1. Play the WebM from frame one to the end at 1x.
 2. Inspect `opening-review-10fps.jpg`.
 3. Inspect every `contact-sheet-*.jpg`.
@@ -192,6 +200,7 @@ Do all of the following:
 7. Compare the visible journey with the requested start and end states.
 
 Specifically reject:
+
 - any first-frame flash, refresh, blank paint, font swap, layout jump, or duplicated opening;
 - pointer disappearance, reset, style change, teleport, duplicate pointer, or inconsistent click cue;
 - abrupt, bouncing, reversed, repeated, or unexplained scrolling;
@@ -209,6 +218,7 @@ Contact sheets do not replace sequential playback. A clean report does not overr
 ## Phase 8: repair and rerun
 
 When anything fails:
+
 1. Identify whether the cause is readiness, locator choice, pointer pacing, scroll timing, fixture state, application state, or journey design.
 2. Fix the root cause within task authorization. If the fix requires unavailable access or an unresolved decision, report the exact blocker; do not approve the attempt.
 3. Record to `artifacts-attempt-02` or the next unused number.
@@ -269,6 +279,7 @@ Do not rely on a previously opened preview.
 ## Completion gate
 
 Recorded E2E requires conditions 1–7 on the accepted WebM, plus E2E's product assertions and durable-state proof. Video delivery requires all ten conditions on the source and exact delivered MP4. Do not report completion with a failed or review-required report.
+
 1. The accepted run report is `passed`.
 2. No runtime, safety, network, or sensitive-data error exists.
 3. Recording began after the real opening state was ready.
@@ -314,7 +325,6 @@ User-reported defects follow [E2E's reopening rule](../e2e/SKILL.md#prove-the-jo
 Negative-path `allowedHttpResponses` follow [Phase 3](#phase-3-establish-safety-boundaries); `"pointer": false` follows [Recorded E2E](#recorded-e2e).
 
 `reducedMotion: "reduce"` asks the application to honor `prefers-reduced-motion`; it does not rewrite application behavior. Keep meaningful product loaders and state changes. Remove decorative motion in the application or a safe recording fixture rather than masking real behavior in post-production.
-
 
 Supported actions:
 

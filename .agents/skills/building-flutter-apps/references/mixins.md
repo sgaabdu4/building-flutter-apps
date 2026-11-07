@@ -12,7 +12,6 @@
 
 Signals: mixin, ConnectivityMixin, RetryMixin, on ConsumerState, abstract interface class
 
-
 ## Rules — NEVER Violate
 
 0. **MUST extract shared behavior to a mixin the moment it appears in 2+ classes.** When the same code shows up in two notifiers, two widgets, or two services, stop copy-pasting and write a mixin. `mixin XxxMixin on Y` with the right `on` constraint. Suffix `Mixin`. Copy-paste sharing across notifiers / widgets / services is forbidden.
@@ -154,6 +153,7 @@ Future<T> retryWithBackoff<T>(
 ```
 
 Rules:
+
 - **Backoff**: `retryWithBackoff` retries transient failures (Appwrite 429/503, `SocketException`, `HttpException`); non-retryable errors rethrow immediately. Base 200ms, doubled each retry, ±50ms jitter, 3 attempts by default.
 - **Module-level RNG**: hoist once. No `math.Random()` per call.
 - **Retryable set explicit**: 429/503 + network IO only. Validation/4xx rethrow immediate.

@@ -14,7 +14,6 @@
 
 Signals: E2E testing, Dart MCP, Marionette MCP, flutter_driver, integration_test, source-of-truth verification
 
-
 Dart MCP server: [Flutter AI tools](https://docs.flutter.dev/ai/tools#dart-and-flutter-mcp-server) and the [`dart_mcp_server` README](https://github.com/dart-lang/ai/tree/main/pkgs/dart_mcp_server) (tool list, categories, `--enable` / `--disable`).
 
 Runtime E2E means real app behavior on a real simulator/device. Static review, screenshots without interactions, widget tests, or one-device happy paths do not prove sync/collaboration/cloud behavior.
@@ -55,6 +54,7 @@ Runtime E2E means real app behavior on a real simulator/device. Static review, s
 [Marionette](https://github.com/leancodepl/marionette_mcp) drives a running Flutter
 app, not a pure-Dart CLI or backend. Treat it as optional tooling, not a default
 application dependency or global MCP installation.
+
 - Before setup, check the project's Flutter/package compatibility and align the
   `marionette_flutter` binding with the MCP server version. Binding placement =
   [E2E entrypoints](#e2e-entrypoints) (upstream: [single-binding setup](https://github.com/leancodepl/marionette_mcp/blob/main/docs/flutter-setup.md)).
@@ -91,6 +91,7 @@ Names = `dart_mcp_server` tool names; a client may add a prefix (e.g.
 Off by default → enable with a server argument: `dart mcp-server --enable
 flutter_app_lifecycle`, `--enable cli` or `--enable <tool-name>`. Not enabled →
 CLI:
+
 - `flutter devices` → `flutter run --print-dtd -d <device> -t <entrypoint>` →
   printed DTD URI to `dtd` `connect`; stop that `flutter run` process at the end.
 - `dart fix --apply`, `dart format .`, `flutter test`.
@@ -170,6 +171,7 @@ Future<void> main() async {
 ```
 
 Rules:
+
 - Keep test-only overrides out of `main.dart`.
 - Prefer `--dart-define` flags for known app states: signed out, onboarding incomplete, update required, disabled notifications.
 - Do not mock the feature under test in the E2E entrypoint.
@@ -293,6 +295,7 @@ callbacks that belong to the scenario before cleanup.
 ## Journey Checklist Template
 
 Copy this per feature.
+
 - Entry route opens from cold launch
 - Auth/account state is known
 - Empty/loading/error states render
@@ -312,6 +315,7 @@ Copy this per feature.
 ## Multi-Actor / Sync Protocol
 
 Use this for teams, squads, chat, shared documents, shared lists, invitations, realtime dashboards, multiplayer, collaborative editing, or any remote state expected to appear elsewhere.
+
 1. Actor A creates parent resource.
 2. Verify parent in source of truth.
 3. Actor B joins/gets access.
@@ -332,6 +336,7 @@ Use this for teams, squads, chat, shared documents, shared lists, invitations, r
 Use the project's real backend/admin read path, local database inspector, CLI, emulator API, or service SDK. Keep this generic; do not bake one vendor into the skill.
 
 Verify:
+
 - IDs used by the app match transport/source-of-truth IDs where required.
 - Generated fields, counters, order indexes, invites, slugs, and membership rows are current.
 - Deleted/revoked records are gone or marked inactive as designed.

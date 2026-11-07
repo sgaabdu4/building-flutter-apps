@@ -4,7 +4,7 @@
 - `.hooks/hard-eng-source.json` exists → get session's Hard Eng update status before any repo work (read-only too).
   - SessionStart reports last result + starts/reports a background update; verified → 1 commit on local `hard-eng/update` from remote base, current branch untouched.
   - No status → from repo root: `curl -fsSL https://raw.githubusercontent.com/sgaabdu4/hard-eng/main/setup.sh | sh` (prepares that branch).
-  - Prepared branch → `python3 .hooks/hard-eng.py update-pr` (opens/reuses PR, auto-merges after checks, no approval; merge denied → rerun `--no-merge`, give user its printed merge command once checks pass). Exempt from one-PR rules; failing → fix on own branch + worktree first.
+  - Prepared branch → `python3 .hooks/hard-eng.py update-pr` (opens/reuses PR, auto-merges after checks, no approval; merge denied → rerun `--no-merge`, give user its printed merge command once checks pass). Exempt from one-PR rules; failing → fix that branch in its worktree.
   - Report: updated | no newer verified release | running in background | failed. No updater output = failed (even exit 0); marker/session file alone ≠ success.
   - Rerun setup only after failed or no status; never mid-update.
 - Before editing: state the single change, files touched + verification.
@@ -23,6 +23,6 @@
 - Reuse settled approvals; ask only if missing info changes the result or a consequential action lacks approval.
 - HE-OUTPUT-PLAIN: ~80% ASD-STE100, ≤20 words/sentence, no jargon/idioms.
 - Setup prints `Gap:` (missing check/language) → file without asking: `python3 .hooks/hard-eng.py gap-issue "<missing check, generic>"`; no project names/code/paths/data.
-- Reproduced fault in Hard Eng's `.hooks/`, `.agents/skills/he*` or setup → tell user, check [issues](https://github.com/sgaabdu4/hard-eng/issues) for duplicates, then with approval file a terse one: Problem, Reproduction, installed revision, Suggestion; apply publication privacy.
+- Failing check → fix the project, never offer to weaken it. Broken Hard Eng `.hooks/`, `.agents/skills/he*` or setup → tell user, check [issues](https://github.com/sgaabdu4/hard-eng/issues) for duplicates, if approved, file: Problem, Reproduction, revision, Suggestion; apply publication privacy.
 - Follow `.agents/skills/he/SKILL.md`; commands: `python3 .hooks/hard-eng.py --help`.
 <!-- hard-eng:end -->

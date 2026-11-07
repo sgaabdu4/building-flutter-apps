@@ -4,8 +4,41 @@ import re
 import subprocess
 from pathlib import Path, PurePosixPath
 
-from gate_config import Group, changed_files, repository_files
-from shipping import ShippingError, load_policy
+from gate_config import ALL_ZERO_OBJECT_ID, Group, changed_files, repository_files
+from shipping import DELIVERY_TARGET_LINE, ShippingError, load_policy, target_problem
+
+BACKTICKED_TEXT = re.compile(r"`([^`]+)`")
+NOT_APPLICABLE_PROOF = re.compile(r"\bN/A — \S")
+NOT_APPLICABLE_WORD = re.compile(r"(?i)\bN/A\b")
+TITLE_LINE = re.compile(r"(?m)^# \S.+$")
+DOCUMENT_TITLE = re.compile(r"(?m)^# \S[^\n]*$")
+SURFACE_FIELD = re.compile(r"(?m)^Surface:")
+E2E_FIELD = re.compile(r"(?m)^E2E:")
+NOT_APPLICABLE_WITH_TEXT = re.compile(r"N/A — \S.+")
+TEST_FILE_SUFFIX = re.compile(r"\.(?:test|spec)\.")
+SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
+LOWERCASE_TOKEN = re.compile(r"[a-z0-9%]+")
+RETIRED_STATUS = re.compile(r"(?m)^Status: Retired\b")
+NOT_APPLICABLE_REASON_SEPARATOR = re.compile(r"\s+—\s+\S")
+SECTION_HEADING = re.compile(r"(?m)^## +([^\n]+)\n")
+DOCUMENT_SECTION = re.compile(r"(?m)^##[ \t]+([^\n]+)\n")
+NOT_APPLICABLE_WITH_REASON = re.compile(r"N/A — [^\n]+")
+PROOF_KIND = re.compile(r"(?m)^Proof: (check|guidance) *$")
+SURFACE_VALUE = re.compile(r"(Existing|New|Mock) — \S.+")
+TEST_REFERENCE = re.compile(r"`([^`\s]+?)::(?:[^`\n]*::)?([^`\n]+)`")
+DECISION_SECTION = re.compile(r"(?ms)^## Decision\n(.*?)(?=^## |\Z)")
+E2E_STATUS_LINE = re.compile(r"(Required|Passed|Delivery|N/A) — (\S.*)")
+NONE_VALUE = re.compile(r"None(?:[.;:](?:\s.*)?|\s+[—–-]\s.*)?")
+DELIVERY_TARGET_FIELD = re.compile(r"(?im)^\s*(?:[-*+]\s+)?Delivery target:")
+DEPLOY_DELIVERY_TARGET = re.compile(
+    r"(?im)^\s*(?:[-*+]\s+)?Delivery target:\s*Deploy\s*$"
+)
+BLOCKED_STATUS = re.compile(r"(?i)^(pending|none|blocked|n/a)\b")
+CHECKBOX_LABEL = re.compile(r"(?m)^\s*(?:[-*+]|\d+[.)])\s+\[([^]\n]*)\](?:\s|$)")
+CHECKBOX_REST = re.compile(r"(?m)^\s*(?:[-*+]|\d+[.)])\s+\[[^]\n]*\](.*)$")
+PLACEHOLDER_STATUS = re.compile(
+    r"(?i)^(?:pending|none|blocked|n/a|unavailable|not (?:run|inspected|captured))\b"
+)
 
 SECTIONS = (
     "Outcome + scope",
@@ -19,7 +52,9 @@ SECTIONS = (
 )
 STAGES = ("Draft", "Ready", "Complete")
 HANDOFFS = ("Clarification", "Approval")
-PLACEHOLDERS = r"(?im)\[TODO:|^\s*(?:#\s+|[\w +]+:\s*)?(?:TODO(?::[^\n]*)?|TBD|<(?!https?://)[^>\n]+>)\s*$"
+PLACEHOLDERS = re.compile(
+    r"(?im)\[TODO:|^\s*(?:#\s+|[\w +]+:\s*)?(?:TODO(?::[^\n]*)?|TBD|<(?!https?://)[^>\n]+>)\s*$"
+)
 
 
 def is_plan_path(path: Path) -> bool:
@@ -108,10 +143,7 @@ def proof(content: str, allowed: set[str]) -> None:
 
 def evidence_field(content: str, name: str) -> str:
     value = field(content, name)
-    if re.match(
-        r"(?i)^(?:pending|none|blocked|n/a|unavailable|not (?:run|inspected|captured))\b",
-        value,
-    ):
+    if PLACEHOLDER_STATUS.match(value):
         raise ValueError(
             f"plan {name} must describe actual proof, not a pending result"
         )
@@ -119,28 +151,28 @@ def evidence_field(content: str, name: str) -> str:
 
 
 def plan_sections(content: str, *, allow_placeholders: bool = False) -> dict[str, str]:
-    if not allow_placeholders and re.search(PLACEHOLDERS, content):
+    if not allow_placeholders and PLACEHOLDERS.search(content):
         raise ValueError("plan contains unfilled template placeholders")
-    if not re.search(r"(?m)^# \S.+$", content):
+    if not TITLE_LINE.search(content):
         raise ValueError("plan needs a title")
-    parts = re.split(r"(?m)^## +([^\n]+)\n", content + "\n")
+    parts = SECTION_HEADING.split(content + "\n")
     headings = [heading.strip() for heading in parts[1::2]]
     sections = dict(zip(headings, parts[2::2]))
     for heading in SECTIONS:
         if headings.count(heading) != 1 or not sections[heading].strip():
             raise ValueError(f"plan needs one filled '## {heading}' section")
     for line in content.splitlines():
-        for marker in re.finditer(r"(?i)\bN/A\b", line):
-            if not re.match(r"\s+—\s+\S", line[marker.end() :]):
+        for marker in NOT_APPLICABLE_WORD.finditer(line):
+            if not NOT_APPLICABLE_REASON_SEPARATOR.match(line[marker.end() :]):
                 raise ValueError("plan N/A needs an inline reason: N/A — reason")
     return sections
 
 
 def e2e_proof(verification: str, status: str, *, legacy: bool = False) -> None:
-    if legacy and not re.search(r"(?m)^E2E:", verification):
+    if legacy and not E2E_FIELD.search(verification):
         return
     e2e = field(verification, "E2E")
-    match = re.fullmatch(r"(Required|Passed|Delivery|N/A) — (\S.*)", e2e)
+    match = E2E_STATUS_LINE.fullmatch(e2e)
     if match is None:
         raise ValueError(
             "plan E2E needs Required, Passed, Delivery or N/A — concrete journey/evidence or reason"
@@ -149,20 +181,16 @@ def e2e_proof(verification: str, status: str, *, legacy: bool = False) -> None:
         raise ValueError(
             "complete plan E2E is still Required; run the journey and record Passed evidence"
         )
-    if match[1] == "Passed" and re.match(
-        r"(?i)^(pending|none|blocked|n/a)\b", match[2]
-    ):
+    if match[1] == "Passed" and BLOCKED_STATUS.match(match[2]):
         raise ValueError("plan E2E Passed needs actual runtime evidence")
-    if match[1] == "Delivery" and not re.search(
-        r"(?im)^\s*(?:[-*+]\s+)?Delivery target:\s*Deploy\s*$", verification
-    ):
+    if match[1] == "Delivery" and not DEPLOY_DELIVERY_TARGET.search(verification):
         raise ValueError(
             "delivery E2E requires Delivery target: Deploy and configured delivery checks"
         )
 
 
 def ux_proof(content: str, *, legacy: bool = False) -> None:
-    if re.fullmatch(r"N/A — [^\n]+", content.strip()):
+    if NOT_APPLICABLE_WITH_REASON.fullmatch(content.strip()):
         return
     proof(content, {"Passed"})
     image = r"!\[[^\]\n]*\]\((\S[^)\n]*)\)"
@@ -170,10 +198,10 @@ def ux_proof(content: str, *, legacy: bool = False) -> None:
         raise ValueError(
             "UX evidence needs a Markdown image reference to the rendered proposal"
         )
-    if legacy and not re.search(r"(?m)^Surface:", content):
+    if legacy and not SURFACE_FIELD.search(content):
         return
     surface = field(content, "Surface")
-    if not re.fullmatch(r"(Existing|New|Mock) — \S.+", surface):
+    if not SURFACE_VALUE.fullmatch(surface):
         raise ValueError(
             "UX Surface needs Existing, New or Mock — actual screen or design-system owner"
         )
@@ -181,7 +209,7 @@ def ux_proof(content: str, *, legacy: bool = False) -> None:
     baseline = re.fullmatch(image, before)
     if baseline is None and not (
         surface.startswith(("New — ", "Mock — "))
-        and re.fullmatch(r"N/A — \S.+", before)
+        and NOT_APPLICABLE_WITH_TEXT.fullmatch(before)
     ):
         raise ValueError(
             "UX Before needs the actual baseline image; only a new app or design-system mock may explain its absence"
@@ -216,7 +244,7 @@ def readiness_errors(
 
 def no_blockers(text: str) -> bool:
     """'None', optionally followed by a note such as 'None. Scope was settled in chat.'"""
-    return re.fullmatch(r"None(?:[.;:](?:\s.*)?|\s+[—–-]\s.*)?", text) is not None
+    return NONE_VALUE.fullmatch(text) is not None
 
 
 def draft_handoff(sections: dict[str, str]) -> tuple[str | None, str | None, list[str]]:
@@ -228,7 +256,7 @@ def draft_handoff(sections: dict[str, str]) -> tuple[str | None, str | None, lis
         blockers = field(decisions, "Blockers")
     except ValueError as error:
         return None, None, [str(error)]
-    question = not no_blockers(blockers) and re.search(PLACEHOLDERS, blockers) is None
+    question = not no_blockers(blockers) and PLACEHOLDERS.search(blockers) is None
     if handoff not in HANDOFFS:
         errors.append("Handoff must be Clarification or Approval")
     elif handoff == "Clarification" and not question:
@@ -325,9 +353,7 @@ def validate_plan(path: Path, *, changed: bool = True) -> str:
         field(sections["Repository context"], "Same cause")
         acceptance_tests(sections)
     if status == "Complete":
-        markers = re.findall(
-            r"(?m)^\s*(?:[-*+]|\d+[.)])\s+\[([^]\n]*)\](?:\s|$)", content
-        )
+        markers = CHECKBOX_LABEL.findall(content)
         if any(marker.lower() != "x" for marker in markers):
             raise ValueError("complete plan has unchecked requirements")
         try:
@@ -343,13 +369,10 @@ def acceptance_tests(
     """Each acceptance checkbox names its `path::test` or requirement ID, or N/A — reason."""
     references: list[tuple[str, str]] = []
     requirements: set[str] = set()
-    for line in re.findall(
-        r"(?m)^\s*(?:[-*+]|\d+[.)])\s+\[[^]\n]*\](.*)$",
-        sections["Acceptance + steps"],
-    ):
-        found = re.findall(r"`([^`\s]+?)::(?:[^`\n]*::)?([^`\n]+)`", line)
+    for line in CHECKBOX_REST.findall(sections["Acceptance + steps"]):
+        found = TEST_REFERENCE.findall(line)
         named = set(REQUIREMENT_ID.findall(line))
-        if not found and not named and not re.search(r"\bN/A — \S", line):
+        if not found and not named and not NOT_APPLICABLE_PROOF.search(line):
             raise ValueError(
                 "Acceptance + steps line needs a `path::test name` reference, "
                 f"a requirement ID or N/A — reason:{line[:80]}"
@@ -391,19 +414,15 @@ def missing_tests(root: Path, references: list[tuple[str, str]]) -> list[str]:
 
 def _validate_shipping(root: Path, path: Path, status: str) -> None:
     content = path.read_text()
-    if status in {"Ready", "Complete"} and re.search(
-        r"(?im)^\s*(?:[-*+]\s+)?Delivery target:", content
-    ):
+    if status in {"Ready", "Complete"} and DELIVERY_TARGET_FIELD.search(content):
         policy = load_policy(root)
+        target = DELIVERY_TARGET_LINE.search(plan_sections(content)["Verification"])
         if (
             policy is not None
-            and not policy["delivery"]
-            and re.search(
-                r"(?im)^\s*(?:[-*+]\s+)?Delivery target:\s*Deploy\s*$",
-                plan_sections(content)["Verification"],
-            )
+            and target
+            and (problem := target_problem(target[1], policy["delivery"]))
         ):
-            raise ValueError("Deploy target requires configured delivery checks")
+            raise ValueError(problem)
 
 
 def plan_stage(root: Path, path: Path, changed: set[str]) -> str:
@@ -437,7 +456,7 @@ def _is_test(path: PurePosixPath) -> bool:
         bool(TEST_DIRECTORIES.intersection(path.parts[:-1]))
         or name.startswith("test_")
         or name.endswith(("_test.py", "_test.dart", "Tests.swift"))
-        or bool(re.search(r"\.(?:test|spec)\.", name))
+        or bool(TEST_FILE_SUFFIX.search(name))
     )
 
 
@@ -592,7 +611,7 @@ def decision_field(content: str, name: str) -> str | None:
 
 def decision_prefixes(content: str) -> list[str]:
     line = decision_field(content, "Applies to") or ""
-    return re.findall(r"`([^`]+)`", line) if ADR_PREFIXES.fullmatch(line) else []
+    return BACKTICKED_TEXT.findall(line) if ADR_PREFIXES.fullmatch(line) else []
 
 
 def accepted_decisions(root: Path) -> list[tuple[str, str, list[str]]]:
@@ -613,7 +632,7 @@ def matched_decisions(root: Path, names: list[str]) -> dict[str, str]:
     for name, content, prefixes in accepted_decisions(root):
         if any(file.startswith(prefix) for file in names for prefix in prefixes):
             title = content.splitlines()[0].lstrip("# ")
-            decision = re.search(r"(?ms)^## Decision\n(.*?)(?=^## |\Z)", content)
+            decision = DECISION_SECTION.search(content)
             matched[name] = (
                 f"{title} ({name})\n{decision[1].strip() if decision else ''}"
             )
@@ -676,7 +695,7 @@ def validate_attribution(root: Path, base: str | None = None) -> None:
     ):
         return
     point = base or default_branch_point(root) or "HEAD"
-    span = "HEAD" if re.fullmatch(r"0{40}|0{64}", point) else f"{point}..HEAD"
+    span = "HEAD" if ALL_ZERO_OBJECT_ID.fullmatch(point) else f"{point}..HEAD"
     try:
         log = _git_output(root, "log", "--format=%x1e%h%x1f%ae%x1f%ce%n%B", span)
     except subprocess.CalledProcessError as error:
@@ -717,10 +736,10 @@ def registry_entries(root: Path) -> tuple[dict[str, tuple[str, str]], list[str]]
             if requirement in entries:
                 errors.append(f"{requirement} is defined more than once")
                 continue
-            if re.search(r"(?m)^Status: Retired\b", body):
+            if RETIRED_STATUS.search(body):
                 entries[requirement] = ("retired", "")
                 continue
-            proof = re.search(r"(?m)^Proof: (check|guidance) *$", body)
+            proof = PROOF_KIND.search(body)
             definition = " ".join(
                 line.strip()
                 for line in body.splitlines()
@@ -820,14 +839,14 @@ def unproven_requirements(
 
 
 def normalized_words(text: str) -> str:
-    return " ".join(re.findall(r"[a-z0-9%]+", text.lower()))
+    return " ".join(LOWERCASE_TOKEN.findall(text.lower()))
 
 
 def copied_requirements(root: Path, entries: dict[str, tuple[str, str]]) -> list[str]:
     sentences = [
         (requirement, normalized_words(sentence))
         for requirement, (_, definition) in entries.items()
-        for sentence in re.split(r"(?<=[.!?])\s+", definition)
+        for sentence in SENTENCE_BOUNDARY.split(definition)
         if len(sentence.split()) >= 8
     ]
     errors: list[str] = []
@@ -868,3 +887,32 @@ def validate_records(root: Path, base: str | None) -> None:
     validate_decisions(root, base)
     validate_attribution(root, base)
     validate_requirements(root)
+
+
+def validate_documents(root: Path) -> None:
+    for name, required in (
+        ("PRODUCT.md", ("Users", "Problem", "Product Purpose", "Boundaries")),
+        ("DESIGN.md", ("Overview", "Components", "Do's and Don'ts")),
+    ):
+        path = root / name
+        if not path.is_file():
+            raise ValueError(f"{name} is required; fill it from the actual project")
+        content = path.read_text().strip()
+        if not content:
+            raise ValueError(f"{name} is empty; fill it from the actual project")
+        if "[todo:" in content.lower():
+            raise ValueError(f"{name} contains unfilled template prompts")
+        if not DOCUMENT_TITLE.search(content):
+            raise ValueError(f"{name} needs a document title using '# Title'")
+        parts = DOCUMENT_SECTION.split(content + "\n")
+        sections = dict(zip((heading.strip() for heading in parts[1::2]), parts[2::2]))
+        for heading in required:
+            if not sections.get(heading, "").strip():
+                raise ValueError(f"{name} needs a filled '## {heading}' section")
+        order = [
+            heading.strip() for heading in parts[1::2] if heading.strip() in required
+        ]
+        if order != list(required):
+            raise ValueError(
+                f"{name} sections must follow the template order without duplicates"
+            )

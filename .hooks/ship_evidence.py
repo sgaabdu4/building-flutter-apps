@@ -3,6 +3,11 @@
 import fnmatch
 import re
 
+BEFORE_AFTER_LABEL = re.compile(r"(?m)^\s*(?:Before|After):")
+UI_APPEARANCE_UNCHANGED = re.compile(
+    r"^UI appearance: unchanged(?:[ \t]*—[ \t]*(.*))?$", re.MULTILINE
+)
+
 _ASSET_URL = r"https://github\.com/user-attachments/assets/[^)\s?#]+"
 _BEFORE = re.compile(
     rf"^\s*Before:\s*!\[[^\]\r\n]*\]\(({_ASSET_URL})\)\s*$",
@@ -27,14 +32,12 @@ def attachment_urls(body: str, paths: list[str], patterns: list[str]) -> list[st
         fnmatch.fnmatchcase(path, pattern) for path in paths for pattern in patterns
     ):
         return []
-    unchanged = re.findall(
-        r"^UI appearance: unchanged(?:[ \t]*—[ \t]*(.*))?$", body, re.MULTILINE
-    )
+    unchanged = UI_APPEARANCE_UNCHANGED.findall(body)
     if unchanged:
         if (
             len(unchanged) != 1
             or not unchanged[0].strip()
-            or re.search(r"(?m)^\s*(?:Before|After):", body)
+            or BEFORE_AFTER_LABEL.search(body)
         ):
             raise ValueError(
                 "Unchanged UI requires one comparison note and no Before/After attachments"

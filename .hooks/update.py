@@ -36,6 +36,8 @@ from update_runner import (
     write_verified,
 )
 
+COMMIT_ID = re.compile(r"[0-9a-f]{40}")
+
 UPSTREAM = "sgaabdu4/hard-eng"
 REPOSITORY = f"https://github.com/{UPSTREAM}.git"
 SOURCE_FILE = ".hooks/hard-eng-source.json"
@@ -125,9 +127,7 @@ def latest_verified(previous: str) -> str | None:
             revision = commit["sha"]
             if revision == previous:
                 return None
-            if not isinstance(revision, str) or not re.fullmatch(
-                r"[0-9a-f]{40}", revision
-            ):
+            if not isinstance(revision, str) or not COMMIT_ID.fullmatch(revision):
                 raise ValueError("GitHub returned an invalid commit")
             if verified_revision(revision):
                 return revision
@@ -142,7 +142,7 @@ def require_current(root: Path) -> None:
     try:
         metadata = json.loads(marker.read_text())
         previous = metadata.get("revision") if isinstance(metadata, dict) else None
-        if not isinstance(previous, str) or not re.fullmatch(r"[0-9a-f]{40}", previous):
+        if not isinstance(previous, str) or not COMMIT_ID.fullmatch(previous):
             raise ValueError("installed revision is not a published commit")
         revision = latest_verified(previous)
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
@@ -704,7 +704,14 @@ def repair_installation(root: Path, previous: str) -> str:
             not (root / name).exists()
             or retired_parent(root, name)
             or name
-            in {"AGENTS.md", "CLAUDE.md", "AGENTS.override.md", "hard-eng.gates.json"}
+            in {
+                "AGENTS.md",
+                "CLAUDE.md",
+                "AGENTS.override.md",
+                "hard-eng.gates.json",
+            }
+            or name == SOURCE_FILE
+            and '"skills"' in (root / name).read_text(errors="replace")
             or any(old in (root / name).read_text(errors="replace") for old in retired)
             or OLD_GENERATION_SCRIPT.search((root / name).read_text(errors="replace"))
         )
@@ -912,8 +919,8 @@ def update_in_diff(root: Path, base: str) -> tuple[str, str, set[str]] | None:
         and not repair
         or not isinstance(previous, str)
         or not isinstance(revision, str)
-        or not re.fullmatch(r"[0-9a-f]{40}", previous)
-        or not re.fullmatch(r"[0-9a-f]{40}", revision)
+        or not COMMIT_ID.fullmatch(previous)
+        or not COMMIT_ID.fullmatch(revision)
     ):
         return None
     return revision, previous, names

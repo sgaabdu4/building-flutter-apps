@@ -76,6 +76,12 @@ A proposed change to a screen that exists is shown as before and after captures 
 
 Proof: check
 
+## HE-HOT-PATH
+
+Code must not build a constant regex inside a function, allocate an array of booleans, read whole rows or entities (`SELECT *`, an ORM query without a column list), add an in-process cache, await inside a loop, await independent calls in sequence, parse the same URL on each loop pass or use a JSON column. Every Semgrep `security` gate runs these rules on the whole repository, so old code fails too; only the change that installs Hard Eng can record them as debt. Each rule skips the shapes that need the slow form, such as calls on one database session, async streams, worker loops and loops that stop early; generated and vendored files are not scanned. When Semgrep can parse only part of a file, the gate scans the parsed part and prints the lines it skipped; every other scan error fails. `python3 .hooks/hard-eng.py hot-paths` lists the findings.
+
+Proof: check
+
 ## HE-YAGNI
 
 Add a file, dependency, abstraction, configuration or stored state only for a current agreed requirement that existing code or a direct command cannot meet.

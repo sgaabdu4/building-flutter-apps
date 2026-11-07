@@ -11,7 +11,6 @@
 
 Signals: atomic design, atoms, molecules, organisms, design tokens, widget hierarchy
 
-
 ## Rules — NEVER Violate
 
 1. **MUST** use design tokens for ALL measurements — NEVER hardcode spacing, colors, radii, font sizes, icon sizes.

@@ -55,6 +55,7 @@ Map = low-resolution index; decision detail lives once, in its ticket. Refer to 
 Use the project's documented tracker when configured + authorized; native child relationships + blocking where supported. Map/ticket notes confer no authority for external writes, access changes, installation or publication.
 
 No authorized tracker → local Markdown:
+
 - Map = `features/<slug>/wayfinder/MAP.md` with the sections above; tickets = descriptively named sibling Markdown files. Directory supplies parentage, filename supplies identity.
 - Local discovery edits need an applicable Draft [PLAN.md](../templates/PLAN.md) under [plan checks](../../he/references/gates.md#plan-checks). Link the map; keep decision detail in tickets. If the user forbids that plan, report the gate blocker.
 - Claim = write worker identity in Assignee before work; never overwrite another claim. Serialize shared-file claims: Markdown has no atomic assignment guarantee.

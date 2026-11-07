@@ -26,6 +26,10 @@ from gate_config import (
 )
 from hook_chain import is_own
 
+CARET_VERSION = re.compile(r"\^?(\d+)\.(\d+)\.(\d+)")
+REGEX_SPECIAL_CHARACTER = re.compile(r"([.\[\]()*+?{}|^$\\])")
+SHELL_SHEBANG = re.compile(rb"^#![^\n]*\b(?:bash|sh)(?:\s|$)")
+
 PACKAGE_MANAGERS = {"npm", "npx", "pnpm", "yarn", "yarnpkg", "bun", "bunx"}
 FLUTTER_PLATFORM_ROOTS = {"android", "ios", "web", "windows", "macos", "linux"}
 
@@ -47,14 +51,12 @@ def migrate_dart_plugins(options: JsonObject, source: Path) -> None:
             continue
         version = entry.get("version") if isinstance(entry, dict) else entry
         installed = (
-            re.fullmatch(r"\^?(\d+)\.(\d+)\.(\d+)", version)
-            if isinstance(version, str)
-            else None
+            CARET_VERSION.fullmatch(version) if isinstance(version, str) else None
         )
         if installed is None:
             continue
         current = canonical["plugins"][name]
-        latest = re.fullmatch(r"\^?(\d+)\.(\d+)\.(\d+)", current)
+        latest = CARET_VERSION.fullmatch(current)
         if latest is None:
             raise ValueError(
                 "Canonical Flutter lint version must be an exact or caret version"
@@ -145,7 +147,7 @@ def is_shell_script(path: Path) -> bool:
     if path.suffix:
         return False
     with path.open("rb") as source:
-        return bool(re.match(rb"^#![^\n]*\b(?:bash|sh)(?:\s|$)", source.readline(4096)))
+        return bool(SHELL_SHEBANG.match(source.readline(4096)))
 
 
 def unlisted_shell_scripts(
@@ -734,6 +736,17 @@ def strict_scanner_flags(package: Group) -> None:
             gate["command"] = [*gate["command"], *required]
 
 
+def drop_unanchored_excludes(config: GateConfig) -> None:
+    """Remove the folder-name excludes older templates gave security scans; the gate now skips only installed files."""
+    stale = {"--exclude=.agents", "--exclude=.hooks"}
+    for gate in [
+        *config["shared"],
+        *(g for p in config["packages"] for g in p["checks"]),
+    ]:
+        if gate.get("role") == "security" and stale & set(gate["command"]):
+            gate["command"] = [part for part in gate["command"] if part not in stale]
+
+
 FLUTTER_TESTS = [
     "flutter",
     "test",
@@ -828,7 +841,7 @@ def browser_test_coverage(directory: Path, package: Group) -> None:
 
 def run_vm_tests(sources: list[str]) -> str:
     targets = "|".join(
-        re.sub(r"([.\[\]()*+?{}|^$\\])", r"\\\1", source)
+        REGEX_SPECIAL_CHARACTER.sub(r"\\\1", source)
         + ("['\"]" if source.endswith(".dart") else "/")
         for source in sources
     )

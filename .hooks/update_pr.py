@@ -1,5 +1,6 @@
 """Publish the prepared Hard Eng update as its own pull request, merged once its checks pass."""
 
+import fcntl
 import json
 import re
 import shlex
@@ -17,10 +18,12 @@ from update_runner import (
     installed_revision,
     landed,
     last_result,
+    lock_file,
     locked_update,
     registered_worktrees,
     revision_at,
     update_base,
+    update_running,
 )
 
 FAILED = {
@@ -296,7 +299,16 @@ def settle(
     return 0
 
 
+def wait_for_running_update(root: Path) -> None:
+    if not update_running(root):
+        return
+    print("Waiting for the running Hard Eng update to finish.", flush=True)
+    with lock_file(root).open() as handle:
+        fcntl.flock(handle, fcntl.LOCK_SH)
+
+
 def publish(root: Path, merge: bool = True) -> int:
+    wait_for_running_update(root)
     base = update_base(root)
     tip = fetch_base(root, base)
     current = revision_at(root, tip)
