@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from gate_config import SOURCE_FILE
+
 
 class StaleRelease(ValueError):
     """The recorded release cannot be placed in upstream history."""
@@ -29,7 +31,7 @@ def ordered(source: Path, revision: str, previous: str) -> None:
         ).returncode
     ):
         raise StaleRelease(
-            f"Recorded Hard Eng release {previous} in .hooks/hard-eng-source.json is "
+            f"Recorded Hard Eng release {previous} in {SOURCE_FILE} is "
             "not in upstream history; rerun the Hard Eng installer from the README "
             "to refresh the record"
         )

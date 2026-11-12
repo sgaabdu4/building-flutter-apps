@@ -1,6 +1,5 @@
 """Swift groups for the Xcode projects in a Flutter app's ios/ and macos/ folders."""
 
-import hashlib
 import json
 import os
 import re
@@ -16,6 +15,7 @@ from gate_config import (
     package_manifests,
     repository_files,
 )
+from project_files import read_project_file
 
 WHITESPACE_RUN = re.compile(r"\s+")
 BLOCK_OR_LINE_COMMENT = re.compile(r"/\*.*?\*/|//[^\n]*", re.DOTALL)
@@ -71,6 +71,8 @@ class SwiftProject(NamedTuple):
 
 def fingerprint(text: str) -> str:
     """The text without comments, whitespace and the plugin-only template sections."""
+    import hashlib
+
     text = INVERTED_TEMPLATE_SECTION.sub(r"\2", text)
     text = TEMPLATE_SECTION.sub("", text)
     text = BLOCK_OR_LINE_COMMENT.sub("", text)
@@ -189,7 +191,9 @@ def local_plugin_folders(root: Path, app: Path, path: str) -> list[str]:
     """Native folders of the path dependencies, whose Swift builds into the app."""
     import yaml
 
-    manifest = yaml.safe_load((root / app / "pubspec.yaml").read_text()) or {}
+    manifest = (
+        read_project_file(root / app / "pubspec.yaml", root, yaml.safe_load) or {}
+    )
     folders: list[str] = []
     for section in ("dependencies", "dev_dependencies", "dependency_overrides"):
         for value in (manifest.get(section) or {}).values():

@@ -24,10 +24,7 @@ Iterable<AstNode> descendants(AstNode node) sync* {
 bool erased(CompilationUnitMember node) {
   if (node is TopLevelVariableDeclaration) return node.variables.isConst;
   if (node is GenericTypeAlias || node is FunctionTypeAlias) return true;
-  if (node is ClassDeclaration) {
-    if (node.abstractKeyword == null && node.sealedKeyword == null) return false;
-    return node.body.members.every(erasedClassMember);
-  }
+  if (node is ClassDeclaration) return node.body.members.every(erasedClassMember);
   if (node is EnumDeclaration) {
     return node.withClause == null && node.implementsClause == null &&
         node.body.members.every(erasedEnumMember);

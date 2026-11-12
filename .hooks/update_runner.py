@@ -1,21 +1,19 @@
 """Run the scaffold update detached from agent startup, one per repository."""
 
 import fcntl
-import hashlib
 import json
 import os
 import re
-import shutil
 import signal
 import subprocess
 import sys
-import tempfile
 import time
-from collections.abc import Generator, Iterable
+from collections.abc import Callable, Generator
 from contextlib import contextmanager, suppress
-from functools import partial
 from pathlib import Path
 from typing import TextIO
+
+from gate_config import SOURCE_FILE
 
 RESULT_FILE = ".hard-eng/update-result.txt"
 LOG_FILE = ".hard-eng/update.log"
@@ -24,13 +22,10 @@ LOCAL_INPUTS = (".claude/settings.local.json", "CLAUDE.local.md")
 UPDATE_BRANCH = "hard-eng/update"
 UPDATE_REF = f"refs/heads/{UPDATE_BRANCH}"
 UPDATE_COMMAND = "python3 .hooks/hard-eng.py update-pr"
-NOT_PUBLISHED = "Hard Eng updates start after the project is pushed to a remote with its base branch."
+REPAIR_SUBJECT = "Install Hard Eng"
+NOT_PUBLISHED = "Hard Eng updates start after the Hard Eng install is on the base branch of a remote."
+CI_STEP = "CI setup pending: add a `shipping` block with the project's checks and a measured ci_seconds budget to hard-eng.gates.json and merge it to the base branch, then rerun setup"
 HEX_REVISION = re.compile(r"[0-9a-f]{40}")
-OWNER = re.compile(r"hard-eng-update (\d+)")
-TEMPORARY = re.compile(
-    r"hard-eng-(?:update|push|gate|gitleaks|dart-parser|scaffold-check|mutation)-[a-z0-9_]{8}"
-)
-WORKTREE = re.compile(r"hard-eng-(?:update-.+/candidate|push-.+/project)")
 
 
 class UpdateRunning(ValueError):
@@ -42,8 +37,6 @@ class UpdateNeeded(ValueError):
 
 
 def update_blocker(root: Path) -> str | None:
-    from update import SOURCE_FILE
-
     marker = root / SOURCE_FILE
     if not marker.exists():
         return "Auto-update unavailable: no installed source revision."
@@ -99,29 +92,64 @@ def stale_error(root: Path, revision: str) -> ValueError:
     )
 
 
-def revision_at(root: Path, ref: str) -> str | None:
-    from update import SOURCE_FILE
-
-    path = f"{ref}:{SOURCE_FILE}"
-    shown = subprocess.run(
-        ["git", "show", path],
+@contextmanager
+def source_reader(root: Path) -> Generator[Callable[[str], str | None]]:
+    """One Git process gives the source revision at each ref when it is asked."""
+    git = subprocess.Popen(
+        ["git", "cat-file", "--batch"],
         cwd=root,
-        capture_output=True,
-        text=True,
-        check=False,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
     )
-    try:
-        revision = json.loads(shown.stdout).get("revision")
-    except (ValueError, AttributeError):
+    stdin, stdout = git.stdin, git.stdout
+
+    def read(ref: str) -> str | None:
+        if stdin is None or stdout is None:
+            return None
+        name = f"{ref}:{SOURCE_FILE}\n".encode()
+        with suppress(OSError, ValueError, AttributeError):
+            stdin.write(name)
+            stdin.flush()
+            fields = stdout.readline().split()
+            if len(fields) == 3 and fields[2].isdigit():
+                revision = json.loads(stdout.read(int(fields[2]) + 1)).get("revision")
+                return revision if isinstance(revision, str) else None
         return None
-    return revision if isinstance(revision, str) else None
+
+    try:
+        yield read
+    finally:
+        git.communicate()
 
 
-def ready_revision(root: Path) -> str | None:
-    """The revision waiting on the update branch that this checkout does not hold yet."""
-    waiting = revision_at(root, f"refs/heads/{UPDATE_BRANCH}")
+def revision_at(root: Path, ref: str) -> str | None:
+    with source_reader(root) as read:
+        return read(ref)
+
+
+def shipping_base(root: Path) -> str:
+    try:
+        base = json.loads((root / "hard-eng.gates.json").read_text())["shipping"][
+            "base"
+        ]
+    except (OSError, ValueError, KeyError, TypeError):
+        return "main"
+    return base if isinstance(base, str) else "main"
+
+
+def waiting_note(root: Path) -> str | None:
+    # The base is read only when an update waits, so the usual Stop pays for one Git start alone.
+    with source_reader(root) as read:
+        waiting = read(f"refs/heads/{UPDATE_BRANCH}")
+        if waiting is None or waiting == installed_revision(root):
+            return None
+        base = shipping_base(root)
+        landed = read(f"refs/remotes/origin/{base}")
+    if landed != waiting:
+        return ready_message(waiting)
     return (
-        waiting if waiting is not None and waiting != installed_revision(root) else None
+        f"Hard Eng update {waiting} is already on origin/{base}; this checkout does not "
+        f"hold it yet. On {base}: `git pull`. On another branch: `git rebase origin/{base}`."
     )
 
 
@@ -134,8 +162,6 @@ def ready_message(revision: str) -> str:
 
 def freshness_note(root: Path) -> str:
     """What the session-start update already found, read without any network request."""
-    from update import SOURCE_FILE
-
     if not (root / SOURCE_FILE).exists():
         return ""
     try:
@@ -143,8 +169,8 @@ def freshness_note(root: Path) -> str:
             return blocker
         if update_running(root):
             return f"Hard Eng update still running ({LOG_FILE}); scaffold may be stale."
-        if (ready := ready_revision(root)) is not None:
-            return ready_message(ready)
+        if (waiting := waiting_note(root)) is not None:
+            return waiting
         result = last_result(root)
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
         return f"Hard Eng freshness unknown: {error}."
@@ -153,7 +179,9 @@ def freshness_note(root: Path) -> str:
     if result == "none recorded yet":
         return "Hard Eng freshness unknown: no update result yet."
     if "failed" in result:
-        return f"Scaffold may be stale. Last Hard Eng update: {result}"
+        first, _, rest = result.partition("\n")
+        more = f" (the rest is in {RESULT_FILE})" if rest else ""
+        return f"Scaffold may be stale. Last Hard Eng update: {first}{more}"
     return ""
 
 
@@ -168,249 +196,107 @@ def current_head(root: Path) -> str:
     return found.stdout.strip()
 
 
-def landed_commit(root: Path, head: str, message: str) -> tuple[str, str] | None:
-    """The updater's own commit since head, found by its message because the agent may commit too."""
-    span = head + "..HEAD" if head else "-1"
-    found = subprocess.run(
-        ["git", "log", "--format=%H %P%x1f%s", span],
+def built_commit(candidate: Path, tip: str) -> str | None:
+    """The update worktree is private, so its new HEAD is the updater's commit; a repair keeps the revision and needs its subject."""
+    commit = current_head(candidate)
+    if not commit or commit == tip:
+        return None
+    if revision_at(candidate, commit) != revision_at(candidate, tip):
+        return commit
+    subject = subprocess.check_output(
+        ["git", "log", "-1", "--format=%s", commit], cwd=candidate, text=True
+    )
+    return commit if subject.strip() == REPAIR_SUBJECT else None
+
+
+def tree_entries(
+    root: Path, command: list[str], column: int, names: list[str]
+) -> dict[str, tuple[str, str]]:
+    listing = subprocess.check_output(
+        [*command, "-z", "--", *names], cwd=root, text=True
+    )
+    return {
+        path: (fields[0], fields[column])
+        for entry in listing.split("\0")
+        if entry
+        for meta, _, path in [entry.partition("\t")]
+        for fields in [meta.split()]
+    }
+
+
+def undo_hooked_commit(
+    root: Path,
+    head: str,
+    staged: dict[str, tuple[str, str]],
+    expected: dict[str, str | None],
+    names: list[str],
+) -> list[str]:
+    """Undo the install commit when a project commit hook rewrote it; return the changed paths."""
+    from update import write_changes
+
+    commit = current_head(root)
+    parent = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", "HEAD^"],
         cwd=root,
         capture_output=True,
         text=True,
         check=False,
+    ).stdout.strip()
+    if not commit or commit == head or parent != head:
+        return []
+    committed = tree_entries(root, ["git", "ls-tree", "-r", commit], 2, names)
+    changed = sorted(
+        path
+        for path in {*staged, *committed}
+        if staged.get(path) != committed.get(path)
     )
-    for line in found.stdout.splitlines():
-        identities, _, subject = line.partition("\x1f")
-        commit, *parents = identities.split()
-        if subject in (message, "Install Hard Eng"):
-            return commit, parents[0] if parents else ""
-    return None
+    if not changed:
+        return []
+    undo = ["git", "reset", "--soft", head]
+    subprocess.run(
+        undo if head else ["git", "update-ref", "-d", "HEAD"], cwd=root, check=True
+    )
+    write_changes(
+        root,
+        {
+            n: expected[n]
+            for n in changed
+            if n in expected and not (root / n).is_symlink()
+        },
+    )
+    subprocess.run(["git", "reset", "--quiet", "--", *names], cwd=root, check=False)
+    return changed
 
 
-def committed_matches(root: Path, commit: str, expected: dict[str, str | None]) -> bool:
-    """Whether the commit holds exactly the planned files and link targets, so no other edit rode along."""
-    listing = subprocess.run(
-        ["git", "ls-tree", "-r", "-z", "--name-only", commit, "--", *expected],
+def rebase_sessions(root: Path, head: str) -> bool:
+    """Sessions based on the install commit's parent must not count that commit as their work."""
+    if not head:
+        return False
+    found = subprocess.run(
+        [
+            "git",
+            "rev-list",
+            "--first-parent",
+            "--reverse",
+            "--parents",
+            head + "..HEAD",
+        ],
         cwd=root,
         capture_output=True,
         text=True,
-        check=True,
-    ).stdout
-    planned = {name for name, content in expected.items() if content is not None}
-    if set(filter(None, listing.split("\0"))) - planned:
+        check=False,
+    ).stdout.splitlines()
+    commit, *parents = found[0].split() if found else [""]
+    if not commit or parents[:1] != [head]:
         return False
-    # Stdin from a file: writing and reading git's pipes in one call deadlocked on macOS.
-    with tempfile.TemporaryFile() as request:
-        request.write("".join(f"{commit}:{name}\n" for name in expected).encode())
-        request.seek(0)
-        output = subprocess.run(
-            ["git", "cat-file", "--batch"],
-            stdin=request,
-            cwd=root,
-            capture_output=True,
-            check=True,
-        ).stdout
-    for content in expected.values():
-        header, _, output = output.partition(b"\n")
-        fields = header.split()
-        found = None
-        if len(fields) == 3:
-            size = int(fields[2])
-            if fields[1] == b"blob":
-                found = output[:size]
-            output = output[size + 1 :]
-        if found != (None if content is None else content.encode()):
-            return False
-    return True
-
-
-def rebase_sessions(
-    root: Path, head: str, message: str, expected: dict[str, str | None] | None = None
-) -> bool:
-    """Sessions based on the update commit's parent must not count that commit as their work."""
-    landed = landed_commit(root, head, message)
-    if landed is None:
-        return False
-    commit, parent = landed
-    if expected is not None and not committed_matches(root, commit, expected):
-        return True
     for state in (root / ".hard-eng/sessions").glob("*.json"):
         try:
             saved = json.loads(state.read_text())
         except (OSError, ValueError):
             continue
-        if isinstance(saved, dict) and parent and saved.get("base") == parent:
+        if isinstance(saved, dict) and saved.get("base") == head:
             state.write_text(json.dumps({**saved, "base": commit}))
     return True
-
-
-def written(root: Path, name: str, content: str | None, link: bool) -> bool:
-    """Whether a path still holds what the updater wrote, so rollback cannot erase a later edit."""
-    target = root / name
-    if content is None:
-        return not target.exists() and not target.is_symlink()
-    if link:
-        return target.is_symlink() and str(target.readlink()) == content
-    return (
-        target.is_file()
-        and not target.is_symlink()
-        and target.read_text(errors="replace") == content
-    )
-
-
-def snapshot(root: Path, names: Iterable[str]) -> dict[str, bytes | None]:
-    return {
-        name: (root / name).read_bytes() if (root / name).exists() else None
-        for name in names
-    }
-
-
-def holds(root: Path, name: str, content: bytes | None) -> bool:
-    return snapshot(root, [name])[name] == content
-
-
-def link_state(root: Path, names: Iterable[str]) -> dict[str, str | None]:
-    return {
-        name: str((root / name).readlink()) if (root / name).is_symlink() else None
-        for name in names
-    }
-
-
-def prune(directory: Path) -> None:
-    """Remove the empty directories left beneath a path, deepest first."""
-    for path in [*sorted(directory.rglob("*"), reverse=True), directory]:
-        with suppress(OSError):
-            path.rmdir()
-
-
-def roll_back(
-    root: Path,
-    changes: dict[str, str | None],
-    links: dict[str, str | None],
-    before: dict[str, bytes | None],
-    before_links: dict[str, str | None],
-    applied: list[str],
-) -> list[str]:
-    """Restore each applied path only while it still holds the updater's write, checked just before."""
-    from update import replace_file
-
-    kept = []
-    for name in applied:
-        if name not in changes:
-            continue
-        content = before[name]
-        unchanged = partial(written, root, name, changes[name], False)
-        if content is None and unchanged():
-            (root / name).unlink(missing_ok=True)
-        elif content is None or not replace_file(root / name, content, unchanged):
-            kept.append(name)
-    for name in applied:
-        if name not in links:
-            continue
-        if links[name] is None and not (root / name).is_symlink():
-            prune(root / name)
-        if not written(root, name, links[name], True):
-            kept.append(name)
-            continue
-        (root / name).unlink(missing_ok=True)
-        if (target := before_links[name]) is not None:
-            (root / name).symlink_to(target, target_is_directory=True)
-    return kept
-
-
-def index_entries(root: Path, names: list[str]) -> dict[str, str]:
-    listing = subprocess.check_output(
-        ["git", "ls-files", "--stage", "-z", "--", *names], cwd=root, text=True
-    )
-    return {
-        path: entry
-        for entry, _, path in (
-            line.partition("\t") for line in listing.split("\0") if line
-        )
-    }
-
-
-def unstage_own(
-    root: Path, names: list[str], staging: tuple[dict[str, str], dict[str, str]]
-) -> None:
-    """Restore only index entries the updater changed and that still hold its staging."""
-    before, staged = staging
-    current = index_entries(root, names)
-    own = [
-        path
-        for path in {*before, *staged, *current}
-        if current.get(path) == staged.get(path) != before.get(path)
-    ]
-    if restored := "".join(
-        f"{before[path]}\t{path}\0" for path in own if path in before
-    ):
-        subprocess.run(
-            ["git", "update-index", "-z", "--index-info"],
-            input=restored,
-            cwd=root,
-            text=True,
-            check=True,
-        )
-    if added := [path for path in own if path not in before]:
-        subprocess.run(
-            ["git", "update-index", "--force-remove", "--", *added],
-            cwd=root,
-            check=True,
-        )
-
-
-@contextmanager
-def deferred_sigterm() -> Generator[None]:
-    """Hold SIGTERM, whichever thread receives it, and keep it from child git commands until the block ends."""
-    received: list[int] = []
-    previous = signal.signal(
-        signal.SIGTERM, lambda signum, _frame: received.append(signum)
-    )
-    mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM})
-    try:
-        yield
-    finally:
-        signal.pthread_sigmask(signal.SIG_SETMASK, mask)
-        signal.signal(signal.SIGTERM, previous)
-        if received:
-            signal.raise_signal(signal.SIGTERM)
-
-
-def relink_verified(
-    root: Path,
-    links: dict[str, str | None],
-    before_links: dict[str, str | None],
-    applied: list[str],
-) -> None:
-    """Replace each link only while it still holds its verified state, checked just before."""
-    from update import write_links
-
-    for name, target in links.items():
-        if link_state(root, [name])[name] != before_links[name]:
-            raise ValueError(f"{name} changed while the update was being applied")
-        applied.append(name)
-        write_links(root, {name: target})
-
-
-def write_verified(
-    root: Path,
-    changes: dict[str, str | None],
-    before: dict[str, bytes | None],
-    relinked: tuple[str, ...],
-    applied: list[str],
-) -> None:
-    """Write each file only while it still holds its verified content, checked just before."""
-    from update import replace_file, write_changes
-
-    for name, content in changes.items():
-        verified = partial(holds, root, name, before[name])
-        applied.append(name)
-        if name.startswith(relinked) or (content is None and verified()):
-            write_changes(root, {name: content})
-        elif content is None or not replace_file(
-            root / name, content.encode(), verified
-        ):
-            applied.pop()
-            raise ValueError(f"{name} changed while the update was being applied")
 
 
 def git_commit(
@@ -448,168 +334,19 @@ def git_commit(
         )
 
 
-def unwritten(
-    root: Path,
-    changes: dict[str, str | None],
-    links: dict[str, str | None],
-    applied: list[str],
-) -> list[str]:
-    """Applied paths that no longer hold the updater's write; a retired link's planned folder is checked by its files."""
-    return [
-        name
-        for name in applied
-        if (name in changes and not written(root, name, changes[name], False))
-        or (
-            name in links
-            and not any(other.startswith(f"{name}/") for other in changes)
-            and not written(root, name, links[name], True)
-        )
-    ]
-
-
 def commit_update(
     root: Path,
     changes: dict[str, str | None],
     links: dict[str, str | None],
     revision: str,
-    before: dict[str, bytes | None],
 ) -> None:
+    from update import write_changes, write_links
+
     names = sorted({*changes, *links})
-    before_links = link_state(root, links)
-    retired = tuple(
-        f"{name}/"
-        for name, target in links.items()
-        if target is None and before_links[name] is not None
-    )
-    # Files beneath a retired link must still be absent when the update writes them.
-    expected = {
-        name: None if name.startswith(retired) else content
-        for name, content in before.items()
-    }
-    head = current_head(root)
-    message = f"Update Hard Eng to {revision}"
-    staging: tuple[dict[str, str], dict[str, str]] | None = None
-    applied: list[str] = []
-    try:
-        relink_verified(root, links, before_links, applied)
-        # Paths under a link the update repointed no longer show their verified content.
-        relinked = tuple(f"{name}/" for name, target in links.items() if target)
-        write_verified(root, changes, expected, relinked, applied)
-        with deferred_sigterm():
-            index = index_entries(root, names)
-            subprocess.run(
-                ["git", "add", "--force", "--", *names], cwd=root, check=True
-            )
-            staging = (index, index_entries(root, names))
-        if moved := unwritten(root, changes, links, applied):
-            raise ValueError(
-                f"{', '.join(moved)} changed while the update was being applied"
-            )
-        git_commit(root, names, changes, message)
-    except (OSError, ValueError, subprocess.SubprocessError) as error:
-        if rebase_sessions(root, head, message, {**changes, **links}):
-            raise
-        kept = roll_back(root, changes, links, expected, before_links, applied)
-        if staging is not None:
-            unstage_own(root, names, staging)
-        if kept:
-            raise subprocess.SubprocessError(
-                f"{error}; kept later edits to {', '.join(kept)} instead of rolling them back"
-            ) from error
-        raise
-    rebase_sessions(root, head, message, {**changes, **links})
-
-
-def alive(process: int) -> bool:
-    try:
-        os.kill(process, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
-
-
-def abandoned(path: Path, owner: re.Match[str] | None) -> bool:
-    """Updaters before the lock ran under a one-hour hook, and a push's checks end within a day."""
-    if owner is not None:
-        return not alive(int(owner[1]))
-    hours = 6 if path.name == "candidate" else 24
-    try:
-        return time.time() - path.parent.stat().st_mtime > hours * 3600
-    except FileNotFoundError:
-        return False
-
-
-def sweep_temporary() -> None:
-    """Directories a killed Hard Eng process left behind; none of its runs lasts a day."""
-    for path in Path(tempfile.gettempdir()).iterdir():
-        with suppress(OSError):
-            if (
-                TEMPORARY.fullmatch(path.name)
-                and path.is_dir()
-                and not path.is_symlink()
-                and time.time() - path.stat().st_mtime > 24 * 3600
-            ):
-                shutil.rmtree(path)
-
-
-def stop_idle_watcher(worktree: Path) -> None:
-    """Git restarts a file watcher on the next command, so stopping an idle one loses nothing."""
-    with suppress(OSError, subprocess.SubprocessError):
-        index = subprocess.check_output(
-            ["git", "rev-parse", "--path-format=absolute", "--git-path", "index"],
-            cwd=worktree,
-            text=True,
-            timeout=30,
-        ).strip()
-        if time.time() - Path(index).stat().st_mtime > 24 * 3600:
-            subprocess.run(
-                ["git", "fsmonitor--daemon", "stop"],
-                cwd=worktree,
-                capture_output=True,
-                timeout=30,
-                check=False,
-            )
-
-
-def registered_worktrees(root: Path) -> list[dict[str, str]]:
-    listing = subprocess.check_output(
-        ["git", "worktree", "list", "--porcelain"], cwd=root, text=True
-    )
-    return [
-        {
-            key: value
-            for key, _, value in (line.partition(" ") for line in block.splitlines())
-        }
-        for block in listing.split("\n\n")
-    ]
-
-
-def remove_stale_candidates(root: Path) -> None:
-    """Remove candidates whose update has exited; the caller holds the lock."""
-    for fields in registered_worktrees(root):
-        path = Path(fields.get("worktree", ""))
-        owner = OWNER.fullmatch(fields.get("locked", ""))
-        if not WORKTREE.fullmatch(f"{path.parent.name}/{path.name}"):
-            if path.is_dir() and path.resolve() != root.resolve():
-                stop_idle_watcher(path)
-            continue
-        if not abandoned(path, owner):
-            continue
-        if owner is not None and not path.exists():
-            subprocess.run(
-                ["git", "worktree", "unlock", str(path)], cwd=root, check=True
-            )
-        elif not subprocess.run(
-            ["git", "worktree", "remove", "--force", "--force", str(path)],
-            cwd=root,
-            check=False,
-            timeout=120,
-        ).returncode:
-            shutil.rmtree(path.parent, ignore_errors=True)
-    sweep_temporary()
-    subprocess.run(["git", "worktree", "prune"], cwd=root, check=True, timeout=60)
+    write_links(root, links)
+    write_changes(root, changes)
+    subprocess.run(["git", "add", "--force", "--", *names], cwd=root, check=True)
+    git_commit(root, names, changes, f"Update Hard Eng to {revision}")
 
 
 def exclusive(handle: TextIO) -> bool:
@@ -629,28 +366,25 @@ def locked_update(root: Path, repair: bool = False) -> str:
                 "Another Hard Eng update is already running for this repository; "
                 "wait for its result instead of starting another"
             )
+        from stale_updates import remove_stale_candidates
+
         remove_stale_candidates(root)
-        return prepare_update(root, repair)
+        try:
+            outcome = prepare_update(root, repair)
+        except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
+            if repair:
+                record_result(root, failed_update(error))
+            raise
+        if repair:
+            record_result(root, outcome)
+        return outcome
 
 
-def update_attempt(root: Path, revision: str) -> str:
-    """What a refused update would see again: any commit or local edit changes it."""
-    digest = hashlib.sha256()
-    for command in (["rev-parse", "HEAD"], ["diff", "HEAD", "--binary"]):
-        digest.update(subprocess.check_output(["git", *command], cwd=root))
-    listing = subprocess.check_output(
-        ["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=root
-    )
-    names = [
-        os.fsdecode(name)
-        for name in listing.split(b"\0")
-        if name and not name.startswith(b".hard-eng/")
-    ]
-    for name in [*names, *LOCAL_INPUTS]:
-        path = root / name
-        if path.is_file():
-            digest.update(name.encode() + b"\0" + path.read_bytes())
-    return f"{revision} {digest.hexdigest()}"
+def update_attempt(head: str, revision: str) -> str:
+    """What a refused update would see again: the release and the base tip it builds on."""
+    import hashlib
+
+    return f"{revision} {hashlib.sha256(head.encode()).hexdigest()}"
 
 
 def known_failure(root: Path, attempt: str) -> str | None:
@@ -667,8 +401,9 @@ def known_failure(root: Path, attempt: str) -> str | None:
         return None
     failed = time.strftime("%Y-%m-%d %H:%M %Z", time.localtime(saved["at"]))
     return failed_update(
-        f"{saved.get('error')} (at {failed}; nothing changed since, so it was not "
-        "retried; fix the cause or run the published setup command to retry now)"
+        f"{saved.get('error')} (at {failed}; it is not retried before 24 hours unless "
+        "a new release or a new base-branch commit appears; run the published setup "
+        "command to retry now)"
     )
 
 
@@ -681,9 +416,12 @@ def remember_failure(root: Path, attempt: str, error: Exception) -> None:
 
 
 def failed_update(error: Exception | str) -> str:
+    cause, start, note = str(error).partition("This checkout")
     return (
-        f"Hard Eng update failed: {error}. Fix its cause first as its own commit; "
-        "cause outside repo → tell user. Installed gates still apply."
+        f"Hard Eng update failed: {cause.strip().rstrip('.')}. Fix that cause first. A fix in tracked files "
+        "goes on the base branch as its own commit, since the update is built from it. "
+        "Cause outside repo → tell user. Installed gates still apply."
+        + (f" {start}{note}" if start else "")
     )
 
 
@@ -701,19 +439,53 @@ def interrupt_update(signum: int, _frame: object) -> None:
 
 
 def installed_revision(root: Path) -> object:
-    from update import SOURCE_FILE
-
     try:
         return json.loads((root / SOURCE_FILE).read_text()).get("revision")
     except (OSError, ValueError, AttributeError):
         return None
 
 
+def lookup_failure(
+    found: "subprocess.CompletedProcess[str]",
+) -> subprocess.SubprocessError:
+    lines = (found.stderr or "").strip().splitlines()
+    fatal = [line for line in lines if line.startswith("fatal:")]
+    reason = fatal[0] if fatal else "".join(lines[-1:])
+    return subprocess.SubprocessError(
+        f"git ls-remote exited {found.returncode}" + (f": {reason}" if reason else "")
+    )
+
+
 def update_base(root: Path) -> str:
     from shipping import load_policy
 
     policy = load_policy(root, required=False)
-    return policy["base"] if policy else "main"
+    if policy:
+        return policy["base"]
+    if (
+        subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=root,
+            capture_output=True,
+            check=False,
+        ).returncode
+        != 0
+    ):
+        return "main"
+    found = subprocess.run(
+        ["git", "ls-remote", "--symref", "origin", "HEAD"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    if found.returncode != 0:
+        raise lookup_failure(found)
+    for line in found.stdout.splitlines():
+        if line.startswith("ref: refs/heads/"):
+            return line.partition("\t")[0].removeprefix("ref: refs/heads/")
+    return "main"
 
 
 def fetch_base(root: Path, base: str) -> str:
@@ -780,38 +552,127 @@ def published(root: Path, base: str) -> bool:
         ["git", "ls-remote", "--exit-code", "--heads", "origin", base],
         cwd=root,
         capture_output=True,
+        text=True,
         check=False,
         timeout=120,
     )
     if found.returncode not in {0, 2}:
-        raise subprocess.SubprocessError(f"git ls-remote exited {found.returncode}")
+        raise lookup_failure(found)
     return found.returncode == 0
+
+
+def ci_step_notes(root: Path) -> list[str]:
+    """The CI step that a project without a shipping block still owes."""
+    try:
+        gates = json.loads((root / "hard-eng.gates.json").read_text())
+    except (OSError, ValueError):
+        return []
+    return [] if "shipping" in gates else [CI_STEP]
+
+
+def repair_checkout(root: Path, previous: str) -> str:
+    """A setup rerun fixes this checkout's pre-push hook, its gates file and the project files that are missing; the update path owns the rest."""
+    import tempfile
+
+    import hook_chain
+    import update
+    from ci_setup import GATES_FILE, without_workflow_gates
+
+    hook_chain.install_worktree_hook(root)
+    needs_hook = update.pre_push_missing(root) or hook_chain.foreign_hook(
+        root, hook_chain.locate(root)[1]
+    )
+    with tempfile.TemporaryDirectory(prefix="hard-eng-update-") as temporary:
+        try:
+            source, old = update.fetch_sources(Path(temporary), previous, previous)
+            changes, _, hook, _ = update.update_plan(root, source, old)
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            if needs_hook:
+                raise
+            refused = isinstance(error, ValueError)
+            reason = "" if refused else "the installed release could not be fetched: "
+            parts = [str(error).rstrip("."), *(ci_step_notes(root) if refused else [])]
+            return f"This checkout is unchanged: {reason}{'; '.join(parts)}."
+    notes = []
+    if needs_hook:
+        update.install_planned_hook(root, hook)
+        notes.append("installed the missing pre-push hook")
+    planned = changes.get(GATES_FILE)
+    waits = without_workflow_gates(root, changes)
+    if waits is not None and waits != planned:
+        changes[GATES_FILE] = (
+            None if waits == (root / GATES_FILE).read_text() else waits
+        )
+    written = {
+        name: content
+        for name, content in sorted(changes.items())
+        if content is not None
+        and not update.maybe_installed(name)
+        and (name == GATES_FILE or not (root / name).exists())
+    }
+    for name, content in written.items():
+        update.replace_file(root / name, content.encode())
+    if written:
+        notes.append(
+            f"setup wrote {', '.join(written)}; "
+            f"review and commit {'it' if len(written) == 1 else 'them'}"
+        )
+    notes.extend(ci_step_notes(root))
+    if waits is not None and waits != planned:
+        notes.append(
+            "the update brings the workflow files and their gates when the `shipping` block of hard-eng.gates.json is on the base branch"
+        )
+    return f"This checkout: {'; '.join(notes)}." if notes else ""
+
+
+def failure_kind(error: Exception) -> type[Exception]:
+    """The base class a caller catches for this error; each takes one message."""
+    for kind in (subprocess.SubprocessError, OSError, TypeError):
+        if isinstance(error, kind):
+            return kind
+    return ValueError
 
 
 def prepare_update(root: Path, repair: bool = False) -> str:
     """Build the update as one commit on its own branch from the remote base, leaving this checkout alone."""
-    base = update_base(root)
-    repaired = ""
+    note = ""
     if repair:
-        from update import SOURCE_FILE, repair_current_hook
-
-        repaired = repair_current_hook(
+        note = repair_checkout(
             root, json.loads((root / SOURCE_FILE).read_text())["revision"]
         )
-    if not published(root, base):
-        return NOT_PUBLISHED
-    outcome = build_update(root, base, repair)
-    if "installed the missing" in repaired:
-        return f"{outcome} This checkout: installed the missing pre-push hook."
-    return outcome
+    try:
+        base = update_base(root)
+        if not published(root, base):
+            return f"{NOT_PUBLISHED} {note}".strip()
+        built = build_update(root, base, repair)
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
+        if not note:
+            raise
+        raise failure_kind(error)(f"{str(error).rstrip('.')}. {note}") from error
+    return f"{built} {note}".strip()
+
+
+def free_step(root: Path, worktree: Path) -> str:
+    from stale_updates import registered_worktrees
+
+    if worktree == Path(registered_worktrees(root)[0]["worktree"]):
+        return f"switch the main checkout to another branch with `git -C {worktree} switch <branch>`"
+    return (
+        f"free it with `git -C {worktree} switch --detach` or "
+        f"`git worktree remove {worktree}`"
+    )
 
 
 def build_update(root: Path, base: str, repair: bool) -> str:
+    import tempfile
+
     from hook_chain import use_own_hooks
     from update import update
     from update_pr import branch_worktree, unfinished_update
 
     tip = fetch_base(root, base)
+    if update_blocker(root) is None and revision_at(root, tip) is None:
+        return NOT_PUBLISHED
     expected = update_branch_tip(root)
     if unfinished_update(root, tip):
         return (
@@ -823,8 +684,8 @@ def build_update(root: Path, base: str, repair: bool) -> str:
     if (worktree := branch_worktree(root)) is not None:
         raise ValueError(
             f"{UPDATE_BRANCH} is checked out in {worktree} with no unfinished work, so the "
-            f"update cannot move it; free it with `git -C {worktree} switch --detach` or "
-            f"`git worktree remove {worktree}`, then rerun `python3 .hooks/hard-eng.py update`"
+            f"update cannot move it; {free_step(root, worktree)}, then rerun "
+            "`python3 .hooks/hard-eng.py update`"
         )
     with tempfile.TemporaryDirectory(prefix="hard-eng-update-") as temporary:
         candidate = Path(temporary) / "candidate"
@@ -842,9 +703,12 @@ def build_update(root: Path, base: str, repair: bool) -> str:
         )
         try:
             use_own_hooks(root, candidate)
-            outcome = update(candidate, repair, remember=root)
+            for name in LOCAL_INPUTS:
+                if (candidate / name).is_symlink():
+                    (candidate / name).unlink()
+            outcome = update(candidate, repair, remember=None if repair else root)
             revision = installed_revision(candidate)
-            landed = landed_commit(candidate, tip, f"Update Hard Eng to {revision}")
+            landed = built_commit(candidate, tip)
         finally:
             subprocess.run(
                 ["git", "worktree", "unlock", str(candidate)], cwd=root, check=False
@@ -857,13 +721,53 @@ def build_update(root: Path, base: str, repair: bool) -> str:
             )
     if landed is None or not isinstance(revision, str):
         return outcome
+    refuse_untracked_overlap(root, tip, landed, revision, repair)
     # Work committed or checked out on the branch during the build stays.
-    if branch_worktree(root) or not set_update_branch(root, landed[0], expected):
+    if branch_worktree(root) or not set_update_branch(root, landed, expected):
         return (
             f"{UPDATE_BRANCH} changed while the update was prepared, so it was kept; "
             f"rerun `python3 .hooks/hard-eng.py update` once that work is finished."
         )
     return ready_message(revision)
+
+
+def refuse_untracked_overlap(
+    root: Path, tip: str, landed: str, revision: str, repair: bool
+) -> None:
+    """The candidate never held this checkout's ignored or untracked files, so a pull could replace them."""
+    from update import local_state
+
+    changed = subprocess.check_output(
+        ["git", "diff", "--name-only", "--no-renames", "-z", tip, landed],
+        cwd=root,
+        text=True,
+    )
+    names = list(filter(None, changed.split("\0")))
+    if not names:
+        return
+    parents = {
+        str(parent)
+        for name in names
+        for parent in Path(name).parents
+        if parent != Path(".")
+        and ((root / parent).is_symlink() or (root / parent).is_file())
+    }
+    found = [
+        line[3:].strip('"')
+        for line in local_state(root, [*names, *sorted(parents)])
+        if line.startswith(("?? ", "!! "))
+    ]
+    if found:
+        from hook_chain import SETUP_COMMAND
+
+        error = ValueError(
+            "The update would replace local files that Git does not track: "
+            + ", ".join(found)
+            + f"; move or rename them, then rerun setup to retry: {SETUP_COMMAND}"
+        )
+        if not repair:
+            remember_failure(root, update_attempt(tip, revision), error)
+        raise error
 
 
 def branch_current(root: Path, tip: str) -> bool:
@@ -874,14 +778,18 @@ def branch_current(root: Path, tip: str) -> bool:
     waiting = revision_at(root, f"refs/heads/{UPDATE_BRANCH}")
     branch = f"refs/heads/{UPDATE_BRANCH}"
     based = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", tip, branch], cwd=root, check=False
+        ["git", "merge-base", "--is-ancestor", tip, branch],
+        cwd=root,
+        stderr=subprocess.DEVNULL,
+        check=False,
     )
     return bool(
         current
         and waiting
         and HEX_REVISION.fullmatch(current)
         and based.returncode == 0
-        and waiting == latest_verified(current)
+        and waiting == (latest_verified(current) or current)
+        and (waiting != current or update_branch_tip(root) != tip)
     )
 
 
@@ -932,6 +840,8 @@ def stop_group(update: "subprocess.Popen[bytes]") -> None:
 
 def run_update(root: Path) -> int:
     """Hold the repository's update lock while one update runs in its own process group."""
+    from stale_updates import remove_stale_candidates
+
     with lock_file(root).open("a") as handle:
         if not exclusive(handle):
             print(

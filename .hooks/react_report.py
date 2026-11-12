@@ -1,5 +1,8 @@
 """Say why React Doctor reports a project as incomplete."""
 
+import json
+from pathlib import Path
+
 from gate_config import JsonObject
 
 DETAIL_LIMIT = 2000
@@ -31,3 +34,15 @@ def incomplete_reason(project: JsonObject) -> str:
     if "out of memory" in message.lower():
         message += MEMORY_FIX
     return message
+
+
+def finding_lines(path: Path) -> list[str]:
+    try:
+        diagnostics = json.loads(path.read_text())["diagnostics"]
+        return [
+            f"{item['filePath']}{':' + str(item['line']) if type(item.get('line')) is int else ''}"
+            f" {item['rule']} {item['message']}"
+            for item in diagnostics
+        ]
+    except (OSError, ValueError, KeyError, TypeError):
+        return []

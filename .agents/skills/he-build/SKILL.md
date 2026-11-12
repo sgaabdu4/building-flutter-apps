@@ -5,7 +5,7 @@ description: Implement and verify a ready, authorized plan through focused fixes
 
 # Hard Eng Build
 
-- Baseline (checks before your edits) fails → repair only that, as its own change + PR; no feature edits until it merges ([repair route](../he/references/gates.md#baseline-repair)).
+- Baseline (checks before your edits) fails → repair only that, as its own change + PR; no feature edits until it merges ([repair route](../he/references/plan-checks.md#baseline-repair)).
 - Input = Ready + authorized plan from [HE Plan](../he-plan/SKILL.md); check its evidence (passing baseline, UX, blockers), not Status alone. Other missing, pending or contradictory readiness → that owner before production edits. Material scope change → same owner; preserve accepted decisions + completed work. Participation and project context → [HE workflow](../he/references/workflow.md).
 - Output = locally implemented + verified behavior, Complete plan (none for a change `check` rates `Size: small`) and explicit Ready for ship handoff. Build adds no authority to commit, push, publish, merge or deploy; delivery is a separate stage.
 
@@ -26,13 +26,13 @@ flowchart TD
   click T "../he/references/testing.md"
   click R "../code-review/SKILL.md"
   click F "../research/references/troubleshooting.md"
-  click I "../he/references/gates.md#plan-checks"
+  click I "../he/references/plan-checks.md#plan-checks"
 ```
 
 - Behavior = required connected callers, persistence, API and interface work; a skeleton or file checklist is not an accepted outcome. Keep changes at existing owners; apply relevant stack/design guidance only for the changed boundary. Diff touches sign-in, permissions, API keys, payments, uploads or personal data → [Security Review](../security-review/SKILL.md) before Ready for ship.
 - Proof = [test quality](../he/references/testing.md) + [actual-diff review](../code-review/SKILL.md); outside service → fake at its boundary from real responses, tests never call the real one; required runtime journeys, visual evidence and applicable accessibility states → [E2E](../e2e/SKILL.md). PR evidence selection → [HE Ship](../he-ship/references/checks.md#ui-evidence-in-the-pr). Reuse these owners for regression, defect reopening and review findings; no duplicate checker or mandatory test/agent count.
-- Focused checks = only the tests, analyzer and lint for the touched files or package; full suites run once, in the final gate. A long run → HE-NO-FOREGROUND-POLL.
-- Direct test/build/check runs = limit ≈3× normal, ≥15 min (macOS: `perl -e 'alarm shift; exec @ARGV' <s> <cmd>`); hit → read log, kill leftover children, rerun.
+- Focused checks = only the tests, analyzer and lint for the touched files or package, plus `python3 .hooks/hard-eng.py hot-paths <touched source files>`; full suites run once, in the final gate. A long run → HE-NO-FOREGROUND-POLL.
+- Direct test/build/check runs = limit ≈3× normal, ≥15 min (macOS: `perl -e 'alarm shift; exec @ARGV or exit 127' <s> <cmd>`); hit → read log, kill leftover children, rerun. A sandbox blocks uv's cache or network → rerun outside it (the host asks the user to approve the run); never copy tool caches.
 - Progress = same plan + remaining work. Retain the actual starting-baseline outcome + evidence; record later build results in Verification, in the commit that changes the proved code. No commit only records a result. Keep Status Ready and Verification Pending during an unblocked feature build; baseline repair follows HE Plan's Draft route above. A material decision or unavailable prerequisite → Draft + exact blocker/resume condition; preserve completed steps and continue independent authorized work. Never replace missing proof with a pass or N/A.
 
 ## Parallel work + integration
@@ -44,5 +44,5 @@ flowchart TD
 ## Build complete → ready for ship
 
 - Reconcile the final diff against every accepted requirement and later correction, including the plan's explicit E2E disposition. Required local journeys must have Passed evidence; only deployment-dependent proof may remain Delivery under a Deploy target with its configured verifier. Confirmed review findings are resolved and no build blocker remains. Review claims against actual tests/runtime evidence; plan checkboxes alone are declarations.
-- Record actual focused-test/runtime evidence in the plan, check only verified acceptance items, set Status Complete + Verification Passed, then run the existing [Complete check](../he/references/gates.md#plan-checks) on the final integrated code. Ready checks own planning/baseline readiness; do not repeat them as an extra build gate. Failure → follow that gate's Draft/blocker recovery and resume the loop; never announce Ready for ship. Code/configuration changes after a pass need affected proof; batch them, then rerun the final gate once. Pre-push repeats that gate, so run no extra full check just before pushing.
+- Record actual focused-test/runtime evidence in the plan, check only verified acceptance items, set Status Complete + Verification Passed, then run the existing [Complete check](../he/references/plan-checks.md#plan-checks) on the final integrated code. Ready checks own planning/baseline readiness; do not repeat them as an extra build gate. Failure → follow that gate's Draft/blocker recovery and resume the loop; never announce Ready for ship. Code/configuration changes after a pass need affected proof; batch them, then rerun the final gate once. Pre-push repeats that gate, so run no extra full check just before pushing.
 - After the gate passes, tell the user `Ready for ship — local implementation and verification complete; delivery not performed.` Handoff = implemented outcome + actual checks/runtime evidence + pending delivery requirements. The Complete plan already records the stage; do not rewrite it or repeat application checks solely to record this announcement. Authorized delivery continues through [HE Ship](../he-ship/SKILL.md); build alone adds no delivery authority. No BUILD.md or second state record.

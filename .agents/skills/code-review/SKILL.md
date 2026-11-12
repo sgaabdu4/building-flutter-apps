@@ -5,11 +5,11 @@ description: Review PR, branch, commit or working-tree changes for concrete defe
 
 # Code Review
 
-Load the review method; load the independent-challenge branch only when requested.
+Load the review method; an independent review also loads challenge.md.
 
 ```mermaid
 flowchart LR
-  R[references/review.md] -->|Independent / adversarial review requested| C[references/challenge.md]
+  R[references/review.md] -->|Independent / adversarial review| C[references/challenge.md]
   R -->|Diff touches sign-in, permissions, API keys, payments, uploads or personal data| S[Security Review]
   click R "references/review.md"
   click C "references/challenge.md"

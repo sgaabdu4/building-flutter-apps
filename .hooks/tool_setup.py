@@ -1,7 +1,6 @@
 """Provision current native tools before concurrent gate execution."""
 
 import fcntl
-import hashlib
 import importlib.util
 import json
 import os
@@ -15,19 +14,32 @@ import tempfile
 import tomllib
 from collections.abc import Generator
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import IO
 
 from fallow_report import native_scanner_command
-from gate_config import Group
-from project_setup import package_script_invocation
+from gate_config import Gate, GateConfig, Group, has_workflows, require_roles
+from project_setup import (
+    is_deployment_file,
+    package_script_invocation,
+    project_shell_scripts,
+    require_listed_shell_scripts,
+)
 
+RELEASE_AGE_SECONDS = 2 * 24 * 60 * 60
 DIGIT_RUN = re.compile(r"\d+")
 TOOL_VERSION = re.compile(r"\d[\w.+-]*")
 VERSION_NUMBER = re.compile(r"\d+(?:\.\d+)+")
+UV_LOST_SCANNER = " was not found in the cache and you require "
 TOOL_BRACKETS_OR_LATEST = re.compile(r"\[[^\]]*\]|@latest$")
 MISSING_MODULE_NAME = re.compile(r"Cannot find module '([^']+)'")
 NPM_LATEST_PACKAGE = re.compile(r"^(npm:[^\[]+?)(@latest)$")
+# mise names each tool that no config file lists; Hard Eng runs it with no config on purpose.
+ACTIVATION_NOTE = re.compile(
+    r"(?m)^mise WARN .* installed but not activated .*\n"
+    r"(?:To install and activate, run:\n(?: +mise use .*\n)*)?"
+)
 
 NATIVE_SCANNERS = {
     "dart-decimate": "dart-decimate",
@@ -50,6 +62,29 @@ PACKAGES = {
     "k6": "aqua:grafana/k6",
 }
 MANAGED_PYTHON_SCANNERS = {"ruff", "pyrefly", "vulture", "semgrep", "zizmor", "poetry"}
+ROLE_TOOLS: dict[str, dict[str, tuple[str, ...]]] = {
+    "python": {
+        "format": ("ruff", "format"),
+        "lint": ("ruff", "check"),
+        "complexity": ("ruff", "check"),
+        "annotations": ("ruff", "check"),
+        "types": ("pyrefly", "check"),
+        "dead-code": ("vulture",),
+    },
+    "javascript": {
+        "format-lint": ("biome", "ci"),
+        "focused-tests": ("biome", "lint"),
+        "typing-style": ("biome", "lint"),
+        "types": ("tsc",),
+    },
+    "dart": {"format": ("dart", "format"), "types": ("dart", "analyze")},
+    "swift": {"format-lint": ("swift", "format", "lint")},
+    "shared": {
+        "workflows": ("actionlint",),
+        "ci-security": ("zizmor",),
+        "shell": ("shellcheck",),
+    },
+}
 SCANNER_VERSIONS: dict[str, str] = {}
 # The platform package installs without the npm-only preinstall of @jdxcode/mise.
 MISE_PACKAGE = "@jdxcode/mise-{}-{}".format(
@@ -62,11 +97,12 @@ MISE_LATEST = MISE_PACKAGE + "@latest"
 MISE_BINARY = Path("node_modules", MISE_PACKAGE, "bin/mise")
 CHECKOUT = Path(__file__).resolve().parents[1]
 TOOL_OWNER = "HARD_ENG_TOOL_OWNER"
+RESTARTED = "HARD_ENG_RESTARTED"
 VISIBLE_TEMP = Path("/tmp")
 HELD: list[IO[str]] = []
 NOT_INSTALLED = (
     "Tools are not installed yet and cannot be fetched now: {error}. "
-    "Connect once or run the full check (python3 .hooks/hard-eng.py check) to install them."
+    "Connect once or run the full check (`python3 .hooks/hard-eng.py check`; during a build, `python3 .hooks/hard-eng.py check --plan-stage Ready`) to install them."
 )
 
 
@@ -76,21 +112,59 @@ def quick_mode() -> bool:
 
 def ensure_python_runtime() -> None:
     """Run the installed CLI with its YAML dependency without changing host Python."""
+    if os.environ.pop(RESTARTED, None):
+        # uv run set VIRTUAL_ENV to its throwaway; Poetry would sync and run gates there.
+        os.environ.pop("VIRTUAL_ENV", None)
     if importlib.util.find_spec("yaml") is None:
-        os.execvp(
-            "uv",
-            [
+        os.environ[RESTARTED] = "1"
+        try:
+            os.execvp(
                 "uv",
-                "run",
-                "--no-project",
-                "--with",
-                "pyyaml",
-                "--python",
-                sys.executable,
-                "python",
-                *sys.argv,
-            ],
+                [
+                    "uv",
+                    "run",
+                    "--no-project",
+                    "--with",
+                    "pyyaml",
+                    "--python",
+                    sys.executable,
+                    "python",
+                    *sys.argv,
+                ],
+            )
+        except FileNotFoundError as error:
+            raise FileNotFoundError(
+                "uv is not on PATH; Hard Eng needs it. Install uv, then run again."
+            ) from error
+
+
+def require_shared_roles(
+    root: Path, config: GateConfig, files: list[Path], secrets: bool
+) -> set[str]:
+    """Files decide the mandatory shared roles; a gate that names a role's tool fills it."""
+    required = {"secrets-files"} if secrets else set()
+    if secrets and config.get("scan_git_history", True):
+        required.add("secrets-history")
+    if has_workflows(root, files):
+        required.update({"workflows", "ci-security"})
+    if next(project_shell_scripts(root, files), None) is not None:
+        required.add("shell")
+    if any(is_deployment_file(path) for path in files):
+        required.add("deployment")
+    roles = {gate.get("role", "") for gate in config["shared"]}
+    for gate in config["shared"]:
+        command = gate["command"]
+        require_role_tool("shared", gate, command)
+        roles.update(
+            role
+            for role, tool in ROLE_TOOLS["shared"].items()
+            if Path(command[0]).name == tool[0]
         )
+        if Path(command[0]).name == "trivy" and "config" in command[1:]:
+            roles.add("deployment")
+    require_roles("shared", required, roles)
+    require_listed_shell_scripts(root, files, config["shared"])
+    return roles
 
 
 def entry_point_names(directory: Path) -> list[str]:
@@ -121,6 +195,22 @@ def with_entry_points(command: list[str], directory: Path) -> list[str]:
     return [*command, "--ignore-names", ",".join(names)]
 
 
+def require_role_tool(language: str, gate: Gate, command: list[str]) -> None:
+    """A required check that writes no report proves itself only by the tool it names."""
+    tool = ROLE_TOOLS.get(language, {}).get(str(gate.get("role")))
+    if tool is None or gate.get("report"):
+        return
+    words = [
+        Path(word.strip("'\"();")).name.split("@", 1)[0]
+        for word in " ".join(command).split()
+    ]
+    if not any(tuple(words[at : at + len(tool)]) == tool for at in range(len(words))):
+        raise ValueError(
+            f"{gate['name']}: the {gate['role']} check must run `{' '.join(tool)}`; "
+            f"this command does not name it: {' '.join(gate['command'])}"
+        )
+
+
 def uvx_scanner(command: list[str]) -> list[str]:
     """A configured `uvx ruff@latest …` gate runs like `ruff …`, so it is pinned too."""
     tool = command[1] if len(command) > 1 and command[0] == "uvx" else ""
@@ -130,7 +220,17 @@ def uvx_scanner(command: list[str]) -> list[str]:
     return command
 
 
-def managed_command(command: list[str], directory: Path | None = None) -> list[str]:
+def release_cutoff(now: datetime | None = None) -> str:
+    """Newest release time uvx may use, floored to the hour so uv's cache stays warm."""
+    moment = (now or datetime.now(UTC)) - timedelta(seconds=RELEASE_AGE_SECONDS)
+    return moment.replace(minute=0, second=0, microsecond=0).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
+
+def managed_command(
+    command: list[str], directory: Path | None = None, now: datetime | None = None
+) -> list[str]:
     command = uvx_scanner(command)
     if directory is not None:
         command = with_entry_points(
@@ -140,7 +240,8 @@ def managed_command(command: list[str], directory: Path | None = None) -> list[s
         offline = ["--offline"] if quick_mode() else []
         version = SCANNER_VERSIONS.get(command[0])
         tool = f"{command[0]}@{version or 'latest'}"
-        return ["uvx", *offline, tool, *command[1:]]
+        wait = ["--exclude-newer", release_cutoff(now)]
+        return ["uvx", *offline, *wait, tool, *command[1:]]
     return command
 
 
@@ -196,11 +297,20 @@ def provision_tools(root: Path, groups: list[Group], timeout: float) -> None:
     pin_python_scanners(sorted(executables & MANAGED_PYTHON_SCANNERS), timeout)
 
 
-def scanner_version(name: str, offline: bool, timeout: float) -> str | None:
+def scanner_version(
+    name: str, offline: bool, timeout: float, now: datetime | None = None
+) -> str | None:
     """The scanner's latest version, or None when it cannot run."""
+    wait = ["--exclude-newer", release_cutoff(now)]
     try:
         done = subprocess.run(
-            ["uvx", *(["--offline"] if offline else []), name + "@latest", "--version"],
+            [
+                "uvx",
+                *(["--offline"] if offline else []),
+                *wait,
+                name + "@latest",
+                "--version",
+            ],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -212,17 +322,69 @@ def scanner_version(name: str, offline: bool, timeout: float) -> str | None:
     return found[0] if found else ""
 
 
+def shared_tool_folder() -> Path:
+    """The tool folder that every checkout on this machine shares."""
+    return Path(os.environ.get("RUNNER_TEMP") or temporary_root()) / "hard-eng-tools"
+
+
+def scanner_store() -> Path:
+    """The file, shared by every checkout, that holds the versions of one cutoff hour."""
+    shared = shared_tool_folder()
+    return shared / "scanner-versions.json"
+
+
+def stored_scanner_versions(cutoff: str) -> dict[str, str]:
+    """The versions stored for this cutoff hour; none when the file is missing or old."""
+    try:
+        stored = json.loads(scanner_store().read_text())
+        versions = stored["versions"] if stored["cutoff"] == cutoff else {}
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+    if not isinstance(versions, dict):
+        return {}
+    return {
+        name: version
+        for name, version in versions.items()
+        if isinstance(name, str)
+        and isinstance(version, str)
+        and VERSION_NUMBER.fullmatch(version)
+    }
+
+
+def lost_scanner_note(output: str) -> str:
+    """The step for a failed quick gate whose stored scanner version left uv's cache."""
+    before, lost, _ = output.partition(UV_LOST_SCANNER)
+    if not (lost and before.split() and quick_mode()):
+        return ""
+    return NOT_INSTALLED.format(error=f"{before.split()[-1]} is not in uv's cache")
+
+
 def pin_python_scanners(names: list[str], timeout: float) -> None:
     """Resolve each scanner's latest version once, serially, so parallel gates run it
-    pinned instead of each refreshing uv's shared interpreter cache at once."""
+    pinned instead of each refreshing uv's shared interpreter cache at once.
+    A quick check reuses the versions that a lookup of the same cutoff hour stored."""
+    cutoff = release_cutoff()
+    stored = stored_scanner_versions(cutoff)
+    found = False
     for name in names:
+        if quick_mode() and name in stored:
+            SCANNER_VERSIONS[name] = stored[name]
+            continue
         version = scanner_version(name, quick_mode(), timeout)
         if version is None and quick_mode():
             version = scanner_version(name, False, timeout)
             if version is None:
                 raise ValueError(NOT_INSTALLED.format(error=f"{name} could not be run"))
         if version:
-            SCANNER_VERSIONS[name] = version
+            SCANNER_VERSIONS[name] = stored[name] = version
+            found = True
+    if found:
+        try:
+            path = scanner_store()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            replace_file(path, json.dumps({"cutoff": cutoff, "versions": stored}))
+        except OSError:
+            pass
 
 
 def bun_age(tool: str, seconds: int) -> str:
@@ -239,8 +401,8 @@ def tool_name(tool: str) -> str:
 
 def provision_batch(batch: list[str], timeout: float) -> None:
     # Two days avoids newly broken releases.
-    batch = [bun_age(tool, 172800) for tool in batch]
-    shared = Path(os.environ.get("RUNNER_TEMP") or temporary_root()) / "hard-eng-tools"
+    batch = [bun_age(tool, RELEASE_AGE_SECONDS) for tool in batch]
+    shared = shared_tool_folder()
     # Checkouts on other Hard Eng revisions rewrite these files while this one runs.
     storage = shared if "RUNNER_TEMP" in os.environ else checkout_storage(shared)
     environment = os.environ.copy()
@@ -281,6 +443,8 @@ def checkout_storage(shared: Path) -> Path:
     """This checkout's tool folder, held until exit; a push snapshot uses its owner's."""
     snapshot, _, owner = os.environ.get(TOOL_OWNER, "").partition(os.pathsep)
     checkout = Path(owner) if snapshot == str(CHECKOUT) else CHECKOUT
+    import hashlib
+
     checkouts = shared / "checkouts"
     storage = checkouts / hashlib.sha256(str(checkout).encode()).hexdigest()[:16]
     if not HELD:
@@ -403,7 +567,7 @@ def run_mise(
     environment: dict[str, str],
     timeout: float,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    result = subprocess.run(
         [*command, *arguments],
         # The project's packageManager pin would otherwise pick the Bun mise drives.
         cwd=storage,
@@ -418,6 +582,8 @@ def run_mise(
             else "1h",
         },
     )
+    result.stderr = ACTIVATION_NOTE.sub("", result.stderr)
+    return result
 
 
 def provision_latest(
@@ -432,7 +598,7 @@ def provision_latest(
             "MISE_NPM_PACKAGE_MANAGER=bun",
             "MISE_PREFER_OFFLINE=false",
             "MISE_USE_VERSIONS_HOST=false",
-            "MISE_MINIMUM_RELEASE_AGE=2d",
+            f"MISE_MINIMUM_RELEASE_AGE={RELEASE_AGE_SECONDS // 86400}d",
             "mise",
             "--no-config",
         ]
@@ -496,6 +662,11 @@ def bun_node(storage: Path, environment: dict[str, str]) -> None:
             "*node_modules/.bin/miniflare*|*node_modules/miniflare/*) "
             f'exec {shlex.quote(node)} "$@";; esac\n'
         )
+        # Under Bun, React Doctor waits 30 s for an idle worker before it exits.
+        script += (
+            'case "$*" in *npm-react-doctor/*|*node_modules/.bin/react-doctor*|'
+            f'*node_modules/react-doctor/*) exec {shlex.quote(node)} "$@";; esac\n'
+        )
     # Node runs a piped script when no script or -e/-p is named; Bun prints help and exits 0.
     script += (
         "piped=1\nvalue=0\n"
@@ -508,6 +679,8 @@ def bun_node(storage: Path, environment: dict[str, str]) -> None:
         f'  printf "%s\\n" "$source" | {shlex.quote(bun)} "$@" -\n  exit $?\nfi\n'
     )
     script += f'exec {shlex.quote(bun)} "$@"\n'
+    import hashlib
+
     # Another Hard Eng revision in this checkout, such as a pushed update, writes its own.
     directory = shims / hashlib.sha256(script.encode()).hexdigest()[:16]
     directory.mkdir(parents=True, exist_ok=True)

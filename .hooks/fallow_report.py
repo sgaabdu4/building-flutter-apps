@@ -262,9 +262,111 @@ def empty_audit(report: JsonObject) -> bool:
     return True
 
 
-def validate_fallow(path: Path) -> None:
+def sdk_binaries(directory: Path) -> set[str]:
+    """Commands from SDKs this repository's own packages already require."""
+    listed = subprocess.run(
+        ["git", "ls-files", "--", ":(top,glob)**/pubspec.yaml"],
+        cwd=directory,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    ).stdout
+    return {"dart", "flutter"} if listed.strip() else set()
+
+
+def lower(counts: object, names: tuple[str, ...], dropped: int) -> None:
+    if not isinstance(counts, dict):
+        raise TypeError("Fallow summary must be an object")
+    for name in names:
+        value = counts.get(name)
+        if type(value) is not int:
+            raise TypeError(f"Fallow {name} must be a count")
+        counts[name] = value - dropped
+
+
+def drop_sdk_binaries(report: JsonObject, provided: set[str]) -> None:
+    """Unlisted commands from required SDKs leave the report; the rest is judged as before."""
+    key = "dead_code" if report.get("kind") == "audit" else "check"
+    section = report.get(key)
+    found = section.get("unlisted_binaries") if isinstance(section, dict) else None
+    if not provided or not isinstance(section, dict) or not isinstance(found, list):
+        return
+    names = [
+        item.get("binary_name") if isinstance(item, dict) else None for item in found
+    ]
+    sdk = [isinstance(name, str) and name in provided for name in names]
+    dropped = sum(sdk)
+    if not dropped:
+        return
+    for name in sorted(
+        {str(name) for name, skip in zip(names, sdk, strict=True) if skip}
+    ):
+        print(f"Fallow: {name} comes from an SDK this repository requires")
+    section["unlisted_binaries"] = [
+        item for item, skip in zip(found, sdk, strict=True) if not skip
+    ]
+    lower(section, ("total_issues",), dropped)
+    lower(section.get("summary"), ("total_issues", "unlisted_binaries"), dropped)
+    if key != "dead_code":
+        return
+    totals = report.get("summary")
+    lower(totals, ("dead_code_issues",), dropped)
+    counts = ("dead_code_issues", "complexity_findings", "duplication_clone_groups")
+    if (
+        isinstance(totals, dict)
+        and report.get("verdict") == "warn"
+        and totals.get("dead_code_has_errors") is False
+        and not any(totals.get(name) for name in counts)
+    ):
+        report["verdict"] = "pass"
+
+
+def reject_diagnostic_notes(diagnostics: list[object], optional: set[str]) -> None:
+    notes = [
+        f"{item.get('kind')}: {item.get('message')}"
+        for item in diagnostics
+        if isinstance(item, dict) and item.get("kind") not in optional
+    ]
+    if notes:
+        raise ValueError("Fallow reports analysis diagnostics: " + "; ".join(notes))
+
+
+def installed_above(directory: Path | None) -> bool:
+    """A package that declares no dependency reads the install of a folder above it, up to the repository."""
+    if directory is None:
+        return False
+    try:
+        manifest = json.loads((directory / "package.json").read_text())
+    except (OSError, ValueError):
+        return False
+    kinds = (
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+    )
+    if any(manifest.get(kind) for kind in kinds):
+        return False
+    folder = directory.resolve()
+    while not (folder / "hard-eng.gates.json").is_file() and folder != folder.parent:
+        folder = folder.parent
+        if (folder / "node_modules").is_dir():
+            return True
+    return False
+
+
+def optional_notes(directory: Path | None) -> set[str]:
+    notes = {"boundaries-not-configured", "rule-packs-not-configured"}
+    return notes | {"node-modules-missing"} if installed_above(directory) else notes
+
+
+def validate_fallow(
+    path: Path, provided: set[str] | None = None, directory: Path | None = None
+) -> None:
     try:
         report = json.loads(path.read_text())
+        drop_sdk_binaries(report, provided or set())
         audit = report["kind"] == "audit"
         if audit and empty_audit(report):
             return
@@ -286,10 +388,11 @@ def validate_fallow(path: Path) -> None:
         clean = all(type(n) in (int, float) and n == 0 for n in counts)
         if report["kind"] != "combined" or not clean:
             raise ValueError("Fallow reports findings or skipped analysis")
-        optional = {"boundaries-not-configured", "rule-packs-not-configured"}
+        optional = optional_notes(directory)
         diagnostics = report.get("workspace_diagnostics", [])
         if not isinstance(diagnostics, list):
             raise TypeError("Fallow diagnostics must be a list")
+        reject_diagnostic_notes(diagnostics, optional)
         if (
             any(isinstance(value, list) and value for value in check.values())
             or dupes["clone_groups"] != []
@@ -310,6 +413,53 @@ def validate_fallow(path: Path) -> None:
                 raise ValueError("Fallow report lacks a valid analysis scope")
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError("Fallow report is incomplete") from error
+
+
+def located(path: object, line: object) -> str:
+    return f"{path}:{line}" if type(line) is int else str(path)
+
+
+def own_place(item: JsonObject) -> tuple[str, str] | None:
+    """Where a finding without a path of its own sits, and what names it."""
+    if "path" in item:
+        return located(item["path"], item.get("line")), ""
+    for key in ("imported_from", "used_in"):
+        sites = item.get(key)
+        if isinstance(sites, list) and sites and isinstance(sites[0], dict):
+            return located(sites[0]["path"], sites[0].get("line")), ""
+    files = item.get("files")
+    if isinstance(files, list) and files:
+        return located(files[0], item.get("line")), " -> ".join(map(str, files))
+    return None
+
+
+def finding_lines(path: Path) -> list[str]:
+    try:
+        report = json.loads(path.read_text())
+        audit = report.get("kind") == "audit"
+        found: list[str] = []
+        for kind, items in report["dead_code" if audit else "check"].items():
+            if not isinstance(items, list) or kind == "workspace_diagnostics":
+                continue
+            for item in items:
+                if isinstance(item, dict) and (place := own_place(item)):
+                    name = (
+                        item.get("export_name")
+                        or item.get("package_name")
+                        or item.get("binary_name")
+                        or place[1]
+                    )
+                    found.append(f"{place[0]} {kind} {name}".rstrip())
+        dupes = report.get("duplication" if audit else "dupes", {})
+        for group in dupes.get("clone_groups", []):
+            copies = [
+                f"{copy['file']}:{copy['start_line']}-{copy['end_line']}"
+                for copy in group["instances"]
+            ]
+            found.append("copied code " + " ".join(copies))
+        return found
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return []
 
 
 def lcov_counts(

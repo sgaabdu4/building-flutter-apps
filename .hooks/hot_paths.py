@@ -9,7 +9,13 @@ import tempfile
 from collections import Counter
 from pathlib import Path, PurePosixPath
 
-from gate_config import Gate, Group, generated_sources, repository_files
+from gate_config import (
+    SOURCE_FILE,
+    Gate,
+    Group,
+    generated_sources,
+    repository_files,
+)
 from tool_setup import managed_command
 
 RULES = (
@@ -39,7 +45,12 @@ def findings(root: Path, targets: list[str], timeout: float) -> list[dict[str, o
     try:
         report = json.loads(result.stdout)
     except json.JSONDecodeError as error:
-        raise ValueError(f"HE-HOT-PATH scan failed: {result.stderr[-500:]}") from error
+        raise ValueError(
+            "HE-HOT-PATH scan failed: Semgrep gave no report. If the text below says uv "
+            "cannot write its cache or reach the package index, run the same "
+            "`python3 .hooks/hard-eng.py hot-paths` command where it can; in an agent "
+            f"sandbox, ask approval to run it outside the sandbox. Output: {result.stderr[-500:]}"
+        ) from error
     require_parsed(report.get("errors", []))
     return report["results"]
 
@@ -63,9 +74,9 @@ def describe(result: dict[str, object]) -> str:
     return f"{result['path']}:{start['line']} {extra['message']}"
 
 
-def scan_all(root: Path, timeout: float = 600) -> int:
-    """List every finding in the repository, for a requested hot-path scan."""
-    results = findings(root, ["."], timeout)
+def scan_all(root: Path, timeout: float = 600, paths: list[str] | None = None) -> int:
+    """List every finding in the named files, else the whole repository."""
+    results = findings(root, paths or ["."], timeout)
     for result in results:
         print(describe(result))
     print(f"HE-HOT-PATH: {len(results)} findings")
@@ -134,7 +145,7 @@ def rules_skipping(skipped: list[str], directory: Path) -> str:
 
 def installed_paths(root: Path) -> list[str]:
     """Folders Hard Eng installed at the repository root, as its install record lists them; an older record lists no skills."""
-    marker = root / ".hooks/hard-eng-source.json"
+    marker = root / SOURCE_FILE
     if not marker.is_file():
         return []
     try:

@@ -9,10 +9,29 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from gate_config import Group
 
+SOURCE_SUFFIXES = {
+    "python": {".py"},
+    "javascript": {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"},
+    "dart": {".dart"},
+    "swift": {".swift"},
+}
+
 
 def owner_language(by_path: dict[str, Group], name: str) -> str | None:
     matches = [path for path in by_path if Path(name).is_relative_to(path)]
     return by_path[max(matches, key=len)].get("language") if matches else None
+
+
+def child_groups(group: Group, role: str | None, groups: list[Group]) -> list[Group]:
+    """Groups below this one in its language that have a gate of the same role."""
+    return [
+        child
+        for child in groups
+        if child["path"] != group["path"]
+        and (group["path"] == "." or Path(child["path"]).is_relative_to(group["path"]))
+        and child.get("language") == group.get("language")
+        and any(check.get("role") == role for check in child["checks"])
+    ]
 
 
 def impact_inputs(group: Group) -> list[PurePosixPath]:
@@ -131,3 +150,21 @@ def shared_only(shared: Group, names: set[str]) -> Group:
         print("No package reads this change; running the secret scan only.")
     checks = [gate for gate in shared["checks"] if gate.get("role") in roles]
     return {**shared, "checks": checks}
+
+
+def readers_above(by_path: dict[str, Group], name: str, nearest: str) -> set[str]:
+    """A file of another language than its group is also read by the nearest group above it of its own."""
+    suffix = Path(name).suffix
+    language = next(
+        (key for key, kinds in SOURCE_SUFFIXES.items() if suffix in kinds), None
+    )
+    if language is None or by_path[nearest].get("language") == language:
+        return set()
+    above = [
+        path
+        for path, group in by_path.items()
+        if group.get("language") == language
+        and path != nearest
+        and Path(nearest).is_relative_to(path)
+    ]
+    return {max(above, key=len)} if above else set()

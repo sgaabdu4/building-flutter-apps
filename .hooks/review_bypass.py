@@ -12,6 +12,7 @@ from shipping import (
     _PR_URL,
     _THREADS_QUERY,
     ShippingError,
+    ShippingPolicy,
     _api_items,
     _complete_nodes,
     _graphql_pull,
@@ -33,6 +34,14 @@ _REVIEW_QUERY = (
     "commits(last:1){nodes{commit{oid statusCheckRollup{state contexts(first:100){"
     "totalCount nodes{...on CheckRun{name conclusion} ...on StatusContext{context state}}"
     "}}}}}}}}"
+)
+_RULE_QUERY = (
+    "query($owner:String!,$name:String!,$number:Int!){"
+    "repository(owner:$owner,name:$name){viewerCanAdminister "
+    "pullRequest(number:$number){baseRef{branchProtectionRule{"
+    "requiredStatusCheckContexts} refUpdateRule{requiredStatusCheckContexts} "
+    "rules(first:100){totalCount nodes{type parameters{"
+    "...on RequiredStatusChecksParameters{requiredStatusChecks{context}}}}}}}}}"
 )
 _PASSED = {"SUCCESS", "NEUTRAL", "SKIPPED"}
 _CODEOWNERS = (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS")
@@ -63,6 +72,72 @@ def _required_checks(
                 check.get("context") for check in checks if isinstance(check, dict)
             ]
     return {name for name in names if isinstance(name, str)}
+
+
+class Noted:
+    """Add a note line to any shipping refusal raised inside the block."""
+
+    def __init__(self, note: str | None) -> None:
+        self.note = note
+
+    def __enter__(self) -> None:
+        return None
+
+    def __exit__(
+        self, kind: object, error: BaseException | None, trace: object
+    ) -> None:
+        if isinstance(error, ShippingError) and self.note:
+            raise type(error)(f"{error}\n{self.note}") from error
+
+
+def _dict(value: JsonValue) -> dict[str, JsonValue]:
+    return value if isinstance(value, dict) else {}
+
+
+def _visible_rules(ref: dict[str, JsonValue]) -> tuple[set[str], bool, bool]:
+    """Checks the visible rules require, if the rule list is whole, if a workflow rule applies."""
+    listed = _dict(ref.get("rules"))
+    nodes = listed.get("nodes")
+    seen = [n for n in nodes if isinstance(n, dict)] if isinstance(nodes, list) else []
+    required = _required_checks(_dict(ref.get("branchProtectionRule")), seen)
+    required |= _required_checks(_dict(ref.get("refUpdateRule")), [])
+    workflows = any(rule.get("type") == "WORKFLOWS" for rule in seen)
+    return required, _complete_nodes(listed) is not None, workflows
+
+
+def branch_rule_note(
+    root: Path, policy: ShippingPolicy, identity: tuple[str, str, int]
+) -> str | None:
+    """A line when the base branch may not require every shipping check; never a refusal."""
+    owner, name, number = identity
+    checks, base = policy["checks"], policy["base"]
+    try:
+        data, pull = _graphql_pull(root, owner, name, number, _RULE_QUERY)
+        ref = _dict(pull.get("baseRef"))
+        required, complete, workflows = _visible_rules(ref)
+        admin = _object(data.get("repository"), "repository").get("viewerCanAdminister")
+    except ShippingError as error:
+        return f"Not checked: whether {base} requires {', '.join(checks)} ({error})."
+    missing = ", ".join(sorted(set(checks) - required))
+    if not missing:
+        return None
+    unknown = f"Not checked: whether {base} requires {missing}"
+    if workflows:
+        return f"{unknown} (a required workflow rule may enforce it)."
+    readable = admin is True or isinstance(ref.get("refUpdateRule"), dict)
+    if not complete or not readable:
+        return f"{unknown} (the base branch rules are unreadable or incomplete)."
+    who = (
+        "A repository admin adds it"
+        if admin is True
+        else "Ask a repository admin to add it"
+    )
+    return (
+        f"Warning: {base} does not require {missing}, so a PR can merge while that "
+        f"check is missing or failed. {who} at "
+        f"https://github.com/{owner}/{name}/settings/rules (branch ruleset for "
+        f"{base}, Require status checks to pass, add {missing})."
+    )
 
 
 def _other_merge_requirement(

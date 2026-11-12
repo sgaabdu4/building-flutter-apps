@@ -23,19 +23,30 @@ BROWSER_CACHE = "ms-playwright"
 
 
 def tool_directory_messages(relative: str, text: str) -> list[str]:
-    """Lines that set a tool directory from the runner temp folder, ignoring the runner's own value."""
-    messages = []
-    for number, line in enumerate(text.splitlines(), 1):
-        found = UNKEPT_DIRECTORY.search(line)
-        if found and f"${{{found[1]}:-" not in line:
-            messages.append(
-                f"CI tool directories: {relative}:{number} sets {found[1]} from the runner "
-                "temp folder, so a runner that exports its own value is ignored and every "
-                f"run downloads the tools again. Set it in a step with echo "
-                f'"{found[1]}=${{{found[1]}:-$RUNNER_TEMP/hard-eng-tools/...}}" >> "$GITHUB_ENV"; '
-                "a job env mapping cannot read the runner's value."
-            )
-    return messages
+    """One message for the lines that set a tool directory from the runner temp folder, ignoring the runner's own value."""
+    found = [
+        (str(number), match[1])
+        for number, line in enumerate(text.splitlines(), 1)
+        if (match := UNKEPT_DIRECTORY.search(line)) and f"${{{match[1]}:-" not in line
+    ]
+    if not found:
+        return []
+    names = list(dict.fromkeys(name for _, name in found))
+    step = "; ".join(
+        f'echo "{name}=${{{name}:-$RUNNER_TEMP/hard-eng-tools/...}}"' for name in names
+    )
+    # shellcheck, which actionlint runs, refuses one redirect for each line (SC2129).
+    step = step if len(names) == 1 else f"{{ {step}; }}"
+    sets, lines = ("sets", "that line") if len(found) == 1 else ("set", "those lines")
+    message = (
+        f"CI tool directories: {relative}:{','.join(number for number, _ in found)} "
+        f"{sets} {', '.join(names)} from the runner temp folder, so a runner that "
+        "exports its own value is ignored and every run downloads the tools again. "
+        f'Replace {lines} with a step whose `run: |` block holds {step} >> "$GITHUB_ENV"; '
+        "then remove an `env:` key that has no lines left; "
+        "a job env mapping cannot read the runner's value."
+    )
+    return [message]
 
 
 def browser_cache_messages(relative: str, text: str) -> list[str]:

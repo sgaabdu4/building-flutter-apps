@@ -9,20 +9,25 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterator
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from xml.parsers.expat import ExpatError
 
 from challenge import shipping_note
 from gate_config import Group
+from process_group import exit_when_stopped, passed_minutes, passed_note
 from shipping import (
     PendingCheck,
     Shipment,
     ShippingError,
+    _pr_url,
+    _pull,
     gh,
     git,
     load_policy,
+    pushed_policy,
+    rebase_step,
     verify,
 )
 from submodules import update_submodules
@@ -53,10 +58,6 @@ def remote_base(root: Path, branch: str | None) -> str | None:
     return revision
 
 
-def interrupted(number: int, _frame: object) -> None:
-    raise SystemExit(128 + number)
-
-
 def run_hard_eng(
     checkout: Path, arguments: list[str], environment: dict[str, str]
 ) -> int:
@@ -81,16 +82,18 @@ def run_hard_eng(
 
 def snapshot_environment(root: Path) -> dict[str, str]:
     environment = os.environ.copy()
+    kept = {"GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT"}
     for name in git(root, "rev-parse", "--local-env-vars").splitlines():
-        environment.pop(name, None)
+        if name not in kept:
+            environment.pop(name, None)
     return environment
 
 
 LOCAL_FILES = {".claude/settings.local.json", "CLAUDE.local.md"}
 
 
-def link_local_files(root: Path, checkout: Path) -> None:
-    """Builds read ignored local .env* files; link them and local settings without reading them."""
+def local_files(root: Path) -> Iterator[tuple[str, bool]]:
+    """Ignored paths of the main checkout that a new worktree gets: (name, copied)."""
     ignored = git(
         root,
         "ls-files",
@@ -105,16 +108,59 @@ def link_local_files(root: Path, checkout: Path) -> None:
     )
     for name in filter(None, ignored.split("\0")):
         source = root / name
-        target = checkout / name
-        if not target.parent.is_dir() or target.exists() or target.is_symlink():
-            continue
         if (
             Path(name).name.startswith(".env") and source.is_file()
         ) or name in LOCAL_FILES:
-            target.symlink_to(source)
+            yield name, False
         elif source.resolve() == hooks.resolve():
             # Git ignores files inside a linked folder, not the link; Husky's folder holds only shims.
+            yield name, True
+
+
+def link_local_files(root: Path, checkout: Path) -> None:
+    """Builds read ignored local .env* files; link them and local settings without reading them."""
+    for name, copied in local_files(root):
+        source = root / name
+        target = checkout / name
+        if not target.parent.is_dir() or target.exists() or target.is_symlink():
+            continue
+        if copied:
             shutil.copytree(source, target, symlinks=True)
+        else:
+            target.symlink_to(source)
+
+
+COMPILED_HOOKS = "!! .hooks/__pycache__/"
+
+
+def placed_by_hard_eng(root: Path, checkout: Path) -> set[str]:
+    """Status lines for what link_local_files put in this worktree."""
+    return {
+        f"!! {name}"
+        for name, copied in local_files(root)
+        if copied or (checkout / name).resolve() == (root / name).resolve()
+    }
+
+
+def changed_copies(root: Path, checkout: Path, folder: str) -> list[str]:
+    """Paths in a copied folder that the main checkout does not hold with the same content."""
+    changed = []
+    for path in sorted((checkout / folder).rglob("*")):
+        name = path.relative_to(checkout)
+        source = root / name
+        if path.is_symlink() or source.is_symlink():
+            same = (
+                path.is_symlink()
+                and source.is_symlink()
+                and path.readlink() == source.readlink()
+            )
+        else:
+            same = path.is_dir() or (
+                source.is_file() and path.read_bytes() == source.read_bytes()
+            )
+        if not same:
+            changed.append(str(name))
+    return changed
 
 
 def prepare_checkout(root: Path, checkout: Path, environment: dict[str, str]) -> None:
@@ -181,8 +227,7 @@ def mutate(
     production: Callable[[Path, Group], set[Path]],
 ) -> int:
     """Mutate committed changes in a snapshot, since Dart mutates source in place."""
-    signal.signal(signal.SIGTERM, interrupted)
-    signal.signal(signal.SIGHUP, interrupted)
+    exit_when_stopped()
     if in_place:
         from mutation import report
 
@@ -229,19 +274,55 @@ def push_base(
     return base
 
 
+def spared(root: Path, revision: str, base: str | None) -> bool:
+    """Say so when a full check passed on this exact commit and base."""
+    minutes = None if base is None else passed_minutes(root, revision, base)
+    if minutes is not None:
+        print(passed_note(minutes), flush=True)
+    return minutes is not None
+
+
+def runner_text(checkout: Path) -> str:
+    """The script text of a pushed revision; an older revision has no runner module."""
+    hooks = checkout / ".hooks"
+    module = hooks / "gate_runner.py"
+    return (hooks / "hard-eng.py").read_text() + (
+        module.read_text() if module.is_file() else ""
+    )
+
+
+def push_check(runner: str, base: str | None, quick: bool) -> list[str]:
+    """The check for a push; a pass that stands in for the full check leaves a quick one."""
+    if quick:
+        return ["check", "--base", str(base), "--quick"]
+    # A pushed revision older than these options runs its full check.
+    narrow = [
+        option
+        for option in ("--without-dependents", "--related-tests")
+        if option in runner
+    ]
+    return ["check", *(["--base", base, *narrow] if base else [])]
+
+
 def pre_push(root: Path) -> int:
-    signal.signal(signal.SIGTERM, interrupted)
-    signal.signal(signal.SIGHUP, interrupted)
-    policy = load_policy(root)
-    assert policy is not None
+    exit_when_stopped()
     started, mutating = time.monotonic(), 0.0
     for line in sys.stdin:
         fields = line.split()
         if len(fields) != 4:
             raise ValueError("Invalid pre-push input")
         revision = fields[1]
+        policy = (
+            load_policy(root)
+            if set(revision) == {"0"}
+            else pushed_policy(root, revision)
+        )
+        assert policy is not None
         base = push_base(root, policy["base"], fields[2], fields[3], revision)
         if set(revision) == {"0"}:
+            continue
+        passed = spared(root, revision, base)
+        if passed and not policy["pre_push_mutation_seconds"]:
             continue
         with suppress(ShippingError):
             if GITHUB_SSH_PREFIX.match(
@@ -255,14 +336,7 @@ def pre_push(root: Path) -> int:
                 )
         environment = snapshot_environment(root)
         with snapshot(root, revision, environment) as checkout:
-            runner = (checkout / ".hooks/hard-eng.py").read_text()
-            # A pushed revision older than these options runs its full check.
-            narrow = [
-                option
-                for option in ("--without-dependents", "--related-tests")
-                if option in runner
-            ]
-            check = ["check", *(["--base", base, *narrow] if base else [])]
+            check = push_check(runner_text(checkout), base, passed)
             if returncode := run_hard_eng(checkout, check, environment):
                 return returncode
             changed = subprocess.run(
@@ -320,20 +394,43 @@ def common_directory(root: Path) -> Path:
     ).resolve()
 
 
+def kept_groups(kept: list[str]) -> list[str]:
+    """Each kept top-level path once; Git lists an ignored folder as one entry, so a file count would mislead."""
+    return list(dict.fromkeys("".join(name.partition("/")[:2]) for name in kept))
+
+
 def unchanged_checkout(shipment: Shipment) -> None:
     target = shipment.root.resolve()
     index_lock = Path(git(target, "rev-parse", "--git-path", "index.lock").strip())
     if (target / index_lock).exists():
         raise ValueError("Cleanup preserves a task with an active Git index lock")
-    if git(
+    main = Path(worktrees(target)[0]["worktree"])
+    own = placed_by_hard_eng(main, target)
+    status = git(
         target,
         "status",
         "--porcelain",
         "--untracked-files=all",
         "--ignored=matching",
         "--ignore-submodules=none",
-    ).strip():
-        raise ValueError("Cleanup preserves modified, untracked or ignored work")
+    )
+    folders = tuple(line for line in own if line.endswith("/"))
+    kept = [
+        line[3:]
+        for line in status.splitlines()
+        if line not in own | {COMPILED_HOOKS} and not line.startswith(folders)
+    ]
+    for folder in folders:
+        kept += changed_copies(main, target, folder[3:])
+    if kept:
+        raise ValueError(
+            "Cleanup preserves modified, untracked or ignored work: "
+            + ", ".join(kept_groups(kept))
+            + ". In that worktree, `git status --ignored --untracked-files=all` lists "
+            "each file under those paths. Delete the generated files that nobody "
+            "needs and move the others out of the worktree. Copy an edited tracked file "
+            "out, then undo its edit. Then run cleanup again."
+        )
     if git(target, "rev-parse", "HEAD").strip() != shipment.head_sha:
         raise ValueError("Cleanup preserves commits added after the verified PR")
 
@@ -433,16 +530,21 @@ def merge(target: Path, plan: Path | None, shipment: Shipment, method: str) -> S
     """Merge the verified head, then prove the merged revision."""
     if shipment.delivery_target == "PR":
         raise ValueError("The plan authorizes PR delivery, not merging")
-    gh(
-        target,
-        "pr",
-        "merge",
-        shipment.pr_url,
-        f"--{method}",
-        *(["--admin"] if shipment.review_bypass else []),
-        "--match-head-commit",
-        shipment.head_sha,
-    )
+    try:
+        gh(
+            target,
+            "pr",
+            "merge",
+            shipment.pr_url,
+            f"--{method}",
+            *(["--admin"] if shipment.review_bypass else []),
+            "--match-head-commit",
+            shipment.head_sha,
+        )
+    except ShippingError as failure:
+        if _pull(target, *_pr_url(shipment.pr_url)).rebaseable is False:
+            raise ShippingError(rebase_step(shipment.base)) from failure
+        raise
     try:
         return verify(target, plan, shipment.pr_url, "delivered")
     except PendingCheck as error:
@@ -458,6 +560,22 @@ def merge(target: Path, plan: Path | None, shipment: Shipment, method: str) -> S
         ) from error
 
 
+def require_stage_options(
+    stage: str, worktree: str | None, merge_method: str | None
+) -> None:
+    if stage not in {"ready", "merge", "delivered", "cleanup"}:
+        raise ValueError("Unknown shipping stage")
+    if stage == "merge" and merge_method != "rebase":
+        raise ValueError(
+            "Hard Eng merges by rebase only; squash and merge commits are refused"
+        )
+    if stage == "cleanup" and not worktree:
+        raise ValueError(
+            "Cleanup needs --worktree <path of the task's worktree>; "
+            "run it from the repository's main checkout."
+        )
+
+
 def run(
     coordinator: Path,
     plan: str | None,
@@ -466,25 +584,23 @@ def run(
     worktree: str | None,
     merge_method: str | None,
 ) -> int:
+    require_stage_options(stage, worktree, merge_method)
     target = Path(worktree).resolve() if worktree else coordinator.resolve()
     if common_directory(coordinator) != common_directory(target):
         raise ValueError("Shipping target belongs to a different repository")
     plan_path = (target / plan).resolve() if plan else None
     if plan_path is not None and not plan_path.is_relative_to(target):
         raise ValueError("Use the selected task's plan inside its worktree")
-    if stage not in {"ready", "merge", "delivered", "cleanup"}:
-        raise ValueError("Unknown shipping stage")
-    if stage == "merge" and merge_method != "rebase":
-        raise ValueError(
-            "Hard Eng merges by rebase only; squash and merge commits are refused"
-        )
     proof_stage = "ready" if stage in {"ready", "merge"} else "delivered"
-    require_current(target)
+    if stage in {"ready", "merge"}:
+        require_current(target)
     shipment = verify(target, plan_path, pr_url, proof_stage)
     if stage in {"ready", "merge"} and (
         note := shipping_note(shipment.root, shipment.head_sha)
     ):
         print(note)
+    if shipment.rule_note:
+        print(shipment.rule_note)
     bypassed = shipment.review_bypass
     if stage == "merge":
         shipment = merge(target, plan_path, shipment, str(merge_method))
