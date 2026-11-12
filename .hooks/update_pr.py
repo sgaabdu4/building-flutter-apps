@@ -80,12 +80,32 @@ def open_pull(root: Path) -> dict[str, JsonValue] | None:
     return next((row for row in rows if row.get("isCrossRepository") is False), None)
 
 
+def run_key(entry: dict[str, JsonValue]) -> tuple[JsonValue, JsonValue]:
+    return entry.get("workflowName"), entry.get("name")
+
+
+def judged_runs(entries: list[dict[str, JsonValue]]) -> list[dict[str, JsonValue]]:
+    """A cancelled run of a workflow check gives no verdict; another run of that check on this head commit gives it."""
+    judged = {
+        run_key(entry)
+        for entry in entries
+        if entry.get("workflowName")
+        and entry.get("conclusion") not in {"CANCELLED", *SKIPPED}
+    }
+    return [
+        entry
+        for entry in entries
+        if entry.get("conclusion") != "CANCELLED" or run_key(entry) not in judged
+    ]
+
+
 def check_state(pull: dict[str, JsonValue], required: list[str] | None = None) -> str:
     rollup = pull.get("statusCheckRollup")
     entries: list[dict[str, JsonValue]] = []
     for item in rollup if isinstance(rollup, list) else []:
         if isinstance(item, dict):
             entries.append(item)
+    entries = judged_runs(entries)
     if any((e.get("conclusion") or e.get("state")) in FAILED for e in entries):
         return "failing"
     named = entries
