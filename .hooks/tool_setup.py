@@ -85,6 +85,10 @@ ROLE_TOOLS: dict[str, dict[str, tuple[str, ...]]] = {
         "shell": ("shellcheck",),
     },
 }
+# Vulture cannot see a route or a model field that a framework calls; uvx installs this scanner, which fails on a finding only with its flag.
+OTHER_ROLE_TOOLS: dict[tuple[str, str], tuple[tuple[str, ...], str]] = {
+    ("python", "dead-code"): (("uvx", "skylos"), "--strict")
+}
 SCANNER_VERSIONS: dict[str, str] = {}
 # The platform package installs without the npm-only preinstall of @jdxcode/mise.
 MISE_PACKAGE = "@jdxcode/mise-{}-{}".format(
@@ -197,14 +201,20 @@ def with_entry_points(command: list[str], directory: Path) -> list[str]:
 
 def require_role_tool(language: str, gate: Gate, command: list[str]) -> None:
     """A required check that writes no report proves itself only by the tool it names."""
-    tool = ROLE_TOOLS.get(language, {}).get(str(gate.get("role")))
+    role = str(gate.get("role"))
+    tool = ROLE_TOOLS.get(language, {}).get(role)
     if tool is None or gate.get("report"):
         return
     words = [
         Path(word.strip("'\"();")).name.split("@", 1)[0]
         for word in " ".join(command).split()
     ]
-    if not any(tuple(words[at : at + len(tool)]) == tool for at in range(len(words))):
+    other, flag = OTHER_ROLE_TOOLS.get((language, role), (tool, ""))
+    if not any(
+        tuple(words[at : at + len(accepted)]) == accepted
+        for accepted in (tool, *([other] if flag in words else []))
+        for at in range(len(words))
+    ):
         raise ValueError(
             f"{gate['name']}: the {gate['role']} check must run `{' '.join(tool)}`; "
             f"this command does not name it: {' '.join(gate['command'])}"
