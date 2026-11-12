@@ -15,13 +15,41 @@ from gate_config import (
     ALL_ZERO_OBJECT_ID,
     changed_files,
     generated_sources,
-    initial_base,
+    initial_point,
 )
 from plans import _is_test as is_test_path
 from plans import default_branch_point
 
 DISABLED_CALL = re.compile(r"\.disabled\(")
 QUOTE_OR_BACKSLASH = re.compile(r"[\\'\"]")
+UI_SUFFIXES = (
+    ".css",
+    ".scss",
+    ".less",
+    ".html",
+    ".vue",
+    ".svelte",
+    ".astro",
+    ".jsx",
+    ".tsx",
+    ".js",
+    ".ts",
+    ".dart",
+    ".swift",
+)
+UI_MARKS = (
+    "-[#",
+    "-[rgb",
+    "-[hsl",
+    "-[oklch",
+    "Color(0x",
+    "Color.from",
+    "Colors.",
+    "Color(red",
+    "Color(.sRGB",
+    "Color(.displayP3",
+    "colorLiteral",
+)
 TEST_ATTRIBUTE = re.compile(r"@(?:Test|Suite)\s*\(")
 DIFF_HUNK_HEADER = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)")
 CONTROL_KEYWORD_BEFORE = re.compile(r"\b(if|while|for|with)\s*$")
@@ -240,11 +268,6 @@ def comment_blocks(path: Path, text: str | None = None) -> list[tuple[int, int, 
 
 def installed_blocks(root: Path, base: str, name: str) -> set[tuple[str, ...]]:
     """Blocks a file held before the change that installs Hard Eng: old code its tools may touch."""
-    if (
-        not (root / ".hooks/hard-eng.py").is_file()
-        or git_file(root, base, ".hooks/hard-eng.py") is not None
-    ):
-        return set()
     text = git_file(root, base, name)
     if text is None:
         return set()
@@ -271,11 +294,14 @@ def validate_comments(root: Path, base: str | None) -> None:
         and not (root / name).is_symlink()
     )
     skipped = generated_sources(root, sources)
+    installing = (root / ".hooks/hard-eng.py").is_file() and (
+        git_file(root, base, ".hooks/hard-eng.py") is None
+    )
     found: list[str] = []
     for name in sources:
         if name in skipped:
             continue
-        older = installed_blocks(root, base, name)
+        older = installed_blocks(root, base, name) if installing else set()
         lines = (root / name).read_text(errors="replace").splitlines()
         found += [
             f"{name}:{start} holds a {length}-line comment block"
@@ -291,21 +317,36 @@ def validate_comments(root: Path, base: str | None) -> None:
 
 
 PYTHON_OFF = re.compile(
-    r"#\s*(noqa|type:\s*ignore|pyrefly:\s*ignore|pyright:\s*ignore|pylint:\s*disable"
-    r"|pragma:\s*no cover)|\b(pytest\.)?mark\.(skip(if)?|xfail)\b|pytest\.(skip|xfail)\("
+    r"#\s*((?:(?:ruff|flake8)\s*:\s*)?(?i:noqa)|type:\s*ignore|pyrefly:\s*ignore"
+    r"|pyright:\s*ignore|pyre-(?:ignore|fixme)|pylint:\s*disable|pragma:\s*no cover"
+    r"|ruff:\s*(?:file-ignore|ignore|disable)\["
+    r"|(?:ruff:\s*)?isort:\s*(?:skip_file|skip|off)\b|fmt:\s*(?:off|skip)\b|yapf:\s*disable\b)|\b(pytest\.)?mark\.(skip(if)?|xfail)\b|pytest\.(skip|xfail)\("
+    r"|\bunittest\.([Ss]kip\w*|expectedFailure)\b|\bskipTest\(|\bimportorskip\("
+    r"|^\s*@skip(If|Unless)?\(|^__test__\s*=\s*False\b|\braise\s+SkipTest\b"
+    r"|^\s*from\s+pytest\s+import\s[^#]*?\b(skip|xfail|importorskip)\b"
 )
 SCRIPT_OFF = re.compile(
     r"eslint-disable|@ts-(ignore|expect-error|nocheck)|biome-ignore"
-    r"|\b(it|test|describe|suite)\.(skip|only)\(|\b(xit|xdescribe|fit|fdescribe)\("
+    r"|\b(it|test|describe|suite)(?:\.(?:concurrent|sequential|shuffle))*\.(skip|only|fixme|todo|fail|failing|fails|if|runIf)(If)?(?:[.(]|\b)"
+    r"|\b(xit|xtest|xdescribe|fit|fdescribe)\("
     r"|(/\*|//)\s*(istanbul|c8|v8) ignore"
 )
-DART_OFF = re.compile(r"//\s*ignore(_for_file)?:|\bskip:(?=\s*(?!false\b)\S)|@Skip\(")
+DART_OFF = re.compile(r"//\s*ignore(_for_file)?:|@Skip\(")
 SWIFT_OFF = re.compile(
     r"swift-format-ignore|\bXCTSkip|<(Skipped|Selected)Tests>"
-    r'|"(skipped|selected)Tests"|\bskipped\s*=\s*"YES"'
+    r'|"(skipped|selected)Tests"|\bskipped\s*=\s*"YES"|\.enabled\(if:\s*false\)'
 )
-SECURITY_OFF = re.compile(r"\bno(semgrep|sem)\b|gitleaks:allow", re.IGNORECASE)
-SCAN_IGNORES = {".gitleaksignore", ".semgrepignore"}
+TEST_OFF = {
+    ".dart": r"\b(skip|solo):(?=\s*(?!false\b)\S)",
+    **dict.fromkeys(JAVASCRIPT, r"\bskip:\s*(true\b|['\"`])|\bonly:\s*true\b"),
+}
+SECURITY_OFF = re.compile(
+    r"\bno(semgrep|sem)\b|gitleaks:allow|jscpd:ignore|fallow-ignore"
+    r"|shellcheck\s+disable=|zizmor:\s*ignore|coverage:ignore-",
+    re.IGNORECASE,
+)
+RETRY_WORDS = ("retry", "Retry", "retries", "rerun", "flaky")
+SCAN_IGNORES = {".gitleaksignore", ".semgrepignore", ".gitleaks.toml"}
 UNOWNED = (".hooks/", ".agents/", ".claude/")
 
 
@@ -330,6 +371,66 @@ def disabled_traits(text: str) -> set[int]:
     return lines
 
 
+def disabled_classes(root: Path, name: str, added: list[tuple[int, str]]) -> list[str]:
+    """Indented `__test__ = False` marks whose class body holds a test function."""
+    marks = [
+        n
+        for n, t in added
+        if "__test__" in t
+        and t[:1] in (" ", "\t")
+        and "".join(t.split()) == "__test__=False"
+    ]
+    if not marks:
+        return []
+    lines = (root / name).read_text(errors="replace").splitlines()
+    found = []
+    for number in marks:
+        indent = len(lines[number - 1]) - len(lines[number - 1].lstrip())
+        head = number - 2
+        while head >= 0 and (
+            not lines[head].strip()
+            or len(lines[head]) - len(lines[head].lstrip()) >= indent
+        ):
+            head -= 1
+        if head < 0 or not lines[head].lstrip().startswith("class "):
+            continue
+        size = len(lines[head]) - len(lines[head].lstrip())
+        body = []
+        for line in lines[head + 1 :]:
+            if line.strip() and len(line) - len(line.lstrip()) <= size:
+                break
+            body.append(line.strip())
+        if any(line.startswith(("def test", "async def test")) for line in body):
+            found.append(f"{name}:{number} adds '__test__ = False'")
+    return found
+
+
+def off_hit(pattern: re.Pattern[str], text: str, in_test: bool) -> re.Match[str] | None:
+    """The first match, leaving out a skip name used as a bare value outside a test file."""
+    for hit in pattern.finditer(text):
+        bare = pattern is SCRIPT_OFF and hit[2] and hit[0][-1:] not in "(."
+        if in_test or not bare:
+            return hit
+    return None
+
+
+def marks_in_file(root: Path, name: str, added: list[tuple[int, str]]) -> list[str]:
+    """Switch-offs that only the whole file shows: Swift traits and Python test classes."""
+    if name.endswith(".py"):
+        marked = any("__test__" in text for _, text in added)
+        return (
+            disabled_classes(root, name, added)
+            if marked and (root / name).is_file()
+            else []
+        )
+    if not name.endswith(".swift") or not (root / name).is_file():
+        return []
+    traits = disabled_traits((root / name).read_text(errors="replace"))
+    return [
+        f"{name}:{number} adds '.disabled('" for number, _ in added if number in traits
+    ]
+
+
 def switch_off_pattern(name: str) -> re.Pattern[str] | None:
     suffix = Path(name).suffix
     if suffix == ".py":
@@ -341,7 +442,7 @@ def switch_off_pattern(name: str) -> re.Pattern[str] | None:
     return SCRIPT_OFF if suffix in JAVASCRIPT else None
 
 
-def diff_base(root: Path, base: str) -> str:
+def diff_base(root: Path, base: str) -> tuple[str, bool]:
     head = subprocess.run(
         ["git", "rev-parse", "--verify", "--quiet", "HEAD"],
         cwd=root,
@@ -349,7 +450,9 @@ def diff_base(root: Path, base: str) -> str:
         check=False,
     )
     unborn = base == "HEAD" and head.returncode == 1
-    return initial_base(root) if unborn or ALL_ZERO_OBJECT_ID.fullmatch(base) else base
+    if unborn or ALL_ZERO_OBJECT_ID.fullmatch(base):
+        return initial_point(root)
+    return base, False
 
 
 def header_path(text: str) -> str:
@@ -360,27 +463,23 @@ def header_path(text: str) -> str:
     return text[2:]
 
 
-def diff_lines(
-    root: Path, base: str
+DIFF = (
+    "git",
+    "-c",
+    "core.quotepath=off",
+    "diff",
+    "-U0",
+    "--no-color",
+    "--no-ext-diff",
+    "--src-prefix=a/",
+    "--dst-prefix=b/",
+)
+
+
+def changed_lines(
+    diff: str,
 ) -> tuple[dict[str, list[tuple[int, str]]], dict[str, list[tuple[int, str]]]]:
-    """Added and removed (line number, text) pairs per file; untracked files count as added."""
-    diff = subprocess.check_output(
-        [
-            "git",
-            "-c",
-            "core.quotepath=off",
-            "diff",
-            "-U0",
-            "--no-color",
-            "--src-prefix=a/",
-            "--dst-prefix=b/",
-            diff_base(root, base),
-            "--",
-        ],
-        cwd=root,
-        text=True,
-        errors="replace",
-    )
+    """Added and removed (line number, text) pairs per file of a zero-context diff."""
     added: dict[str, list[tuple[int, str]]] = {}
     removed: dict[str, list[tuple[int, str]]] = {}
     name, old, new, in_hunk = "", 0, 0, False
@@ -402,6 +501,17 @@ def diff_lines(
             and line[4:] != "/dev/null"
         ):
             name = header_path(line[4:])
+    return added, removed
+
+
+def diff_lines(
+    root: Path, base: str
+) -> tuple[dict[str, list[tuple[int, str]]], dict[str, list[tuple[int, str]]]]:
+    """Added and removed (line number, text) pairs per file; untracked files count as added."""
+    diff = subprocess.check_output(
+        [*DIFF, base, "--"], cwd=root, text=True, errors="replace"
+    )
+    added, removed = changed_lines(diff)
     untracked = subprocess.check_output(
         ["git", "ls-files", "--others", "--exclude-standard", "-z"],
         cwd=root,
@@ -420,7 +530,12 @@ def assertion_lines(name: str, lines: list[tuple[int, str]]) -> list[tuple[int, 
         if name.endswith(".py")
         else ("assert", "expect(", "XCTAssert", "#require(")
     )
-    return [(n, text) for n, text in lines if any(word in text for word in words)]
+    mark = "#" if name.endswith(".py") else "//"
+    return [
+        (n, text)
+        for n, text in lines
+        if any(word in text for word in words) and not text.lstrip().startswith(mark)
+    ]
 
 
 WORD = re.compile(r"[A-Za-z_]\w*")
@@ -431,6 +546,15 @@ TEST_START = re.compile(
 PYTHON_FUNCTION = re.compile(r"^\s*(?:async\s+)?def\s")
 PYTHON_BLOCK = re.compile(r"^\s*(?:(?:async\s+)?def|class)\s")
 IMPORT = re.compile(r"^\s*(import|from|export|use)\b|\brequire\(")
+
+
+def import_or_empty(text: str) -> bool:
+    """A line with no text, or an import line that names no test (a Swift `@testable` prefix aside)."""
+    if any(mark in text for mark in (".spec", ".test", "_test", " test_", "Test")):
+        return not text.strip()
+    return not text.strip() or bool(IMPORT.search(text.replace("@testable ", "", 1)))
+
+
 SYNTAX = {"import", "from", "as", "export", "use", "require", "const", "let", "var"}
 DEFINITION = re.compile(
     r"\b(?:def|class|function|fn|struct|enum|trait|interface|mixin|extension)\s+(\w+)"
@@ -563,7 +687,7 @@ def lost_assertions(
 def security_switch_offs(
     root: Path, added: dict[str, list[tuple[int, str]]]
 ) -> list[str]:
-    """Inline markers and ignore entries in any file hide Semgrep or Gitleaks findings."""
+    """Inline markers, ignore entries and test retries in any file hide a failing check."""
     names = sorted(name for name in added if not name.startswith(UNOWNED))
     skipped = generated_sources(root, names)
     found: list[str] = []
@@ -575,12 +699,43 @@ def security_switch_offs(
                 found.append(f"{name}:{number} adds {hit[0]!r}")
             elif ignore and entry and not entry.startswith("#"):
                 found.append(f"{name}:{number} adds {entry!r}")
+            elif any(word in text for word in RETRY_WORDS):
+                from retry_forms import retry_form, table_retry
+
+                if form := retry_form(name, text) or table_retry(
+                    root / name, number, text
+                ):
+                    found.append(f"{name}:{number} adds {form!r}")
     return found
+
+
+def ui_candidate(text: str) -> bool:
+    return ("transition" in text and "all" in text) or any(
+        mark in text for mark in UI_MARKS
+    )
+
+
+def ui_source_check(root: Path, added: dict[str, list[tuple[int, str]]]) -> None:
+    marked = {
+        name: [(n, t) for n, t in lines if ui_candidate(t)]
+        for name, lines in added.items()
+        if name.endswith(UI_SUFFIXES)
+    }
+    if candidates := {name: lines for name, lines in marked.items() if lines}:
+        from ui_rules import ui_findings
+
+        if found := ui_findings(root, candidates):
+            raise ValueError(
+                "HE-UI-SOURCE: Added UI lines must hold no transition on every property "
+                "and no colour literal outside a theme or token file. "
+                + "; ".join(found)
+            )
 
 
 def validate_suppressions(root: Path, base: str | None) -> None:
     try:
-        added, removed = diff_lines(root, base or default_branch_point(root) or "HEAD")
+        point, empty = diff_base(root, base or default_branch_point(root) or "HEAD")
+        added, removed = diff_lines(root, point)
     except subprocess.CalledProcessError as error:
         raise ValueError(
             "Cannot verify suppression scope; fetch or supply a valid Git --base"
@@ -598,18 +753,17 @@ def validate_suppressions(root: Path, base: str | None) -> None:
         pattern = switch_off_pattern(name)
         if name in skipped or pattern is None:
             continue
+        in_test = is_test_path(PurePosixPath(name))
+        tested = in_test and TEST_OFF.get(Path(name).suffix)
         found += [
             f"{name}:{number} adds {hit[0].strip()!r}"
             for number, text in added.get(name, [])
-            if (hit := pattern.search(text))
+            if (
+                hit := off_hit(pattern, text, in_test)
+                or (tested and re.search(tested, text))
+            )
         ]
-        if name.endswith(".swift") and (root / name).is_file():
-            traits = disabled_traits((root / name).read_text(errors="replace"))
-            found += [
-                f"{name}:{number} adds '.disabled('"
-                for number, _ in added.get(name, [])
-                if number in traits
-            ]
+        found += marks_in_file(root, name, added.get(name, []))
         if is_test_path(PurePosixPath(name)):
             gained += len(assertion_lines(name, added.get(name, [])))
             blocks += [(name, b) for b in removed_blocks(removed.get(name, []))]
@@ -621,11 +775,16 @@ def validate_suppressions(root: Path, base: str | None) -> None:
         found.append(
             f"tests lose {len(lost) - gained} assertion lines net "
             f"({len(lost)} removed, {gained} added); removed at {', '.join(lost)}. "
-            "To remove an unneeded test, add `Removed test: <path> :: <test name> :: "
-            "<what still proves it or why it is unneeded>` to the plan"
+            "To remove a whole test, add `Removed test: <path> :: <test name> :: "
+            "<what still proves it or why it is unneeded>` to the plan; the test name "
+            "is the function name for a Python test and the text between the quotes "
+            "for it(), test() and testWidgets(). An assertion in a test that stays "
+            "must stay or get an equal check"
         )
     if found:
         raise ValueError(
             "HE-NO-SWITCH-OFF: A change must not switch a check off: fix the cause instead of "
-            "suppressing, skipping or deleting the check. " + "; ".join(found)
+            "suppressing, skipping, retrying or deleting the check. " + "; ".join(found)
         )
+    if not empty:
+        ui_source_check(root, added)

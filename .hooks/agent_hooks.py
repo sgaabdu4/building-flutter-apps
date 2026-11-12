@@ -1,28 +1,23 @@
 """Native context/completion responses; Git records scope, never gate results."""
 
-import hashlib
 import json
 import os
 import re
 import signal
 import subprocess
 import sys
-import tempfile
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 
 from gate_config import JsonObject, JsonValue, nonproduction_source, repository_files
+from project_files import keeping
 
 HOOK_IDENTIFIER = re.compile(r"[A-Za-z0-9_-]{1,200}")
 FAILED_COMMAND_LINE = re.compile(
     r"FAIL (\S+?)(?: \(exit \d+;|: [^\n]*; elapsed)(?:[^\n]*? @ (\S+))?"
 )
-COPILOT_HOOK_COMMAND = re.compile(
-    r'(?:bash|sh) (?:"\$\((?:env -u GIT_DIR )?git rev-parse --show-toplevel\)/)?'
-    r'\.hard-eng/(?:bootstrap|hook)\.sh"? copilot(?: [a-z]+)?'
-)
 
-GATE_OUTPUT_LIMIT = 8000
 # The HE Build handoff line, not a quoted or negated mention of it.
 SHIP_CLAIM = re.compile(r"^[*_ ]*Ready for ship[*_]*\s*[—–-]", re.MULTILINE)
 
@@ -239,19 +234,21 @@ def owned_hook_entry(
 
 
 HOOK_TIMEOUTS = {"session": 60, "stop": 3600}
-POLL_COMMAND = 'python3 "$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/polling.py" 2>/dev/null || true'
+OLD_TOOL_COMMAND = 'python3 "$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/{}.py" 2>/dev/null || true'
+TOOL_COMMAND = 'python3 "$CLAUDE_PROJECT_DIR/.hooks/{}.py" 2>/dev/null || true'
+POLL_COMMAND = TOOL_COMMAND.format("polling")
 POLL_HOOK: JsonObject = {
     "matcher": "Bash",
     "hooks": [{"type": "command", "command": POLL_COMMAND, "timeout": 5}],
 }
-PREVIEW_COMMAND = 'python3 "$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/previews.py" 2>/dev/null || true'
+PREVIEW_COMMAND = TOOL_COMMAND.format("previews")
 PREVIEW_HOOK: JsonObject = {
     "matcher": "Artifact",
     "hooks": [{"type": "command", "command": PREVIEW_COMMAND, "timeout": 5}],
 }
 CLAUDE_TOOL_HOOKS = [POLL_HOOK, PREVIEW_HOOK]
-# Its own script: the hard-eng.py entry point loads every gate module first.
-FAILURE_COMMAND = 'python3 "$(git rev-parse --show-toplevel 2>/dev/null)/.hooks/failures.py" 2>/dev/null || true'
+# Its own script: hard-eng.py loads gate_runner, which loads every gate module.
+FAILURE_COMMAND = TOOL_COMMAND.format("failures")
 FAILURE_HOOK: JsonObject = {
     "hooks": [{"type": "command", "command": FAILURE_COMMAND, "timeout": 5}]
 }
@@ -259,6 +256,15 @@ CODEX_HOOK_STATUS = {
     "session": "Hard Eng: updating project setup",
     "stop": "Hard Eng: verifying changes",
 }
+
+
+def _old_tool_entry(script: str, matcher: str | None) -> JsonObject:
+    handler: JsonObject = {
+        "type": "command",
+        "command": OLD_TOOL_COMMAND.format(script),
+        "timeout": 5,
+    }
+    return {"matcher": matcher, "hooks": [handler]} if matcher else {"hooks": [handler]}
 
 
 def _remove_owned_entry(hooks: JsonObject, native: str, owned: JsonObject) -> None:
@@ -286,6 +292,13 @@ def remove_routine_hooks(current: JsonObject, agent: str, command: str) -> None:
             "hooks": [{"type": "command", "command": call, "timeout": 10}]
         }
         _remove_owned_entry(hooks, native, owned)
+    if agent == "claude":
+        for native, script, matcher in (
+            ("PreToolUse", "polling", "Bash"),
+            ("PreToolUse", "previews", "Artifact"),
+            ("PostToolUseFailure", "failures", None),
+        ):
+            _remove_owned_entry(hooks, native, _old_tool_entry(script, matcher))
     if agent == "codex":
         for event in CODEX_HOOK_STATUS:
             _remove_owned_entry(
@@ -351,55 +364,6 @@ def reject_attribution(
             f"{where} has Claude attribution, which .claude/settings.json turns off: "
             f"{found.group().strip()}"
         )
-
-
-def retired_copilot_entry(native: str, entry: JsonValue, command: str) -> bool:
-    events = {
-        "sessionStart": ("session", 3600),
-        "postToolUseFailure": ("failure", 10),
-        "agentStop": ("stop", 3600),
-        "postToolUse": ("tool", 10),
-    }
-    event, timeout = events.get(native, ("", 0))
-    if entry == {
-        "type": "command",
-        "bash": f"{command} {event} copilot",
-        "timeoutSec": timeout,
-    }:
-        return True
-    return (
-        isinstance(entry, dict)
-        and entry.keys() <= {"type", "bash", "timeoutSec"}
-        and entry.get("type") == "command"
-        and isinstance(call := entry.get("bash"), str)
-        and COPILOT_HOOK_COMMAND.fullmatch(call) is not None
-    )
-
-
-def retire_copilot_hooks(root: Path, command: str) -> list[str]:
-    from update import contained
-
-    retired: list[str] = []
-    for target in root.glob(".github/hooks/*.json"):
-        name = str(target.relative_to(root))
-        current: JsonObject = json.loads(target.read_text())
-        wiring = current.get("hooks")
-        if not isinstance(wiring, dict):
-            raise TypeError(f"Conflicting hooks in {name}; expected an object")
-        if current.keys() - {"version", "hooks"} or any(
-            not isinstance(entries, list)
-            or any(
-                not retired_copilot_entry(native, entry, command) for entry in entries
-            )
-            for native, entries in wiring.items()
-        ):
-            raise ValueError(
-                f"Harness migration required: {name} contains project hooks; preserve their checks in Claude or Codex and remove the retired registration before setup."
-            )
-        if target.is_symlink() or not contained(root, target):
-            raise ValueError(f"Preserve linked retired harness config: {name}")
-        retired.append(name)
-    return retired
 
 
 CLAUDE_IMPORT = "<!-- hard-eng:start -->\n@AGENTS.md\n<!-- hard-eng:end -->\n\n"
@@ -473,17 +437,25 @@ def session_state(root: Path, payload: JsonObject) -> Path | None:
     return root / ".hard-eng/sessions" / (identifier + ".json")
 
 
-def dirty_files(root: Path, base: str) -> dict[str, str]:
+def untracked(root: Path) -> list[str]:
+    return subprocess.check_output(
+        ["git", "ls-files", "-z", "--others", "--exclude-standard"], cwd=root, text=True
+    ).split("\0")
+
+
+def dirty_files(
+    root: Path, base: str, others: Callable[[], list[str]] | None = None
+) -> dict[str, str]:
     """Content hash of each file differing from base; absent files hash to ''."""
     names = subprocess.check_output(
         ["git", "diff", "--name-only", "-z", base, "--"], cwd=root, text=True
     ).split("\0")
-    names += subprocess.check_output(
-        ["git", "ls-files", "-z", "--others", "--exclude-standard"], cwd=root, text=True
-    ).split("\0")
+    names += others() if others else untracked(root)
     digests = dict.fromkeys(set(names) - {""}, "")
     for name in digests:
         if (root / name).is_file():
+            import hashlib
+
             with (root / name).open("rb") as file:
                 digests[name] = hashlib.file_digest(file, "sha256").hexdigest()
     return digests
@@ -491,12 +463,15 @@ def dirty_files(root: Path, base: str) -> dict[str, str]:
 
 def gate_status(root: Path) -> str:
     """Say whether `check` can start, so an install never looks active while broken."""
-    from gate_config import load_groups
-    from update import SOURCE_FILE, install_paths
+    from gate_config import SOURCE_FILE, load_groups
 
     try:
-        load_groups(root)
+        load_groups(root, starting=True)
         status = "Gates: ok."
+    except ModuleNotFoundError as error:
+        if error.name != "yaml":
+            raise
+        status = "Gates: not checked at session start — this python3 has no PyYAML; `check` installs it and runs them."
     except (
         OSError,
         ValueError,
@@ -504,7 +479,9 @@ def gate_status(root: Path) -> str:
         KeyError,
         subprocess.SubprocessError,
     ) as error:
-        status = "Gates: not runnable — " + " ".join(str(error).split())
+        first, _, rest = str(error).strip().partition("\n")
+        more = " (`python3 .hooks/hard-eng.py check` prints the rest)" if rest else ""
+        status = "Gates: not runnable — " + " ".join(first.split()) + more
     try:
         pending: list[str] = [
             line[3:]
@@ -528,6 +505,8 @@ def gate_status(root: Path) -> str:
     except (OSError, subprocess.SubprocessError):
         pending = []
     if pending and (root / SOURCE_FILE).exists():
+        from update import install_paths
+
         status += (
             " Uncommitted Hard Eng paths block updates + new worktrees; commit: "
             + install_paths(pending)
@@ -537,25 +516,35 @@ def gate_status(root: Path) -> str:
 
 def record_session(root: Path, payload: JsonObject) -> bool:
     """Save the session's Git base before a background update can move HEAD."""
+    from project_files import background, clean_tree
+
     state = session_state(root, payload)
-    if state is None:
+    if state is None or state.exists():
         return True
+    failures = (OSError, subprocess.SubprocessError)
     try:
-        revision = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=root, text=True
-        ).strip()
+        tree = clean_tree(root)
+        if tree is None:
+            return False
         state.parent.mkdir(parents=True, exist_ok=True)
-        if not state.exists():
-            dirty = dirty_files(root, revision)
-            state.write_text(json.dumps({"base": revision, "dirty": dirty}))
-    except (OSError, subprocess.SubprocessError):
+        others = None if tree[1] else background(lambda: untracked(root), failures)
+        dirty = dirty_files(root, tree[0], others) if others else {}
+        state.write_text(json.dumps({"base": tree[0], "dirty": dirty}))
+    except failures:
         return False
     return True
 
 
 def session_context(root: Path, payload: JsonObject) -> str:
+    from project_files import background
     from update_runner import failed_update, start_update
 
+    failures = (OSError, ValueError, subprocess.SubprocessError)
+    gates, scan = background(lambda: gate_status(root), (*failures, TypeError)), None
+    if os.name == "posix":
+        from process_group import process_table, stop_idle_codex_brokers
+
+        scan = background(process_table, failures)
     recorded = record_session(root, payload)
     try:
         messages = [start_update(root)]
@@ -565,13 +554,11 @@ def session_context(root: Path, payload: JsonObject) -> str:
 
     if note := restore_note(root):
         messages.append(note)
-    messages.append(gate_status(root))
-    if os.name == "posix":
-        from process_group import stop_idle_codex_brokers
-
+    messages.append(gates())
+    if scan is not None:
         try:
-            brokers, processes = stop_idle_codex_brokers()
-        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            brokers, processes = stop_idle_codex_brokers(scan())
+        except failures as error:
             messages.append(f"Idle Codex broker cleanup failed: {error}")
             brokers = processes = 0
         if brokers:
@@ -596,9 +583,7 @@ def completion_notice(agent: str | None, output: str) -> JsonObject:
     if agent not in {"claude", "codex"}:
         return {}
     lines = output.splitlines()
-    if lines and lines[-1].startswith(
-        ("Hard Eng: planning checks passed", "Hard Eng: build checks passed")
-    ):
+    if lines and lines[-1].startswith("Hard Eng: ") and " checks passed" in lines[-1]:
         return {"systemMessage": lines[-1]}
     return {}
 
@@ -648,29 +633,33 @@ def passed_notice(
     return {"systemMessage": notice} if notice else completion_notice(agent, output)
 
 
-def bounded(text: str, *, tail: bool = False) -> str:
-    if len(text) <= GATE_OUTPUT_LIMIT:
-        return text
-    note = "\n[gate output cut; rerun check for the full log]\n"
-    return note + text[-GATE_OUTPUT_LIMIT:] if tail else text[:GATE_OUTPUT_LIMIT] + note
-
-
 def failure_summary(log: str) -> str:
     """Failed gate names, then the first failing gate's output from its start."""
+    from debt import bounded, keep_debt_lines
+
     failures = FAILED_COMMAND_LINE.findall(log)
+    failures = [f for f in failures if f"\nDEBT {f[0]} @ {f[1]}:" not in log]
     if not failures:
         return bounded(log, tail=True)
-    heading = "Failed gates: " + ", ".join(dict.fromkeys(n for n, _ in failures)) + "\n"
+    named = {p for _, p in failures} - {".", ""}
+    labels = [f"{n} @ {p}" if named else n for n, p in failures]
+    heading = "Failed gates: " + ", ".join(dict.fromkeys(labels)) + "\n"
     name, package = failures[0]
     owner = re.escape(f"{package}/" if package else "") or r"(?:\S*/)?"
     start = re.search(rf"OUTPUT {owner}{re.escape(name)}[^\n]*\n", log)
     if start is None:
         return heading + bounded(log, tail=True)
     body = log[start.end() :]
-    tail = f"[^\n]* @ {re.escape(package)}(?!\\S)" if package else ""
-    finished = re.escape(name) + r"(?: \(exit|:)" + tail
+    where = f" @ {re.escape(package)}" if package else r"(?: @ \S+)?"
+    finished = re.escape(name) + r"(?: \(exit|:)[^\n]*" + where + r"(?!\S)"
     end = re.search(rf"(?m)^(?:CHECK|OUTPUT) \S*/\S+|(?:PASS|FAIL) {finished}", body)
-    return heading + bounded(body[: end.start() if end else None])
+    cut = end.start() if end else len(body)
+    beyond = rf"(?m)^FAIL {re.escape(name)}{where}: (?:findings beyond|\d+ recorded lines are fixed).*\n(?:  .*\n)*"
+    return (
+        heading
+        + bounded(keep_debt_lines(body[:cut], log))
+        + "".join(re.findall(beyond, body[cut:])[:1])
+    )
 
 
 def show_decisions(root: Path, names: list[str], state: Path | None) -> str:
@@ -696,34 +685,40 @@ def show_decisions(root: Path, names: list[str], state: Path | None) -> str:
 
 
 def run_check(root: Path, base: str, building: bool) -> tuple[int, str]:
+    import tempfile
+
     with tempfile.TemporaryFile() as log:
-        check = subprocess.Popen(
-            [
-                sys.executable,
-                str(root / ".hooks/hard-eng.py"),
-                "check",
-                "--quick",
-                "--base",
-                base,
-                *(["--plan-stage", "Ready"] if building else []),
-            ],
-            cwd=root,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+        check: subprocess.Popen[bytes] | None = None
 
         def stop_check(signum: int, _frame: object) -> None:
+            if check is None:
+                raise SystemExit(128 + signum)
             with suppress(ProcessLookupError, PermissionError):
                 os.killpg(check.pid, signum)
 
         # An interrupted Stop hook must not leave the check's tools running.
         previous = signal.signal(signal.SIGTERM, stop_check)
         try:
+            check = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(root / ".hooks/hard-eng.py"),
+                    "check",
+                    "--quick",
+                    "--base",
+                    base,
+                    *(["--plan-stage", "Ready"] if building else []),
+                ],
+                cwd=root,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
             returncode = check.wait(timeout=3500)
         except subprocess.TimeoutExpired:
             stop_check(signal.SIGKILL, None)
-            check.wait()
+            if check is not None:
+                check.wait()
             raise
         finally:
             signal.signal(signal.SIGTERM, previous)
@@ -760,30 +755,35 @@ def saved_session(state: Path | None) -> tuple[str, JsonObject]:
     return base, before
 
 
-def session_scope(root: Path, base: str) -> str:
-    """Commits already on a remote passed pre-push and are not this session's change."""
+def session_scope(root: Path, base: str, recorded: bool = True) -> tuple[str, str]:
+    """Commits already on a remote passed pre-push and are not this session's change; the commit of HEAD comes with the base."""
+    listing = ["rev-list", "--first-parent", "--parents", "HEAD", "--not", "--remotes"]
     unpushed = subprocess.check_output(
-        ["git", "rev-list", "--first-parent", "HEAD", "--not", "--remotes"],
-        cwd=root,
-        text=True,
-    ).split()
-    pushed = unpushed[-1] + "^" if unpushed else "HEAD"
-    point = subprocess.run(
-        ["git", "rev-parse", "--verify", "-q", pushed],
-        cwd=root,
-        check=False,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    if not point:
-        return base
+        ["git", *listing], cwd=root, text=True
+    ).splitlines()
+    if unpushed:
+        head, point = unpushed[0].split()[0], "".join(unpushed[-1].split()[1:2])
+    else:
+        head = point = subprocess.run(
+            ["git", "rev-parse", "--verify", "-q", "HEAD"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    if not point or point == base:
+        return base, head
+    if not recorded:
+        return point, head
     older = subprocess.run(
         ["git", "merge-base", "--is-ancestor", point, base],
         cwd=root,
         check=False,
         capture_output=True,
     )
-    return base if older.returncode == 0 else point
+    if older.returncode > 1:
+        raise subprocess.SubprocessError(f"Git cannot read the session base {base}")
+    return (base if older.returncode == 0 else point), head
 
 
 def with_freshness(root: Path, output: JsonObject) -> JsonObject:
@@ -822,22 +822,27 @@ def paused_turn(payload: JsonObject) -> JsonObject | None:
     return None
 
 
+@keeping("listings")
 def completion(root: Path, payload: JsonObject, agent: str | None = None) -> JsonObject:
     from plans import planning_feedback, planning_only
+    from project_files import background
 
     if (paused := paused_turn(payload)) is not None:
         return paused
     state = session_state(root, payload)
     recorded = state is not None and state.exists()
     base, before = saved_session(state)
+    failures = (OSError, ValueError, TypeError, subprocess.SubprocessError)
     try:
-        base = subprocess.check_output(
-            ["git", "rev-parse", "--verify", "--end-of-options", f"{base}^{{commit}}"],
-            cwd=root,
-            text=True,
-        ).strip()
-        base = session_scope(root, base)
-        current = dirty_files(root, base)
+        others = background(lambda: untracked(root), failures)
+        # A recorded session holds the full commit ID that Git gave at its start.
+        if len(base) not in (40, 64) or not base.isalnum():
+            verify = ["rev-parse", "--verify", "--end-of-options", f"{base}^{{commit}}"]
+            base = subprocess.check_output(
+                ["git", *verify], cwd=root, text=True
+            ).strip()
+        base, head = session_scope(root, base, recorded)
+        current = dirty_files(root, base, others)
         changed = "".join(
             f"{name}\n"
             for name, digest in current.items()
@@ -858,10 +863,11 @@ def completion(root: Path, payload: JsonObject, agent: str | None = None) -> Jso
                 root,
                 {"systemMessage": notice + ". Planning-only; no code checks run."},
             )
+        tip = None if any(others()) else head
         return checked_changes(
-            root, payload, state, agent, (base, current, changed, notice)
+            root, payload, state, agent, (base, current, changed, notice, tip)
         )
-    except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
+    except failures as error:
         return {
             "decision": "block",
             "reason": f"Verification could not run: {error}. Report it; repair only within the authorized task. No new authority.",
@@ -873,12 +879,13 @@ def checked_changes(
     payload: JsonObject,
     state: Path | None,
     agent: str | None,
-    scope: tuple[str, dict[str, str], str, str],
+    scope: tuple[str, dict[str, str], str, str, str | None],
 ) -> JsonObject:
     """Run the check on the session's changes; a split keeps Semgrep's taint analysis bounded."""
-    from plans import build_in_progress
+    from plans import QUICK_PASS, SMALL_SIZE, build_in_progress
+    from process_group import covering_minutes, lock_and_pass, passed_note
 
-    base, current, changed, notice = scope
+    base, current, changed, notice, tip = scope
     claim = str(
         payload.get("last_assistant_message", payload.get("lastAssistantMessage"))
     )
@@ -898,7 +905,20 @@ def checked_changes(
                 "systemMessage": "Hard Eng: unchanged since last passing check; not rerun."
             },
         )
-    returncode, output = run_check(root, base, building)
+    held, passed = lock_and_pass(root)
+    if held:
+        step = "check --plan-stage Ready" if building else "check"
+        return {
+            "decision": "block",
+            "reason": f"Hard Eng: another Hard Eng check holds this checkout's lock, so this turn's changes are not checked; that check may predate your last edits. You started it after your last edit → read its exit notice + fix its findings. Else → start `python3 .hooks/hard-eng.py {step}` in the background (it waits its turn) + read its exit notice. Don't claim done.",
+        }
+    covered = None if building else covering_minutes(root, passed, tip, base)
+    if covered is None:
+        returncode, output = run_check(root, base, building)
+    else:
+        returncode, output, notice = 0, "", notice or passed_note(*covered)
+    if SMALL_SIZE in output:
+        building, notice = False, QUICK_PASS
     decisions = show_decisions(root, changed.splitlines(), state)
     if returncode == 0:
         if state is not None and not state.exists():

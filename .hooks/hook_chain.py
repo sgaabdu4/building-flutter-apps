@@ -54,7 +54,10 @@ LAUNCHERS = {
     HUSKY_WORKTREE_LAUNCHER,
 }
 KEPT = "Kept your existing pre-push hook; it runs before Hard Eng's checks. Compare its checks with Hard Eng's (he references: adopting existing checks)."
-RESTORE = "Hard Eng pre-push hook missing or replaced (maybe by another tool) → pushes unchecked. Rerun setup to restore: curl -fsSL https://raw.githubusercontent.com/sgaabdu4/hard-eng/main/setup.sh | sh"
+SETUP_COMMAND = (
+    "curl -fsSL https://raw.githubusercontent.com/sgaabdu4/hard-eng/main/setup.sh | sh"
+)
+RESTORE = f"Hard Eng pre-push hook missing or replaced (maybe by another tool) → pushes unchecked. Rerun setup to restore: {SETUP_COMMAND}"
 
 
 def locate(root: Path, name: str = "pre-push") -> tuple[Path, Path]:
@@ -78,6 +81,11 @@ def worktree_hook(root: Path) -> tuple[Path, str]:
 
 def project_copy(hook: Path) -> Path:
     return hook.with_name(hook.name + ".project")
+
+
+def keeps_copy(hook: Path) -> bool:
+    copy = project_copy(hook)
+    return copy.exists() or copy.is_symlink()
 
 
 def is_own(root: Path, hook: Path) -> bool:
@@ -123,13 +131,15 @@ def preserve(root: Path, hook: Path) -> bool:
     check_free(root, hook)
     if not foreign_hook(root, hook):
         return False
-    if not kept_copy_matches(hook):
-        shutil.copy2(hook, project_copy(hook))
+    copy = project_copy(hook)
+    if not kept_copy_matches(hook) or copy.is_symlink() != hook.is_symlink():
+        copy.unlink(missing_ok=True)
+        shutil.copy2(hook, copy, follow_symlinks=False)
     return True
 
 
 def restore_note(root: Path) -> str:
-    from update import SOURCE_FILE
+    from gate_config import SOURCE_FILE
 
     if not (root / SOURCE_FILE).exists():
         return ""
@@ -196,9 +206,7 @@ def planned_hook(root: Path, plan: object) -> tuple[str, str]:
     if hook_path == ".husky/pre-push":
         if (root / hook_path).is_symlink():
             raise ValueError("Preserve the existing hook symlink before updating")
-        if foreign_hook(root, root / hook_path) and not (
-            project_copy(root / hook_path).exists()
-        ):
+        if foreign_hook(root, root / hook_path) and not keeps_copy(root / hook_path):
             raise ValueError(
                 "Existing pre-push hook must be preserved; run the setup command to keep it"
             )

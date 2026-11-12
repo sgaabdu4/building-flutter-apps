@@ -11,8 +11,10 @@ from pathlib import Path
 
 from ci_cache import TOOL_DIRECTORIES, report_cache_problems
 from ci_jobs import migrate_bun_version, migrate_runner_variable, migrate_swift_runner
-from gate_config import GateConfig, Group
+from gate_config import GateConfig, Group, json_file
+from project_files import read_project_file
 from project_setup import dependency_command
+from tool_setup import RELEASE_AGE_SECONDS
 
 MISE_INSTALL_EXEC_LINE = re.compile(
     r"(?m)^(?P<indent> +)(?P<launcher>bun x (?:\S+ )+?mise --no-config) "
@@ -72,13 +74,15 @@ OLD_TRIGGERS = (
 )
 OLD_BASE = "${{ github.event.pull_request.base.sha || github.event.before }}"
 NEW_BASE = "${{ inputs.base_sha || github.event.pull_request.base.sha || github.event.before }}"
+TEMPLATE = ".github/hard-eng.yml"
+TEMPLATE_BEFORE_MOVE = ".github/workflows/hard-eng.yml"
 BOOTSTRAP_TOOLS = ["uv@latest", "python@3.12"]
 
 
 def bun_specification(root: Path, package: Group, groups: list[Group]) -> str:
     """Reuse the pin of an established workspace dependency-install owner."""
     directory = root / package["path"]
-    manifest = json.loads((directory / "package.json").read_text())
+    manifest = read_project_file(directory / "package.json", root)
     if (
         "packageManager" not in manifest
         and not (directory / "bun.lock").exists()
@@ -99,7 +103,7 @@ def bun_specification(root: Path, package: Group, groups: list[Group]) -> str:
             reverse=True,
         )
         if owners and (owners[0] / "package.json").is_file():
-            manifest = json.loads((owners[0] / "package.json").read_text())
+            manifest = read_project_file(owners[0] / "package.json", root)
     declared = manifest.get("packageManager", "bun@latest")
     if isinstance(declared, str) and not declared.startswith("bun@"):
         declared = "bun@latest"
@@ -132,9 +136,15 @@ def impact_tools(root: Path, groups: list[Group]) -> list[str]:
     return list(dict.fromkeys(tools))
 
 
+def template_text(source: Path) -> str:
+    """The template of a release tree; a tree from before the move holds it as the workflow."""
+    path = source / TEMPLATE
+    return (path if path.is_file() else source / TEMPLATE_BEFORE_MOVE).read_text()
+
+
 def workflow_triggers(source: Path, base: str) -> tuple[str, str]:
     """The template trigger block and its copy for the project's base branch."""
-    template = (source / ".github/workflows/hard-eng.yml").read_text()
+    template = template_text(source)
     block = template[template.index("on:\n") : template.index("\n\npermissions:") + 1]
     # Only this source repository releases from develop.
     project = block.replace("      - develop\n", "", 1)
@@ -190,7 +200,7 @@ def migrate_workflow_pins(content: str) -> str:
 
 def migrate_bun(source: Path, content: str) -> str:
     """Replace the generated pnpm bootstrap with the template's Bun steps."""
-    template = (source / ".github/workflows/hard-eng.yml").read_text()
+    template = template_text(source)
     start = template.index("      - uses: oven-sh/setup-bun@")
     setup = template[start : template.index("      - name: ", start)]
     launcher = BUN_X_MISE_LAUNCHER.search(template)
@@ -221,7 +231,7 @@ def migrate_launcher(source: Path, content: str) -> str:
     """Bash 3.2 on macOS runners cannot lowercase with ${var,,}; compute the package once per job."""
     if LEGACY_PACKAGE not in content and MISE_PACKAGE not in content:
         return content
-    template = (source / ".github/workflows/hard-eng.yml").read_text()
+    template = template_text(source)
     echo = next(line for line in template.splitlines() if "MISE_PACKAGE=" in line)
     # Each job runs on its own runner, so every job that launches mise sets the package.
     jobs = JOB_BOUNDARY.split(content)
@@ -284,7 +294,7 @@ def migrate_workflow_tools(content: str) -> str:
 
 def migrate_docs_path(source: Path, content: str) -> str:
     """Add the template's docs-only steps to a generated workflow without them."""
-    template = (source / ".github/workflows/hard-eng.yml").read_text()
+    template = template_text(source)
     setup = "      - uses: oven-sh/setup-bun@"
     checks = "      - name: Run required checks\n"
     if "id: impact" in content:
@@ -429,7 +439,7 @@ def migrate_affected_tools(
         return content
     if "        env:\n" not in content.split(marker, 1)[1].split("\n      - ", 1)[0]:
         return content
-    template = (source / ".github/workflows/hard-eng.yml").read_text()
+    template = template_text(source)
     required = workflow_tools(root, config)
     known = {tool.split("@", 1)[0] for tool in required}
     redundant_latest = "bun@latest" not in required and any(
@@ -472,7 +482,7 @@ def migrate_affected_tools(
 
 def migrate_tool_cache(source: Path, content: str) -> str:
     """Keep installed tools and store data in the template's runner storage."""
-    template = (source / ".github/workflows/hard-eng.yml").read_text()
+    template = template_text(source)
     old = '        run: python3 .hooks/hard-eng.py impact --base "$BASE_SHA" >> "$GITHUB_OUTPUT" || echo docs_only=false >> "$GITHUB_OUTPUT"\n'
     start = template.index("        run: |\n", template.index("id: impact"))
     end = template.index("      - uses: oven-sh/setup-bun@", start)
@@ -579,6 +589,20 @@ def report_missing_bun(path: Path) -> None:
         )
 
 
+def report_branch_filter(path: Path, triggers: object) -> None:
+    """Say when a pull_request branch filter leaves out PRs into other branches."""
+    event = triggers.get("pull_request") if isinstance(triggers, dict) else None
+    branches = event.get("branches") if isinstance(event, dict) else None
+    names = [branches] if isinstance(branches, str) else branches
+    if isinstance(names, list) and names and "**" not in names:
+        print(
+            f"CI adaptation pending: {path.name} runs Hard Eng only for PRs into "
+            f"{', '.join(map(str, names))}; a stacked PR into another branch skips "
+            "the check. Add '**' to its pull_request branches.",
+            file=sys.stderr,
+        )
+
+
 def integrated(workflows: list[Path]) -> bool:
     """Existing CI that already runs the check needs no integration reminder."""
     import yaml
@@ -591,6 +615,7 @@ def integrated(workflows: list[Path]) -> bool:
                 found = True
                 report_missing_bun(path)
                 triggers = workflow.get("on", workflow.get(True))
+                report_branch_filter(path, triggers)
                 if (isinstance(triggers, str) and triggers in MAINTENANCE_EVENTS) or (
                     isinstance(triggers, (list, dict))
                     and triggers
@@ -624,6 +649,26 @@ def setup_written(
     root: Path, base: str, names: set[str], sources: tuple[Path, Path]
 ) -> set[str]:
     """The changed paths the release's setup writes exactly when it updates the base tree."""
+    from project_files import keep
+
+    key = ("base_plan", str(root), base, *map(str, sources))
+    planned = keep("references", key, lambda: base_plan(root, base, sources))
+    return {
+        name
+        for name in names
+        if name in planned
+        and (
+            not (root / name).exists()
+            if planned[name] is None
+            else (root / name).is_file() and planned[name] == (root / name).read_text()
+        )
+    }
+
+
+def base_plan(
+    root: Path, base: str, sources: tuple[Path, Path]
+) -> dict[str, str | None]:
+    """What the release's setup writes when it updates the tree of the base commit."""
     from hook_chain import own_hooks_env
     from update import update_plan
 
@@ -638,7 +683,7 @@ def setup_written(
             timeout=120,
         )
         try:
-            planned = update_plan(tree, *sources, own_hooks_env(tree), replace=True)[0]
+            return update_plan(tree, *sources, own_hooks_env(tree), replace=True)[0]
         finally:
             subprocess.run(
                 [*git, "remove", "--force", str(tree)],
@@ -646,16 +691,6 @@ def setup_written(
                 check=False,
                 timeout=60,
             )
-    return {
-        name
-        for name in names
-        if name in planned
-        and (
-            not (root / name).exists()
-            if planned[name] is None
-            else (root / name).is_file() and planned[name] == (root / name).read_text()
-        )
-    }
 
 
 def migrate_project_workflows(
@@ -681,6 +716,8 @@ def configure_ci(
 def adapt_ci(
     root: Path, source: Path, config: GateConfig, changes: dict[str, str]
 ) -> None:
+    from shards import split_test_shards
+
     name = ".github/workflows/hard-eng.yml"
     workflows = [
         path
@@ -704,13 +741,17 @@ def adapt_ci(
             config, migrate_runner_variable(migrate_launcher(source, migrated))
         )
         migrated = migrate_tool_environment(migrate_bun_version(migrated))
+        migrated = split_test_shards(config, migrated)
         if "\n  pull-requests:" not in migrated:
             migrated = migrated.replace(
                 OLD_PERMISSIONS, OLD_PERMISSIONS + PERMISSIONS, 1
             )
         migrated = migrated.replace(
-            "MISE_MINIMUM_RELEASE_AGE: 0s\n", "MISE_MINIMUM_RELEASE_AGE: 2d\n"
+            "MISE_MINIMUM_RELEASE_AGE: 0s\n",
+            f"MISE_MINIMUM_RELEASE_AGE: {RELEASE_AGE_SECONDS // 86400}d\n",
         )
+        for switch in ("MISE_PREFER_OFFLINE", "MISE_USE_VERSIONS_HOST"):
+            migrated = migrated.replace(f"{switch}: 'false'\n", f'{switch}: "false"\n')
         if migrated != original:
             changes[name] = migrated
         integrated(workflows)
@@ -728,7 +769,7 @@ def adapt_ci(
     policy = load_policy(root, required=False)
     if policy is None:
         print(
-            "CI setup pending: configure project shipping checks and a measured ci_seconds budget, then rerun setup. The source repository's timeout is not a project budget.",
+            "CI setup pending: add a `shipping` block with the project's checks and a measured ci_seconds budget to hard-eng.gates.json. After it is on the base branch, rerun setup; the update then adds the workflow. The source repository's timeout is not a project budget.",
             file=sys.stderr,
         )
         return
@@ -743,8 +784,7 @@ def adapt_ci(
     tools = workflow_tools(root, config)
     block, triggers = workflow_triggers(source, policy["base"])
     changes[name] = (
-        (source / name)
-        .read_text()
+        template_text(source)
         .replace(
             "      EXTRA_SDK_TOOLS: dart@latest\n",
             "      EXTRA_SDK_TOOLS: "
@@ -759,7 +799,31 @@ def adapt_ci(
         )
         .replace(block, triggers, 1)
     )
-    changes[name] = workflow_budget(root, migrate_swift_runner(config, changes[name]))
+    changes[name] = split_test_shards(
+        config, workflow_budget(root, migrate_swift_runner(config, changes[name]))
+    )
+
+
+def without_workflow_gates(root: Path, changes: dict[str, str | None]) -> str | None:
+    """The planned gates file without the workflow gates the project lacks, while no workflow file exists."""
+    planned = changes.get(GATES_FILE)
+    workflows = root / ".github/workflows"
+    if (
+        planned is None
+        or not any(name.startswith(".github/workflows/") for name in changes)
+        or any(path.is_file() for path in workflows.rglob("*"))
+    ):
+        return None
+    config = json.loads(planned)
+    held = {
+        gate["name"] for gate in json.loads((root / GATES_FILE).read_text())["shared"]
+    }
+    config["shared"] = [
+        gate
+        for gate in config["shared"]
+        if gate.get("role") not in {"workflows", "ci-security"} or gate["name"] in held
+    ]
+    return json_file(root, config)
 
 
 def add_workflow_checks(config: GateConfig) -> None:
@@ -839,6 +903,7 @@ def push_base(root: Path, base: str | None) -> str | None:
 
 
 PR_TEXT = ".github/workflows/pr-text.yml"
+GATES_FILE = "hard-eng.gates.json"
 
 
 def configure_github_ci(
@@ -850,7 +915,7 @@ def configure_github_ci(
         add_workflow_checks(config)
     if workflow not in changes and not (root / workflow).is_file():
         return
-    # The cloud GitHub proxy adds a Claude footer to PR bodies; this workflow removes it.
+    # This workflow removes the Claude footer that the cloud GitHub proxy adds to PR bodies, and checks the PR text.
     content = (source / PR_TEXT).read_text()
     if not (root / PR_TEXT).is_file() or (root / PR_TEXT).read_text() != content:
         changes[PR_TEXT] = content

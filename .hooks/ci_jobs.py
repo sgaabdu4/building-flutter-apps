@@ -6,7 +6,7 @@ import re
 import subprocess
 import sys
 import urllib.request
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, ArgumentTypeError, Namespace
 from collections.abc import Callable
 from contextlib import redirect_stdout, suppress
 from datetime import UTC, datetime, timedelta
@@ -44,6 +44,23 @@ def add_language_filters(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
+def shard_value(value: str) -> str:
+    if value in ("rest", "merge"):
+        return value
+    if value.isascii() and value.isdecimal() and int(value) > 0:
+        return str(int(value))
+    raise ArgumentTypeError("--shard takes a shard number, rest or merge")
+
+
+def add_shard_option(parser: ArgumentParser) -> ArgumentParser:
+    parser.add_argument(
+        "--shard",
+        type=shard_value,
+        help="Run test shard N, the gates outside the shards (rest), or merge the shard reports (merge)",
+    )
+    return parser
+
+
 NO_LANGUAGES = LanguageFilter()
 
 
@@ -52,7 +69,7 @@ def language_filter(args: Namespace) -> LanguageFilter:
 
 
 def language_groups(groups: list[Group], languages: LanguageFilter) -> list[Group]:
-    """Groups of the chosen languages; a group kept by `only` keeps its ancestors' lockfiles gates."""
+    """Groups of the chosen languages; a group kept by `only` keeps the lockfiles gate of every folder above it."""
     only, skip = languages
     if not only and not skip:
         return groups
@@ -66,7 +83,7 @@ def language_groups(groups: list[Group], languages: LanguageFilter) -> list[Grou
     for group in groups:
         if chosen(group):
             result.append(group)
-        elif only and group.get("language"):
+        elif only:
             installs = [g for g in group["checks"] if g.get("role") == "lockfiles"]
             if installs and any(
                 PurePosixPath(group["path"]) in p.parents for p in paths
@@ -124,7 +141,9 @@ def bootstrap_bun(
         return pinned
     if os.environ.get("GITHUB_ACTIONS") != "true":
         return None
-    cutoff = datetime.now(UTC) - timedelta(days=2)
+    from tool_setup import RELEASE_AGE_SECONDS
+
+    cutoff = datetime.now(UTC) - timedelta(seconds=RELEASE_AGE_SECONDS)
     try:
         versions = [
             released_bun(release, cutoff) for release in (releases or bun_releases)()

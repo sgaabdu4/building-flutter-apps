@@ -17,7 +17,7 @@ from contextlib import suppress
 from io import StringIO
 from pathlib import Path
 
-from gate_config import Group, parse_config
+from gate_config import Group, parse_config, performance_suites
 from process_group import run_in_group
 from python_setup import python_gate_command
 
@@ -25,9 +25,9 @@ GLOB = re.compile(r"[?*()[\]]")
 HUNK = re.compile(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 STACK_FRAME = re.compile(r"\s+at ")
 LISTED = 20
-Survivor = tuple[str, int, str]
+Survivor = tuple[str, int, str, bool]
 Result = tuple[int, list[Survivor]]
-Adapter = Callable[[Path, dict[str, set[int]], list[str], float | None, Path], Result]
+Adapter = Callable[[Path, dict[str, set[int]], Group, float | None, Path], Result]
 
 
 class Capped(Exception):
@@ -78,6 +78,9 @@ def run(
             raise Capped from None
 
 
+NO_MUTANTS = "Filtered for specific mutants, but nothing matches"
+
+
 def failed(tool: str, output: Path) -> ValueError:
     lines = output.read_text(errors="replace").strip().splitlines()
     tail = [line for line in lines if not STACK_FRAME.match(line)][-15:]
@@ -109,19 +112,27 @@ def stryker_survivors(report: object) -> Result:
             tested += status in {"Killed", "Survived", "NoCoverage", "Timeout"}
             if status in {"Survived", "NoCoverage"}:
                 line = mutant["location"]["start"]["line"]
-                survivors.append((name, line, mutated_line(file["source"], mutant)))
+                survivors.append(
+                    (
+                        name,
+                        line,
+                        mutated_line(file["source"], mutant),
+                        status == "NoCoverage",
+                    )
+                )
     return tested, survivors
 
 
 def javascript(
     directory: Path,
     files: dict[str, set[int]],
-    tests: list[str],
+    group: Group,
     deadline: float | None,
     work: Path,
 ) -> Result:
     from tool_setup import provision_batch
 
+    tests = gate_command(group, "tests")
     remaining = 600 if deadline is None else max(deadline - time.monotonic(), 1)
     provision_batch(["npm:@stryker-mutator/core@latest"], remaining)
     report, config, output = work / "report.json", work / "stryker.json", work / "log"
@@ -244,7 +255,22 @@ def mutmut_change(diff: str) -> tuple[str, str]:
     return removed[0], added[0] if added else ""
 
 
-def configure_mutmut(directory: Path, files: Iterable[str]) -> None:
+def gate_command(group: Group, role: str) -> list[str]:
+    return next(gate["command"] for gate in group["checks"] if gate.get("role") == role)
+
+
+def package_suites(group: Group) -> list[str]:
+    return [
+        suite
+        for gate in group["checks"]
+        if gate.get("role") == "performance"
+        for suite in performance_suites(gate["command"])
+    ]
+
+
+def configure_mutmut(
+    directory: Path, files: Iterable[str], suites: Iterable[str]
+) -> None:
     """Name the changed top-level paths when the project leaves mutmut to guess its layout."""
     pyproject, setup = directory / "pyproject.toml", directory / "setup.cfg"
     if pyproject.is_file() and "mutmut" in tomllib.loads(pyproject.read_text()).get(
@@ -269,7 +295,12 @@ def configure_mutmut(directory: Path, files: Iterable[str]) -> None:
     ).stdout.split("\0")
     # Tests may read any tracked file, and mutmut copies only tests/ and lockfiles.
     copies = {Path(name).parts[0] for name in tracked if name} - sources
-    settings = {"source_paths": sources, "also_copy": copies}
+    ignored = {f"--ignore={suite}".replace("%", "%%") for suite in suites}
+    settings = {
+        "source_paths": sources,
+        "also_copy": copies,
+        "pytest_add_cli_args": ignored,
+    }
     section = "".join(
         f"{key} =\n" + "".join(f"\t{path}\n" for path in sorted(paths))
         for key, paths in settings.items()
@@ -281,13 +312,15 @@ def configure_mutmut(directory: Path, files: Iterable[str]) -> None:
 
 
 def mutmut(manager: str, *arguments: str) -> list[str]:
-    return python_gate_command(["mutmut", *arguments], manager)
+    from tool_setup import managed_command
+
+    return managed_command(python_gate_command(["mutmut", *arguments], manager))
 
 
 def python(
     directory: Path,
     files: dict[str, set[int]],
-    tests: list[str],
+    group: Group,
     deadline: float | None,
     work: Path,
 ) -> Result:
@@ -296,12 +329,14 @@ def python(
         globs |= changed_functions(name, (directory / name).read_text(), lines)
     if not globs:
         return 0, []
-    configure_mutmut(directory, files)
-    manager = "poetry" if tests[0] == "poetry" else "uv"
+    configure_mutmut(directory, files, package_suites(group))
+    manager = "poetry" if gate_command(group, "tests")[0] == "poetry" else "uv"
     output, listing = work / "log", work / "results"
-    if run(mutmut(manager, "run", *globs), directory, deadline, output) or run(
-        mutmut(manager, "results", "--all", "true"), directory, deadline, listing
-    ):
+    if run(mutmut(manager, "run", *globs), directory, deadline, output):
+        if NO_MUTANTS in output.read_text(errors="replace"):
+            return 0, []
+        raise failed("mutmut", output)
+    if run(mutmut(manager, "results", "--all", "true"), directory, deadline, listing):
         raise failed("mutmut", output)
     statuses = mutmut_statuses(listing.read_text(), list(globs))
     survivors: list[Survivor] = []
@@ -315,7 +350,14 @@ def python(
             globs[pattern] for pattern in globs if fnmatch.fnmatchcase(mutant, pattern)
         )
         if original in content and not text_only(original, mutated):
-            survivors.append((file, content[original], f"{original} → {mutated}"))
+            survivors.append(
+                (
+                    file,
+                    content[original],
+                    f"{original} → {mutated}",
+                    status == "no tests",
+                )
+            )
     return len(statuses), survivors
 
 
@@ -332,7 +374,7 @@ def xunit_survivors(document: str) -> Result:
             if ": " in line
         )
         change = f"{fields['Original line'].strip()} → {fields['Mutation'].strip()}"
-        survivors.append((fields["File"].strip(), int(fields["Line"]), change))
+        survivors.append((fields["File"].strip(), int(fields["Line"]), change, False))
     return tested, survivors
 
 
@@ -352,10 +394,11 @@ def dart_test_command(tests: list[str]) -> str:
 def dart(
     directory: Path,
     files: dict[str, set[int]],
-    tests: list[str],
+    group: Group,
     deadline: float | None,
     work: Path,
 ) -> Result:
+    tests = gate_command(group, "tests")
     output = work / "log"
     if run(
         ["dart", "pub", "global", "activate", "mutation_test"],
@@ -422,18 +465,24 @@ def summary(name: str, tested: int, survivors: list[Survivor], directory: Path) 
         print(f"{name}: the tests caught every mutant ({tested}).")
     else:
         print(
-            f"{name}: {len(survivors)} of {tested} mutants survived on changed lines; "
-            "the tests still pass with these changes:"
+            f"{name}: {len(survivors)} of {tested} mutants survived on changed lines."
         )
-        for file, line, change in survivors[:LISTED]:
-            print(f"  {directory / file}:{line}  {change}")
-        if len(survivors) > LISTED:
-            print(f"  … and {len(survivors) - LISTED} more")
+        for unreached, heading in (
+            (False, "the tests still pass with these changes:"),
+            (True, "no test ran the code where these changes are:"),
+        ):
+            listed = [found for found in survivors if found[3] is unreached]
+            if listed:
+                print(heading)
+            for file, line, change, _ in listed[:LISTED]:
+                print(f"  {directory / file}:{line}  {change}")
+            if len(listed) > LISTED:
+                print(f"  … and {len(listed) - LISTED} more")
 
 
 def targets(
     root: Path, base: str, production: Callable[[Path, Group], set[Path]]
-) -> list[tuple[Group, list[str], dict[str, set[int]]]]:
+) -> list[tuple[Group, dict[str, set[int]]]]:
     """Packages with a supported language, a tests gate and changed production lines."""
     command = ["git", "-c", "core.quotePath=false", "diff", "-U0", "--no-color"]
     command += ["--no-ext-diff", "--no-renames", "--diff-filter=AM", base, "--"]
@@ -441,13 +490,11 @@ def targets(
     changed = changed_lines(diff.stdout)
     selected = []
     for group in parse_config((root / "hard-eng.gates.json").read_text())["packages"]:
-        tests = [
-            gate["command"] for gate in group["checks"] if gate.get("role") == "tests"
-        ]
+        has_tests = any(gate.get("role") == "tests" for gate in group["checks"])
         if (
             group.get("language") not in ADAPTERS
             or not group.get("sources")
-            or not tests
+            or not has_tests
         ):
             continue
         directory = (root / group["path"]).resolve()
@@ -457,7 +504,7 @@ def targets(
             if (lines := changed.get(path.relative_to(root.resolve()).as_posix()))
         }
         if files:
-            selected.append((group, tests[0], files))
+            selected.append((group, files))
     return selected
 
 
@@ -476,13 +523,13 @@ def report(
             "that the tests should catch.",
             flush=True,
         )
-    for group, tests, files in selected:
+    for group, files in selected:
         name = group.get("name", group["path"])
         try:
             with tempfile.TemporaryDirectory(prefix="hard-eng-mutation-") as work:
                 adapter = ADAPTERS[group.get("language", "")]
                 tested, survivors = adapter(
-                    root / group["path"], files, tests, deadline, Path(work)
+                    root / group["path"], files, group, deadline, Path(work)
                 )
         except Capped:
             print(

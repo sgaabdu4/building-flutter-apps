@@ -1,6 +1,6 @@
 ---
 name: he-learn
-description: Prevent verified repeated failures and preserve lasting decisions in terse ADRs. Use when failures recur, a bug is found on the base branch, prevention needs strengthening, or accepted decisions and steering need durable capture; skip one-off fixes to unmerged work and routine task updates.
+description: Prevent verified repeated failures, run the task-end retro and preserve lasting decisions in terse ADRs. Use at every task end to run the retro, and when failures recur, a bug is found on the base branch, prevention needs strengthening, or accepted decisions and steering need durable capture; outside the retro, skip one-off fixes to unmerged work and routine task updates.
 ---
 
 # Hard Eng Learn
@@ -14,7 +14,10 @@ flowchart TD
   T -->|Repeated failure| R[Research: confirm common cause]
   T -->|Escaped bug| P
   T -->|Lasting decision or steering| A[Decision capture]
+  T -->|Task end| RT[Retro: sort each item; plan Retro line]
   T -->|No durable gap| N[Continue without new files]
+  RT -->|Prevention needed| P
+  RT -->|None or outside cause| D
   R --> P[Repair cause and existing deterministic prevention]
   P --> L{Adequate executable prevention?}
   L -->|Yes| V[Original failure + nearby valid case]
@@ -40,6 +43,22 @@ flowchart TD
 - Skill = last resort for the part executable prevention cannot adequately cover. State that limitation from evidence; reuse/repair an existing skill before adding one. Follow [Writing Great Skills](../writing-great-skills/SKILL.md), including its [repair route](../writing-great-skills/references/repair.md). Canonical location = `.agents/skills/<name>/SKILL.md`; only needed references/scripts belong beside it.
 - Attribution = give each tried fix one verdict against the original failure: helped, hurt, no effect or confounded. Confounded = several changes in one run, or one run alone behind the difference. Keep a lesson only from helped fixes; narrow a confounded one to what the evidence shows, or record nothing. Write the trigger as the shape of the situation, not one task's facts.
 - Behavioral proof = exercise the original request + nearby valid/non-trigger case. Material trigger, authority, action-order or completion changes need actual agent execution; a wording/metadata check alone is insufficient. Verify the future consumer reaches the rule when relevant. Failed/unknown proof stays unfinished; never promise universal non-recurrence.
+
+## Retro
+
+- When = every task end, before its plan is Complete. Retro line = each item → its row's prevention, named as `path::test`, a rule ID, a step, an issue link, a freshness hold or `None — <reason>`. No item → `None — no failed check or correction`.
+- Items = each failed check (Stop hook, local run, pre-push, CI) and each user or review correction in the task, including ones fixed at once.
+- Sort each item into every row that fits. In a project that installed Hard Eng, a prevention that would edit a file Hard Eng installed (`.hooks/`, its skills except `trello-coordinator/`) goes to the Hard Eng fault row instead.
+
+| Item | Prevention |
+| --- | --- |
+| Hard Eng fault: a Hard Eng check, hook, skill or setup was wrong or missing | Tell the user; if approved, file a Hard Eng issue per AGENTS.md's broken Hard Eng rule; still fix the project in this task |
+| Ran too late: an existing check first ran at push or CI | The check is a test, analyzer or lint for the touched files (HE Build's focused checks) → fix the worker brief or plan step that skipped it, and name that step. Otherwise → Hard Eng fault row. Never add it to the Stop hook |
+| Mechanical: pattern, banned API, file place, size, shape | Deterministic check at its owner: an existing lint or check rule first, else the smallest new one; never one checker per incident |
+| Judgement: a defect only a reviewer can find | Add or sharpen one project `REQ-` rule in `docs/requirements.md`, which review applies; name its ID. In Hard Eng itself, the owner is [Code Review's review method](../code-review/references/review.md) |
+| Outside cause: outage, upstream release | None + the reason, or a freshness hold on the broken release (the freshness gate's `holds`, in [gates](../he/references/gates.md)) |
+
+- A retro item caused by a second copy of a rule, value or type → merge that copy into its one owner in this change and record it on the plan's `Single source:` line. That line says what to do when the copy cannot merge.
 
 ## Apply + continue
 

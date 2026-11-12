@@ -10,7 +10,7 @@ Add YAML tokens only when actual token values are established in the project. --
 
 ## Colors
 
-[TODO: Existing semantic colors, exact values and source locations.]
+[TODO: Existing semantic colors, exact values and the theme or token files that own them (the only files that may hold a colour literal).]
 
 ## Typography
 
@@ -18,7 +18,19 @@ Add YAML tokens only when actual token values are established in the project. --
 
 ## Layout
 
-[TODO: Existing layout, spacing and responsive behavior.]
+[TODO: Existing layout, spacing scale, supported widths (narrowest first), how the layout changes between them, and minimum touch target (44 pt on iOS, 48 dp on Android, 44 px on the web).]
+
+## Hierarchy
+
+[TODO: The primary action style (one per screen), what stays quiet, and what a row, card or screen may hold before detail moves one tap away.]
+
+## Motion
+
+[TODO: Duration + curve per role (enter, exit, move), the exact properties that transition, what never animates (for example keyboard and high-use actions) and the reduced-motion behaviour.]
+
+## States
+
+[TODO: The empty, first-use, loading, error and offline patterns that screens reuse.]
 
 ## Components
 

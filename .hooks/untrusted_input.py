@@ -4,10 +4,18 @@ import json
 import os
 import re
 import subprocess
+import sys
 from itertools import takewhile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from gate_config import JSONC, Group, JsonObject, JsonValue, json_file
+from gate_config import (
+    JSONC,
+    Group,
+    JsonObject,
+    JsonValue,
+    biome_formatters,
+    json_file,
+)
 
 OPENING_BRACE = re.compile(r"\{(\s*)")
 TRAILING_COMMA = re.compile(r",(\s*[}\]])")
@@ -86,6 +94,244 @@ def fallow_ignores_hooks(root: Path, changes: dict[str, str]) -> None:
     if "extends" in config and "ignorePatterns" not in config:
         raise ValueError(f"{advice}; a local list replaces the inherited one")
     updated = json_listed(name, text, "ignorePatterns", pattern, [])
+    if updated is not None:
+        changes[name] = updated
+
+
+BIOME_IGNORES = ("!.hooks", "!.hard-eng", "!coverage")
+
+
+def biome_entries(root: Path, changes: dict[str, str]) -> tuple[str, ...]:
+    """The Hard Eng entries of files.includes: the hook folders and the report folder of each package."""
+    try:
+        gates = json.loads(
+            changes.get("hard-eng.gates.json")
+            or (root / "hard-eng.gates.json").read_text()
+        )
+        paths = [group["path"] for group in gates["packages"]]
+    except (OSError, ValueError, TypeError, KeyError):
+        return BIOME_IGNORES
+    folders = (PurePosixPath(path).as_posix() for path in paths)
+    reports = (f"!{folder}/coverage" for folder in folders if folder != ".")
+    return tuple(dict.fromkeys((*BIOME_IGNORES, *reports)))
+
+
+def closing(text: str, start: int) -> int:
+    """Offset of the bracket that closes the object or list opening at start."""
+    depth = 0
+    index = start
+    while index < len(text):
+        char = text[index]
+        if char == '"':
+            index += 1
+            while text[index] != '"':
+                index += 2 if text[index] == "\\" else 1
+        elif char in "{[":
+            depth += 1
+        elif char in "}]":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    raise ValueError("unbalanced brackets")
+
+
+def value_starts(text: str, start: int) -> dict[str, int]:
+    """Offset of the value of each key that sits directly in the object opening at start."""
+    found: dict[str, int] = {}
+    depth = 0
+    index = start
+    while index < len(text):
+        char = text[index]
+        if char == '"':
+            end = index + 1
+            while text[end] != '"':
+                end += 2 if text[end] == "\\" else 1
+            after = text[end + 1 :].lstrip()
+            if depth == 1 and after.startswith(":"):
+                found[text[index + 1 : end]] = len(text) - len(after[1:].lstrip())
+            index = end
+        elif char in "{[":
+            depth += 1
+        elif char in "}]":
+            depth -= 1
+            if depth == 0:
+                break
+        index += 1
+    return found
+
+
+def biome_setting(layout: dict[str, int | str], key: str, default: int) -> int:
+    """The formatter option as an integer, else the Biome default."""
+    value = layout.get(key)
+    return value if isinstance(value, int) else default
+
+
+def add_member(text: str, masked: str, brace: int, member: str) -> str:
+    """Put member before the first member of the object, with the gap the file already has."""
+    first = brace + 1
+    while masked[first] in " \t\r\n":
+        first += 1
+    gap = text[brace + 1 : first]
+    if gap.strip():
+        raise ValueError("a comment stands before the first member")
+    if masked[first] == "}":
+        return f"{text[:brace]}{{ {member} }}{text[first + 1 :]}"
+    return f"{text[:first]}{member},{gap}{text[first:]}"
+
+
+def add_line_entry(
+    text: str, masked: str, end: int, close: int, added: list[str]
+) -> str:
+    """Add the entries as new lines below the last entry of a list written over several lines."""
+    start = text.rfind("\n", 0, end) + 1
+    stop = text.find("\n", end)
+    line = text[start:end]
+    if stop < 0 or stop > close or "[" in masked[start:end]:
+        raise ValueError("the last entry shares its line")
+    indent = line[: len(line) - len(line.lstrip())]
+    comma = "" if masked[end - 1] == "," else ","
+    entry = ",".join(f'\n{indent}"{name}"' for name in added)
+    return f"{text[:end]}{comma}{text[end:stop]}{entry}{text[stop:]}"
+
+
+def add_inline_entry(
+    text: str,
+    masked: str,
+    layout: dict[str, int | str],
+    span: tuple[int, int],
+    added: list[str],
+) -> str:
+    """Add the entries to a one-line list; write the list over several lines when the line gets too long."""
+    start, close = span
+    end = len(masked[:close].rstrip())
+    comma = "" if masked[end - 1] in ",[" else ","
+    space = "" if masked[end - 1] == "[" else " "
+    new = ", ".join(json.dumps(name) for name in added)
+    rest = text[close:] if space == "" else text[end:]
+    edited = f"{text[:end]}{comma}{space}{new}{rest}"
+    first = edited.rfind("\n", 0, start) + 1
+    last = edited.find("\n", start)
+    line = edited[first : None if last < 0 else last]
+    tab = " " * biome_setting(layout, "indentWidth", 2)
+    if len(line.replace("\t", tab)) <= biome_setting(layout, "lineWidth", 80):
+        return edited
+    key = line[: line.index("[")]
+    after = line[line.index("]") + 1 :]
+    if not key.strip().startswith('"includes"') or after not in {"", ","}:
+        raise ValueError("the list shares its line")
+    if masked[start : close + 1] != text[start : close + 1]:
+        raise ValueError("a comment stands in the list")
+    indent = key[: len(key) - len(key.lstrip())]
+    inner = indent + ("\t" if indent.startswith("\t") else tab)
+    entries = [*json.loads(text[start : close + 1]), *added]
+    body = ",\n".join(f"{inner}{json.dumps(entry)}" for entry in entries)
+    return f"{text[:start]}[\n{body}\n{indent}]{text[close + 1 :]}"
+
+
+def biome_list(includes: list[str] | None, entries: tuple[str, ...]) -> list[str]:
+    """The files.includes list with the Hard Eng entries that it lacks at the end."""
+    current = includes or ["**"]
+    return [*current, *(name for name in entries if name not in current)]
+
+
+def biome_includes(config: dict[str, object]) -> list[str] | None:
+    """The files.includes list of the config, or None when it has none."""
+    files = config.get("files")
+    includes = files.get("includes") if isinstance(files, dict) else None
+    return includes if isinstance(includes, list) else None
+
+
+def biome_edit(
+    text: str,
+    config: dict[str, object],
+    layout: dict[str, int | str],
+    entries: tuple[str, ...],
+) -> str | None:
+    """The text with the Hard Eng entries in files.includes; None when they are there."""
+    masked = JSONC.sub(lambda match: match[1] or " " * len(match[0]), text)
+    top = value_starts(masked, masked.index("{"))
+    files = config.get("files")
+    includes = biome_includes(config)
+    wanted = biome_list(includes, entries)
+    if includes is not None:
+        added = wanted[len(includes) :]
+        if not added:
+            return None
+        start = value_starts(masked, top["files"])["includes"]
+        close = closing(masked, start)
+        end = len(masked[:close].rstrip())
+        if not includes:
+            if text[start + 1 : close].strip():
+                raise ValueError("a comment stands in the empty list")
+            return add_inline_entry(text, masked, layout, (start, close), added)
+        if "\n" in text[start:close]:
+            return add_line_entry(text, masked, end, close, added)
+        return add_inline_entry(text, masked, layout, (start, close), added)
+    if "extends" in config:
+        raise ValueError("a local list replaces the inherited one")
+    listed = f'"includes": {json.dumps(wanted)}'
+    if isinstance(files, dict):
+        return add_member(text, masked, top["files"], listed)
+    if files is not None:
+        raise ValueError("files is not an object")
+    return add_member(text, masked, masked.index("{"), f'"files": {{ {listed} }}')
+
+
+def biome_proof(
+    before: dict[str, object], after: dict[str, object], entries: tuple[str, ...]
+) -> bool:
+    """True when only the files.includes list differs and it now ends with the Hard Eng entries."""
+
+    def rest(config: dict[str, object]) -> dict[str, object]:
+        others = {key: value for key, value in config.items() if key != "files"}
+        files = config.get("files")
+        if isinstance(files, dict):
+            kept = {key: value for key, value in files.items() if key != "includes"}
+            return {**others, "files": kept} if kept else others
+        return others
+
+    return biome_includes(after) == biome_list(
+        biome_includes(before), entries
+    ) and rest(before) == rest(after)
+
+
+def biome_ignores_hooks(root: Path, changes: dict[str, str]) -> None:
+    """Keep the project's Biome from judging the files that Hard Eng writes, such as .hooks, which holds any[] and {} on purpose."""
+    name = next(
+        (name for name in ("biome.json", "biome.jsonc") if (root / name).exists()),
+        None,
+    )
+    if name is None:
+        return
+    text = changes.get(name) or (root / name).read_text()
+    entries = biome_entries(root, changes)
+    try:
+        config = jsonc_config(name, text)
+        formatter, own = biome_formatters(root / name, set())
+        updated = biome_edit(text, config, {**formatter, **own}, entries)
+        if updated is not None:
+            after = jsonc_config(name, updated)
+            if not biome_proof(config, after, entries):
+                raise ValueError("the edit changed other settings")
+    except (ValueError, TypeError, KeyError) as error:
+        quoted = [f'"{entry}"' for entry in entries]
+        entries = f"{', '.join(quoted[:-1])} and {quoted[-1]}"
+        step = f"add {entries} as the last entries of files.includes"
+        if "empty" in str(error):
+            step = f'files.includes is empty: put "**" first, then add {entries} as the last entries'
+        if "inherited" in str(error):
+            step = (
+                "it extends another configuration, and a local files.includes list "
+                "replaces the inherited one. Copy the inherited list into "
+                f'files.includes (use "**" when there is none) and add {entries} '
+                "as its last entries"
+            )
+        print(
+            f"{name}: {step}, so that your own Biome runs leave the Hard Eng files",
+            file=sys.stderr,
+        )
+        return
     if updated is not None:
         changes[name] = updated
 
@@ -251,6 +497,7 @@ def validate_typescript(
     compiler = list(takewhile(lambda argument: not argument.startswith("-"), command))
     selected = explicit_project(command)
     files: set[Path] = set()
+    read: list[Path] = []
     for project in typescript_projects(root, command, directory):
         options = shown_config(project_command(command, project), directory, timeout)
         target = project or selected
@@ -263,17 +510,30 @@ def validate_typescript(
                 "TypeScript requires all strict checks and JavaScript checking without noCheck"
             )
         config = directory / target[1] if target else directory / "tsconfig.json"
-        base = config if config.is_dir() else config.parent
+        config = config / "tsconfig.json" if config.is_dir() else config
+        base = config.parent
+        read.append(config)
         listed = options.get("files", [])
         names: list[JsonValue] = listed if isinstance(listed, list) else []
         resolved = {(base / str(name)).resolve() for name in names}
         if (root / DECLARATIONS).resolve() not in resolved:
+            entry = os.path.relpath(root / DECLARATIONS, base)
             raise ValueError(
-                f"HE-UNTRUSTED-JSON: TypeScript configuration omits {DECLARATIONS}; rerun the Hard Eng installer"
+                f"HE-UNTRUSTED-JSON: {os.path.relpath(config, root)} omits {DECLARATIONS}; "
+                f'add "{entry}" to its files list'
             )
         files |= resolved
-    if not {(directory / name).resolve() for name in expected} <= files:
-        raise ValueError("TypeScript configuration omits declared production files")
+    if omitted := sorted({(directory / name).resolve() for name in expected} - files):
+        shown = [os.path.relpath(path, root.resolve()) for path in omitted]
+        configs = ", ".join(os.path.relpath(path, root.resolve()) for path in read)
+        several = f"the configuration that should compile it; the check read {configs}"
+        where = configs if len(read) == 1 else several
+        raise ValueError(
+            "TypeScript configuration omits declared production files: "
+            + ", ".join(shown[:3])
+            + (f" and {len(shown) - 3} more" if len(shown) > 3 else "")
+            + f". Add the folder of each file to the `include` list of {where}, and remove any `exclude` entry that matches the file"
+        )
     build_composites(root, compiler, selected, directory, timeout)
 
 

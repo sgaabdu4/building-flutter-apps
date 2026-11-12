@@ -9,6 +9,8 @@ rules:
           ".agents/",
           "test/",
           "tests/",
+          "integration_test/",
+          "test_driver/",
           "__tests__/",
           "*Tests/",
           "test_*.py",
@@ -455,20 +457,7 @@ rules:
   - id: await-in-loop-python
     languages:
       - python
-    paths:
-      exclude:
-        - .agents/
-        - test/
-        - tests/
-        - __tests__/
-        - "*Tests/"
-        - test_*.py
-        - "*_test.py"
-        - conftest.py
-        - "*.test.*"
-        - "*.spec.*"
-        - "*_test.dart"
-        - "*Tests.swift"
+    paths: *paths
     severity: ERROR
     message:
       "This loop awaits work inside each pass. Independent work: use the bounded-concurrency helper map_with_concurrency. Ordered work: use in_order
@@ -1036,6 +1025,8 @@ rules:
                     pattern-not-inside: "async for $X in $Y:\n  ...\n"
                   - &await_in_loop_python_id004
                     pattern-not-inside: "while True:\n  ...\n"
+                  - pattern-not-inside: "while $X:\n  await asyncio.gather(*$X, ...)\n"
+                  - pattern-not-inside: "while $X:\n  await asyncio.gather(*list($X), ...)\n"
                   - &await_in_loop_python_id005
                     pattern-not-inside:
                       patterns:
@@ -1127,7 +1118,10 @@ rules:
                         - metavariable-pattern:
                             metavariable: $...CONDITION_BODY
                             patterns:
-                              - pattern: $V = $X
+                              - pattern-either:
+                                  - pattern: $V = $X
+                                  - pattern: $A, $V = $X
+                                  - pattern: $V, $A = $X
                               - pattern-not-inside: "for $SCOPE_I in $SCOPE_C:\n  ..."
                               - pattern-not-inside: "while $SCOPE_C:\n  ..."
                               - pattern-not-inside: "def $N(...):\n  ..."
@@ -2361,20 +2355,7 @@ rules:
     languages:
       - javascript
       - typescript
-    paths:
-      exclude:
-        - .agents/
-        - test/
-        - tests/
-        - __tests__/
-        - "*Tests/"
-        - test_*.py
-        - "*_test.py"
-        - conftest.py
-        - "*.test.*"
-        - "*.spec.*"
-        - "*_test.dart"
-        - "*Tests.swift"
+    paths: *paths
     severity: ERROR
     message:
       "This loop awaits work inside each pass. Independent work: use the bounded-concurrency helper mapLimit. Ordered work: use inOrder or inOrderSteps
@@ -2640,6 +2621,14 @@ rules:
                         regex: ^\s*for(?:\s|//[^\n]*(?:\n|$)|/\*[\s\S]*?\*/)+await\b
               - &await_in_loop_javascript_id005
                 pattern-not-inside: while (true) { ... }
+              - pattern-not-inside: while ($X.size > 0) { await Promise.all($X); }
+              - pattern-not-inside: while ($X.size > 0) { await Promise.all([...$X]); }
+              - pattern-not-inside: while ($X.size > 0) { await Promise.allSettled($X); }
+              - pattern-not-inside: while ($X.size > 0) { await Promise.allSettled([...$X]); }
+              - pattern-not-inside: while ($X.length > 0) { await Promise.all($X); }
+              - pattern-not-inside: while ($X.length > 0) { await Promise.all([...$X]); }
+              - pattern-not-inside: while ($X.length > 0) { await Promise.allSettled($X); }
+              - pattern-not-inside: while ($X.length > 0) { await Promise.allSettled([...$X]); }
               - &await_in_loop_javascript_id006
                 pattern-not-inside:
                   patterns:
@@ -3937,22 +3926,10 @@ rules:
       - dart
     severity: ERROR
     message:
-      Each loop pass waits for the last one. Start independent calls together with Future.wait. A loop passes when it stops early (break or return),
-      reads a value it updates in its condition, or sleeps on purpose.
-    paths:
-      exclude:
-        - .agents/
-        - test/
-        - tests/
-        - __tests__/
-        - "*Tests/"
-        - test_*.py
-        - "*_test.py"
-        - conftest.py
-        - "*.test.*"
-        - "*.spec.*"
-        - "*_test.dart"
-        - "*Tests.swift"
+      "This loop awaits work inside each pass. Independent work: use the bounded-concurrency helper mapWithConcurrency. Ordered work: use inOrder or
+      inOrderSteps with a reason. A join in a raw loop still needs a named helper. A loop passes when it stops early (break or return), reads a value
+      it updates in its condition, or sleeps on purpose."
+    paths: *paths
     patterns:
       - pattern-either:
           - patterns:
@@ -3994,6 +3971,9 @@ rules:
       - pattern-not-inside: while ($C) { ... <... (...) async { ... <... await $E ...>; ... } ...>; ... }
       - pattern-not-regex: (?ms)^([ \t]*)await\s+for\s*\((?:[^;{]*?\{[ \t]*\n.*?^\1\}[ \t]*$|[^\n]*$)
       - pattern-not-inside: while (true) { ... }
+      - pattern-not-inside: while ($X.isNotEmpty) { await Future.wait($X, ...); }
+      - pattern-not-inside: while ($X.isNotEmpty) { await Future.wait($X.toList(), ...); }
+      - pattern-not-inside: while ($X.isNotEmpty) { await Future.wait([...$X], ...); }
       - pattern-not-inside: for ($I in $C) { ... break; }
       - pattern-not-inside: for ($I in $C) { ... return; }
       - pattern-not-inside: for ($I in $C) { ... return $R; }
@@ -5418,20 +5398,7 @@ rules:
   - id: await-in-loop-swift
     languages:
       - swift
-    paths:
-      exclude:
-        - .agents/
-        - test/
-        - tests/
-        - __tests__/
-        - "*Tests/"
-        - test_*.py
-        - "*_test.py"
-        - conftest.py
-        - "*.test.*"
-        - "*.spec.*"
-        - "*_test.dart"
-        - "*Tests.swift"
+    paths: *paths
     severity: ERROR
     message:
       "This loop awaits work inside each pass. Independent work: use the bounded-concurrency helper mapWithConcurrency. Ordered work: use inOrder or

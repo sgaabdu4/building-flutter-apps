@@ -57,7 +57,7 @@ Use the project's documented tracker when configured + authorized; native child 
 No authorized tracker → local Markdown:
 
 - Map = `features/<slug>/wayfinder/MAP.md` with the sections above; tickets = descriptively named sibling Markdown files. Directory supplies parentage, filename supplies identity.
-- Local discovery edits need an applicable Draft [PLAN.md](../templates/PLAN.md) under [plan checks](../../he/references/gates.md#plan-checks). Link the map; keep decision detail in tickets. If the user forbids that plan, report the gate blocker.
+- Local discovery edits need an applicable Draft [PLAN.md](../templates/PLAN.md) under [plan checks](../../he/references/plan-checks.md#plan-checks). Link the map; keep decision detail in tickets. If the user forbids that plan, report the gate blocker.
 - Claim = write worker identity in Assignee before work; never overwrite another claim. Serialize shared-file claims: Markdown has no atomic assignment guarantee.
 - Resolution = append `## Resolution` + mark closed. `Blocked by` is a body convention, without native dependency rendering or concurrency guarantees.
 

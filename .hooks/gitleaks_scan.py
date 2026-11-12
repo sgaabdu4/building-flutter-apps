@@ -11,7 +11,7 @@ from process_group import run_in_group
 
 
 def scan_paths(repository: Path) -> list[Path]:
-    """Return tracked files plus nonignored working-tree files."""
+    """Return tracked files plus nonignored working-tree files that still exist."""
     result = subprocess.run(
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         cwd=repository,
@@ -19,18 +19,58 @@ def scan_paths(repository: Path) -> list[Path]:
         capture_output=True,
         text=True,
     )
-    deleted = subprocess.run(
-        ["git", "ls-files", "-z", "--deleted"],
-        cwd=repository,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    paths = {Path(value) for value in result.stdout.split("\0") if value}
-    paths -= {Path(value) for value in deleted.stdout.split("\0") if value}
+    paths = {
+        Path(value)
+        for value in result.stdout.split("\0")
+        if value and os.path.lexists(repository / value)
+    }
     if any(path.is_absolute() or ".." in path.parts for path in paths):
         raise ValueError("Scan inventory contains an unsafe repository path")
     return sorted(paths)
+
+
+def git_owner(folder: Path) -> Path | None:
+    """Return the nearest folder at or above this one that holds a .git entry."""
+    return next(
+        (parent for parent in (folder, *folder.parents) if (parent / ".git").exists()),
+        None,
+    )
+
+
+class ScanCache:
+    """One Git listing per repository, shared by every link that reaches it."""
+
+    def __init__(self) -> None:
+        self.listings: dict[Path, list[Path]] = {}
+        self.tracked: dict[Path, set[str]] = {}
+
+    def paths(self, root: Path) -> list[Path]:
+        if root not in self.listings:
+            owner = git_owner(root)
+            if owner is None or owner == root or owner not in self.listings:
+                self.listings[root] = scan_paths(root)
+            else:
+                prefix = root.relative_to(owner).parts
+                self.listings[root] = [
+                    Path(*path.parts[len(prefix) :])
+                    for path in self.listings[owner]
+                    if path.parts[: len(prefix)] == prefix
+                    and len(path.parts) > len(prefix)
+                ]
+        return self.listings[root]
+
+    def is_tracked(self, path: Path) -> bool:
+        """Ask the repository owning the file, which may be a submodule."""
+        if path.parent not in self.tracked:
+            result = subprocess.run(
+                ["git", "ls-files", "-z"],
+                cwd=path.parent,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.tracked[path.parent] = set(result.stdout.split("\0"))
+        return path.name in self.tracked[path.parent]
 
 
 def is_gitlink(repository: Path, relative_path: Path) -> bool:
@@ -45,18 +85,6 @@ def is_gitlink(repository: Path, relative_path: Path) -> bool:
     return any(
         entry.startswith("160000 ") for entry in result.stdout.split("\0") if entry
     )
-
-
-def is_tracked(path: Path) -> bool:
-    """Ask the repository owning the file, which may be a submodule."""
-    result = subprocess.run(
-        ["git", "ls-files", "-z", "--", path.name],
-        cwd=path.parent,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return bool(result.stdout)
 
 
 def validate_current_files_command(command: list[str]) -> None:
@@ -77,10 +105,12 @@ def validate_current_files_gate(role: object, command: list[str]) -> None:
         validate_current_files_command(command)
 
 
-def copy_link_target(source: Path, target: Path, ancestors: frozenset[Path]) -> None:
+def copy_link_target(
+    source: Path, target: Path, ancestors: frozenset[Path], cache: ScanCache
+) -> None:
     """Copy a safe tracked alias without preserving an executable link."""
     if source.is_dir():
-        copy_scan_tree(source, target, ancestors)
+        copy_scan_tree(source, target, ancestors, cache)
         return
     if not source.is_file():
         raise ValueError(f"Scan source is not a regular file: {source}")
@@ -89,7 +119,11 @@ def copy_link_target(source: Path, target: Path, ancestors: frozenset[Path]) -> 
 
 
 def copy_scan_entry(
-    root: Path, destination: Path, relative_path: Path, ancestors: frozenset[Path]
+    root: Path,
+    destination: Path,
+    relative_path: Path,
+    ancestors: frozenset[Path],
+    cache: ScanCache,
 ) -> None:
     """Copy one inventory entry, recursing only into known source directories."""
     entry = root / relative_path
@@ -101,9 +135,9 @@ def copy_scan_entry(
         raise ValueError(f"Scan source escapes the repository: {relative_path}")
     target = destination / relative_path
     if entry.is_symlink():
-        if source.is_file() and not is_tracked(source):
+        if source.is_file() and not cache.is_tracked(source):
             return
-        copy_link_target(source, target, ancestors)
+        copy_link_target(source, target, ancestors, cache)
         return
     if source.is_dir():
         if not is_gitlink(root, relative_path):
@@ -112,21 +146,25 @@ def copy_scan_entry(
             raise ValueError(
                 f"Scan submodule is uninitialized: {relative_path}; run git submodule update --init --recursive"
             )
-        copy_scan_tree(source, target, ancestors)
+        copy_scan_tree(source, target, ancestors, cache)
         return
-    copy_link_target(source, target, ancestors)
+    copy_link_target(source, target, ancestors, cache)
 
 
 def copy_scan_tree(
-    repository: Path, destination: Path, ancestors: frozenset[Path] = frozenset()
+    repository: Path,
+    destination: Path,
+    ancestors: frozenset[Path] = frozenset(),
+    cache: ScanCache | None = None,
 ) -> None:
     """Copy scan inputs, recursively scanning tracked submodules."""
+    cache = cache or ScanCache()
     root = repository.resolve()
     if root in ancestors:
         raise ValueError("Scan source contains a directory symlink cycle")
     next_ancestors = ancestors | {root}
-    for relative_path in scan_paths(root):
-        copy_scan_entry(root, destination, relative_path, next_ancestors)
+    for relative_path in cache.paths(root):
+        copy_scan_entry(root, destination, relative_path, next_ancestors, cache)
 
 
 def snapshot_command(command: list[str], repository: Path) -> list[str]:
@@ -250,7 +288,7 @@ def run_gate_command(
         from gate_config import has_workflows, repository_files
 
         zizmor = any(
-            Path(part).name.partition("@")[0] == "zizmor" for part in command[:3]
+            Path(part).name.partition("@")[0] == "zizmor" for part in command[:5]
         )
         if zizmor and not has_workflows(directory, repository_files(directory)):
             stderr.write("No GitHub workflows to audit: zizmor collected no inputs.\n")

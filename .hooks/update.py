@@ -1,6 +1,5 @@
 """Install a CI-verified upstream revision with an isolated local Git commit."""
 
-import http.client
 import json
 import os
 import re
@@ -8,39 +7,36 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.request
-from collections.abc import Callable
 from operator import itemgetter
 from pathlib import Path
 
 import agent_hooks
 import hook_chain
 import source_trees
+from gate_config import SOURCE_FILE, parse_config, repository_files
+from local_edits import refusal_reason
 from mcp_setup import retired_settings
+from project_files import keep, tell_once
 from release_history import StaleRelease, ordered
 from submodules import update_submodules
 from update_runner import (
+    REPAIR_SUBJECT,
     commit_update,
     current_head,
     known_failure,
-    link_state,
     rebase_sessions,
-    relink_verified,
     remember_failure,
-    roll_back,
-    snapshot,
     stale_error,
+    tree_entries,
+    undo_hooked_commit,
     update_attempt,
     update_blocker,
-    write_verified,
 )
 
 COMMIT_ID = re.compile(r"[0-9a-f]{40}")
 
 UPSTREAM = "sgaabdu4/hard-eng"
 REPOSITORY = f"https://github.com/{UPSTREAM}.git"
-SOURCE_FILE = ".hooks/hard-eng-source.json"
 
 
 def github_token() -> str | None:
@@ -59,6 +55,10 @@ def github_token() -> str | None:
 
 
 def github_response(endpoint: str, headers: dict[str, str]) -> bytes:
+    import http.client
+    import urllib.error
+    import urllib.request
+
     auth = {"Authorization": f"Bearer {token}"} if (token := github_token()) else {}
     url = f"https://api.github.com/{endpoint}"
     request = urllib.request.Request(url, headers={**headers, **auth})
@@ -67,6 +67,13 @@ def github_response(endpoint: str, headers: dict[str, str]) -> bytes:
             return response.read()
     except http.client.HTTPException as error:
         raise OSError(f"GitHub response for {endpoint} was cut short") from error
+    except urllib.error.HTTPError:
+        raise
+    except urllib.error.URLError as error:
+        raise OSError(
+            f"Could not reach api.github.com ({error.reason}); "
+            "check the network and run the same command again"
+        ) from error
 
 
 def github_json(endpoint: str) -> object:
@@ -77,6 +84,8 @@ def github_json(endpoint: str) -> object:
 
 def upstream_moved(previous: str) -> bool:
     """One 40-byte request instead of a 100-commit page; an authenticated 304 is free."""
+    import urllib.error
+
     headers = {"Accept": "application/vnd.github.sha", "If-None-Match": f'"{previous}"'}
     try:
         head = github_response(f"repos/{UPSTREAM}/commits/main", headers)
@@ -216,8 +225,6 @@ def revision_follows(revision: str, reference: str) -> bool:
 
 
 def scaffold_files(source: Path) -> set[str]:
-    from gate_config import repository_files
-
     skills = list((source / ".agents/skills").iterdir())
     if any(skill.is_symlink() and not skill.is_dir() for skill in skills):
         raise ValueError(
@@ -325,9 +332,10 @@ def update_plan(
         timeout=60,
         check=False,
     )
-    sys.stderr.write(planned.stderr)
+    before, _, pending = planned.stderr.partition("CI setup pending:")
+    tell_once(before + pending.partition("\n")[2])
     if planned.returncode != 0:
-        reason = " | ".join(planned.stderr.strip().splitlines()[-5:])
+        reason = refusal_reason(planned.stderr)
         raise ValueError(f"setup refused the update: {reason or 'no reason printed'}")
     plan = json.loads(planned.stdout)
     hook = hook_chain.planned_hook(root, plan)
@@ -592,27 +600,20 @@ def write_changes(root: Path, changes: dict[str, str | None]) -> None:
             replace_file(target, content.encode())
 
 
-def replace_file(
-    target: Path, content: bytes, ready: Callable[[], bool] = lambda: True
-) -> bool:
-    """Swap in the whole file if `ready` holds just before, so a write is never partial."""
+def replace_file(target: Path, content: bytes) -> None:
+    """Swap in the whole file, so a write is never partial."""
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.is_symlink():
-        if not ready():
-            return False
         target.write_bytes(content)
-        return True
+        return
     pending = target.with_name(target.name + ".hard-eng-pending")
     try:
         pending.write_bytes(content)
         if target.exists():
             shutil.copymode(target, pending)
-        if not ready():
-            return False
         pending.replace(target)
     finally:
         pending.unlink(missing_ok=True)
-    return True
 
 
 def write_links(root: Path, links: dict[str, str | None]) -> None:
@@ -703,13 +704,8 @@ def repair_installation(root: Path, previous: str) -> str:
         and (
             not (root / name).exists()
             or retired_parent(root, name)
-            or name
-            in {
-                "AGENTS.md",
-                "CLAUDE.md",
-                "AGENTS.override.md",
-                "hard-eng.gates.json",
-            }
+            or name in RULE_FILES
+            or name in {"hard-eng.gates.json", ".github/workflows/hard-eng.yml"}
             or name == SOURCE_FILE
             and '"skills"' in (root / name).read_text(errors="replace")
             or any(old in (root / name).read_text(errors="replace") for old in retired)
@@ -725,77 +721,62 @@ def repair_installation(root: Path, previous: str) -> str:
         status += "; installed the missing pre-push hook"
     status += hook_chain.install_worktree_hook(root)
     names = sorted({*missing, *added})
-    clean = bool(names) and not local_state(root, names)
-    moved = {name for name in missing if retired_parent(root, name)}
+    dirty = local_state(root, names) if names else []
     retire_local_generation(root)
     if not names:
         return status + "."
-    # Files beneath a retired link must still be absent when the repair writes them.
-    before = {
-        name: None if name in moved else content
-        for name, content in snapshot(root, missing).items()
-    }
-    before_links = link_state(root, added)
-    applied: list[str] = []
-    try:
-        write_verified(root, missing, before, (), applied)
-        relink_verified(root, added, before_links, applied)
-    except (OSError, ValueError) as error:
-        if kept := roll_back(root, missing, added, before, before_links, applied):
-            raise ValueError(
-                f"{error}; kept later edits to {', '.join(kept)} instead of rolling them back"
-            ) from error
-        raise
+    write_changes(root, missing)
+    write_links(root, added)
     return f"{status}; repaired {install_paths(names)}. " + commit_install(
-        root, names, clean, {**missing, **added}
+        root, names, dirty, {**missing, **added}
     )
 
 
 def commit_install(
     root: Path,
     names: list[str],
-    clean: bool,
+    dirty: list[str],
     expected: dict[str, str | None] | None = None,
 ) -> str:
-    reason = "these paths already had local changes"
-    if clean:
+    reason = "these paths already had local changes: " + install_paths(
+        [line[3:].strip('"') for line in dirty]
+    )
+    if not dirty:
         subprocess.run(["git", "add", "--force", "--", *names], cwd=root, check=True)
         if not subprocess.run(
             ["git", "diff", "--cached", "--quiet", "--", *names], cwd=root, check=False
         ).returncode:
             return "Installed files already match the current commit."
+        staged = tree_entries(root, ["git", "ls-files", "-s"], 1, names)
         head = current_head(root)
         result = subprocess.run(
-            ["git", "commit", "--only", "-m", "Install Hard Eng", "--", *names],
+            ["git", "commit", "--only", "-m", REPAIR_SUBJECT, "--", *names],
             cwd=root,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             check=False,
         )
-        if result.returncode == 0:
-            rebase_sessions(root, head, "Install Hard Eng", expected)
+        changed: list[str] = []
+        if result.returncode == 0 and expected:
+            changed = undo_hooked_commit(root, head, staged, expected, names)
+        if result.returncode == 0 and not changed:
+            rebase_sessions(root, head)
             return "Committed the installed files locally without pushing."
-        subprocess.run(["git", "reset", "--quiet", "--", *names], cwd=root, check=False)
-        reason = " | ".join(result.stdout.strip().splitlines()[-3:])
+        if changed:
+            reason = (
+                f"a project commit hook changed {', '.join(changed)}; "
+                "leave Hard Eng's files out of that hook"
+            )
+        else:
+            subprocess.run(
+                ["git", "reset", "--quiet", "--", *names], cwd=root, check=False
+            )
+            reason = " | ".join(result.stdout.strip().splitlines()[-3:])
     return (
-        f"Installed files are not committed ({reason}). Commit them so updates and "
-        "worktrees include them: " + install_paths(names)
+        f"Installed files are not committed ({reason}). Commit all installed files so "
+        "updates and worktrees include them: " + install_paths(names)
     )
-
-
-def refuse_local_state(root: Path, names: list[str]) -> None:
-    status = local_state(root, names)
-    if status and all(line.startswith("?? ") for line in status):
-        raise ValueError(
-            "Installed Hard Eng files are not committed: "
-            + install_paths([line[3:].strip('"') for line in status])
-            + "; commit them, then rerun the update"
-        )
-    if status:
-        raise ValueError(
-            "The update overlaps local edits; preserve them and ask before updating"
-        )
 
 
 def update(root: Path, repair: bool = False, *, remember: Path | None = None) -> str:
@@ -808,7 +789,7 @@ def update(root: Path, repair: bool = False, *, remember: Path | None = None) ->
         if repair or local_generation(root):
             return repair_installation(root, previous)
         return repair_current_hook(root, previous)
-    attempt = update_attempt(root, revision) if remember else None
+    attempt = update_attempt(current_head(root), revision) if remember else None
     if attempt is not None and remember and (known := known_failure(remember, attempt)):
         return known
     with tempfile.TemporaryDirectory(prefix="hard-eng-update-") as temporary:
@@ -826,43 +807,19 @@ def install_revision(root: Path, source: Path, old: Path, revision: str) -> str:
     if not changes and not links:
         install_planned_hook(root, hook)
         return "Hard Eng already matches the verified source."
-    names = sorted({*changes, *links})
-    refuse_local_state(root, names)
     local_settings(root)
-    before = snapshot(root, changes)
     validate_gates(root, source, changes)
-    if snapshot(root, changes) != before:
-        raise ValueError(
-            "Files changed during verification; the update was not applied"
-        )
-    if subprocess.check_output(
-        [
-            "git",
-            "status",
-            "--porcelain",
-            "--untracked-files=all",
-            "--ignored",
-            "--",
-            *names,
-        ],
-        cwd=root,
-        text=True,
-    ):
-        raise ValueError(
-            "The update paths changed during verification; nothing was applied"
-        )
-    commit_update(root, changes, links, revision, before)
+    commit_update(root, changes, links, revision)
     retire_local_generation(root)
     if hook[0] not in changes:
         install_planned_hook(root, hook)
     return f"Updated Hard Eng to {revision}; created an isolated local commit without pushing."
 
 
+RULE_FILES = {"AGENTS.md", "CLAUDE.md", "AGENTS.override.md"}
 INSTALLED_FILES = {
     SOURCE_FILE,
-    "AGENTS.md",
-    "CLAUDE.md",
-    "AGENTS.override.md",
+    *RULE_FILES,
     ".husky/pre-push",
     ".github/workflows/hard-eng.yml",
     ".github/workflows/pr-text.yml",
@@ -883,16 +840,10 @@ def maybe_installed(name: str) -> bool:
     )
 
 
-def update_in_diff(root: Path, base: str) -> tuple[str, str, set[str]] | None:
-    """The installed and previous revisions and changed paths of a committed update."""
-    marker = root / SOURCE_FILE
-    if not marker.is_file():
-        return None
-    # Only a clean, committed installation update may narrow the application checks.
-    if subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True):
-        return None
+def recorded_revisions(root: Path, base: str) -> tuple[str, str] | None:
+    """The installed revision and the revision at the base, when both are commit ids."""
     try:
-        revision = json.loads(marker.read_text()).get("revision")
+        revision = json.loads((root / SOURCE_FILE).read_text()).get("revision")
         previous = json.loads(
             subprocess.check_output(
                 ["git", "show", f"{base}:{SOURCE_FILE}"],
@@ -901,6 +852,35 @@ def update_in_diff(root: Path, base: str) -> tuple[str, str, set[str]] | None:
                 stderr=subprocess.DEVNULL,
             )
         ).get("revision")
+    except (OSError, subprocess.CalledProcessError, ValueError, AttributeError):
+        return None
+    if (
+        isinstance(revision, str)
+        and isinstance(previous, str)
+        and COMMIT_ID.fullmatch(revision)
+        and COMMIT_ID.fullmatch(previous)
+    ):
+        return revision, previous
+    return None
+
+
+def commit_subjects(root: Path, base: str) -> list[str]:
+    return subprocess.check_output(
+        ["git", "log", "--format=%s", f"{base}..HEAD"], cwd=root, text=True
+    ).splitlines()
+
+
+def update_in_diff(root: Path, base: str) -> tuple[str, str, set[str]] | None:
+    """The installed and previous revisions and changed paths of a committed update."""
+    # Only a clean, committed installation update may narrow the application checks.
+    if not (root / SOURCE_FILE).is_file() or subprocess.check_output(
+        ["git", "status", "--porcelain"], cwd=root, text=True
+    ):
+        return None
+    if (found := recorded_revisions(root, base)) is None:
+        return None
+    revision, previous = found
+    try:
         names = set(
             subprocess.check_output(
                 ["git", "diff", "--name-only", "--no-renames", "-z", base, "--"],
@@ -908,22 +888,24 @@ def update_in_diff(root: Path, base: str) -> tuple[str, str, set[str]] | None:
                 text=True,
             ).split("\0")
         ) - {""}
-        subjects = subprocess.check_output(
-            ["git", "log", "--format=%s", f"{base}..HEAD"], cwd=root, text=True
-        ).splitlines()
-    except (subprocess.CalledProcessError, ValueError, AttributeError):
+        subjects = commit_subjects(root, base)
+    except subprocess.CalledProcessError:
         return None
-    repair = revision == previous and set(subjects) == {"Install Hard Eng"}
-    if (
-        (SOURCE_FILE not in names or revision == previous)
-        and not repair
-        or not isinstance(previous, str)
-        or not isinstance(revision, str)
-        or not COMMIT_ID.fullmatch(previous)
-        or not COMMIT_ID.fullmatch(revision)
-    ):
+    repair = revision == previous and set(subjects) == {REPAIR_SUBJECT}
+    if (SOURCE_FILE not in names or revision == previous) and not repair:
         return None
     return revision, previous, names
+
+
+def update_since(root: Path, base: str) -> tuple[str, str] | None:
+    """The revisions of a real update or a repair in this branch, with fixes beside it allowed."""
+    if (found := recorded_revisions(root, base)) is None:
+        return None
+    try:
+        repair = REPAIR_SUBJECT in commit_subjects(root, base)
+    except subprocess.CalledProcessError:
+        return None
+    return found if found[0] != found[1] or repair else None
 
 
 def release_installed(
@@ -942,7 +924,9 @@ def release_installed(
         if path.is_dir()
     }
     env = hook_chain.own_hooks_env(root)
-    changes, links, _, _ = update_plan(root, source, source, env)
+    key = ("tree_plan", str(root), str(source))
+    made = keep("listings", key, lambda: update_plan(root, source, source, env))
+    changes, links = made[:2]
     if (
         not names <= allowed
         or (env is not None and ".husky/pre-push" in names)
@@ -960,7 +944,7 @@ def release_installed(
     return True
 
 
-def check_scaffold_update(root: Path, base: str) -> bool:
+def check_scaffold_update(root: Path, base: str, *, sources: bool = True) -> bool:
     found = update_in_diff(root, base)
     if found is None or not all(maybe_installed(name) for name in found[2]):
         return False
@@ -974,6 +958,12 @@ def check_scaffold_update(root: Path, base: str) -> bool:
             return False
     except (subprocess.CalledProcessError, StaleRelease):
         return False
+    if sources:
+        from coverage_sources import require_listed_sources
+
+        gates = parse_config((root / "hard-eng.gates.json").read_text())
+        files = repository_files(root)
+        require_listed_sources(root, gates["packages"], files, python_only=False)
     print(
         "Scaffold-only update: source CI verified and the gate configuration accepted.",
         flush=True,
@@ -987,11 +977,19 @@ def installed_update_paths(root: Path, base: str) -> set[str]:
     if found is None:
         return set()
     revision, previous, names = found
+    return proven_installed(root, base, names, revision, previous)
+
+
+def proven_installed(
+    root: Path, base: str, names: set[str], revision: str, previous: str
+) -> set[str]:
+    """The installed paths among these names, when the verified release installs them exactly."""
     installed = {name for name in names if maybe_installed(name)}
     try:
-        proven = verified_revision(revision) and release_installed(
-            root, base, installed, revision, previous
-        )
-    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        proven = keep(
+            "references", ("verified", revision), lambda: verified_revision(revision)
+        ) and release_installed(root, base, installed, revision, previous)
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
+        source_trees.tell_unproven(error)
         return set()
     return installed if proven else set()

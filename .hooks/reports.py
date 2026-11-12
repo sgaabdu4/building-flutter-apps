@@ -11,17 +11,34 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TextIO, cast
 
-from coverage_sources import erased_swift, erased_typescript
+from coverage_sources import (
+    erased_swift,
+    erased_typescript,
+    lcov_coverage,
+    omit_step,
+    python_coverage,
+    xccov_coverage,
+)
 from dart_coverage import erased_dart
 from dart_test_report import dart_events, failure_summary
-from fallow_report import validate_fallow, write_istanbul
+from fallow_report import finding_lines as fallow_findings
+from fallow_report import sdk_binaries, validate_fallow, write_istanbul
 from gate_config import Gate, Group, JsonObject
 from gate_schedule import QUICK_ROLES
 from project_setup import (
     dependency_free,
     package_script_invocation,
 )
+from react_report import finding_lines as react_findings
 from react_report import incomplete_reason
+from scan_findings import (
+    dart_performance_findings,
+    decimate_findings,
+    import_linter_findings,
+    jscpd_findings,
+    semgrep_findings,
+    trivy_findings,
+)
 
 SHELL_OPERATOR = re.compile(r"[;&|]")
 WARNINGS_LINE = re.compile(r"^Warnings$", re.MULTILINE)
@@ -61,23 +78,24 @@ def emit_dart_test_failure(
         print(summary)
 
 
-def parallel_hint(code: int, tests: bool, command: list[str]) -> str:
-    if code == 0 or not tests or "-n auto" not in " ".join(command):
-        return ""
-    return (
-        "\nThese tests ran in parallel (-n auto). If they pass serially, isolate "
-        "the state they share, or set -n 0 in this gate's command."
-    )
-
-
-def quick_groups(groups: list[Group], quick: bool = True) -> list[Group]:
+def quick_groups(
+    groups: list[Group], quick: bool = True, installed: frozenset[str] = frozenset()
+) -> list[Group]:
     if not quick:
         return groups
+    from process_group import INSTALL_ROLES, install_key
+
     return [
         {
             **group,
             "checks": [
-                gate for gate in group["checks"] if gate.get("role") in QUICK_ROLES
+                gate
+                for gate in group["checks"]
+                if gate.get("role") in QUICK_ROLES
+                or (
+                    gate.get("role") in INSTALL_ROLES
+                    and install_key(group) not in installed
+                )
             ],
         }
         for group in groups
@@ -137,6 +155,12 @@ def validate_scanner_log(scanner: str | None, log: TextIO) -> None:
         SCANNER_LOGS[scanner](log)
 
 
+def junit_root(path: Path) -> ET.Element:
+    # Local JUnit only; ElementTree rejects external entities (test_junit_rejects_entities).
+    # nosemgrep: python.lang.security.use-defused-xml-parse.use-defused-xml-parse
+    return ET.parse(path).getroot()
+
+
 def completed_tests(path: Path, kind: str) -> int:
     if kind == "dart-tests":
         if (
@@ -162,10 +186,15 @@ def completed_tests(path: Path, kind: str) -> int:
         ):
             raise ValueError("Test report does not contain a successful completed run")
         return passed
-    # Local JUnit only; ElementTree rejects external entities (test_junit_rejects_entities).
-    # nosemgrep: python.lang.security.use-defused-xml-parse.use-defused-xml-parse
-    tree = ET.parse(path)
-    if tree.getroot().tag not in {"testsuites", "testsuite"}:
+    try:
+        tree = junit_root(path)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"The command passed but wrote no JUnit report ({'/'.join(path.parts[-2:])}). "
+            "Make the command of this gate write its JUnit report to the `report` path "
+            "that hard-eng.gates.json gives for this gate."
+        ) from None
+    if tree.tag not in {"testsuites", "testsuite"}:
         raise ValueError("Expected a JUnit test report")
     if tree.findall(".//failure") or tree.findall(".//error"):
         raise ValueError("Test report contains failures or errors")
@@ -188,8 +217,7 @@ def reported_skips(path: Path, kind: str) -> set[str]:
         }
     if kind == "xcode-tests":
         return set()
-    # nosemgrep: python.lang.security.use-defused-xml-parse.use-defused-xml-parse
-    tree = ET.parse(path)
+    tree = junit_root(path)
     return {
         test.get("name", "").split("[", 1)[0]
         for test in tree.iter("testcase")
@@ -213,80 +241,9 @@ def skipped_tests(root: Path, groups: list[Group], since: float) -> set[str]:
     return names
 
 
-def python_coverage(path: Path, directory: Path) -> dict[Path, tuple[int, int]]:
-    files = {}
-    report = json.loads(path.read_text())
-    entries = report.get("files") if isinstance(report, dict) else None
-    if not isinstance(entries, dict):
-        raise TypeError("Invalid Python coverage files")
-    for name, entry in entries.items():
-        summary = entry.get("summary") if isinstance(entry, dict) else None
-        if not isinstance(summary, dict):
-            raise TypeError("Invalid Python coverage summary")
-        covered, total = summary.get("covered_lines"), summary.get("num_statements")
-        if (
-            type(covered) is not int
-            or type(total) is not int
-            or not 0 <= covered <= total
-        ):
-            raise ValueError("Invalid Python line coverage counts")
-        file = (directory / name).resolve()
-        if file in files:
-            raise ValueError(f"Duplicate Python coverage file: {name}")
-        files[file] = covered, total
-    return files
-
-
-def xccov_coverage(path: Path, directory: Path) -> dict[Path, tuple[int, int]]:
-    """Per-file counts from `xccov view --report --json`; targets share a file."""
-    report = json.loads(path.read_text())
-    targets = report.get("targets") if isinstance(report, dict) else None
-    if not isinstance(targets, list):
-        raise TypeError("Invalid xccov targets")
-    files: dict[Path, tuple[int, int]] = {}
-    for target in targets:
-        for entry in target["files"]:
-            covered, total = entry["coveredLines"], entry["executableLines"]
-            if type(covered) is not int or type(total) is not int:
-                raise TypeError("Invalid xccov line counts")
-            if not 0 <= covered <= total:
-                raise ValueError("Invalid xccov line counts")
-            file = (directory / entry["path"]).resolve()
-            files[file] = max(
-                files.get(file, (0, 0)), (covered, total), key=lambda c: (c[1], c[0])
-            )
-    return files
-
-
-def lcov_coverage(path: Path, directory: Path) -> dict[Path, tuple[int, int]]:
-    files = {}
-    lines = {}
-    source = None
-    for record in path.read_text().splitlines():
-        if record.startswith("SF:"):
-            if source is not None or not record[3:]:
-                raise ValueError("Invalid LCOV source record")
-            source = (directory / record[3:]).resolve()
-            files.setdefault(source, (0, 0))
-        elif record.startswith("DA:"):
-            number, hits, *_ = record[3:].split(",")
-            number, hits = int(number), int(hits)
-            if source is None or number <= 0 or hits < 0:
-                raise ValueError("Invalid LCOV line record")
-            lines[source, number] = lines.get((source, number), False) or hits > 0
-        elif record == "end_of_record":
-            source = None
-    if source is not None:
-        raise ValueError("Incomplete LCOV source record")
-    for (file, _), hit in lines.items():
-        covered, total = files[file]
-        files[file] = covered + hit, total + 1
-    return files
-
-
-def line_coverage(
+def expected_coverage(
     path: Path, kind: str, directory: Path, expected: set[Path]
-) -> tuple[int, int]:
+) -> dict[Path, tuple[int, int]]:
     reader = {"python-tests": python_coverage, "xcode-tests": xccov_coverage}.get(
         kind, lcov_coverage
     )
@@ -311,25 +268,72 @@ def line_coverage(
         outside_lib = kind == "dart-tests" and any(
             path.parts[0] != "lib" for path in relative
         )
+        from dart_boundaries import flutter_without_test
+
         raise ValueError(
             f"Coverage report omits production files: {', '.join(map(str, relative))}. "
             "Cover them, or mark generator output with "
             "`<pattern> linguist-generated=true` in .gitattributes"
+            + (omit_step(directory, relative) if kind == "python-tests" else "")
             + (
-                ". Dart outside lib/ needs tests under test/ that import it by relative"
-                " path and import package:test/test.dart (not flutter_test), with test"
-                " as a dev dependency"
+                ". For Dart code outside lib/: move it under lib/ and test it there"
                 if outside_lib
                 else ""
             )
+            + (
+                ". Or leave it in place and write tests under test/ that import it by a"
+                " relative path and use package:test/test.dart (not flutter_test). The"
+                " second way needs `test` as a dev dependency and a setup rerun, which adds"
+                " the VM test run"
+                if outside_lib and not flutter_without_test(directory)
+                else ""
+            )
         )
-    covered = sum(files[file][0] for file in expected)
-    total = sum(files[file][1] for file in expected)
+    return {file: files[file] for file in expected}
+
+
+def line_coverage(
+    path: Path, kind: str, directory: Path, expected: set[Path]
+) -> tuple[int, int]:
+    return coverage_totals(
+        path, kind, directory, expected_coverage(path, kind, directory, expected)
+    )
+
+
+def coverage_totals(
+    path: Path, kind: str, directory: Path, files: dict[Path, tuple[int, int]]
+) -> tuple[int, int]:
+    covered = sum(hit for hit, _ in files.values())
+    total = sum(count for _, count in files.values())
     if not total:
         raise ValueError("Coverage report contains no executable lines")
     if kind != "xcode-tests":
-        report_branches(path, kind, directory, expected)
+        report_branches(path, kind, directory, set(files))
     return covered, total
+
+
+def check_coverage(path: Path, kind: str, directory: Path, expected: set[Path]) -> None:
+    files = expected_coverage(path, kind, directory, expected)
+    covered, total = coverage_totals(path, kind, directory, files)
+    print(
+        f"Line coverage: {covered}/{total} ({100 * covered / total:.2f}%; minimum 70%)"
+    )
+    if covered * 100 < total * 70:
+        raise ValueError(
+            "HE-COVERAGE-MIN: Line coverage is below 70%. Files with the most uncovered lines: "
+            + most_uncovered(files, directory)
+        )
+
+
+def most_uncovered(files: dict[Path, tuple[int, int]], directory: Path) -> str:
+    lost = sorted(
+        (hit - count, file.relative_to(directory.resolve()), count)
+        for file, (hit, count) in files.items()
+        if hit < count
+    )
+    return ", ".join(
+        f"{file} {-gap} of {count} uncovered" for gap, file, count in lost[:5]
+    )
 
 
 def report_branches(
@@ -371,7 +375,9 @@ def validate_osv_package(
         isinstance(package.get(key), str) and package[key]
         for key in ("name", "version", "ecosystem")
     ):
-        raise ValueError("OSV report is missing package identity")
+        from python_setup import osv_identity
+
+        osv_identity(package, source["path"])
     if item.get("vulnerabilities", []) != [] or item.get("groups", []) != []:
         found = item.get("vulnerabilities")
         entries = found if isinstance(found, list) else []
@@ -489,9 +495,14 @@ def validate_semgrep(path: Path) -> None:
                 raise ValueError(
                     "Semgrep requires scanned files and executed rules (--time)"
                 )
-        if timing.get("fixpoint_timeouts", []) != []:
+        if timeouts := timing.get("fixpoint_timeouts", []):
+            paths = {(t.get("location") or {}).get("path") for t in timeouts}
+            named = ", ".join(sorted(p for p in paths if p))
             raise ValueError(
-                f"Semgrep reports analysis timeouts: {timing['fixpoint_timeouts']}"
+                f"Semgrep ran out of time on {named}. If a file holds big tables of "
+                "text constants, move them to a data module, then run the same check again"
+                if named
+                else "Semgrep ran out of time and named no file; run the same check again"
             )
         targets = timing["targets"]
         if not isinstance(targets, list) or {t["path"] for t in targets} != set(
@@ -809,9 +820,12 @@ def validate_scanner_report(
     elif scanner == "jscpd":
         validate_jscpd(path, lambda: jscpd_below_minimum(command, directory, timeout))
     elif scanner == "freshness":
-        from freshness import bun_waiting, validate_freshness
+        from freshness import freshness_waiting, validate_freshness
 
-        validate_freshness(path, gate, waiting=bun_waiting(directory))
+        waiting = freshness_waiting(gate, directory)
+        validate_freshness(path, gate, waiting=waiting, directory=directory)
+    elif scanner == "fallow":
+        validate_fallow(path, sdk_binaries(directory), directory)
     else:
         SCANNERS[scanner](path)
 
@@ -825,14 +839,53 @@ def scanner_result(
     directory: Path,
     timeout: float,
 ) -> None:
-    """OSV writes findings only to its report, so a failed scan shows them from there."""
+    """A failed scan shows its findings from its report, as the tool prints none."""
     if passed:
         validate_scanner_report(scanner, gate, path, command, directory, timeout)
-    elif scanner == "osv" and path.is_file():
+    elif scanner in {"osv", "osv-image"} and path.is_file():
         try:
             validate_scanner_report(scanner, gate, path, command, directory, timeout)
         except ValueError as error:
             print(error)
+    elif scanner in FINDING_READERS:
+        lines = FINDING_READERS[scanner](path)
+        if (more := len(lines) - FINDING_LIMIT) > 0:
+            lines[FINDING_LIMIT:] = [f"{more} more findings in {path}"]
+        for line in lines:
+            print(f"{gate['name']}: {line}")
+        if scanner == "import-linter" and missing_build_system(lines, directory):
+            print(
+                f"{gate['name']}: Add a [build-system] table to pyproject.toml and run `uv sync`."
+            )
+
+
+def missing_build_system(lines: list[str], directory: Path) -> bool:
+    """Import Linter cannot find the package when uv has no build system to install it with."""
+    project = directory / "pyproject.toml"
+    return (
+        any(line.startswith("Could not find package") for line in lines)
+        and project.is_file()
+        and "[build-system]" not in project.read_text()
+    )
+
+
+def commit_sha(item: JsonObject) -> str:
+    prints = item.get("partialFingerprints")
+    sha = prints.get("commitSha") if isinstance(prints, dict) else None
+    return f" in commit {sha[:12]}" if isinstance(sha, str) and sha else ""
+
+
+def gitleaks_findings(path: Path) -> list[str]:
+    try:
+        results = json.loads(path.read_text())["runs"][0]["results"]
+        return [
+            f"{item['ruleId']} {place['artifactLocation']['uri']}:"
+            f"{place['region']['startLine']}{commit_sha(item)}"
+            for item in results
+            for place in [item["locations"][0]["physicalLocation"]]
+        ]
+    except (OSError, ValueError, KeyError, IndexError, TypeError):
+        return []
 
 
 def validate_gitleaks(path: Path) -> None:
@@ -924,4 +977,16 @@ SCANNERS = {
     "jscpd": validate_jscpd,
 }
 
+FINDING_LIMIT = 20
+FINDING_READERS = {
+    "gitleaks": gitleaks_findings,
+    "react-doctor": react_findings,
+    "fallow": fallow_findings,
+    "semgrep": semgrep_findings,
+    "trivy": trivy_findings,
+    "dart-decimate": decimate_findings,
+    "jscpd": jscpd_findings,
+    "import-linter": import_linter_findings,
+    "performance-dart": dart_performance_findings,
+}
 SCANNER_LOGS = {"deptry": validate_deptry_log, "trivy": validate_trivy_log}

@@ -9,7 +9,8 @@ import tomllib
 from pathlib import Path
 from urllib.parse import urlparse
 
-from gate_config import JsonObject, json_file, repository_files
+from gate_config import JsonObject, JsonValue, json_file, repository_files
+from project_files import parse_project_text, read_project_file
 
 PATH_SEPARATOR = r"""(?:[/\\]+|['"]\s*/\s*['"])"""
 RETIRED_APPWRITE_REFERENCE = re.compile(
@@ -32,6 +33,10 @@ APPWRITE_CLOUD_MCP_URL = "https://mcp.appwrite.io/"
 RETIRED_INTEGRATIONS = re.compile(
     r"(?<![a-z0-9-])(?:context-mode|codebase-memory(?:-mcp)?)(?![a-z0-9-])",
     re.IGNORECASE,
+)
+COPILOT_HOOK_COMMAND = re.compile(
+    r'(?:bash|sh) (?:"\$\((?:env -u GIT_DIR )?git rev-parse --show-toplevel\)/)?'
+    r'\.hard-eng/(?:bootstrap|hook)\.sh"? copilot(?: [a-z]+)?'
 )
 APPWRITE_CLI_FILES = (
     ".agents/skills/appwrite-backend/references/appwrite-cli.md",
@@ -147,9 +152,8 @@ def existing_servers(root: Path, service: str) -> list[JsonObject]:
         path = root / name
         if not path.exists():
             continue
-        content = path.read_text()
-        parsed = (
-            tomllib.loads(content) if name.endswith(".toml") else json.loads(content)
+        parsed = read_project_file(
+            path, root, tomllib.loads if name.endswith(".toml") else json.loads
         )
         servers = parsed.get(
             "mcp_servers" if name.endswith(".toml") else "mcpServers", {}
@@ -300,7 +304,7 @@ def marionette_server(root: Path) -> JsonObject | None:
             continue
         if {".agents", ".claude", ".hooks"} & set(relative.parts):
             continue
-        manifest = yaml.safe_load(path.read_text())
+        manifest = read_project_file(path, root, yaml.safe_load)
         dependencies = {
             **(manifest.get("dependencies") or {}),
             **(manifest.get("dev_dependencies") or {}),
@@ -434,7 +438,7 @@ def retired_settings(settings: Path) -> str | None:
 
     if not settings.is_file() or settings.is_symlink() or settings.parent.is_symlink():
         return None
-    current = json.loads(settings.read_text())
+    current = read_project_file(settings)
     before = json.dumps(current)
     retire_claude_integrations(current)
     if isinstance(hooks := current.get("hooks"), dict):
@@ -490,7 +494,7 @@ def approve_claude_servers(
     text = changes.get(name) or (
         (root / name).read_text() if (root / name).is_file() else "{}"
     )
-    settings: JsonObject = json.loads(text)
+    settings: JsonObject = parse_project_text(text, name)
     approved = settings.setdefault("enabledMcpjsonServers", [])
     if not isinstance(approved, list):
         raise TypeError(
@@ -500,6 +504,55 @@ def approve_claude_servers(
     if missing:
         approved.extend(missing)
         changes[name] = json_file(root, settings)
+
+
+def retired_copilot_entry(native: str, entry: JsonValue, command: str) -> bool:
+    events = {
+        "sessionStart": ("session", 3600),
+        "postToolUseFailure": ("failure", 10),
+        "agentStop": ("stop", 3600),
+        "postToolUse": ("tool", 10),
+    }
+    event, timeout = events.get(native, ("", 0))
+    if entry == {
+        "type": "command",
+        "bash": f"{command} {event} copilot",
+        "timeoutSec": timeout,
+    }:
+        return True
+    return (
+        isinstance(entry, dict)
+        and entry.keys() <= {"type", "bash", "timeoutSec"}
+        and entry.get("type") == "command"
+        and isinstance(call := entry.get("bash"), str)
+        and COPILOT_HOOK_COMMAND.fullmatch(call) is not None
+    )
+
+
+def retire_copilot_hooks(root: Path, command: str) -> list[str]:
+    from update import contained
+
+    retired: list[str] = []
+    for target in root.glob(".github/hooks/*.json"):
+        name = str(target.relative_to(root))
+        current: JsonObject = json.loads(target.read_text())
+        wiring = current.get("hooks")
+        if not isinstance(wiring, dict):
+            raise TypeError(f"Conflicting hooks in {name}; expected an object")
+        if current.keys() - {"version", "hooks"} or any(
+            not isinstance(entries, list)
+            or any(
+                not retired_copilot_entry(native, entry, command) for entry in entries
+            )
+            for native, entries in wiring.items()
+        ):
+            raise ValueError(
+                f"Harness migration required: {name} contains project hooks; preserve their checks in Claude or Codex and remove the retired registration before setup."
+            )
+        if target.is_symlink() or not contained(root, target):
+            raise ValueError(f"Preserve linked retired harness config: {name}")
+        retired.append(name)
+    return retired
 
 
 def retired_integration_files(root: Path) -> list[str]:
@@ -526,7 +579,7 @@ def configure_mcp(root: Path, changes: dict[str, str]) -> list[str]:
 
     detected = detected_servers(root)
     target = root / ".mcp.json"
-    current: JsonObject = json.loads(target.read_text()) if target.exists() else {}
+    current: JsonObject = read_project_file(target, root) if target.exists() else {}
     before = json.dumps(current)
     existing = current.setdefault("mcpServers", {})
     if not isinstance(existing, dict):
@@ -552,7 +605,7 @@ def configure_mcp(root: Path, changes: dict[str, str]) -> list[str]:
     text = changes.get(settings_name) or (
         (root / settings_name).read_text() if (root / settings_name).is_file() else "{}"
     )
-    settings = json.loads(text)
+    settings = parse_project_text(text, settings_name)
     retire_claude_integrations(settings, removed)
     if settings != json.loads(text):
         changes[settings_name] = json_file(root, settings)
@@ -572,7 +625,9 @@ def configure_codex_mcp(
     retired: list[str] = []
     target = root / ".codex/config.toml"
     original = target.read_text() if target.exists() else ""
-    configured = tomllib.loads(original).get("mcp_servers", {})
+    configured = parse_project_text(original, ".codex/config.toml", tomllib.loads).get(
+        "mcp_servers", {}
+    )
     removed = {
         name for name, settings in configured.items() if retired_server(name, settings)
     }
@@ -597,7 +652,7 @@ def retire_copilot_mcp(
     target = root / name
     if not target.exists():
         return []
-    current: JsonObject = json.loads(target.read_text())
+    current: JsonObject = read_project_file(target, root)
     servers = current.get("mcpServers")
     if not isinstance(servers, dict):
         raise TypeError(f"Conflicting MCP servers in {name}; expected an object")
