@@ -96,7 +96,8 @@ def body_problem(body: str) -> str | None:
 
 def event_problem(event_path: str, root: Path = Path()) -> str | None:
     """Name what the text of the PR in a GitHub event file lacks; None when it passes."""
-    from shipping import ShippingError, load_policy
+    from ship_evidence import attachment_urls
+    from shipping import ShippingError, changed_paths, load_policy
     from update_runner import UPDATE_BRANCH
 
     pull = json.loads(Path(event_path).read_text())["pull_request"]
@@ -112,7 +113,19 @@ def event_problem(event_path: str, root: Path = Path()) -> str | None:
         policy = None
     if policy is not None and pull["base"]["ref"] != policy["base"]:
         return None
-    problem = body_problem(pull["body"] or "")
+    body = pull["body"] or ""
+    problem = body_problem(body)
+    if not problem and policy is not None and policy["ui_paths"]:
+        owner, _, name = pull["base"]["repo"]["full_name"].partition("/")
+        try:
+            paths = changed_paths(root, owner, name, pull["number"])
+        except ShippingError as error:
+            problem = f"The list of files that the PR changes is unavailable ({error})"
+        else:
+            try:
+                attachment_urls(body, paths, policy["ui_paths"])
+            except ValueError as error:
+                problem = str(error)
     if problem:
         return f"{problem}. Edit the PR text; this check runs again on each edit."
     return None
