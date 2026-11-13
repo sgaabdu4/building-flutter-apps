@@ -1,0 +1,55 @@
+name: PR text
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  remove-claude-footer:
+    name: remove-claude-footer
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.action != 'synchronize'
+    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    timeout-minutes: 2
+    concurrency:
+      group: pr-text-${{ github.event.pull_request.number }}-${{ github.event.action == 'synchronize' && github.run_id || 'footer' }}
+      cancel-in-progress: false
+    permissions:
+      contents: read # Read the footer rule from .hooks.
+      pull-requests: write # Rewrite the PR body without the footer.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .hooks
+      - name: Remove the Claude footer that the cloud GitHub proxy appends
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$REPO/pulls/$PR" --jq '.body // ""' > "$RUNNER_TEMP/body.md"
+          python3 -I -c 'import sys; sys.path.insert(0, ".hooks"); from agent_hooks import without_attribution_footer as clean; sys.stdout.write(clean(sys.stdin.read()))' < "$RUNNER_TEMP/body.md" > "$RUNNER_TEMP/clean.md"
+          if ! cmp -s "$RUNNER_TEMP/body.md" "$RUNNER_TEMP/clean.md"; then
+            gh api -X PATCH "repos/$REPO/pulls/$PR" -F "body=@$RUNNER_TEMP/clean.md" > /dev/null
+          fi
+  pr-text:
+    name: pr text
+    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    timeout-minutes: 2
+    concurrency:
+      group: pr-text-check-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read # Read the PR text rules from .hooks.
+      pull-requests: read # List the files that the PR changes.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .hooks
+      - name: Check the PR text against the Hard Eng rules
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I -c 'import sys; sys.path.insert(0, ".hooks"); from pr_text import event_problem; sys.exit(event_problem(sys.argv[1]))' "$GITHUB_EVENT_PATH"

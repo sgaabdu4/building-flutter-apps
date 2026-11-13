@@ -582,7 +582,7 @@ def passed_branch_point(root: Path) -> str | None:
     return point
 
 
-def _changed_paths(root: Path, owner: str, name: str, number: int) -> list[str]:
+def changed_paths(root: Path, owner: str, name: str, number: int) -> list[str]:
     endpoint = f"repos/{owner}/{name}/pulls/{number}/files?per_page=100"
     items = _api_items(root, endpoint, "files", "PR files query")
     paths: list[str] = []
@@ -919,7 +919,7 @@ def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
             revision = _delivered(resolved_root, pull, policy["base"], origin_url)
             merged_sha = revision
         if policy["ui_paths"]:
-            paths = _changed_paths(resolved_root, owner, name, number)
+            paths = changed_paths(resolved_root, owner, name, number)
             _ui_evidence(resolved_root, pull, paths, policy)
         _checks(resolved_root, repository, revision, policy, True)
         if stage == "delivered" and target == "Deploy":

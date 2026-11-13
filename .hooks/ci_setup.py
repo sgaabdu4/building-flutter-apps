@@ -713,17 +713,23 @@ def configure_ci(
     report_cache_problems(root, changes)
 
 
+def project_workflows(root: Path) -> list[Path]:
+    return [
+        path
+        for path in (root / ".github/workflows").glob("*")
+        if path.is_file()
+        and path.suffix in {".yml", ".yaml"}
+        and path != root / PR_TEXT
+    ]
+
+
 def adapt_ci(
     root: Path, source: Path, config: GateConfig, changes: dict[str, str]
 ) -> None:
     from shards import split_test_shards
 
     name = ".github/workflows/hard-eng.yml"
-    workflows = [
-        path
-        for path in (root / ".github/workflows").glob("*")
-        if path.is_file() and path.suffix in {".yml", ".yaml"}
-    ]
+    workflows = project_workflows(root)
     migrate_project_workflows(root, workflows, changes)
     if (root / name).exists():
         original = (root / name).read_text()
@@ -913,7 +919,11 @@ def configure_github_ci(
     configure_ci(root, source, config, changes)
     if workflow in changes:
         add_workflow_checks(config)
-    if workflow not in changes and not (root / workflow).is_file():
+    if (
+        workflow not in changes
+        and not (root / workflow).is_file()
+        and not project_workflows(root)
+    ):
         return
     # This workflow removes the Claude footer that the cloud GitHub proxy adds to PR bodies, and checks the PR text.
     content = (source / PR_TEXT).read_text()
