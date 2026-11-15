@@ -373,11 +373,9 @@ sealed class ProductState with _$ProductState {
 @Riverpod(keepAlive: true)
 class ProductNotifier extends _$ProductNotifier {
   @override
-  ProductState build() {
-    unawaited(.microtask(_load)); // Defer — see notifier-structure.md "Sync notifier init trap"
-    return const ProductState(isLoading: true);
-  }
+  ProductState build() => const ProductState(isLoading: true);
 
+  // load(): the action that opens the route calls it. See notifier-structure.md "Sync notifier init trap".
   // ... see notifier-structure.md and async-mutations.md.
 }
 ```

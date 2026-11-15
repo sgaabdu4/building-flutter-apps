@@ -83,7 +83,7 @@ verify(() => mock.fetchAll()).called(1);
 
 ## ProviderContainer.test
 
-Auto-dispose each test. Sync `Notifier` with deferred `_load` has no `.future` → read the provider, then `await pumpEventQueue()` to drain the load and its awaited repository call; one microtask is not enough.
+Auto-dispose each test. Sync `Notifier` has no `.future` → await its public `load()`, the call its trigger makes, so the test waits on the real work.
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -102,8 +102,7 @@ void main() {
       ],
     );
 
-    container.read(productProvider);
-    await pumpEventQueue();
+    await container.read(productProvider.notifier).load();
 
     final state = container.read(productProvider);
     expect(state.items, hasLength(1));
@@ -300,9 +299,8 @@ test('deleteItem removes from state', () async {
     ],
   );
 
-  // Wait for initial load (sync Notifier with deferred load)
-  container.read(productProvider);
-  await pumpEventQueue();
+  // Wait for initial load
+  await container.read(productProvider.notifier).load();
 
   // Delete and verify
   await container.read(productProvider.notifier).deleteItem('1');
@@ -356,8 +354,7 @@ test('refetches source of truth after remote update event', () async {
     ],
   );
 
-  container.read(productProvider);
-  await pumpEventQueue();
+  await container.read(productProvider.notifier).load();
 
   repo.items = [Product(id: ProductId('p1'), name: DisplayName('New'), price: .usd(1))];
   events.emit(const .updated(id: 'p1'));

@@ -450,18 +450,45 @@ class _ProductTabState extends State<ProductTab>
 }
 ```
 
-## Post-Frame Callbacks
+## Work After a Trigger
 
-Defer work til after current frame render:
+Never defer work to the next frame with `addPostFrameCallback`, `scheduleFrameCallback` or `endOfFrame`. Start it where its trigger happens:
+
+- User action: run it in the event handler.
+- State change: the notifier decides in the method that changes state. The widget reacts with `ref.listen` in `build()` ([UI effects](state-management/async-mutations.md#ui-effects)).
 
 ```dart
-@override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!context.mounted) return;
-    ref.read(welcomeProvider.notifier).maybeShowWelcomeMessage();
-  });
+@riverpod
+class WelcomeNotifier extends _$WelcomeNotifier {
+  @override
+  WelcomeState build() => const WelcomeState();
+
+  // The sign-in success handler calls this.
+  void maybeShowWelcomeMessage() {
+    if (state.welcomeShown) return;
+    state = state.copyWith(
+      welcomeShown: true,
+      messageSerial: state.messageSerial + 1,
+    );
+  }
 }
 
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(
+      welcomeProvider.select((state) => state.messageSerial),
+      (previous, next) {
+        if (previous != next && context.mounted) {
+          showWelcomeSnackBar(context, context.l10n);
+        }
+      },
+    );
+    return const HomeView();
+  }
+}
 ```
+
+A listener sees changes after it mounts. A message that must show on first mount stays in state, and `build()` renders it with `ref.watch`.

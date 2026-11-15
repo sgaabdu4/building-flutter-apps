@@ -59,12 +59,10 @@ mixin ConnectivityMixin {
 // Usage in a notifier
 class ProductNotifier extends _$ProductNotifier with ConnectivityMixin {
   @override
-  ProductState build() {
-    unawaited(.microtask(_load)); // Defer — see notifier-structure.md "Sync notifier init trap"
-    return const ProductState();
-  }
+  ProductState build() => const ProductState();
 
-  Future<void> _load() async {
+  // The action that opens the route calls load(). See notifier-structure.md "Sync notifier init trap".
+  Future<void> load() async {
     if (!ref.mounted) return;
     final connected = checkConnectivity(
       ref.read(connectivityServiceProvider),

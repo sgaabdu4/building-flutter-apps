@@ -128,12 +128,10 @@ Future<List<Product>> productsByCategory(Ref ref, String category) async {
 @riverpod
 class ProductEditorNotifier extends _$ProductEditorNotifier {
   @override
-  ProductFormState build(String productId) {
-    unawaited(.microtask(() => _loadProduct(productId)));
-    return const ProductFormState();
-  }
+  ProductFormState build(String productId) => const ProductFormState();
 
-  Future<void> _loadProduct(String id) async {
+  // The action that opens the editor calls loadProduct().
+  Future<void> loadProduct(String id) async {
     final product = await ref.read(productRepositoryProvider).fetchById(id);
     if (!ref.mounted) return;
     state = state.copyWith(name: product.name, price: product.price);
