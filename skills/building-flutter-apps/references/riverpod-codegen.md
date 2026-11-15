@@ -242,7 +242,7 @@ Future<Config> appConfig(Ref ref) async {
 }
 ```
 
-A provider whose screen shows a failed view with a retry button turns the automatic retry off. With the default, a failed load stays in the loading state through about ten retries, roughly 38 seconds, and each manual retry starts that delay again. With `noRetry`, the error shows at once.
+A provider whose screen shows the error with a retry button, a failed view, turns the automatic retry off. With the default, a failed load stays in the loading state through about ten retries, roughly 38 seconds, and each manual retry starts that delay again. With `noRetry`, the error shows at once.
 
 ```dart
 // core/providers/no_retry.dart

@@ -88,7 +88,7 @@ Future<void> remove(String id) => _remote.remove(id);
 ```
 
 ```dart
-// ProductListNotifier, a sync notifier with its own error state.
+// ProductListNotifier: its state holds its own error.
 // MUST catch here. Translate to typed AppError; never store raw String.
 Future<void> _load() async {
   try {
