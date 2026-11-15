@@ -20,6 +20,7 @@ sealed class PaginatedState with _$PaginatedState {
     @Default(false) bool isLoadingMore,
     @Default(true) bool hasMore,
     @Default(0) int page,
+    @Default(0) int refreshFailedSerial,
   }) = _PaginatedState;
 }
 
@@ -59,11 +60,16 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
 
   // The pull-to-refresh event or a button calls this; RefreshIndicator awaits it.
   Future<void> refresh() async {
+    final previous = state.value;
     ref.invalidateSelf();
     try {
       await future;
     } catch (error, stackTrace) {
       Crash.error(error, stackTrace, reason: 'refresh');
+      if (!ref.mounted || previous == null) return;
+      state = AsyncData(
+        previous.copyWith(refreshFailedSerial: previous.refreshFailedSerial + 1),
+      );
     }
   }
 }
@@ -305,7 +311,7 @@ Future<void> updateAll(List<Product> products) async {
 
 ## Pull-to-Refresh
 
-The pull event calls the notifier's `refresh()` from the pagination example above. `RefreshIndicator` awaits it. A failed refresh does not escape: `refresh()` reports it, `AsyncValue` holds the error, and the screen listens for it and shows a message.
+The pull event calls the notifier's `refresh()` from the pagination example above. `RefreshIndicator` awaits it. A failed refresh does not escape the future that `RefreshIndicator` awaits. `refresh()` reports the failure, restores the old list and raises `refreshFailedSerial`. The screen listens for that serial and shows a message, once for each failed refresh. A failed first load does not raise it.
 
 ```dart
 class RefreshableProductListScreen extends ConsumerWidget {
@@ -318,9 +324,9 @@ class RefreshableProductListScreen extends ConsumerWidget {
     );
 
     ref.listen(
-      paginatedProductProvider.select((s) => s.hasError),
-      (_, hasError) {
-        if (hasError && context.mounted) {
+      paginatedProductProvider.select((s) => s.value?.refreshFailedSerial ?? 0),
+      (previous, next) {
+        if (previous != next && context.mounted) {
           showProductsRefreshFailedSnackBar(context, context.l10n);
         }
       },
