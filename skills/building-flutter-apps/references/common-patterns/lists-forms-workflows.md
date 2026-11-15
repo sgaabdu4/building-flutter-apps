@@ -29,10 +29,10 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
   static const _pageSize = 20;
 
   @override
-  PaginatedState build() {
-    unawaited(.microtask(() => _loadPage(0))); // Defer — see notifier-structure.md.
-    return const PaginatedState(isLoading: true);
-  }
+  PaginatedState build() => const PaginatedState(isLoading: true);
+
+  // The action that opens the route calls load() — see notifier-structure.md.
+  Future<void> load() => _loadPage(0);
 
   Future<void> _loadPage(int page) async {
     if (!ref.mounted) return;
@@ -283,7 +283,6 @@ Future<void> parallelBatch<T>({
     final end = min(i + batchSize, items.length);
     final batch = items.sublist(i, end);
     await Future.wait(batch.map(action));
-    await Future<void>.value(); // yield to event loop
   }
 }
 

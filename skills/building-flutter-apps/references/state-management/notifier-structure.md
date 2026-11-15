@@ -46,11 +46,14 @@ CounterState build() {
 ```
 
 ```dart
-// RIGHT: direct seed, then defer the load past build().
+// RIGHT: direct seed. The trigger calls load(), which awaits before it touches state.
 @override
-CounterState build() {
-  unawaited(.microtask(_load));
-  return const CounterState(isLoading: true);
+CounterState build() => const CounterState(isLoading: true);
+
+Future<void> load() async {
+  await ref.read(counterRepositoryProvider).refresh();
+  if (!ref.mounted) return;
+  state = state.copyWith(isLoading: false);
 }
 ```
 
@@ -69,7 +72,7 @@ class ProfileNotifier extends _$ProfileNotifier {
 }
 ```
 
-For app state with explicit flags, keep a Freezed state object behind a sync notifier: seed state in `build()` and defer the first load with `unawaited(.microtask(_load))` (the `avoid_sync_notifier_state_read` fix). Exception: pause-sensitive startup starts from its durable owner after the watch/listen path exists, through an idempotent `load()` ([pause boundaries](../state-management-lifecycle.md#pause-projection-and-mode-boundaries)). Do not rely on `Future.microtask` ordering there to beat route pause or listener attachment.
+For app state with explicit flags, keep a Freezed state object behind a sync notifier: seed state in `build()` and start the first load from its trigger with a public `load()` that awaits before it reads or writes `state` (the `avoid_sync_notifier_state_read` fix). The action that opens the route calls `load()` once, from an event handler, never from `build()` or `initState`. Never delay a load with a frame callback or a zero-delay wait. Pause-sensitive startup starts from its durable owner after the watch/listen path exists, through an idempotent `load()` ([pause boundaries](../state-management-lifecycle.md#pause-projection-and-mode-boundaries)). Do not rely on `Future.microtask` ordering to beat route pause or listener attachment.
 
 ## Loading and progress
 

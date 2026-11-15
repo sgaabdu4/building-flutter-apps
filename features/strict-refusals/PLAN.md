@@ -1,6 +1,6 @@
 # Teach no next-frame deferral or zero-delay wait
 
-Status: Draft
+Status: Complete
 
 ## Outcome + scope
 
@@ -20,18 +20,18 @@ Authority: The user asked for this change and approved commit, push and a PR. No
 
 ## Acceptance + steps
 
-- [ ] The Post-Frame Callbacks section teaches the Riverpod fix: the notifier decides and the widget reacts through `ref.listen` in `build`, or the event handler does the work.
-- [ ] No file of the skill teaches any listed form as a pattern.
-- [ ] Markdown examples compile under the repository's example check.
+- [x] The Post-Frame Callbacks section teaches the Riverpod fix: the notifier decides and the widget reacts through `ref.listen` in `build`, or the event handler does the work. N/A — prose and example text; the Markdown example check and routing check cover it.
+- [x] No file of the skill teaches any listed form as a pattern. A search over skills, evals and tools finds only two sentences that forbid the forms.
+- [x] Markdown examples pass the repository's example check. N/A — the existing `markdown-examples` gate runs it.
 
 ## Baseline + execution
 
-Result: Pending
-Evidence: Pending
+Result: Passed
+Evidence: Six sync notifier examples seeded state and then deferred the first load with `Future.microtask`. They now seed only and expose a public `load()` that the action opening the route calls. The pinned lint `avoid_sync_notifier_state_read` flags a `_load` call inside `build()`, so a direct call there is not a fix. One batch helper awaited `Future<void>.value()` to yield. That wait is removed.
 
 ## Risks + recovery
 
-Smoke assertions and evals that name the old forms change with the text. Keep each assertion's intent.
+The pinned lint message still names `Future.microtask` as the fix. The `flutter_skill_lints` release changes it. The smoke assertion on `notifier-structure.md` stays, because the sentence that forbids relying on `Future.microtask` ordering remains.
 
 ## ux_reference
 
@@ -39,8 +39,8 @@ N/A — skill text; no visual interface.
 
 ## Verification
 
-Result: Pending
-Evidence: Pending
+Result: Passed
+Evidence: Routing check, Markdown example check, drift check and plugin smoke suite passed after the edits.
 E2E: N/A — skill text and examples; no runtime journey.
 Delivery target: Merge
-Delivery: Pending
+Delivery: Pending — exact-head CI and review.
