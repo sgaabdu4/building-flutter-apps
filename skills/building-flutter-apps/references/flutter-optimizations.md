@@ -452,7 +452,7 @@ class _ProductTabState extends State<ProductTab>
 
 ## Start Work at Its Trigger
 
-The trigger is the event that causes the work. Start the work there. Never defer it to the next frame with `addPostFrameCallback`, `scheduleFrameCallback` or `endOfFrame`. Never delay it with a zero-delay wait: `scheduleMicrotask`, `Future.microtask`, `Future.delayed(Duration.zero)`, `Timer(Duration.zero)`, `Timer.run`, `await null`, `Future(...)` or `await Future.value()` when it only postpones the work or yields.
+The trigger is the event that causes the work. Start the work there. Never defer it to the next frame with `addPostFrameCallback`, `scheduleFrameCallback` or `endOfFrame`. Never delay it with a zero-delay wait: `scheduleMicrotask`, `Future.microtask`, `Future.delayed(Duration.zero)`, `Timer(Duration.zero)`, `Timer.run` or `await null`. Also refused: a `Future(...)` call that runs the work in a later turn, and `await Future.value()` that only yields.
 
 - User action: run the work in the event handler.
 - State change: the notifier method that changes state also records that a reaction is due, here as a serial number. A widget that is already mounted reacts with `ref.listen` in `build()` ([UI effects](state-management/async-mutations.md#ui-effects)).
