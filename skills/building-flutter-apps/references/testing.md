@@ -438,7 +438,7 @@ test('auth state transitions', () async {
   final initial = container.read(authProvider);
   expect(initial, isA<AuthLoading>());
 
-  // The test awaits the call that starts the session check.
+  // The app's start-up owner calls checkSession() on launch; the test awaits it.
   await container.read(authProvider.notifier).checkSession();
 
   final state = container.read(authProvider);
