@@ -434,14 +434,19 @@ class ProductDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final isLoading = ref.watch(
-      productProvider.select((s) => s.isLoading),
+    final failed = ref.watch(
+      productProvider.select((s) => s.hasError && !s.isLoading),
     );
     final items = ref.watch(
       productProvider.select((s) => s.value?.productCardViewData),
     );
 
-    if (isLoading || items == null) {
+    if (items == null && failed) {
+      return Scaffold(
+        body: ProductLoadFailedView(onRetry: () => ref.invalidate(productProvider)),
+      );
+    }
+    if (items == null) {
       return const Scaffold(body: Center(child: LoadingIndicator()));
     }
 
