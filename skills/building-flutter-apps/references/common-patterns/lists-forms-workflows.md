@@ -101,14 +101,14 @@ class PaginatedProductListScreen extends ConsumerWidget {
     final items = ref.watch(
       paginatedProductProvider.select((s) => s.value?.items),
     );
-    final hasError = ref.watch(
-      paginatedProductProvider.select((s) => s.hasError),
+    final failed = ref.watch(
+      paginatedProductProvider.select((s) => s.hasError && !s.isLoading),
     );
     final hasMore = ref.watch(
       paginatedProductProvider.select((s) => s.value?.hasMore ?? false),
     );
 
-    if (items == null && hasError) {
+    if (items == null && failed) {
       return ProductLoadFailedView(
         onRetry: () => unawaited(ref.read(paginatedProductProvider.notifier).refresh()),
       );
@@ -340,8 +340,8 @@ class RefreshableProductListScreen extends ConsumerWidget {
     final items = ref.watch(
       paginatedProductProvider.select((s) => s.value?.items),
     );
-    final hasError = ref.watch(
-      paginatedProductProvider.select((s) => s.hasError),
+    final failed = ref.watch(
+      paginatedProductProvider.select((s) => s.hasError && !s.isLoading),
     );
 
     ref.listen(
@@ -353,7 +353,7 @@ class RefreshableProductListScreen extends ConsumerWidget {
       },
     );
 
-    if (items == null && hasError) {
+    if (items == null && failed) {
       return ProductLoadFailedView(
         onRetry: () => unawaited(ref.read(paginatedProductProvider.notifier).refresh()),
       );

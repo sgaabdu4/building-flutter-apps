@@ -388,15 +388,15 @@ class ProductListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasError = ref.watch(
-      productProvider.select((s) => s.hasError),
+    final failed = ref.watch(
+      productProvider.select((s) => s.hasError && !s.isLoading),
     );
 
     final items = ref.watch(
       productProvider.select((s) => s.value?.items),
     );
 
-    if (items == null && hasError) {
+    if (items == null && failed) {
       return ProductLoadFailedView(onRetry: () => ref.invalidate(productProvider));
     }
     if (items == null) return const Center(child: CircularProgressIndicator());
