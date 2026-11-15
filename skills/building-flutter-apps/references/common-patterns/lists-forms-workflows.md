@@ -31,12 +31,12 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
   @override
   PaginatedState build() => const PaginatedState(isLoading: true);
 
-  // The action that opens the route calls load() — see notifier-structure.md.
+  // The screen calls load() from initState — see notifier-structure.md.
   Future<void> load() => _loadPage(0);
 
   Future<void> _loadPage(int page) async {
     if (!ref.mounted) return;
-    state = state.copyWith(isLoading: page == 0, isLoadingMore: page > 0);
+    if (page > 0) state = state.copyWith(isLoadingMore: true);
     try {
       final items = await ref.read(productRepositoryProvider).fetchPage(page, _pageSize);
       if (!ref.mounted) return;
@@ -65,10 +65,23 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
 Widget with scroll detection:
 
 ```dart
-class PaginatedProductListScreen extends ConsumerWidget {
+class PaginatedProductListScreen extends ConsumerStatefulWidget {
   const PaginatedProductListScreen({super.key});
 
-  bool _onScroll(WidgetRef ref, ScrollNotification scroll) {
+  @override
+  ConsumerState<PaginatedProductListScreen> createState() =>
+      _PaginatedProductListScreenState();
+}
+
+class _PaginatedProductListScreenState
+    extends ConsumerState<PaginatedProductListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ref.read(paginatedProductProvider.notifier).load());
+  }
+
+  bool _onScroll(ScrollNotification scroll) {
     if (scroll.metrics.pixels >= scroll.metrics.maxScrollExtent - 200) {
       unawaited(ref.read(paginatedProductProvider.notifier).loadMore());
     }
@@ -76,7 +89,7 @@ class PaginatedProductListScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final items = ref.watch(
       paginatedProductProvider.select((s) => s.items),
     );
@@ -85,7 +98,7 @@ class PaginatedProductListScreen extends ConsumerWidget {
     );
 
     return NotificationListener<ScrollNotification>(
-      onNotification: (scroll) => _onScroll(ref, scroll),
+      onNotification: _onScroll,
       child: ListView.builder(
         itemCount: items.length + (hasMore ? 1 : 0),
         itemBuilder: (context, index) {

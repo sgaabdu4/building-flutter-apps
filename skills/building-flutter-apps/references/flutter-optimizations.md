@@ -455,15 +455,15 @@ class _ProductTabState extends State<ProductTab>
 Never defer work to the next frame with `addPostFrameCallback`, `scheduleFrameCallback` or `endOfFrame`. Start it where its trigger happens:
 
 - User action: run it in the event handler.
-- State change: the notifier decides in the method that changes state. The widget reacts with `ref.listen` in `build()` ([UI effects](state-management/async-mutations.md#ui-effects)).
+- State change: the notifier decides in the method that changes state. A widget that is already mounted reacts with `ref.listen` in `build()` ([UI effects](state-management/async-mutations.md#ui-effects)).
 
 ```dart
-@riverpod
+@Riverpod(keepAlive: true)
 class WelcomeNotifier extends _$WelcomeNotifier {
   @override
   WelcomeState build() => const WelcomeState();
 
-  // The sign-in success handler calls this.
+  // The sign-in success path calls this.
   void maybeShowWelcomeMessage() {
     if (state.welcomeShown) return;
     state = state.copyWith(
@@ -473,8 +473,8 @@ class WelcomeNotifier extends _$WelcomeNotifier {
   }
 }
 
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+class SignInScreen extends ConsumerWidget {
+  const SignInScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -486,9 +486,9 @@ class HomeScreen extends ConsumerWidget {
         }
       },
     );
-    return const HomeView();
+    return const SignInView();
   }
 }
 ```
 
-A listener sees changes after it mounts. A message that must show on first mount stays in state, and `build()` renders it with `ref.watch`.
+The screen is on display when sign-in succeeds, so its listener sees the change. A message for a screen that is not mounted yet stays in state, and `build()` renders it with `ref.watch`.
