@@ -450,12 +450,12 @@ class _ProductTabState extends State<ProductTab>
 }
 ```
 
-## Work After a Trigger
+## Start Work at Its Trigger
 
-Never defer work to the next frame with `addPostFrameCallback`, `scheduleFrameCallback` or `endOfFrame`. Start it where its trigger happens:
+The trigger is the event that causes the work. Start the work there. Never defer it to the next frame with `addPostFrameCallback`, `scheduleFrameCallback` or `endOfFrame`. Never delay it with a zero-delay wait: `scheduleMicrotask`, `Future.microtask`, `Future.delayed(Duration.zero)`, `Timer(Duration.zero)`, `Timer.run` or `await null`.
 
-- User action: run it in the event handler.
-- State change: the notifier decides in the method that changes state. A widget that is already mounted reacts with `ref.listen` in `build()` ([UI effects](state-management/async-mutations.md#ui-effects)).
+- User action: run the work in the event handler.
+- State change: the notifier method that changes state also records that a reaction is due, here as a serial number. A widget that is already mounted reacts with `ref.listen` in `build()` ([UI effects](state-management/async-mutations.md#ui-effects)).
 
 ```dart
 @Riverpod(keepAlive: true)
@@ -491,4 +491,4 @@ class SignInScreen extends ConsumerWidget {
 }
 ```
 
-The screen is on display when sign-in succeeds, so its listener sees the change. A message for a screen that is not mounted yet stays in durable state with an identity. The later screen shows it and acknowledges it ([pause boundaries](state-management-lifecycle.md#pause-projection-and-mode-boundaries)).
+This listener belongs to one screen. Use it only when that screen stays on display until the message shows, as `SignInScreen` does while sign-in runs. If the screen can pause or leave first, keep the message in durable state with an event identity, deliver it as the pause boundaries list says, and acknowledge it after it shows ([pause boundaries](state-management-lifecycle.md#pause-projection-and-mode-boundaries)).

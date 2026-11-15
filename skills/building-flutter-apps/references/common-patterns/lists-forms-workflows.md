@@ -27,7 +27,7 @@ sealed class PaginatedState with _$PaginatedState {
 class PaginatedProductNotifier extends _$PaginatedProductNotifier {
   static const _pageSize = 20;
 
-  // The first watch loads page 0; AsyncValue carries first-load loading and error.
+  // The first read or watch loads page 0; AsyncValue carries first-load loading and error.
   @override
   Future<PaginatedState> build() async {
     final items = await ref.read(productRepositoryProvider).fetchPage(0, _pageSize);
@@ -57,8 +57,11 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
     }
   }
 
-  // The pull-to-refresh event or a button calls this.
-  void refresh() => ref.invalidateSelf();
+  // The pull-to-refresh event or a button calls this; RefreshIndicator awaits it.
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
 }
 ```
 
