@@ -63,7 +63,7 @@ class ProductNotifier extends _$ProductNotifier with ConnectivityMixin {
     final connected = checkConnectivity(
       ref.read(connectivityServiceProvider),
     );
-    if (!connected) return const ProductState(error: 'No connection');
+    if (!connected) throw const AppError.network('No connection');
     // ...fetch from remote
     return const ProductState();
   }
