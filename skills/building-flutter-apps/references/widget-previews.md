@@ -96,7 +96,7 @@ Widget productCardInStockPreview() {
     ],
     child: Consumer(
       builder: (context, ref, _) {
-        final product = ref.watch(productProvider.select((s) => s.items.firstOrNull));
+        final product = ref.watch(productProvider.select((s) => s.value?.items.firstOrNull));
         if (product == null) return const SizedBox.shrink();
         return ProductCard(
           item: ProductItemViewData(id: product.id, name: product.name),
