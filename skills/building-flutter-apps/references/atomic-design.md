@@ -438,10 +438,10 @@ class ProductDashboardScreen extends ConsumerWidget {
       productProvider.select((s) => s.isLoading),
     );
     final items = ref.watch(
-      productProvider.select((s) => s.productCardViewData),
+      productProvider.select((s) => s.value?.productCardViewData),
     );
 
-    if (isLoading) {
+    if (isLoading || items == null) {
       return const Scaffold(body: Center(child: LoadingIndicator()));
     }
 
