@@ -8,7 +8,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from gate_config import Gate, Group, JsonObject, Report
+from gate_config import Gate, Group, JsonObject, Report, generated_sources
+from project_files import GIT_LISTING
 
 
 def owns_package_fallow(
@@ -265,7 +266,7 @@ def empty_audit(report: JsonObject) -> bool:
 def sdk_binaries(directory: Path) -> set[str]:
     """Commands from SDKs this repository's own packages already require."""
     listed = subprocess.run(
-        ["git", "ls-files", "--", ":(top,glob)**/pubspec.yaml"],
+        [*GIT_LISTING, "ls-files", "--", ":(top,glob)**/pubspec.yaml"],
         cwd=directory,
         capture_output=True,
         text=True,
@@ -310,8 +311,12 @@ def drop_sdk_binaries(report: JsonObject, provided: set[str]) -> None:
     lower(section.get("summary"), ("total_issues", "unlisted_binaries"), dropped)
     if key != "dead_code":
         return
+    lower(report.get("summary"), ("dead_code_issues",), dropped)
+    pass_when_clean(report)
+
+
+def pass_when_clean(report: JsonObject) -> None:
     totals = report.get("summary")
-    lower(totals, ("dead_code_issues",), dropped)
     counts = ("dead_code_issues", "complexity_findings", "duplication_clone_groups")
     if (
         isinstance(totals, dict)
@@ -320,6 +325,54 @@ def drop_sdk_binaries(report: JsonObject, provided: set[str]) -> None:
         and not any(totals.get(name) for name in counts)
     ):
         report["verdict"] = "pass"
+
+
+def clone_files(group: object) -> list[str]:
+    instances = group.get("instances") if isinstance(group, dict) else None
+    if not isinstance(instances, list):
+        raise TypeError("Fallow clone group must list its copies")
+    files = []
+    for copy in instances:
+        name = copy.get("file") if isinstance(copy, dict) else None
+        if not isinstance(name, str):
+            raise TypeError("Fallow clone copy must name a file")
+        files.append(name)
+    return files
+
+
+def set_aside_generated_clones(report: JsonObject, directory: Path | None) -> int:
+    """Clone groups whose every copy sits in a generated file leave the report."""
+    audit = report.get("kind") == "audit"
+    dupes = report.get("duplication" if audit else "dupes")
+    groups = dupes.get("clone_groups") if isinstance(dupes, dict) else None
+    if directory is None or not isinstance(dupes, dict) or not groups:
+        return 0
+    if not isinstance(groups, list):
+        raise TypeError("Fallow clone groups must be a list")
+    named = [clone_files(group) for group in groups]
+    generated = generated_sources(directory, sorted({n for f in named for n in f}))
+    kept = [
+        group
+        for group, files in zip(groups, named, strict=True)
+        if not files or not generated.issuperset(files)
+    ]
+    aside = len(groups) - len(kept)
+    dupes["clone_groups"] = kept
+    stats = dupes.get("stats")
+    if kept or not aside or not isinstance(stats, dict):
+        return aside
+    for name in stats.keys() - {"total_files", "total_lines", "total_tokens"}:
+        stats[name] = 0
+    totals = report.get("summary")
+    if audit and isinstance(totals, dict):
+        totals["duplication_clone_groups"] = 0
+        pass_when_clean(report)
+    return aside
+
+
+def note_set_aside(aside: int) -> None:
+    if aside:
+        print(f"Fallow: {aside} clone group(s) only in generated files set aside")
 
 
 def reject_diagnostic_notes(diagnostics: list[object], optional: set[str]) -> None:
@@ -367,6 +420,7 @@ def validate_fallow(
     try:
         report = json.loads(path.read_text())
         drop_sdk_binaries(report, provided or set())
+        note_set_aside(set_aside_generated_clones(report, directory))
         audit = report["kind"] == "audit"
         if audit and empty_audit(report):
             return
@@ -433,9 +487,10 @@ def own_place(item: JsonObject) -> tuple[str, str] | None:
     return None
 
 
-def finding_lines(path: Path) -> list[str]:
+def finding_lines(path: Path, directory: Path | None = None) -> list[str]:
     try:
         report = json.loads(path.read_text())
+        set_aside_generated_clones(report, directory)
         audit = report.get("kind") == "audit"
         found: list[str] = []
         for kind, items in report["dead_code" if audit else "check"].items():

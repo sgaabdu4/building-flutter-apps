@@ -87,7 +87,7 @@ def stale_error(root: Path, revision: str) -> ValueError:
 
     return UpdateNeeded(
         f"Hard Eng freshness check found newer verified revision {revision}. "
-        f"Last update result: {last_result(root)}. {next_step(root)} "
+        f"Last update result: {last_result(root).rstrip('.')}. {next_step(root)} "
         "Shipping stays blocked until this branch contains the current Hard Eng; then reverify."
     )
 
@@ -340,13 +340,30 @@ def commit_update(
     links: dict[str, str | None],
     revision: str,
 ) -> None:
+    from hook_chain import keep_copy_mode
     from update import write_changes, write_links
 
     names = sorted({*changes, *links})
     write_links(root, links)
     write_changes(root, changes)
+    keep_copy_mode(root, names)
     subprocess.run(["git", "add", "--force", "--", *names], cwd=root, check=True)
     git_commit(root, names, changes, f"Update Hard Eng to {revision}")
+
+
+def uv_run(source: Path) -> list[str]:
+    return [
+        "uv",
+        "run",
+        "--quiet",
+        "--project",
+        str(source),
+        "--locked",
+        "--no-dev",
+        "--python",
+        sys.executable,
+        "python",
+    ]
 
 
 def exclusive(handle: TextIO) -> bool:
@@ -634,7 +651,10 @@ def failure_kind(error: Exception) -> type[Exception]:
 
 
 def prepare_update(root: Path, repair: bool = False) -> str:
-    """Build the update as one commit on its own branch from the remote base, leaving this checkout alone."""
+    """Build the update as one commit on its own branch from the remote base; it first undoes what earlier reruns left in the main hooks folder."""
+    from stale_updates import settle_worktree_hook
+
+    settle_worktree_hook(root)
     note = ""
     if repair:
         note = repair_checkout(

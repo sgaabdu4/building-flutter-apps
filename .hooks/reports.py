@@ -848,7 +848,10 @@ def scanner_result(
         except ValueError as error:
             print(error)
     elif scanner in FINDING_READERS:
-        lines = FINDING_READERS[scanner](path)
+        read = FINDING_READERS[scanner]
+        lines = (
+            fallow_findings(path, directory) if read is fallow_findings else read(path)
+        )
         if (more := len(lines) - FINDING_LIMIT) > 0:
             lines[FINDING_LIMIT:] = [f"{more} more findings in {path}"]
         for line in lines:

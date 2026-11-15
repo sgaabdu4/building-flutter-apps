@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from gate_config import SOURCE_FILE, Gate, Group, JsonObject
-from project_files import read_project_file
+from project_files import GIT_LISTING, read_project_file
 
 WORD_CHARACTER = re.compile(r"\w")
 DIGIT_RUN = re.compile(r"\d+")
@@ -265,7 +265,7 @@ def judge(root: Path, group: Group, gate: Gate, failed: bool, output: str) -> bo
 def worktree(root: Path) -> bytes:
     """Tracked changes plus untracked, unignored file contents."""
     untracked = subprocess.check_output(
-        ["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=root
+        [*GIT_LISTING, "ls-files", "--others", "--exclude-standard", "-z"], cwd=root
     ).split(b"\0")
     files = [root / name.decode() for name in untracked if name]
     return subprocess.check_output(["git", "diff"], cwd=root) + b"".join(

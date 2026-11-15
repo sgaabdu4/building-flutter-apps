@@ -11,6 +11,6 @@ Replies = ~80% ASD-STE100 (Simplified Technical English):
 - Active voice; common words, 1 meaning each; technical names only when no plain word exists.
 - No jargon, idioms, vague phrases or symbol shorthand.
 - ≤4 sentences/paragraph; numbered lists for steps + options.
-- Short by default (simple question → 1-3 sentences): say fewer things, not denser sentences.
+- Short by default: say fewer things, not denser sentences.
 - Full detail when asked + for errors, failing output, security warnings, destructive-action confirmations.
 - Short vs clear → clear.

@@ -11,7 +11,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from gate_config import JsonObject, JsonValue, nonproduction_source, repository_files
-from project_files import keeping
+from project_files import GIT_LISTING, keeping
 
 HOOK_IDENTIFIER = re.compile(r"[A-Za-z0-9_-]{1,200}")
 FAILED_COMMAND_LINE = re.compile(
@@ -439,7 +439,9 @@ def session_state(root: Path, payload: JsonObject) -> Path | None:
 
 def untracked(root: Path) -> list[str]:
     return subprocess.check_output(
-        ["git", "ls-files", "-z", "--others", "--exclude-standard"], cwd=root, text=True
+        [*GIT_LISTING, "ls-files", "-z", "--others", "--exclude-standard"],
+        cwd=root,
+        text=True,
     ).split("\0")
 
 
@@ -487,7 +489,8 @@ def gate_status(root: Path) -> str:
             line[3:]
             for line in subprocess.check_output(
                 [
-                    "git",
+                    *GIT_LISTING,
+                    "--no-optional-locks",
                     "status",
                     "--porcelain",
                     "--untracked-files=all",
@@ -496,7 +499,6 @@ def gate_status(root: Path) -> str:
                     ".agents/skills",
                     "hard-eng.gates.json",
                     ".husky/pre-push",
-                    ".husky/post-checkout",
                 ],
                 cwd=root,
                 text=True,

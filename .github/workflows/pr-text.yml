@@ -40,10 +40,10 @@ jobs:
     timeout-minutes: 2
     concurrency:
       group: pr-text-check-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     permissions:
       contents: read # Read the PR text rules from .hooks.
-      pull-requests: read # List the files that the PR changes.
+      pull-requests: read # Read the PR text and the files that the PR changes.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -52,4 +52,8 @@ jobs:
       - name: Check the PR text against the Hard Eng rules
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 -I -c 'import sys; sys.path.insert(0, ".hooks"); from pr_text import event_problem; sys.exit(event_problem(sys.argv[1]))' "$GITHUB_EVENT_PATH"
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$REPO/pulls/$PR" --jq '{pull_request: .}' > "$RUNNER_TEMP/pull.json" || cp "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/pull.json"
+          python3 -I -c 'import sys; sys.path.insert(0, ".hooks"); from pr_text import event_problem; sys.exit(event_problem(sys.argv[1]))' "$RUNNER_TEMP/pull.json"

@@ -22,6 +22,8 @@ INSTALL_LOCKS = {
 INSTALL_STEP = "run the project's install to write the file, "
 KINDS = {".toml": "TOML", ".yaml": "YAML", ".yml": "YAML"}
 KEPT: dict[str, dict[tuple[str, ...], object]] = {}
+# A file watcher answers late on a busy Mac; a listing gains nothing from it.
+GIT_LISTING = ("git", "-c", "core.fsmonitor=")
 
 
 @contextmanager

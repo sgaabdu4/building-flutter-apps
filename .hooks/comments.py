@@ -19,6 +19,7 @@ from gate_config import (
 )
 from plans import _is_test as is_test_path
 from plans import default_branch_point
+from project_files import GIT_LISTING
 
 DISABLED_CALL = re.compile(r"\.disabled\(")
 QUOTE_OR_BACKSLASH = re.compile(r"[\\'\"]")
@@ -51,7 +52,8 @@ UI_MARKS = (
     "colorLiteral",
 )
 TEST_ATTRIBUTE = re.compile(r"@(?:Test|Suite)\s*\(")
-DIFF_HUNK_HEADER = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)")
+DIFF_HUNK_HEADER = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,(\d+))?")
+WALL_SUFFIXES = (".tsx", ".jsx", "hard-eng.gates.json")
 CONTROL_KEYWORD_BEFORE = re.compile(r"\b(if|while|for|with)\s*$")
 STRING_LITERAL = re.compile(r'"(?:\\.|[^"\\\n])*"')
 
@@ -477,7 +479,7 @@ DIFF = (
 
 
 def changed_lines(
-    diff: str,
+    diff: str, joins: dict[str, list[int]] | None = None
 ) -> tuple[dict[str, list[tuple[int, str]]], dict[str, list[tuple[int, str]]]]:
     """Added and removed (line number, text) pairs per file of a zero-context diff."""
     added: dict[str, list[tuple[int, str]]] = {}
@@ -489,6 +491,8 @@ def changed_lines(
             in_hunk = False
         elif hunk:
             old, new, in_hunk = int(hunk[1]), int(hunk[2]), True
+            if joins is not None and hunk[3] == "0":
+                joins.setdefault(name, []).extend([new, new + 1] if new else [1])
         elif in_hunk and line[:1] == "+":
             added.setdefault(name, []).append((new, line[1:]))
             new += 1
@@ -505,15 +509,15 @@ def changed_lines(
 
 
 def diff_lines(
-    root: Path, base: str
+    root: Path, base: str, joins: dict[str, list[int]] | None = None
 ) -> tuple[dict[str, list[tuple[int, str]]], dict[str, list[tuple[int, str]]]]:
     """Added and removed (line number, text) pairs per file; untracked files count as added."""
     diff = subprocess.check_output(
         [*DIFF, base, "--"], cwd=root, text=True, errors="replace"
     )
-    added, removed = changed_lines(diff)
+    added, removed = changed_lines(diff, joins)
     untracked = subprocess.check_output(
-        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        [*GIT_LISTING, "ls-files", "--others", "--exclude-standard", "-z"],
         cwd=root,
         text=True,
     )
@@ -601,7 +605,7 @@ def retired_names(
     }
     names |= modules
     remaining = subprocess.check_output(
-        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        [*GIT_LISTING, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         cwd=root,
         text=True,
     )
@@ -732,23 +736,96 @@ def ui_source_check(root: Path, added: dict[str, list[tuple[int, str]]]) -> None
             )
 
 
-def validate_suppressions(root: Path, base: str | None) -> None:
-    try:
-        point, empty = diff_base(root, base or default_branch_point(root) or "HEAD")
-        added, removed = diff_lines(root, point)
-    except subprocess.CalledProcessError as error:
-        raise ValueError(
-            "Cannot verify suppression scope; fetch or supply a valid Git --base"
-        ) from error
-    names = sorted(
+def scoped_names(
+    added: dict[str, list[tuple[int, str]]], removed: dict[str, list[tuple[int, str]]]
+) -> list[str]:
+    return sorted(
         name
         for name in added.keys() | removed.keys()
         if not name.startswith(UNOWNED) and switch_off_pattern(name) is not None
     )
-    skipped = generated_sources(root, names)
-    found = security_switch_offs(root, added)
+
+
+def assertion_balance(
+    root: Path,
+    added: dict[str, list[tuple[int, str]]],
+    removed: dict[str, list[tuple[int, str]]],
+    skipped: set[str],
+) -> tuple[list[str], int]:
     gained = 0
     blocks: list[tuple[str, list[tuple[int, str]]]] = []
+    for name in scoped_names(added, removed):
+        if name not in skipped and is_test_path(PurePosixPath(name)):
+            gained += len(assertion_lines(name, added.get(name, [])))
+            blocks += [(name, b) for b in removed_blocks(removed.get(name, []))]
+    recorded = recorded_removals(added)
+    lost = lost_assertions(blocks, (set(), set()), recorded)
+    if len(lost) > gained:
+        lost = lost_assertions(blocks, retired_names(root, removed), recorded)
+    return lost, gained
+
+
+def is_ancestor(root: Path, older: str, newer: str) -> bool:
+    return (
+        subprocess.run(
+            ["git", "merge-base", "--is-ancestor", older, newer],
+            cwd=root,
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+
+def whole_branch_balance(root: Path, point: str) -> tuple[str, list[str], int] | None:
+    """The assertion balance from the branch point, when it lies before the judged range."""
+    whole = default_branch_point(root)
+    if not whole or whole == point or not is_ancestor(root, whole, point):
+        return None
+    added, removed = diff_lines(root, whole)
+    skipped = generated_sources(root, scoped_names(added, removed))
+    return whole, *assertion_balance(root, added, removed, skipped)
+
+
+def flutter_changed(root: Path, names: list[str]) -> bool:
+    if not any(name.endswith((".dart", ".arb")) for name in names):
+        return False
+    from flutter_screens import screen_files
+
+    return bool(screen_files(root, names))
+
+
+def text_walls_check(
+    root: Path,
+    point: str,
+    joins: dict[str, list[int]],
+    added: dict[str, list[tuple[int, str]]],
+    removed: dict[str, list[tuple[int, str]]],
+) -> None:
+    names = [*joins, *added, *removed]
+    if any(name.endswith(WALL_SUFFIXES) for name in names) or flutter_changed(
+        root, names
+    ):
+        from text_walls import wall_check
+
+        wall_check(root, added, removed, joins, point)
+
+
+def validate_suppressions(root: Path, base: str | None, screens: bool = True) -> None:
+    joins: dict[str, list[int]] = {}
+    try:
+        point, empty = diff_base(root, base or default_branch_point(root) or "HEAD")
+        added, removed = diff_lines(root, point, joins)
+    except subprocess.CalledProcessError as error:
+        raise ValueError(
+            "Cannot verify suppression scope; fetch or supply a valid Git --base"
+        ) from error
+    names = scoped_names(added, removed)
+    skipped = generated_sources(root, names)
+    lost, gained = assertion_balance(root, added, removed, skipped)
+    if len(lost) > gained and base and (whole := whole_branch_balance(root, point)):
+        point, lost, gained = whole
+    found = security_switch_offs(root, added)
     for name in names:
         pattern = switch_off_pattern(name)
         if name in skipped or pattern is None:
@@ -764,17 +841,11 @@ def validate_suppressions(root: Path, base: str | None) -> None:
             )
         ]
         found += marks_in_file(root, name, added.get(name, []))
-        if is_test_path(PurePosixPath(name)):
-            gained += len(assertion_lines(name, added.get(name, [])))
-            blocks += [(name, b) for b in removed_blocks(removed.get(name, []))]
-    recorded = recorded_removals(added)
-    lost = lost_assertions(blocks, (set(), set()), recorded)
-    if len(lost) > gained:
-        lost = lost_assertions(blocks, retired_names(root, removed), recorded)
     if len(lost) > gained:
         found.append(
             f"tests lose {len(lost) - gained} assertion lines net "
-            f"({len(lost)} removed, {gained} added); removed at {', '.join(lost)}. "
+            f"({len(lost)} removed, {gained} added) since {point[:12]}; "
+            f"removed at {', '.join(lost)}. "
             "To remove a whole test, add `Removed test: <path> :: <test name> :: "
             "<what still proves it or why it is unneeded>` to the plan; the test name "
             "is the function name for a Python test and the text between the quotes "
@@ -788,3 +859,5 @@ def validate_suppressions(root: Path, base: str | None) -> None:
         )
     if not empty:
         ui_source_check(root, added)
+        if screens:
+            text_walls_check(root, point, joins, added, removed)

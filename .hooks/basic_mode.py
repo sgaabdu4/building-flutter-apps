@@ -47,6 +47,12 @@ OSV_LOCKFILES = {
 }
 GENERATED_DIRECTORIES = {".agents", ".hooks", ".claude", ".codex", ".husky"}
 FALLBACK_LABEL = "this language"
+SCREEN_SUFFIXES = {".vue": "Vue", ".svelte": "Svelte", ".astro": "Astro"}
+SCREEN_MARKS = {
+    ".swift": ("import SwiftUI", "SwiftUI"),
+    ".kt": ("androidx.compose", "Compose"),
+}
+SCREEN_STACKS = ("Vue", "Svelte", "Astro", "SwiftUI", "Compose")
 
 
 def trivial(path: Path) -> bool:
@@ -147,11 +153,24 @@ def basic_config(source: Path, root: Path, files: list[Path]) -> GateConfig | No
     return {"version": 1, "packages": [], "shared": shared}
 
 
-def gap(label: str) -> str:
+def gap(text: str) -> str:
     return (
-        f"Gap: No built-in checks for {label}\n"
-        f'File it, without asking: python3 .hooks/hard-eng.py gap-issue "No built-in checks for {label}"'
+        f"Gap: {text}\n"
+        f'File it, without asking: python3 .hooks/hard-eng.py gap-issue "{text}"'
     )
+
+
+def screen_stacks(root: Path, files: list[Path]) -> list[str]:
+    """The screen stacks that the text wall rule cannot read: its stack names, in a fixed order."""
+    found: set[str] = set()
+    for path in project_files(root, files):
+        if label := SCREEN_SUFFIXES.get(path.suffix):
+            found.add(label)
+        elif (mark := SCREEN_MARKS.get(path.suffix)) and mark[0] in path.read_text(
+            errors="replace"
+        ):
+            found.add(mark[1])
+    return [stack for stack in SCREEN_STACKS if stack in found]
 
 
 def announce(root: Path, config: GateConfig) -> None:
@@ -161,9 +180,11 @@ def announce(root: Path, config: GateConfig) -> None:
         path.name == "Package.swift" and "ephemeral" not in path.parts
         for path in project_files(root, files)
     ):
-        print(gap("SwiftPM packages"))
+        print(gap("No built-in checks for SwiftPM packages"))
     if label is not None:
         print(
             f"Basic mode for {label}: rules, skills, secret scans and security scan installed; no built-in checks for {label}.\n"
-            f"{gap(label)}"
+            f"{gap(f'No built-in checks for {label}')}"
         )
+    for stack in screen_stacks(root, files):
+        print(gap(f"No text wall check for {stack}"))

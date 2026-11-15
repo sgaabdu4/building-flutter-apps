@@ -20,6 +20,7 @@ from ci_jobs import (
     LanguageFilter,
     add_language_filters,
     add_shard_option,
+    add_walls_command,
     language_filter,
     language_groups,
 )
@@ -55,6 +56,7 @@ if TYPE_CHECKING:
 
 ROOT = Path(__file__).resolve().parents[1]
 FAILED_GATES: list[str] = []
+CONFIGURED: list[Group] = []
 CHANGED_DART: dict[str, list[str]] = {}
 RECORDING = threading.Event()
 TEST_REPORTS = {"python-tests", "lcov-tests", "dart-tests", "xcode-tests"}
@@ -72,12 +74,12 @@ def validate_typing(
     directory: Path,
     language: str | None,
     sources: list[str] | tuple[str, ...] = (),
-    package_root: Path | None = None,
+    children: frozenset[str] = frozenset(),
 ) -> None:
     if language == "python":
         validate_pyrefly(directory, ROOT)
     elif language == "dart":
-        validate_dart_typing(directory, sources, package_root)
+        validate_dart_typing(directory, sources, None, children)
 
 
 def reject_test_filters(
@@ -191,7 +193,10 @@ def prepare_command(
     if gate.get("role") == "types":
         directory = ROOT / group["path"]
         language = group.get("language")
-        validate_typing(directory, language, group.get("sources", []))
+        from dart_boundaries import nested_package_patterns
+
+        children = nested_package_patterns(group, CONFIGURED or groups or [])
+        validate_typing(directory, language, group.get("sources", []), children)
         if language == "python":
             from project_setup import python_interpreter
 
@@ -654,6 +659,7 @@ def run_gates(groups: list[Group], timeout: float, related: str | None) -> bool 
     output_lock = threading.Lock()
     FAILED_GATES.clear()
     config = parse_config((ROOT / "hard-eng.gates.json").read_text())
+    CONFIGURED[:] = config["packages"]
     return run_checks(
         [(group, gate) for group in groups for gate in group["checks"]],
         lambda group, gate: run_gate(
@@ -724,7 +730,7 @@ def check(
         if verify_plan:
             plan_stage = change_size.judged_stage(ROOT, base, plan_stage)
         validate_comments(ROOT, base)
-        validate_suppressions(ROOT, base)
+        validate_suppressions(ROOT, base, screens=shard != "merge")
         plans.validate_records(ROOT, base)
         before_gates(groups, quick, base)
         stop_keeping("listings")
@@ -783,6 +789,10 @@ def deliver(args: "Namespace") -> int:
         from hot_paths import scan_all
 
         return scan_all(ROOT, paths=args.paths)
+    if args.command == "text-walls":
+        from text_walls import walls_command
+
+        return walls_command(ROOT, args.paths, args.stdin)
     if args.command == "gap-issue":
         from gap_issue import file_gap
 
@@ -888,6 +898,7 @@ def main() -> int:
         "hot-paths",
         help="List known slow patterns in the named files, else the whole repository",
     ).add_argument("paths", nargs="*")
+    add_walls_command(commands.add_parser)
     mutating = commands.add_parser(
         "mutation",
         help="Report changed lines whose tests miss small deliberate bugs",
@@ -960,6 +971,7 @@ def main() -> int:
         "gap-issue",
         "ci-usage",
         "hot-paths",
+        "text-walls",
     }:
         return deliver(args)
     from agent_hooks import handle_event

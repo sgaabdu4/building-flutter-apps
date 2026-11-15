@@ -13,7 +13,7 @@ from pathlib import Path
 import agent_hooks
 import hook_chain
 import source_trees
-from gate_config import SOURCE_FILE, parse_config, repository_files
+from gate_config import SOURCE_FILE, load_groups, repository_files
 from local_edits import refusal_reason
 from mcp_setup import retired_settings
 from project_files import keep, tell_once
@@ -31,6 +31,7 @@ from update_runner import (
     undo_hooked_commit,
     update_attempt,
     update_blocker,
+    uv_run,
 )
 
 COMMIT_ID = re.compile(r"[0-9a-f]{40}")
@@ -237,6 +238,7 @@ def scaffold_files(source: Path) -> set[str]:
                 "*.py",
                 "ruff.toml",
                 "dart_declarations.pubspec.*",
+                "text_walls.*",
                 "untrusted-input.d.ts",
             )
             for path in (source / ".hooks").glob(pattern)
@@ -305,19 +307,11 @@ def update_plan(
     previous: Path,
     env: dict[str, str] | None = None,
     replace: bool = False,
+    chained: bool = False,
 ) -> tuple[dict[str, str | None], dict[str, str | None], tuple[str, str], list[str]]:
     planned = subprocess.run(
         [
-            "uv",
-            "run",
-            "--quiet",
-            "--project",
-            str(source),
-            "--locked",
-            "--no-dev",
-            "--python",
-            sys.executable,
-            "python",
+            *uv_run(source),
             str(source / "setup.py"),
             str(root),
             "--plan",
@@ -326,7 +320,7 @@ def update_plan(
             *(["--replace-scaffold"] if replace else []),
         ],
         cwd=root,
-        env=env,
+        env=hook_chain.plan_env(env, chained),
         capture_output=True,
         text=True,
         timeout=60,
@@ -803,12 +797,11 @@ def update(root: Path, repair: bool = False, *, remember: Path | None = None) ->
 
 
 def install_revision(root: Path, source: Path, old: Path, revision: str) -> str:
-    changes, links, hook, _ = update_plan(root, source, old)
+    changes, links, hook, _ = update_plan(root, source, old, chained=True)
     if not changes and not links:
         install_planned_hook(root, hook)
         return "Hard Eng already matches the verified source."
     local_settings(root)
-    validate_gates(root, source, changes)
     commit_update(root, changes, links, revision)
     retire_local_generation(root)
     if hook[0] not in changes:
@@ -959,11 +952,7 @@ def check_scaffold_update(root: Path, base: str, *, sources: bool = True) -> boo
     except (subprocess.CalledProcessError, StaleRelease):
         return False
     if sources:
-        from coverage_sources import require_listed_sources
-
-        gates = parse_config((root / "hard-eng.gates.json").read_text())
-        files = repository_files(root)
-        require_listed_sources(root, gates["packages"], files, python_only=False)
+        load_groups(root)
     print(
         "Scaffold-only update: source CI verified and the gate configuration accepted.",
         flush=True,

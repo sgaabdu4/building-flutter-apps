@@ -19,7 +19,7 @@ from plans import (
     release_references,
     validate_plan,
 )
-from project_files import KEPT, keep, keeping
+from project_files import GIT_LISTING, KEPT, keep, keeping
 
 NO_CHANGE = "no change"
 MAX_SMALL_LINES = 20
@@ -74,7 +74,7 @@ def _branch_change(root: Path, point: str) -> tuple[list[str], list[str], list[s
     untracked = [
         name
         for name in _git_output(
-            root, "ls-files", "--others", "--exclude-standard", "-z"
+            root, *GIT_LISTING[1:], "ls-files", "--others", "--exclude-standard", "-z"
         ).split("\0")
         if (root / name).is_file() or (root / name).is_symlink()
     ]

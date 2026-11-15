@@ -1,12 +1,20 @@
 """Billed GitHub Actions minutes and where each job's time goes."""
 
 import math
+import os
 import re
 from pathlib import Path
 from statistics import median
+from time import sleep
+from typing import TYPE_CHECKING
 
 from gate_config import JsonValue
 
+if TYPE_CHECKING:
+    from shipping import ShippingPolicy
+
+SERVER_ERROR = re.compile(r"HTTP 5\d\d")
+LOOKUP_WAITS = (2.0, 6.0)
 RUNNER_MULTIPLIERS = {"windows": 2, "macos": 10}
 SETUP_STEP = re.compile(
     r"(?i)^(?:set up job|complete job|post )|checkout|set ?up|install|cache|restore|download"
@@ -253,7 +261,7 @@ def _pull_request_head(
     root: Path, repository: str, base: str, branch: str
 ) -> tuple[str, str]:
     """The head and tree of the one PR merged into this push, whatever the merge method."""
-    from shipping import ShippingError, _json, _object, _sha, _text, gh, git
+    from shipping import ShippingError, _compare, _json, _object, _sha, _text, gh, git
 
     revision = git(root, "rev-parse", "HEAD").strip()
     endpoint = f"repos/{repository}/commits/{revision}/pulls"
@@ -271,8 +279,7 @@ def _pull_request_head(
     if len(heads) != 1:
         raise ShippingError("push merges no single PR")
     head = heads.pop()
-    endpoint = f"repos/{repository}/compare/{base}...{head}"
-    comparison = _object(_json(gh(root, "api", endpoint), "compare"), "compare")
+    comparison = _compare(root, repository, base, head)
     if comparison.get("status") not in {"ahead", "identical"}:
         tree = _compared_tree(comparison, "base_commit")
         if tree is None or tree != _compared_tree(comparison, "merge_base_commit"):
@@ -284,8 +291,6 @@ def _pull_request_head(
 
 def _release_revision(base_branch: str) -> str | None:
     """The head commit of a PR from the base branch into another branch of this repository."""
-    import os
-
     from shipping import ShippingError, _json, _object, _repo, _sha, _text
 
     try:
@@ -307,11 +312,35 @@ def _release_revision(base_branch: str) -> str | None:
     return _sha(head.get("sha"), "PR head") if len(repositories) == 1 else None
 
 
-def reused_pull_request(root: Path, base: str) -> str | None:
-    """The commit whose passed required checks already cover this branch push or release PR."""
-    import os
+def _covering_head(
+    root: Path, base: str, policy: "ShippingPolicy", ref: str, release: str
+) -> str:
+    """The commit whose passed checks cover this tree; a ShippingError says why none does."""
+    from shipping import ShippingError, _checks, _repo, _sha, git
 
-    from shipping import ShippingError, _checks, _repo, _sha, git, load_policy
+    on_push = not release
+    if git(root, "status", "--porcelain"):
+        raise ShippingError("the checkout has uncommitted changes")
+    repository = _repo(os.environ.get("GITHUB_REPOSITORY"), "workflow")
+    if on_push:
+        head, tree = _pull_request_head(
+            root,
+            repository,
+            _sha(base, "push base"),
+            ref.removeprefix("refs/heads/"),
+        )
+    else:
+        head = release
+        tree = git(root, "rev-parse", f"{head}^{{tree}}").strip()
+    if tree != git(root, "rev-parse", "HEAD^{tree}").strip():
+        raise ShippingError("the covering PR tested a different tree")
+    _checks(root, repository, head, policy, False, completed_only=not on_push)
+    return head
+
+
+def reused_pull_request(root: Path, base: str) -> str | None:
+    """The commit whose passed required checks already cover this branch push or release PR; a GitHub server error is asked again."""
+    from shipping import ShippingError, load_policy
 
     try:
         policy = load_policy(root, required=False)
@@ -329,29 +358,18 @@ def reused_pull_request(root: Path, base: str) -> str | None:
             return None
     except ShippingError:
         return None
-    try:
-        if git(root, "status", "--porcelain"):
-            raise ShippingError("the checkout has uncommitted changes")
-        repository = _repo(os.environ.get("GITHUB_REPOSITORY"), "workflow")
-        if on_push:
-            head, tree = _pull_request_head(
-                root,
-                repository,
-                _sha(base, "push base"),
-                ref.removeprefix("refs/heads/"),
+    waits = list(LOOKUP_WAITS)
+    while True:
+        try:
+            return _covering_head(root, base, policy, ref, release)
+        except ShippingError as error:
+            if waits and SERVER_ERROR.search(str(error)):
+                sleep(waits.pop(0))
+                continue
+            who = "merged PR's" if on_push else "earlier"
+            where = "push" if on_push else "PR"
+            print(
+                f"Running the checks again; the {who} checks do not cover this {where}: {error}",
+                flush=True,
             )
-        else:
-            head = release
-            tree = git(root, "rev-parse", f"{head}^{{tree}}").strip()
-        if tree != git(root, "rev-parse", "HEAD^{tree}").strip():
-            raise ShippingError("the covering PR tested a different tree")
-        _checks(root, repository, head, policy, False, completed_only=not on_push)
-    except ShippingError as error:
-        who = "merged PR's" if on_push else "earlier"
-        where = "push" if on_push else "PR"
-        print(
-            f"Running the checks again; the {who} checks do not cover this {where}: {error}",
-            flush=True,
-        )
-        return None
-    return head
+            return None

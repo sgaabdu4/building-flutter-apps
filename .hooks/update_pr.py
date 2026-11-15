@@ -4,11 +4,12 @@ import fcntl
 import json
 import shlex
 import subprocess
+import tempfile
 from pathlib import Path
 
 from gate_config import SOURCE_FILE, JsonValue
 from review_bypass import author_only_review_block
-from shipping import ShippingError, gh, load_policy
+from shipping import ShippingError, _pr_url, gh, load_policy, merge_settings
 from stale_updates import registered_worktrees
 from update_runner import (
     REPAIR_SUBJECT,
@@ -47,12 +48,11 @@ MERGE_METHODS = (
 REPAIR_TITLE = "Repair the Hard Eng installation"
 
 
-def merge_method(root: Path) -> str:
-    allowed = json.loads(
-        gh(root, "repo", "view", "--json", ",".join(name for name, _ in MERGE_METHODS))
+def merge_method(root: Path, url: str) -> str:
+    owner, repository, _ = _pr_url(url)
+    allowed = merge_settings(
+        root, f"{owner}/{repository}", tuple(name for name, _ in MERGE_METHODS)
     )
-    if not isinstance(allowed, dict):
-        raise ShippingError("repository merge settings must be an object")
     for name, flag in MERGE_METHODS:
         if allowed.get(name) is True:
             return flag
@@ -178,6 +178,65 @@ def merged_update(root: Path, tip: str) -> bool:
     return ahead == ["0"] or landed(root, tip, branch)
 
 
+LOAD_CHECK = """
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import debt
+from gate_config import load_groups
+try:
+    load_groups(Path(sys.argv[2]))
+    debt.load(Path(sys.argv[2]))
+except (OSError, ValueError, TypeError, KeyError) as error:
+    sys.exit(str(error))
+"""
+
+
+def load_refusal(tree: Path) -> str | None:
+    from tool_setup import yaml_python
+
+    result = subprocess.run(
+        yaml_python("-I", "-c", LOAD_CHECK, str(tree / ".hooks"), str(tree)),
+        cwd=tree,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    if result.returncode:
+        shown = result.stderr.strip()
+        if shown.startswith("Traceback"):
+            shown = shown.splitlines()[-1]
+        return shown or f"exit {result.returncode}"
+    return None
+
+
+def tip_refusal(root: Path) -> str | None:
+    with tempfile.TemporaryDirectory(prefix="hard-eng-update-") as temporary:
+        tip = Path(temporary) / "candidate"
+        subprocess.run(
+            [
+                "git",
+                "worktree",
+                "add",
+                "--quiet",
+                "--detach",
+                str(tip),
+                f"refs/heads/{UPDATE_BRANCH}",
+            ],
+            cwd=root,
+            check=True,
+        )
+        try:
+            return load_refusal(tip)
+        finally:
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", str(tip)],
+                cwd=root,
+                check=False,
+            )
+
+
 def fix_steps(root: Path) -> str:
     existing = branch_worktree(root)
     if existing is not None:
@@ -293,6 +352,16 @@ def replaceable_remote(root: Path, base: str) -> str | None:
     return None
 
 
+def push_lease(root: Path, base: str, check_tip: bool) -> str | None:
+    if check_tip and (refusal := tip_refusal(root)) is not None:
+        print(
+            f"The new release cannot load the checks of this project on {UPDATE_BRANCH}: "
+            f"{refusal}. {fix_steps(root)}"
+        )
+        return None
+    return replaceable_remote(root, base)
+
+
 def settle(
     root: Path,
     url: str,
@@ -318,7 +387,7 @@ def settle(
             waiting = "--admin"
         else:
             print(f"Auto-merge waits for the PR's merge rules: {problem}.")
-    merging = ["pr", "merge", url, waiting, merge_method(root)]
+    merging = ["pr", "merge", url, waiting, merge_method(root, url)]
     merging += ["--match-head-commit", head]
     if not merge:
         print(
@@ -382,7 +451,7 @@ def publish(root: Path, merge: bool = True) -> int:
             f"Nothing to publish: Hard Eng is current on {base}. Last update result: {last_result(root)}"
         )
         return 0
-    lease = replaceable_remote(root, base)
+    lease = push_lease(root, base, revision != current)
     if lease is None:
         return 1
     expected = f"--force-with-lease=refs/heads/{UPDATE_BRANCH}:{lease}"

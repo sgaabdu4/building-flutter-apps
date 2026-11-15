@@ -21,13 +21,14 @@ from shipping import (
     PendingCheck,
     Shipment,
     ShippingError,
+    _compare,
     _pr_url,
     _pull,
     gh,
     git,
     load_policy,
+    merge_settings,
     pushed_policy,
-    rebase_step,
     verify,
 )
 from submodules import update_submodules
@@ -38,6 +39,60 @@ OBJECT_ID = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 GITHUB_SSH_PREFIX = re.compile(r"(?:ssh://)?git@github\.com[:/]")
 
 DERIVED_DATA = Path.home() / "Library/Developer/Xcode/DerivedData"
+
+
+def rebase_step(base: str) -> str:
+    return (
+        f"GitHub cannot rebase this PR onto {base}, so nothing was merged. "
+        f"Rebase the branch on origin/{base} and push it with --force-with-lease. "
+        "If GitHub still cannot rebase it, cut its commits (HE-PR-COMMITS). "
+        "Then wait for the checks and run ship again."
+    )
+
+
+def _stale_rebase_report(root: Path, repository: str, base: str, head: str) -> bool:
+    """True when the branch is current with base and has no merge commit."""
+    try:
+        comparison = _compare(root, repository, base, head)
+    except ShippingError:
+        return False
+    commits = comparison.get("commits")
+    return (
+        type(comparison.get("behind_by")) is int
+        and comparison["behind_by"] == 0
+        and isinstance(commits, list)
+        and comparison.get("total_commits") == len(commits)
+        and all(
+            isinstance(commit, dict)
+            and isinstance(commit.get("parents"), list)
+            and len(commit["parents"]) <= 1
+            for commit in commits
+        )
+    )
+
+
+def rebase_problem(root: Path, repository: str, base: str, head: str) -> str:
+    try:
+        allowed = merge_settings(root, repository, ("rebaseMergeAllowed",)).get(
+            "rebaseMergeAllowed"
+        )
+    except ShippingError:
+        return rebase_step(base)
+    if allowed is not False:
+        if _stale_rebase_report(root, repository, base, head):
+            return (
+                f"GitHub reports that it cannot rebase this PR onto {base}, but the "
+                f"branch is current with {base} and has no merge commit, so that "
+                "report can be stale. Close the pull request and open it again, wait "
+                "for the checks, then run ship again. If GitHub still cannot rebase "
+                "it, cut its commits (HE-PR-COMMITS)."
+            )
+        return rebase_step(base)
+    return (
+        "This repository does not allow rebase merges, and Hard Eng merges by "
+        "rebase only, so nothing was merged. Allow rebase merges in the "
+        "repository settings, then run ship again."
+    )
 
 
 def remote_base(root: Path, branch: str | None) -> str | None:
@@ -543,7 +598,11 @@ def merge(target: Path, plan: Path | None, shipment: Shipment, method: str) -> S
         )
     except ShippingError as failure:
         if _pull(target, *_pr_url(shipment.pr_url)).rebaseable is False:
-            raise ShippingError(rebase_step(shipment.base)) from failure
+            raise ShippingError(
+                rebase_problem(
+                    target, shipment.repository, shipment.base, shipment.head_sha
+                )
+            ) from failure
         raise
     try:
         return verify(target, plan, shipment.pr_url, "delivered")

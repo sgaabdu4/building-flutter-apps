@@ -61,6 +61,15 @@ def add_shard_option(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
+def add_walls_command(add_parser: Callable[..., ArgumentParser]) -> None:
+    walls = add_parser(
+        "text-walls",
+        help="List screen text blocks over the caps, or judge server strings with --stdin",
+    )
+    walls.add_argument("paths", nargs="*")
+    walls.add_argument("--stdin", action="store_true")
+
+
 NO_LANGUAGES = LanguageFilter()
 
 

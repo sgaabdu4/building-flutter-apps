@@ -8,12 +8,13 @@ from pathlib import Path
 from typing import IO
 
 from process_group import run_in_group
+from project_files import GIT_LISTING
 
 
 def scan_paths(repository: Path) -> list[Path]:
     """Return tracked files plus nonignored working-tree files that still exist."""
     result = subprocess.run(
-        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        [*GIT_LISTING, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         cwd=repository,
         check=True,
         capture_output=True,
