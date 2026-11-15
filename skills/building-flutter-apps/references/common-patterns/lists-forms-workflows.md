@@ -60,7 +60,11 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
   // The pull-to-refresh event or a button calls this; RefreshIndicator awaits it.
   Future<void> refresh() async {
     ref.invalidateSelf();
-    await future;
+    try {
+      await future;
+    } catch (error, stackTrace) {
+      Crash.error(error, stackTrace, reason: 'refresh');
+    }
   }
 }
 ```
@@ -301,7 +305,7 @@ Future<void> updateAll(List<Product> products) async {
 
 ## Pull-to-Refresh
 
-The pull event calls the notifier's `refresh()` from the pagination example above. `RefreshIndicator` awaits it.
+The pull event calls the notifier's `refresh()` from the pagination example above. `RefreshIndicator` awaits it. A failed refresh does not escape: `refresh()` reports it, `AsyncValue` holds the error, and the screen listens for it and shows a message.
 
 ```dart
 class RefreshableProductListScreen extends ConsumerWidget {
@@ -311,6 +315,15 @@ class RefreshableProductListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
       paginatedProductProvider.select((s) => s.value?.items ?? const <Product>[]),
+    );
+
+    ref.listen(
+      paginatedProductProvider.select((s) => s.hasError),
+      (_, hasError) {
+        if (hasError && context.mounted) {
+          showProductsRefreshFailedSnackBar(context, context.l10n);
+        }
+      },
     );
 
     return RefreshIndicator(
