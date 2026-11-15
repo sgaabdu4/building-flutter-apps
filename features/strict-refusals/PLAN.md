@@ -11,6 +11,7 @@ Non-goals: the `flutter_skill_lints` version pin in the analysis options templat
 ## Repository context
 
 Owners: `skills/building-flutter-apps/references/` and `evals/evals.json`. The smoke test `tool/smoke_test.sh` asserts some of the wording. The `.agents/skills/building-flutter-apps` copy is installed by Hard Eng updates, so it follows the next update.
+Same cause: the old lint advice said to defer work out of `build()`, so each example copied that deferral. The fix is the same in each place: start the work at its trigger.
 
 ## Decisions + authorization
 
