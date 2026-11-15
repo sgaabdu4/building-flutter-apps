@@ -396,7 +396,9 @@ class ProductListScreen extends ConsumerWidget {
       productProvider.select((s) => s.value?.items),
     );
 
-    if (items == null && hasError) return const ProductLoadFailedView();
+    if (items == null && hasError) {
+      return ProductLoadFailedView(onRetry: () => ref.invalidate(productProvider));
+    }
     if (items == null) return const Center(child: CircularProgressIndicator());
 
     return ProductListView(

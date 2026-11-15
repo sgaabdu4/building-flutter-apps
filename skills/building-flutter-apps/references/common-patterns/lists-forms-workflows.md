@@ -98,11 +98,21 @@ class PaginatedProductListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
-      paginatedProductProvider.select((s) => s.value?.items ?? const <Product>[]),
+      paginatedProductProvider.select((s) => s.value?.items),
+    );
+    final hasError = ref.watch(
+      paginatedProductProvider.select((s) => s.hasError),
     );
     final hasMore = ref.watch(
-      paginatedProductProvider.select((s) => s.value?.hasMore ?? !s.hasError),
+      paginatedProductProvider.select((s) => s.value?.hasMore ?? false),
     );
+
+    if (items == null && hasError) {
+      return ProductLoadFailedView(
+        onRetry: () => unawaited(ref.read(paginatedProductProvider.notifier).refresh()),
+      );
+    }
+    if (items == null) return const Center(child: CircularProgressIndicator());
 
     return NotificationListener<ScrollNotification>(
       onNotification: (scroll) => _onScroll(ref, scroll),
@@ -327,7 +337,10 @@ class RefreshableProductListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
-      paginatedProductProvider.select((s) => s.value?.items ?? const <Product>[]),
+      paginatedProductProvider.select((s) => s.value?.items),
+    );
+    final hasError = ref.watch(
+      paginatedProductProvider.select((s) => s.hasError),
     );
 
     ref.listen(
@@ -338,6 +351,13 @@ class RefreshableProductListScreen extends ConsumerWidget {
         }
       },
     );
+
+    if (items == null && hasError) {
+      return ProductLoadFailedView(
+        onRetry: () => unawaited(ref.read(paginatedProductProvider.notifier).refresh()),
+      );
+    }
+    if (items == null) return const Center(child: CircularProgressIndicator());
 
     return RefreshIndicator(
       onRefresh: () => ref.read(paginatedProductProvider.notifier).refresh(),
