@@ -365,21 +365,16 @@ Notifier structure = [state-management/notifier-structure.md](state-management/n
 sealed class ProductState with _$ProductState {
   const factory ProductState({
     @Default([]) List<Product> items,
-    @Default(false) bool isLoading,
-    AppError? error,
   }) = _ProductState;
 }
 
 @Riverpod(keepAlive: true)
 class ProductNotifier extends _$ProductNotifier {
+  // The first watch starts the load; AsyncValue carries loading and error. See notifier-structure.md.
   @override
-  ProductState build() => const ProductState(isLoading: true);
-
-  // The screen calls load() from initState. See notifier-structure.md "Sync notifier init trap".
-  Future<void> load() async {
+  Future<ProductState> build() async {
     final items = await ref.read(productRepositoryProvider).fetchAll();
-    if (!ref.mounted) return;
-    state = state.copyWith(items: items, isLoading: false);
+    return ProductState(items: items);
   }
 
   // ... see notifier-structure.md and async-mutations.md.
@@ -388,31 +383,21 @@ class ProductNotifier extends _$ProductNotifier {
 
 ```dart
 // features/products/presentation/screens/product_list_screen.dart
-class ProductListScreen extends ConsumerStatefulWidget {
+class ProductListScreen extends ConsumerWidget {
   const ProductListScreen({super.key});
 
   @override
-  ConsumerState<ProductListScreen> createState() => _ProductListScreenState();
-}
-
-class _ProductListScreenState extends ConsumerState<ProductListScreen> {
-  @override
-  void initState() {
-    super.initState();
-    unawaited(ref.read(productProvider.notifier).load());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isLoading = ref.watch(
-      productProvider.select((s) => s.isLoading),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasError = ref.watch(
+      productProvider.select((s) => s.hasError),
     );
 
     final items = ref.watch(
-      productProvider.select((s) => s.items),
+      productProvider.select((s) => s.value?.items),
     );
 
-    if (isLoading) return const Center(child: CircularProgressIndicator());
+    if (hasError) return const ProductLoadFailedView();
+    if (items == null) return const Center(child: CircularProgressIndicator());
 
     return ProductListView(
       items: UnmodifiableListView([

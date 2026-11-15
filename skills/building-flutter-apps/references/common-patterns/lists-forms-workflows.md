@@ -17,7 +17,6 @@ Signals: pagination, infinite scroll, cursor loading, search debounce, form vali
 sealed class PaginatedState with _$PaginatedState {
   const factory PaginatedState({
     @Default([]) List<Product> items,
-    @Default(false) bool isLoading,
     @Default(false) bool isLoadingMore,
     @Default(true) bool hasMore,
     @Default(0) int page,
@@ -28,60 +27,48 @@ sealed class PaginatedState with _$PaginatedState {
 class PaginatedProductNotifier extends _$PaginatedProductNotifier {
   static const _pageSize = 20;
 
+  // The first watch loads page 0; AsyncValue carries first-load loading and error.
   @override
-  PaginatedState build() => const PaginatedState(isLoading: true);
+  Future<PaginatedState> build() async {
+    final items = await ref.read(productRepositoryProvider).fetchPage(0, _pageSize);
+    return PaginatedState(items: items, hasMore: items.length >= _pageSize);
+  }
 
-  // The screen calls load() from initState — see notifier-structure.md.
-  Future<void> load() => _loadPage(0);
-
-  Future<void> _loadPage(int page) async {
-    if (!ref.mounted) return;
-    if (page > 0) state = state.copyWith(isLoadingMore: true);
+  // The scroll event that reaches the end calls this.
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || current.isLoadingMore || !current.hasMore) return;
+    state = AsyncData(current.copyWith(isLoadingMore: true));
     try {
+      final page = current.page + 1;
       final items = await ref.read(productRepositoryProvider).fetchPage(page, _pageSize);
       if (!ref.mounted) return;
-      state = state.copyWith(
-        items: page == 0 ? items : [...state.items, ...items],
-        page: page,
-        hasMore: items.length >= _pageSize,
-        isLoading: false,
-        isLoadingMore: false,
+      state = AsyncData(
+        current.copyWith(
+          items: [...current.items, ...items],
+          page: page,
+          hasMore: items.length >= _pageSize,
+          isLoadingMore: false,
+        ),
       );
     } catch (e) {
       if (!ref.mounted) return;
-      state = state.copyWith(isLoading: false, isLoadingMore: false);
+      state = AsyncData(current.copyWith(isLoadingMore: false));
     }
   }
 
-  Future<void> loadMore() async {
-    if (state.isLoadingMore || !state.hasMore) return;
-    await _loadPage(state.page + 1);
-  }
-
-  Future<void> refresh() => _loadPage(0);
+  // The pull-to-refresh event or a button calls this.
+  void refresh() => ref.invalidateSelf();
 }
 ```
 
 Widget with scroll detection:
 
 ```dart
-class PaginatedProductListScreen extends ConsumerStatefulWidget {
+class PaginatedProductListScreen extends ConsumerWidget {
   const PaginatedProductListScreen({super.key});
 
-  @override
-  ConsumerState<PaginatedProductListScreen> createState() =>
-      _PaginatedProductListScreenState();
-}
-
-class _PaginatedProductListScreenState
-    extends ConsumerState<PaginatedProductListScreen> {
-  @override
-  void initState() {
-    super.initState();
-    unawaited(ref.read(paginatedProductProvider.notifier).load());
-  }
-
-  bool _onScroll(ScrollNotification scroll) {
+  bool _onScroll(WidgetRef ref, ScrollNotification scroll) {
     if (scroll.metrics.pixels >= scroll.metrics.maxScrollExtent - 200) {
       unawaited(ref.read(paginatedProductProvider.notifier).loadMore());
     }
@@ -89,16 +76,16 @@ class _PaginatedProductListScreenState
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
-      paginatedProductProvider.select((s) => s.items),
+      paginatedProductProvider.select((s) => s.value?.items ?? const <Product>[]),
     );
     final hasMore = ref.watch(
-      paginatedProductProvider.select((s) => s.hasMore),
+      paginatedProductProvider.select((s) => s.value?.hasMore ?? !s.hasError),
     );
 
     return NotificationListener<ScrollNotification>(
-      onNotification: _onScroll,
+      onNotification: (scroll) => _onScroll(ref, scroll),
       child: ListView.builder(
         itemCount: items.length + (hasMore ? 1 : 0),
         itemBuilder: (context, index) {
@@ -318,12 +305,13 @@ class ProductListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
-      productProvider.select((s) => s.items),
+      productProvider.select((s) => s.value?.items ?? const <Product>[]),
     );
 
     return RefreshIndicator(
       onRefresh: () async {
-        await ref.read(productProvider.notifier).refresh();
+        ref.invalidate(productProvider);
+        await ref.read(productProvider.future);
       },
       child: ListView.builder(
         itemCount: items.length,

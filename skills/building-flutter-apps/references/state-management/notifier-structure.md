@@ -66,7 +66,7 @@ class ProfileNotifier extends _$ProfileNotifier {
 }
 ```
 
-For app state with explicit flags, keep a Freezed state object behind a sync notifier: seed state in `build()` and start the first load from its trigger with a public `load()` that awaits before it reads or writes `state` (the `avoid_sync_notifier_state_read` fix). The screen that needs the data calls `load()` once from `initState`, never from `build()`; a user action calls it from its event handler. Never delay a load with a frame callback or a zero-delay wait. Pause-sensitive startup starts from its durable owner after the watch/listen path exists, through an idempotent `load()` ([pause boundaries](../state-management-lifecycle.md#pause-projection-and-mode-boundaries)). Do not rely on `Future.microtask` ordering to beat route pause or listener attachment.
+State loaded when the screen shows starts in `AsyncNotifier.build()`: the first watch starts the load, so no screen code starts it (the `avoid_sync_notifier_state_read` fix). Keep a Freezed state object with explicit flags inside the `AsyncValue` when the UI needs them, such as `isLoadingMore`. Later work, such as the next page, a refresh or a retry, starts from the event that causes it: scroll, pull to refresh or a button. Never call `ref.read` in `initState` to start a load, and never delay a load with a frame callback or a zero-delay wait. Pause-sensitive startup starts from its durable owner after the watch/listen path exists, through an idempotent `load()` ([pause boundaries](../state-management-lifecycle.md#pause-projection-and-mode-boundaries)). Do not rely on `Future.microtask` ordering to beat route pause or listener attachment.
 
 ## Loading and progress
 
