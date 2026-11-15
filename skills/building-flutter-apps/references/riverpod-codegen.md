@@ -128,13 +128,9 @@ Future<List<Product>> productsByCategory(Ref ref, String category) async {
 @riverpod
 class ProductEditorNotifier extends _$ProductEditorNotifier {
   @override
-  ProductFormState build(String productId) => const ProductFormState();
-
-  // The action that opens the editor calls loadProduct().
-  Future<void> loadProduct(String id) async {
-    final product = await ref.read(productRepositoryProvider).fetchById(id);
-    if (!ref.mounted) return;
-    state = state.copyWith(name: product.name, price: product.price);
+  Future<ProductFormState> build(String productId) async {
+    final product = await ref.read(productRepositoryProvider).fetchById(productId);
+    return ProductFormState(name: product.name, price: product.price);
   }
 }
 ```

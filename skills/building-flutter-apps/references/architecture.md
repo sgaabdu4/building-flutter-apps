@@ -375,18 +375,35 @@ class ProductNotifier extends _$ProductNotifier {
   @override
   ProductState build() => const ProductState(isLoading: true);
 
-  // load(): the action that opens the route calls it. See notifier-structure.md "Sync notifier init trap".
+  // The screen calls load() from initState. See notifier-structure.md "Sync notifier init trap".
+  Future<void> load() async {
+    final items = await ref.read(productRepositoryProvider).fetchAll();
+    if (!ref.mounted) return;
+    state = state.copyWith(items: items, isLoading: false);
+  }
+
   // ... see notifier-structure.md and async-mutations.md.
 }
 ```
 
 ```dart
 // features/products/presentation/screens/product_list_screen.dart
-class ProductListScreen extends ConsumerWidget {
+class ProductListScreen extends ConsumerStatefulWidget {
   const ProductListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProductListScreen> createState() => _ProductListScreenState();
+}
+
+class _ProductListScreenState extends ConsumerState<ProductListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ref.read(productProvider.notifier).load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isLoading = ref.watch(
       productProvider.select((s) => s.isLoading),
     );

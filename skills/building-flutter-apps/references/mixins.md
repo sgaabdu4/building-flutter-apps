@@ -59,19 +59,13 @@ mixin ConnectivityMixin {
 // Usage in a notifier
 class ProductNotifier extends _$ProductNotifier with ConnectivityMixin {
   @override
-  ProductState build() => const ProductState();
-
-  // The action that opens the route calls load(). See notifier-structure.md "Sync notifier init trap".
-  Future<void> load() async {
-    if (!ref.mounted) return;
+  Future<ProductState> build() async {
     final connected = checkConnectivity(
       ref.read(connectivityServiceProvider),
     );
-    if (!connected) {
-      state = state.copyWith(error: 'No connection');
-      return;
-    }
+    if (!connected) return const ProductState(error: 'No connection');
     // ...fetch from remote
+    return const ProductState();
   }
 }
 ```

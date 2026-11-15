@@ -90,7 +90,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('fetches products on init', () async {
+  test('load fetches products', () async {
     final mockRepo = MockIProductRepository();
     when(() => mockRepo.fetchAll()).thenAnswer((_) async => [
       Product(id: ProductId('1'), name: DisplayName('Widget'), price: .usd(9.99)),
