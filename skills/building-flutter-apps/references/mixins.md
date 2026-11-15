@@ -56,7 +56,8 @@ mixin ConnectivityMixin {
   }
 }
 
-// Usage in a notifier
+// Usage in a notifier; noRetry shows the thrown error at once (riverpod-codegen.md#automatic-retry)
+@Riverpod(retry: noRetry)
 class ProductNotifier extends _$ProductNotifier with ConnectivityMixin {
   @override
   Future<ProductState> build() async {

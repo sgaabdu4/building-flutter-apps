@@ -368,7 +368,8 @@ sealed class ProductState with _$ProductState {
   }) = _ProductState;
 }
 
-@Riverpod(keepAlive: true)
+// noRetry: the failed view shows at once. See riverpod-codegen.md#automatic-retry.
+@Riverpod(keepAlive: true, retry: noRetry)
 class ProductNotifier extends _$ProductNotifier {
   // The first read or watch starts the load; AsyncValue carries loading and error. See notifier-structure.md.
   @override
