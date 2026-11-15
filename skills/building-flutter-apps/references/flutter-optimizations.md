@@ -491,4 +491,4 @@ class SignInScreen extends ConsumerWidget {
 }
 ```
 
-The screen is on display when sign-in succeeds, so its listener sees the change. A message for a screen that is not mounted yet stays in state, and `build()` renders it with `ref.watch`.
+The screen is on display when sign-in succeeds, so its listener sees the change. A message for a screen that is not mounted yet stays in durable state with an identity. The later screen shows it and acknowledges it ([pause boundaries](state-management-lifecycle.md#pause-projection-and-mode-boundaries)).
