@@ -311,7 +311,7 @@ Future<void> updateAll(List<Product> products) async {
 
 ## Pull-to-Refresh
 
-The pull event calls the notifier's `refresh()` from the pagination example above. `RefreshIndicator` awaits it. A failed refresh does not escape the future that `RefreshIndicator` awaits. `refresh()` reports the failure, restores the old list and raises `refreshFailedSerial`. The screen listens for that serial and shows a message, once for each failed refresh. A failed first load does not raise it.
+The pull event calls the notifier's `refresh()` from the pagination example above. `RefreshIndicator` awaits it. A failed refresh does not escape the future that `RefreshIndicator` awaits. `refresh()` reports the failure, restores the old list and raises `refreshFailedSerial`. The screen listens for that serial and shows a message, once for each failed refresh of a list that loaded. A failed first load, and a pull after it, raise no serial because no list exists to restore.
 
 ```dart
 class RefreshableProductListScreen extends ConsumerWidget {
