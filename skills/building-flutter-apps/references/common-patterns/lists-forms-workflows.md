@@ -318,7 +318,7 @@ Future<void> updateAll(List<Product> products) async {
 
 ## Pull-to-Refresh
 
-The pull event calls the notifier's `refresh()` from the pagination example above. `RefreshIndicator` awaits it. A failed refresh does not escape the future that `RefreshIndicator` awaits. `refresh()` reports the failure, restores the old list and raises `refreshFailedSerial`. The screen listens for that serial and shows a message, once for each failed refresh of a list that loaded. A failed first load, and a pull after it, raise no serial because no list exists to restore.
+The pull event calls the notifier's `refresh()` from the pagination example above, and `RefreshIndicator` awaits it. With a list on screen, `refresh()` fetches page 0 itself. It does not re-run `build()`, because a failing `build()` makes Riverpod 3 retry for a long time: the awaited future would stay pending and the spinner would turn with no message. A failed refresh does not escape that future. `refresh()` reports the failure, keeps the old list and raises `refreshFailedSerial`. The screen listens for that serial and shows a message, once for each failed refresh. A later refresh that succeeds keeps the serial, so it shows no message. With no list yet, `refresh()` re-runs `build()` and returns, and the failed view in the screen has a retry button that calls it.
 
 ```dart
 class RefreshableProductListScreen extends ConsumerWidget {
