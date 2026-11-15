@@ -17,9 +17,20 @@ Independent work: use the bounded-concurrency helper. Dart and Swift use `mapWit
 
 C1 only reads a literal 1 at the call. Write ordered work with inOrder. Only the second positional argument is the supported positional bound; an explicit named width takes precedence. Named bounds and inline JavaScript options require a literal one. Inline options must have no top-level spread or duplicate bound key. Identifier widths, computed bounds, computed property keys and options variables remain outside guaranteed coverage.
 
+Dart, two independent calls that are not a loop: add this `waitBoth` helper to the project's helpers if it is missing, then call `final (a, b) = await waitBoth(readA(), readB());`. It throws the original error as soon as one call fails; when both fail, it throws the error that comes first in time. For three calls, add a separate `waitThree` helper of the same form.
+
+```dart
+Future<(A, B)> waitBoth<A, B>(Future<A> first, Future<B> second) async {
+  await Future.wait<void>([first, second], eagerError: true);
+  return (await first, await second);
+}
+```
+
 Each loop is judged on its own, including loops inside async context managers. A helper body or an outer loop's early exit, sleep or condition update does not exempt a nested loop. Python `async with` waits on context entry and exit even without an explicit body await; task groups from asyncio and anyio also join their tasks. A raw loop containing these waits needs a named helper.
 
 Ordered work: use `inOrder` or `inOrderSteps` with a reason; Python uses `in_order` or `in_order_steps`. Pass a static `reason` string with at least 20 characters and more than one word. Literals, constants and literal concatenations are accepted. Dart and Swift use `reason: "..."`; JavaScript uses `{ reason: "..." }`; Python uses `reason="..."`. Write the reason inline at the helper call; options variables are not supported. State the real order constraint. Keep the helper's loop plain; never hide the order with recursion, streams or comments. When TypeScript or Biome flags `reason` as unused in the project's own `inOrder` or `inOrderSteps` definition, make `void reason;` its first statement (`void _reason;` when it destructures `{ reason: _reason }`).
+
+Dart, ordered steps that return values: `inOrderSteps` returns nothing, so declare `late final A a; late final B b;` first and assign them in the steps: `await inOrderSteps([() async { a = await readA(); }, () async { b = await readB(); }], reason: "...");`.
 
 ## Hot paths + data layout
 

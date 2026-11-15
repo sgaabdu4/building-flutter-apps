@@ -13,7 +13,7 @@ from gate_config import (
     changed_files,
     repository_files,
 )
-from project_files import keep
+from project_files import GIT_LISTING, keep
 
 BACKTICKED_TEXT = re.compile(r"`([^`]+)`")
 SMALL_SIZE = "Size: small ("
@@ -27,7 +27,6 @@ TITLE_LINE = re.compile(r"(?m)^# \S.+$")
 DOCUMENT_TITLE = re.compile(r"(?m)^# \S[^\n]*$")
 SURFACE_FIELD = re.compile(r"(?m)^Surface:")
 UX_REFERENCE = ".agents/skills/he-plan/references/ux.md"
-E2E_FIELD = re.compile(r"(?m)^E2E:")
 NOT_APPLICABLE_WITH_TEXT = re.compile(r"N/A — \S.+")
 TEST_FILE_SUFFIX = re.compile(r"\.(?:test|spec)\.")
 NOT_APPLICABLE_REASON_SEPARATOR = re.compile(r"\s+—\s+\S")
@@ -37,13 +36,8 @@ NOT_APPLICABLE_WITH_REASON = re.compile(r"N/A — [^\n]+")
 SURFACE_VALUE = re.compile(r"(Existing|New|Mock) — \S.+")
 TEST_REFERENCE = re.compile(r"`([^`\s]+?)::(?:[^`\n]*::)?([^`\n]+)`")
 DECISION_SECTION = re.compile(r"(?ms)^## Decision\n(.*?)(?=^## |\Z)")
-E2E_STATUS_LINE = re.compile(r"(Required|Passed|Delivery|N/A) — (\S.*)")
 NONE_VALUE = re.compile(r"(?i:none)(?:[.;:](?:\s.*)?|\s+[—–-]\s.*)?")
 DELIVERY_TARGET_FIELD = re.compile(r"(?im)^\s*(?:[-*+]\s+)?Delivery target:")
-DEPLOY_DELIVERY_TARGET = re.compile(
-    r"(?im)^\s*(?:[-*+]\s+)?Delivery target:\s*Deploy\s*$"
-)
-BLOCKED_STATUS = re.compile(r"(?i)^(pending|none|blocked|n/a)\b")
 CHECKBOX_LABEL = re.compile(r"(?m)^\s*(?:[-*+]|\d+[.)])\s+\[([^]\n]*)\](?:\s|$)")
 CHECKBOX_REST = re.compile(r"(?m)^\s*(?:[-*+]|\d+[.)])\s+\[[^]\n]*\](.*)$")
 PLACEHOLDER_STATUS = re.compile(
@@ -86,7 +80,7 @@ def plan_files(root: Path) -> list[Path]:
 def _plan_files(root: Path) -> list[Path]:
     names = subprocess.check_output(
         [
-            "git",
+            *GIT_LISTING,
             "ls-files",
             "-z",
             "--cached",
@@ -216,27 +210,6 @@ def plan_sections(content: str, *, allow_placeholders: bool = False) -> dict[str
             f"plan N/A needs an inline reason: N/A — reason; {'; '.join(bare)}; add the reason after each N/A"
         )
     return sections
-
-
-def e2e_proof(verification: str, status: str, *, legacy: bool = False) -> None:
-    if legacy and not E2E_FIELD.search(verification):
-        return
-    e2e = field(verification, "E2E")
-    match = E2E_STATUS_LINE.fullmatch(e2e)
-    if match is None:
-        raise ValueError(
-            "plan E2E needs Required, Passed, Delivery or N/A — concrete journey/evidence or reason"
-        )
-    if status == "Complete" and match[1] == "Required":
-        raise ValueError(
-            "complete plan E2E is still Required; run the journey and record Passed evidence"
-        )
-    if match[1] == "Passed" and BLOCKED_STATUS.match(match[2]):
-        raise ValueError("plan E2E Passed needs actual runtime evidence")
-    if match[1] == "Delivery" and not DEPLOY_DELIVERY_TARGET.search(verification):
-        raise ValueError(
-            "delivery E2E requires Delivery target: Deploy and configured delivery checks"
-        )
 
 
 def usability_rules() -> list[tuple[str, list[str]]]:
@@ -423,17 +396,19 @@ def readiness_errors(
     age: Callable[[], bool] | None = None,
 ) -> list[str]:
     errors = []
-    for name in ("Baseline + execution", "ux_reference", "Verification"):
+    for name in ("Baseline + execution", "ux_reference"):
         try:
             if name == "Baseline + execution":
                 proof(sections[name], {"Passed"})
-            elif name == "ux_reference":
-                ux_proof(sections[name], legacy=legacy, age=age)
             else:
-                e2e_proof(sections[name], status, legacy=legacy)
+                ux_proof(sections[name], legacy=legacy, age=age)
         except ValueError as error:
             errors.append(f"{name}: {error}")
-    return errors
+    from plan_coverage import coverage_errors
+    from plan_runs import run_errors
+
+    errors += run_errors(sections["Verification"], status, legacy, age)
+    return errors + coverage_errors(sections, legacy, age)
 
 
 def no_blockers(text: str) -> bool:

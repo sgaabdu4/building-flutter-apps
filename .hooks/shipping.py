@@ -111,15 +111,6 @@ class _PullRequest:
     rebaseable: bool | None = field(compare=False)
 
 
-def rebase_step(base: str) -> str:
-    return (
-        f"GitHub cannot rebase this PR onto {base}, so nothing was merged. "
-        f"Rebase the branch on origin/{base} and push it with --force-with-lease. "
-        "If GitHub still cannot rebase it, cut its commits (HE-PR-COMMITS). "
-        "Then wait for the checks and run ship again."
-    )
-
-
 def _run(
     root: Path,
     executable: str,
@@ -152,6 +143,18 @@ def git(root: Path, *args: str) -> str:
 
 def gh(root: Path, *args: str) -> str:
     return _run(root, "gh", args, _GH_TIMEOUT)
+
+
+def merge_settings(
+    root: Path, repository: str, names: tuple[str, ...]
+) -> dict[str, JsonValue]:
+    return _object(
+        _json(
+            gh(root, "repo", "view", repository, "--json", ",".join(names)),
+            "repository",
+        ),
+        "repository merge settings",
+    )
 
 
 def _json(text: str, description: str) -> JsonValue:
@@ -490,11 +493,18 @@ def _timestamp(value: JsonValue, description: str) -> float:
     return parsed.timestamp()
 
 
-def _run_sort_key(run: dict[str, JsonValue]) -> int:
-    run_id = run.get("id")
+def _run_identity(run: dict[str, JsonValue], field: str) -> int:
+    run_id = run.get(field)
     if isinstance(run_id, bool) or not isinstance(run_id, int) or run_id <= 0:
         raise ShippingError("required check has no valid run identity")
     return run_id
+
+
+def newest_run(
+    runs: list[dict[str, JsonValue]], field: str = "id"
+) -> dict[str, JsonValue]:
+    """The run with the largest identity; the newest run of a check decides."""
+    return max(runs, key=lambda run: _run_identity(run, field))
 
 
 def _check_revision(run: dict[str, JsonValue], revision: str) -> None:
@@ -514,6 +524,30 @@ def _pending(
     return PendingCheck(f"required check has not completed: {run['name']}{note}")
 
 
+def _push_suites(root: Path, repository: str, revision: str, base: str) -> set[int]:
+    endpoint = (
+        f"repos/{repository}/actions/runs?head_sha={revision}&event=push&per_page=100"
+    )
+    runs = _api_items(root, endpoint, "workflow_runs", "push runs query")
+    return {
+        run["check_suite_id"]
+        for run in runs
+        if isinstance(run.get("check_suite_id"), int) and run.get("head_branch") == base
+    }
+
+
+def _from_push(
+    candidates: list[dict[str, JsonValue]], suites: set[int]
+) -> list[dict[str, JsonValue]]:
+    pushed = [
+        item
+        for item in candidates
+        if isinstance(suite := item.get("check_suite"), dict)
+        and suite.get("id") in suites
+    ]
+    return pushed or candidates
+
+
 def _checks(
     root: Path,
     repository: str,
@@ -522,6 +556,7 @@ def _checks(
     explain: bool,
     *,
     completed_only: bool = False,
+    push_only: bool = False,
 ) -> None:
     endpoint = (
         f"repos/{repository}/commits/{revision}/check-runs?per_page=100&filter=all"
@@ -541,10 +576,12 @@ def _checks(
             and (finished or not completed_only)
         ):
             by_name[name].append(item)
+    base = policy["base"]
+    suites = _push_suites(root, repository, revision, base) if push_only else set()
     for name, candidates in by_name.items():
         if not candidates:
             raise PendingCheck(f"required check missing: {name}")
-        run = max(candidates, key=_run_sort_key)
+        run = newest_run(_from_push(candidates, suites))
         if run.get("truncated") is True or (
             isinstance(run.get("output"), dict)
             and run["output"].get("truncated") is True
@@ -804,12 +841,15 @@ def _graphql_pull(
     return data, _object(repository.get("pullRequest"), "review PR")
 
 
+def _compare(root: Path, repository: str, base: str, head: str) -> dict[str, JsonValue]:
+    endpoint = f"repos/{repository}/compare/{base}...{head}"
+    return _object(_json(gh(root, "api", endpoint), "base comparison"), "base")
+
+
 def _current_with_base(
     root: Path, identity: tuple[str, str, int], base: str, head: str
 ) -> None:
-    owner, name, _ = identity
-    endpoint = f"repos/{owner}/{name}/compare/{base}...{head}"
-    comparison = _object(_json(gh(root, "api", endpoint), "base comparison"), "base")
+    comparison = _compare(root, "/".join(identity[:2]), base, head)
     behind = comparison.get("behind_by")
     if type(behind) is not int:
         raise ShippingError("PR comparison with its base is invalid")
@@ -841,11 +881,16 @@ def _ready_state(
         raise ShippingError("a review conversation is unresolved or uncounted")
     from change_size import commits_problem
     from pr_text import body_problem
+    from ship_actions import rebase_problem
 
     if problem := (
         body_problem(pull.body)
         or commits_problem(pull.commits)
-        or (rebase_step(pull.base_ref) if pull.rebaseable is False else None)
+        or (
+            rebase_problem(root, "/".join(identity[:2]), pull.base_ref, pull.head_sha)
+            if pull.rebaseable is False
+            else None
+        )
     ):
         raise ShippingError(problem)
     _current_with_base(root, identity, pull.base_ref, pull.head_sha)
@@ -921,7 +966,14 @@ def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
         if policy["ui_paths"]:
             paths = changed_paths(resolved_root, owner, name, number)
             _ui_evidence(resolved_root, pull, paths, policy)
-        _checks(resolved_root, repository, revision, policy, True)
+        _checks(
+            resolved_root,
+            repository,
+            revision,
+            policy,
+            True,
+            push_only=stage == "delivered",
+        )
         if stage == "delivered" and target == "Deploy":
             _delivery(resolved_root, policy, revision, url)
         current = _pull(resolved_root, owner, name, number)

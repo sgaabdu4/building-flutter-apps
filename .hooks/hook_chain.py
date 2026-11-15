@@ -83,6 +83,31 @@ def project_copy(hook: Path) -> Path:
     return hook.with_name(hook.name + ".project")
 
 
+def ignored(root: Path, path: Path) -> bool:
+    found = subprocess.run(
+        ["git", "check-ignore", "-q", "--", str(path.relative_to(root))],
+        cwd=root,
+        check=False,
+    )
+    return found.returncode == 0
+
+
+def committed_hook_names(root: Path, hooks: list[tuple[Path, bool]]) -> list[str]:
+    """The hooks inside the work tree that an install commits; a kept copy goes where its hook goes, so an ignored hook keeps both local."""
+    names: list[str] = []
+    for path, chained in hooks:
+        if (
+            path.is_relative_to(root)
+            and ".git" not in path.relative_to(root).parts
+            and not ignored(root, path)
+        ):
+            names += [
+                str(member.relative_to(root))
+                for member in [path, project_copy(path)][: 1 + chained]
+            ]
+    return names
+
+
 def keeps_copy(hook: Path) -> bool:
     copy = project_copy(hook)
     return copy.exists() or copy.is_symlink()
@@ -186,12 +211,82 @@ def use_own_hooks(root: Path, candidate: Path) -> None:
 
 
 def install_worktree_hook(root: Path) -> str:
+    from stale_updates import committed_bytes, hide, worktree_place
     from update import install_planned_hook
 
     target, launcher = worktree_hook(root)
-    if install_planned_hook(root, (str(target), launcher)):
-        return "; installed the worktree hook"
-    return ""
+    place, name, main = worktree_place(root, target)
+    foreign = foreign_hook(root, target)
+    if (
+        place == "elsewhere"
+        or (place == "loose" and foreign)
+        or (
+            place == "tracked"
+            and (foreign or committed_bytes(main, name) != launcher.encode())
+        )
+    ):
+        return ""
+    installed = install_planned_hook(root, (str(target), launcher))
+    if place == "loose":
+        hide(main, name)
+    return "; installed the worktree hook" if installed else ""
+
+
+def chain_worktree_hook(
+    root: Path, previous: Path | None = None
+) -> dict[str, str | None]:
+    """The files that chain a tracked project post-checkout hook; the old updater gives a new copy no mode, so only the old release that keeps it may plan one."""
+    try:
+        hook, target = locate(root, "post-checkout")
+    except ValueError:
+        return {}
+    husky = target != hook or (hook.parent == root / ".husky/_" and not hook.exists())
+    target = root / ".husky" / hook.name if husky else target
+    check_free(root, target)
+    if (
+        not target.is_relative_to(root)
+        or ".git" in target.relative_to(root).parts
+        or target.is_symlink()
+        or not foreign_hook(root, target)
+        or subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", str(target.relative_to(root))],
+            cwd=root,
+            capture_output=True,
+            check=False,
+        ).returncode
+    ):
+        return {}
+    try:
+        kept = target.read_text()
+    except UnicodeDecodeError:
+        return {}
+    launcher = HUSKY_WORKTREE_LAUNCHER if husky else WORKTREE_LAUNCHER
+    changes: dict[str, str | None] = {str(target.relative_to(root)): launcher}
+    if not kept_copy_matches(target):
+        if not husky and previous is not None and not keeps_copy_mode(previous):
+            return {}
+        changes[str(project_copy(target).relative_to(root))] = kept
+    return changes
+
+
+LOOSE_PLAN = "HARD_ENG_LOOSE_PLAN"
+
+
+def plan_env(env: dict[str, str] | None, chained: bool) -> dict[str, str] | None:
+    """Only an update commit takes the chained hook; every other plan writes loose files and asks setup to leave it out."""
+    return env if chained else {**(os.environ if env is None else env), LOOSE_PLAN: "1"}
+
+
+def keeps_copy_mode(source: Path) -> bool:
+    return "def keep_copy_mode(" in (source / ".hooks/hook_chain.py").read_text()
+
+
+def keep_copy_mode(root: Path, names: list[str]) -> None:
+    """A kept copy written as a new file takes the mode of its hook."""
+    for name in names:
+        hook = root / name.removesuffix(".project")
+        if name.endswith(".project") and hook.is_file():
+            (root / name).chmod(hook.stat().st_mode & 0o777)
 
 
 def planned_hook(root: Path, plan: object) -> tuple[str, str]:

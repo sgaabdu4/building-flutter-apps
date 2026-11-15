@@ -400,7 +400,15 @@ def dart(
 ) -> Result:
     tests = gate_command(group, "tests")
     output = work / "log"
-    if run(
+    listing = work / "active"
+    active = run(["dart", "pub", "global", "list"], directory, deadline, listing) == 0
+    if not (
+        active
+        and any(
+            line.startswith("mutation_test ")
+            for line in listing.read_text().splitlines()
+        )
+    ) and run(
         ["dart", "pub", "global", "activate", "mutation_test"],
         directory,
         deadline,

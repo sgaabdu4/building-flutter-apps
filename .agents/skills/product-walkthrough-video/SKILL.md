@@ -22,4 +22,6 @@ flowchart LR
   click C "README.md#important-configuration"
 ```
 
+Video delivery for a client, in a task with a plan = name the video on the plan's `Deliverables:` line first; HE-SOURCE-COVERAGE says when you may make it.
+
 Completion = selected route's [completion gate](README.md#completion-gate) on the exact reviewed artifact. Mechanical success without actual visual review remains incomplete.

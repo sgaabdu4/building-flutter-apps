@@ -28,10 +28,11 @@ ERROR_NOISE = (
 def checkout_state(root: Path) -> str:
     """A short hash of HEAD, staged and unstaged changes and untracked files; empty when git cannot say."""
     from debt import worktree
+    from project_files import GIT_LISTING
 
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root)
-        staged = subprocess.check_output(["git", "diff", "--cached"], cwd=root)
+        staged = subprocess.check_output([*GIT_LISTING, "diff", "--cached"], cwd=root)
         return hashlib.sha256(head + staged + worktree(root)).hexdigest()[:16]
     except (subprocess.CalledProcessError, OSError):
         return ""

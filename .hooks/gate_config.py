@@ -19,6 +19,7 @@ from dependency_graph import (
     shared_only,
 )
 from project_files import (
+    GIT_LISTING,
     group_locks,
     json_text,
     keep,
@@ -178,7 +179,7 @@ def fixture_manifest(root: Path, manifest: Path, manifests: list[Path]) -> bool:
 
 def listed_names(root: Path) -> list[str]:
     names = subprocess.check_output(
-        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        [*GIT_LISTING, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         cwd=root,
         text=True,
     )
@@ -266,7 +267,7 @@ def generated_sources(root: Path, names: list[str]) -> set[str]:
         paths.write(("\0".join(names) + "\0").encode())
         paths.seek(0)
         listed = subprocess.run(
-            ["git", "check-attr", "-z", "--all", "--stdin"],
+            [*GIT_LISTING, "check-attr", "-z", "--all", "--stdin"],
             cwd=root,
             capture_output=True,
             text=True,
@@ -471,7 +472,7 @@ def _changed(root: Path, base: str) -> set[str] | None:
             text=True,
         )
         changed += subprocess.check_output(
-            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+            [*GIT_LISTING, "ls-files", "--others", "--exclude-standard", "-z"],
             cwd=root,
             text=True,
         )
@@ -689,7 +690,7 @@ def validate_group(root: Path, group: Group, report_paths: set[Path]) -> int:
     ):
         raise TypeError("Each gate group must contain a path and checks list")
     directory = (root / group["path"]).resolve()
-    if not directory.is_relative_to(root) or not directory.is_dir():
+    if not directory.is_relative_to(root.resolve()) or not directory.is_dir():
         raise ValueError(
             f"Gate directory must exist inside the project: {group['path']}"
         )
