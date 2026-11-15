@@ -22,7 +22,7 @@ Authority: The user asked for this change and approved commit, push and a PR. No
 ## Acceptance + steps
 
 - [x] The Post-Frame Callbacks section teaches the Riverpod fix: the notifier decides and the widget reacts through `ref.listen` in `build`, or the event handler does the work. N/A — prose and example text; the Markdown example check and routing check cover it.
-- [x] No file of the skill teaches any listed form as a pattern. A search over skills, evals and tools finds only two sentences that forbid the forms.
+- [x] No file of the skill teaches any listed form as a pattern. N/A — a text search over skills, evals and tools finds only two sentences that forbid the forms; no runtime behavior changes.
 - [x] Markdown examples pass the repository's example check. N/A — the existing `markdown-examples` gate runs it.
 
 ## Baseline + execution
