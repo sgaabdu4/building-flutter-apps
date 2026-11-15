@@ -370,7 +370,7 @@ sealed class ProductState with _$ProductState {
 
 @Riverpod(keepAlive: true)
 class ProductNotifier extends _$ProductNotifier {
-  // The first watch starts the load; AsyncValue carries loading and error. See notifier-structure.md.
+  // The first read or watch starts the load; AsyncValue carries loading and error. See notifier-structure.md.
   @override
   Future<ProductState> build() async {
     final items = await ref.read(productRepositoryProvider).fetchAll();
@@ -396,7 +396,7 @@ class ProductListScreen extends ConsumerWidget {
       productProvider.select((s) => s.value?.items),
     );
 
-    if (hasError) return const ProductLoadFailedView();
+    if (items == null && hasError) return const ProductLoadFailedView();
     if (items == null) return const Center(child: CircularProgressIndicator());
 
     return ProductListView(
