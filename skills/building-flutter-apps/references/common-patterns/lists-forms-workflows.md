@@ -61,12 +61,19 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
   // The pull-to-refresh event or a button calls this; RefreshIndicator awaits it.
   Future<void> refresh() async {
     final previous = state.value;
-    ref.invalidateSelf();
+    if (previous == null) {
+      ref.invalidateSelf();
+      return;
+    }
     try {
-      await future;
+      final items = await ref.read(productRepositoryProvider).fetchPage(0, _pageSize);
+      if (!ref.mounted) return;
+      state = AsyncData(
+        previous.copyWith(items: items, page: 0, hasMore: items.length >= _pageSize),
+      );
     } catch (error, stackTrace) {
       Crash.error(error, stackTrace, reason: 'refresh');
-      if (!ref.mounted || previous == null) return;
+      if (!ref.mounted) return;
       state = AsyncData(
         previous.copyWith(refreshFailedSerial: previous.refreshFailedSerial + 1),
       );
