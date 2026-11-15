@@ -301,21 +301,20 @@ Future<void> updateAll(List<Product> products) async {
 
 ## Pull-to-Refresh
 
+The pull event calls the notifier's `refresh()` from the pagination example above. `RefreshIndicator` awaits it.
+
 ```dart
-class ProductListScreen extends ConsumerWidget {
-  const ProductListScreen({super.key});
+class RefreshableProductListScreen extends ConsumerWidget {
+  const RefreshableProductListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(
-      productProvider.select((s) => s.value?.items ?? const <Product>[]),
+      paginatedProductProvider.select((s) => s.value?.items ?? const <Product>[]),
     );
 
     return RefreshIndicator(
-      onRefresh: () async {
-        ref.invalidate(productProvider);
-        await ref.read(productProvider.future);
-      },
+      onRefresh: () => ref.read(paginatedProductProvider.notifier).refresh(),
       child: ListView.builder(
         itemCount: items.length,
         itemBuilder: (context, index) => ProductCard(product: items[index]),
