@@ -65,6 +65,7 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
       ref.invalidateSelf();
       return;
     }
+    if (previous.isLoadingMore) return;
     try {
       final items = await ref.read(productRepositoryProvider).fetchPage(0, _pageSize);
       if (!ref.mounted) return;
