@@ -29,7 +29,7 @@ Authority: The user asked for this change and approved commit, push and a PR. No
 ## Baseline + execution
 
 Result: Passed
-Evidence: Five notifier examples seeded state and then deferred the first load with `Future.microtask`. Two screens (`architecture.md`, `lists-forms-workflows.md`) now call a public `load()` from `initState`, and `load()` awaits before it writes state. Two notifiers (`mixins.md`, `riverpod-codegen.md`) hold primary async state, so they use `AsyncNotifier.build()` as the skill's own rule says. The welcome example now listens on the screen that is on display when sign-in succeeds. The pinned lint `avoid_sync_notifier_state_read` flags a `_load` call inside `build()`, so a direct call there is not a fix. One batch helper awaited `Future<void>.value()` to yield. That wait is removed.
+Evidence: Five notifier examples seeded state and then deferred the first load with `Future.microtask`. All four now load in `AsyncNotifier.build()` (`architecture.md`, `lists-forms-workflows.md`, `mixins.md`, `riverpod-codegen.md`), as the skill's own rule for primary async state says. Later work, such as the next page and a refresh, starts from its event. The pinned lint `avoid_sync_notifier_state_read` flags a `_load` call inside `build()`, and the pinned lint `riverpod_read_init_state` flags `ref.read` in `initState`, so neither is a fix. The welcome example listens on the screen that is on display when sign-in succeeds, and says where a message that misses it goes. One batch helper awaited `Future<void>.value()` to yield. That wait is removed.
 
 ## Risks + recovery
 
@@ -42,7 +42,8 @@ N/A — skill text; no visual interface.
 ## Verification
 
 Result: Passed
-Evidence: Routing check, Markdown example check, drift check and plugin smoke suite passed after the edits.
+Evidence: Routing check, Markdown example check, drift check and plugin smoke suite passed after the edits. The full Hard Eng check and the upstream drift check are recorded in the PR.
+Reader: Writing Great Skills Reader check, five rounds, one fresh Opus subagent that did not write the text, given the old and new text and the facts of the code. It quoted sentences it had to reread and sentences whose meaning changed. Each quoted sentence was reworded: `SKILL.md` checklist line, the `notifier-structure.md` rule and bullets, the "Start Work at Its Trigger" section, the architecture error view, the pagination `refresh()` and the auth test comment. The last round found both reworded sentences clear. Left open and not changed: no reference shows who calls `load()` at the root owner, the auth caller or a worked acknowledge example; unchanged examples in `atomic-design.md`, `performance.md`, `state-management-lifecycle.md` and `freezed-sealed.md` keep their own sync state with `isLoading`; the two refresh patterns in `lists-forms-workflows.md`; no catch on the pull-to-refresh future.
 Retro: N/A — no check failed twice and no bug escaped; the shared cause is recorded above.
 E2E: N/A — skill text and examples; no runtime journey.
 Delivery target: Merge
