@@ -44,9 +44,10 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
       final page = current.page + 1;
       final items = await ref.read(productRepositoryProvider).fetchPage(page, _pageSize);
       if (!ref.mounted) return;
+      final latest = state.value ?? current;
       state = AsyncData(
-        current.copyWith(
-          items: [...current.items, ...items],
+        latest.copyWith(
+          items: [...latest.items, ...items],
           page: page,
           hasMore: items.length >= _pageSize,
           isLoadingMore: false,
@@ -54,7 +55,7 @@ class PaginatedProductNotifier extends _$PaginatedProductNotifier {
       );
     } catch (e) {
       if (!ref.mounted) return;
-      state = AsyncData(current.copyWith(isLoadingMore: false));
+      state = AsyncData((state.value ?? current).copyWith(isLoadingMore: false));
     }
   }
 
