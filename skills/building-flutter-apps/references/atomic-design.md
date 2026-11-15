@@ -434,6 +434,7 @@ class ProductDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    // productProvider sets retry: noRetry (architecture.md), so a failed load shows at once.
     final failed = ref.watch(
       productProvider.select((s) => s.hasError && !s.isLoading),
     );
