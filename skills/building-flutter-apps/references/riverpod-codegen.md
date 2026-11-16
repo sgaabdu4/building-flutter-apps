@@ -285,7 +285,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/experimental/mutation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart'; // 3.47.x: see core-stack.md
+import 'package:material_ui/material_ui.dart';
 import 'package:my_app/core/extensions/extensions.dart';
 
 final addTodoMutation = Mutation<void>(); // experimental API — may change without major bump

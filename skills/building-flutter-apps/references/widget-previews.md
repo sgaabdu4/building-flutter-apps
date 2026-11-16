@@ -46,7 +46,7 @@ scale, and provider overrides consistently.
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
-import 'package:material_ui/material_ui.dart'; // 3.47.x: see core-stack.md
+import 'package:material_ui/material_ui.dart';
 
 class AppPreviewShell extends StatelessWidget {
   const AppPreviewShell({
@@ -80,7 +80,7 @@ Target = inline `Consumer` surface binding the real provider → plain widget in
 // features/products/presentation/previews/product_card_provider_preview.dart
 import 'package:flutter/widget_previews.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart'; // 3.47.x: see core-stack.md
+import 'package:material_ui/material_ui.dart';
 
 @Preview(name: 'Product card - in stock')
 Widget productCardInStockPreview() {

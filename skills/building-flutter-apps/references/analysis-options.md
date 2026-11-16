@@ -53,7 +53,7 @@ feature code needs them.
   Dart setters cannot be `async`, and these mutation methods must remain
   awaitable.
 - Codegen warnings stay visible. Fix an annotation package or generator constraint when generated annotations are incompatible. Do not silence annotation diagnostics with an analyzer error override.
-- Exclude: `*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`
+- Exclude: `*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`, `app_localizations*.dart`
 
 ## Install
 

@@ -34,11 +34,14 @@ dependencies:
     sdk: flutter
   flutter_driver:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_riverpod: 3.4.3
   freezed_annotation: 3.1.0
   go_router: ^18.0.1
   hive_ce: ^2.20.0
   hive_ce_flutter: ^2.3.4
+  intl: ^0.20.2
   json_annotation: ^4.12.0
   material_ui: ^1.11.0
   riverpod_annotation: 4.0.7
@@ -53,6 +56,25 @@ dev_dependencies:
   riverpod_generator: 4.0.9
   flutter_test:
     sdk: flutter
+flutter:
+  generate: true
+"""
+
+
+L10N_YAML = """\
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+nullable-getter: false
+use-escaping: true
+"""
+
+
+APP_EN_ARB = """\
+{
+  "@@locale": "en",
+  "hello": "Hello"
+}
 """
 
 
@@ -142,6 +164,14 @@ void runFixture() {
 """
 
 
+APP_ROUTER = """\
+import 'package:generator_compatibility_fixture/fixture_route.dart';
+import 'package:go_router/go_router.dart';
+
+final appRouter = GoRouter(routes: $appRoutes);
+"""
+
+
 CRASH = """\
 abstract final class Crash {
   static Future<void> init() async {}
@@ -181,15 +211,16 @@ WEB_INDEX = """\
 
 
 TEST = """\
-import 'dart:ui' show VoidCallback;
-
 import 'package:flutter_test/flutter_test.dart';
+import 'package:generator_compatibility_fixture/core/router/app_router.dart';
 import 'package:generator_compatibility_fixture/fixture_model.dart';
 import 'package:generator_compatibility_fixture/fixture_provider.dart';
 import 'package:generator_compatibility_fixture/fixture_route.dart';
 import 'package:generator_compatibility_fixture/hive_adapters.dart';
+import 'package:generator_compatibility_fixture/l10n/app_localizations.dart';
 import 'package:generator_compatibility_fixture/main.dart' as fixture_app;
 import 'package:generator_compatibility_fixture/main_dev.dart' as fixture_dev;
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   test('generated families compile together', () {
@@ -199,6 +230,32 @@ void main() {
     expect(registerFixtureAdapters, isA<VoidCallback>());
     expect(fixture_app.runFixture, isA<VoidCallback>());
     expect(fixture_dev.runFixtureDev, isA<VoidCallback>());
+  });
+
+  testWidgets('go_router builds Material pages under MaterialApp.router', (
+    tester,
+  ) async {
+    await tester.pumpWidget(MaterialApp.router(routerConfig: appRouter));
+    final navigator = tester.widget<Navigator>(find.byType(Navigator));
+    expect(navigator.pages.single, isA<MaterialPage<void>>());
+  });
+
+  testWidgets('generated localizations load with the material_ui delegates', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          ...GlobalMaterialLocalizations.delegates,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Text(AppLocalizations.of(context).hello),
+        ),
+      ),
+    );
+    expect(find.text('Hello'), findsOneWidget);
   });
 }
 """
@@ -215,36 +272,6 @@ void main() {
   runApp(Text(title!, textDirection: TextDirection.ltr));
 }
 """
-
-
-MATERIAL_UI_IMPORT = "import 'package:material_ui/material_ui.dart';"
-MATERIAL_UI_FLUTTER = (3, 50)
-
-
-def flutter_version() -> tuple[int, int]:
-    result = subprocess.run(
-        ['flutter', '--version', '--machine'], text=True, capture_output=True
-    )
-    if result.returncode:
-        raise SystemExit(f'flutter --version failed:\n{result.stderr}')
-    major, minor = json.loads(result.stdout)['frameworkVersion'].split('.')[:2]
-    return int(major), int(minor)
-
-
-def for_material(text: str, uses_material_ui: bool) -> str:
-    """Flutter 3.50 and later use material_ui; Flutter 3.47.x keeps material.dart."""
-    if uses_material_ui:
-        return text
-    lines = text.splitlines()
-    imports = [
-        "import 'package:flutter/material.dart';"
-        if line == MATERIAL_UI_IMPORT
-        else line
-        for line in lines
-        if line.startswith('import ')
-    ]
-    rest = [line for line in lines if not line.startswith('import ')]
-    return '\n'.join(sorted(imports) + rest) + '\n'
 
 
 def run(command: list[str], cwd: Path, required_output: tuple[str, ...] = ()) -> str:
@@ -434,28 +461,36 @@ def main() -> None:
         (package / 'lib').mkdir()
         (package / 'test').mkdir()
         (package / 'web').mkdir()
-        uses_material_ui = flutter_version() >= MATERIAL_UI_FLUTTER
-        pubspec = PUBSPEC if uses_material_ui else PUBSPEC.replace('  material_ui: ^1.11.0\n', '')
-        (package / 'pubspec.yaml').write_text(pubspec)
+        (package / 'pubspec.yaml').write_text(PUBSPEC)
         (package / 'analysis_options.yaml').write_text(analysis_options(local_plugin))
         (package / 'build.yaml').write_text(BUILD_YAML)
+        (package / 'l10n.yaml').write_text(L10N_YAML)
+        (package / 'lib/l10n').mkdir()
+        (package / 'lib/l10n/app_en.arb').write_text(APP_EN_ARB)
         (package / 'lib/fixture_model.dart').write_text(MODEL)
         (package / 'lib/fixture_provider.dart').write_text(PROVIDER)
         (package / 'lib/hive_adapters.dart').write_text(HIVE)
-        (package / 'lib/fixture_route.dart').write_text(for_material(ROUTER, uses_material_ui))
-        (package / 'lib/main.dart').write_text(for_material(MAIN, uses_material_ui))
+        (package / 'lib/fixture_route.dart').write_text(ROUTER)
+        (package / 'lib/main.dart').write_text(MAIN)
         (package / 'lib/crash.dart').write_text(CRASH)
+        (package / 'lib/core/router').mkdir(parents=True)
+        (package / 'lib/core/router/app_router.dart').write_text(APP_ROUTER)
         (package / 'lib/main_dev.dart').write_text(MAIN_DEV)
         (package / 'web/index.html').write_text(WEB_INDEX)
         (package / 'test/fixture_test.dart').write_text(TEST)
 
         run(['flutter', 'pub', 'get'], package)
+        run(['flutter', 'gen-l10n'], package)
         run(['dart', 'run', 'build_runner', 'build'], package)
         assert_valid_fixture(package, local_plugin)
         (package / 'lib/plugin_probe.dart').write_text(PLUGIN_PROBE)
         assert_plugin_diagnostics(package)
         (package / 'lib/plugin_probe.dart').unlink()
-        run(['dart', 'analyze'], package, required_output=('No issues found!',))
+        run(
+            ['dart', 'analyze', '--fatal-infos'],
+            package,
+            required_output=('No issues found!',),
+        )
         run(['flutter', 'test'], package, required_output=('All tests passed!',))
         run(['flutter', 'build', 'web', '--no-pub'], package)
         assert_web_build(package)
