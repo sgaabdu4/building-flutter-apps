@@ -29,7 +29,7 @@ Add dependencies:
 
 ```bash
 flutter pub add flutter_localizations --sdk=flutter
-flutter pub add intl:any
+flutter pub add intl
 ```
 
 Enable generation:
@@ -55,11 +55,23 @@ With the config above, generated output is `lib/l10n/app_localizations.dart`; im
 import 'package:my_app/l10n/app_localizations.dart';
 ```
 
-## App Wiring
+Generated output and `--fatal-infos`: on Flutter 3.50 and later `flutter
+gen-l10n` writes `GlobalMaterialLocalizations` and `GlobalCupertinoLocalizations`
+from `flutter_localizations` into `app_localizations.dart`, and the analyzer
+reports two `deprecated_member_use` infos there. gen-l10n has no option that
+avoids it. Keep `dart analyze --fatal-infos` green by excluding the generated
+file in `analysis_options.yaml`, as for every other generated file:
 
-On Flutter 3.50 or later (see Material library in core-stack.md; Flutter 3.47.x
-keeps `package:flutter/material.dart` and the three `flutter_localizations`
-delegates):
+```yaml
+analyzer:
+  exclude:
+    - "**/app_localizations*.dart"
+```
+
+Do not add an ignore comment. The fixture runs `flutter gen-l10n` and
+`dart analyze --fatal-infos` with this exclude on 3.47.9 and 3.50.0.
+
+## App Wiring
 
 ```dart
 import 'package:material_ui/material_ui.dart';

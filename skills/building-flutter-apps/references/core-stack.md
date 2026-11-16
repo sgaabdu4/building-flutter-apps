@@ -11,8 +11,8 @@
 The compatibility fixture requires Dart `>=3.13.0 <4.0.0` and Flutter
 `>=3.47.0`. It solves this application and generator family together:
 
-The fixture runs on Flutter 3.47.9 (the floor) and on Flutter 3.50.0; both
-pass. This is a tested floor, not a floating "latest" policy. Projects below it must
+The fixture passes on Flutter 3.47.9 (the newest 3.47 patch) and on Flutter
+3.50.0; the floor is 3.47.0. This is a tested floor, not a floating "latest" policy. Projects below it must
 upgrade their SDK constraint, CI image, and local toolchain together; do not add
 legacy branches. Re-run the compatibility fixture before raising the floor.
 
@@ -32,21 +32,27 @@ legacy branches. Re-run the compatibility fixture before raising the floor.
 | `hive_ce_generator`   |   `1.11.3` | Hive adapter generation         |
 | `build_runner`        |   `2.16.1` | Build orchestration             |
 | `analyzer`            |   `14.4.0` | Analyzer                        |
-| `material_ui`         |  `^1.11.0` | Material widgets, Flutter 3.50+ |
+| `material_ui`         |  `^1.11.0` | Material widgets                |
+| `intl`                |  `^0.20.2` | Localization formatting         |
 | `flutter_lints`       |    `6.0.0` | Base Flutter lints              |
 
 ## Material library
 
-- Flutter 3.50 or later: import `package:material_ui/material_ui.dart`, not
-  `package:flutter/material.dart`, which is deprecated from 3.50.0. Migrate with
-  `dart fix --apply --code=migrate_design_widgets`. Take the localization
-  delegates from `material_ui` (`GlobalMaterialLocalizations.delegates`).
-- Flutter 3.47.x: keep `package:flutter/material.dart` and do not add
-  `material_ui`.
+One rule for every supported Flutter version (3.47.0 and later): import
+`package:material_ui/material_ui.dart` and never `package:flutter/material.dart`.
+
+- Why: every `go_router` 18.x depends on `material_ui` and detects a Material app
+  with `material_ui`'s own `MaterialApp`. An app built with `flutter/material.dart`
+  gets `NoTransitionPage` pages and the plain error screen, on 3.47.9 and 3.50.0
+  alike. The fixture proves `MaterialPage` for a `MaterialApp.router` app.
+- Migrate: add the package (`flutter pub add material_ui`), then run
+  `dart fix --apply --code=migrate_design_widgets`. It works on 3.47.9. By hand,
+  change each `import 'package:flutter/material.dart';` to
+  `import 'package:material_ui/material_ui.dart';`.
+- Localization delegates come from `material_ui`:
+  `...GlobalMaterialLocalizations.delegates` (see localization.md).
 - Never import both libraries in one app. Mixing them needs the deprecated
   `MaterialUiCompatibilityBridge`.
-
-The compatibility fixture follows this rule for the Flutter version it runs on.
 
 ## Analyzer plugins
 
@@ -70,12 +76,13 @@ these Flutter/Riverpod plugins.
 ## Compatibility proof
 
 `tool/run_compatibility_fixture.py` resolves the application family, generates
-Riverpod, Freezed, Hive, JSON, and typed-route code, confirms analyzer
-`14.4.0`, then runs the analyzer with both plugins. Its deliberate probe
-requires a `flutter_skill_lints` `avoid_null_bang` diagnostic and a
+Riverpod, Freezed, Hive, JSON, typed-route, and gen-l10n code, confirms
+analyzer `14.4.0`, then runs `dart analyze --fatal-infos` with both plugins.
+Its deliberate probe requires a `flutter_skill_lints` `avoid_null_bang` diagnostic and a
 `riverpod_lint` `missing_provider_scope` diagnostic while rejecting
 `server.pluginError`. It removes the probe before the Flutter test and web
-build.
+build. The Flutter test asserts that `go_router` builds a `MaterialPage` under
+`MaterialApp.router` and that the generated localizations load.
 
 The fixture uses the top-level hosted plugin configuration without a local path
 or dependency override. Its analyzer probe proves that both plugins load and
