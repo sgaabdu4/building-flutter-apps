@@ -370,8 +370,7 @@ def run_single_case(
     command_file = project_commands_dir / f"{clean_name}.md"
 
     indented_desc = "\n  ".join(skill_description.split("\n"))
-    # In a command file "!`...`" runs as shell; SKILL.md has inline code like
-    # `value!`. A zero-width space keeps the text but breaks that syntax.
+    # A zero-width space stops "!`" in SKILL.md code from running as shell in a command file.
     command_body = skill_body.lstrip().replace("!`", "!\u200b`")
     command_content = (
         f"---\n"
