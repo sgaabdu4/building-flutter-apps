@@ -33,7 +33,7 @@ legacy branches. Re-run the compatibility fixture before raising the floor.
 | `build_runner`        |   `2.16.1` | Build orchestration             |
 | `analyzer`            |   `14.4.0` | Analyzer                        |
 | `material_ui`         |  `^1.11.0` | Material widgets                |
-| `intl`                |  `^0.20.2` | Localization formatting         |
+| `intl`                |  `^0.20.3` | Localization formatting         |
 | `flutter_lints`       |    `6.0.0` | Base Flutter lints              |
 
 ## Material library
@@ -81,7 +81,7 @@ analyzer `14.4.0`, then runs `dart analyze --fatal-infos` with both plugins.
 Its deliberate probe requires a `flutter_skill_lints` `avoid_null_bang` diagnostic and a
 `riverpod_lint` `missing_provider_scope` diagnostic while rejecting
 `server.pluginError`. It removes the probe before the Flutter test and web
-build. The Flutter test asserts that `go_router` builds a `MaterialPage` under
+build. Hard Eng's check of the analyzer exclusions must accept the options and refuse the old`app_localizations*.dart` glob. The Flutter test asserts that `go_router` builds a `MaterialPage` under
 `MaterialApp.router` and that the generated localizations load.
 
 The fixture uses the top-level hosted plugin configuration without a local path
