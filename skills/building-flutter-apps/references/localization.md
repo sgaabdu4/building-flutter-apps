@@ -57,19 +57,32 @@ import 'package:my_app/l10n/app_localizations.dart';
 
 Generated output and `--fatal-infos`: on Flutter 3.50 and later `flutter
 gen-l10n` writes `GlobalMaterialLocalizations` and `GlobalCupertinoLocalizations`
-from `flutter_localizations` into `app_localizations.dart`, and the analyzer
-reports two `deprecated_member_use` infos there. gen-l10n has no option that
-avoids it. Keep `dart analyze --fatal-infos` green by excluding the generated
-file in `analysis_options.yaml`, as for every other generated file:
+from `flutter_localizations` into the main file `app_localizations.dart`, and the
+analyzer reports two `deprecated_member_use` infos there. gen-l10n has no option
+that avoids it. The per-language files (`app_localizations_en.dart` and the
+others) have no deprecated uses. Keep `dart analyze --fatal-infos` green by
+excluding only the main file, by its exact path (`lib/l10n/app_localizations.dart`
+by default; a project with `output-dir` or `output-localization-file` in
+`l10n.yaml` uses that path):
 
 ```yaml
 analyzer:
   exclude:
-    - "**/app_localizations*.dart"
+    - "lib/l10n/app_localizations.dart"
 ```
 
-Do not add an ignore comment. The fixture runs `flutter gen-l10n` and
-`dart analyze --fatal-infos` with this exclude on 3.47.9 and 3.50.0.
+Do not use a glob such as `**/app_localizations*.dart` and do not add an ignore
+comment. In a project with Hard Eng installed the exclusion is accepted only for
+that one file and only when it is marked generated, so add this line to
+`.gitattributes`:
+
+```text
+lib/l10n/app_localizations.dart linguist-generated=true
+```
+
+The fixture runs `flutter gen-l10n`, Hard Eng's check of the analyzer
+exclusions and `dart analyze --fatal-infos` on 3.47.9 and 3.50.0, and requires
+Hard Eng to refuse the old glob.
 
 ## App Wiring
 

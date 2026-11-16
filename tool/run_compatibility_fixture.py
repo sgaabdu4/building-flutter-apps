@@ -7,6 +7,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -41,7 +42,7 @@ dependencies:
   go_router: ^18.0.1
   hive_ce: ^2.20.0
   hive_ce_flutter: ^2.3.4
-  intl: ^0.20.2
+  intl: ^0.20.3
   json_annotation: ^4.12.0
   material_ui: ^1.11.0
   riverpod_annotation: 4.0.7
@@ -274,6 +275,66 @@ void main() {
 """
 
 
+LOCALIZATION_OUTPUT = 'lib/l10n/app_localizations.dart'
+OLD_LOCALIZATION_GLOB = '**/app_localizations*.dart'
+
+HARD_ENG_DART_SETTINGS = """\
+import sys
+from pathlib import Path
+
+import yaml
+
+sys.path.insert(0, sys.argv[1])
+from project_setup import validate_dart_exclusions
+
+package = Path(sys.argv[2])
+options = yaml.safe_load((package / 'analysis_options.yaml').read_text())
+validate_dart_exclusions(package, options['analyzer']['exclude'])
+"""
+
+
+def hard_eng_dart_settings(package: Path) -> subprocess.CompletedProcess[str]:
+    """Run Hard Eng's own check of the analyzer exclusions on the fixture project."""
+    hooks = Path(os.environ.get('HARD_ENG_HOOKS', REPO_ROOT / '.hooks'))
+    has_yaml = subprocess.run(
+        [sys.executable, '-c', 'import yaml'], capture_output=True
+    ).returncode == 0
+    python = (
+        [sys.executable]
+        if has_yaml
+        else ['uv', 'run', '--no-project', '--with', 'pyyaml', 'python']
+    )
+    return subprocess.run(
+        [*python, '-c', HARD_ENG_DART_SETTINGS, str(hooks), str(package)],
+        text=True,
+        capture_output=True,
+    )
+
+
+def assert_hard_eng_dart_settings(package: Path) -> None:
+    accepted = hard_eng_dart_settings(package)
+    if accepted.returncode:
+        raise SystemExit(
+            f'Hard Eng refuses the fixture analysis exclusions:\n{accepted.stderr}'
+        )
+    options = package / 'analysis_options.yaml'
+    original = options.read_text()
+    exclusion = f'    - "{LOCALIZATION_OUTPUT}"\n'
+    if exclusion not in original:
+        raise SystemExit('fixture analysis options lack the gen-l10n output exclusion')
+    options.write_text(
+        original.replace(exclusion, f'    - "{OLD_LOCALIZATION_GLOB}"\n')
+    )
+    try:
+        refused = hard_eng_dart_settings(package)
+    finally:
+        options.write_text(original)
+    if refused.returncode == 0:
+        raise SystemExit(
+            f'Hard Eng accepted the glob {OLD_LOCALIZATION_GLOB}; the proof is void'
+        )
+
+
 def run(command: list[str], cwd: Path, required_output: tuple[str, ...] = ()) -> str:
     result = subprocess.run(command, cwd=cwd, text=True, capture_output=True)
     output = result.stdout + result.stderr
@@ -481,7 +542,12 @@ def main() -> None:
 
         run(['flutter', 'pub', 'get'], package)
         run(['flutter', 'gen-l10n'], package)
+        (package / '.gitattributes').write_text(
+            f'*.g.dart linguist-generated=true\n{LOCALIZATION_OUTPUT} linguist-generated=true\n'
+        )
+        run(['git', 'init', '-q'], package)
         run(['dart', 'run', 'build_runner', 'build'], package)
+        assert_hard_eng_dart_settings(package)
         assert_valid_fixture(package, local_plugin)
         (package / 'lib/plugin_probe.dart').write_text(PLUGIN_PROBE)
         assert_plugin_diagnostics(package)

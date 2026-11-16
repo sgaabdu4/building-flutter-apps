@@ -10,7 +10,7 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.freezed.dart"
     - "**/*.gr.dart"
-    - "**/app_localizations*.dart"
+    - "lib/l10n/app_localizations.dart"
     - "**/*.arb"
   language:
     strict-inference: true
