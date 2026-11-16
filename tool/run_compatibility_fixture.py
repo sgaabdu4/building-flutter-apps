@@ -40,15 +40,16 @@ dependencies:
   hive_ce: ^2.20.0
   hive_ce_flutter: ^2.3.4
   json_annotation: ^4.12.0
+  material_ui: ^1.11.0
   riverpod_annotation: 4.0.7
 dev_dependencies:
   analyzer: 14.4.0
   build_runner: 2.16.1
   flutter_lints: 6.0.0
   freezed: 4.0.2
-  go_router_builder: 4.5.0
+  go_router_builder: 4.5.3
   hive_ce_generator: 1.11.3
-  json_serializable: 6.14.1
+  json_serializable: 6.15.2
   riverpod_generator: 4.0.9
   flutter_test:
     sdk: flutter
@@ -105,8 +106,8 @@ void registerFixtureAdapters() {}
 
 
 ROUTER = """\
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 
 part 'fixture_route.g.dart';
 
@@ -122,9 +123,9 @@ class FixtureRoute extends GoRouteData with $FixtureRoute {
 
 
 MAIN = """\
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:generator_compatibility_fixture/crash.dart';
+import 'package:material_ui/material_ui.dart';
 
 Future<void> main() async {
   await Crash.init();
