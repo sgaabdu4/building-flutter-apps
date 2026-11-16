@@ -1,6 +1,6 @@
 # Hard Eng strict rules fixes
 
-Status: Ready
+Status: Complete
 
 ## Outcome + scope
 
@@ -28,7 +28,7 @@ Authority: Autonomous. The owner asked for one PR that moves the pins and fixes 
 - [x] Every live `flutter_skill_lints` pin is `^0.14.0` → N/A — the plugin hook smoke gate compares them and `grep` finds no live `0.13.4`; no unit test can.
 - [x] The plugin hook smoke gate passes → N/A — `tool/smoke_test.sh` is the gate itself; its result is in Verification.
 - [x] The two comment blocks are one why-line each → N/A — the whole-project comment pass proves it; no unit test can.
-- [ ] Hard Eng check passes → N/A — the runs in Verification are the proof.
+- [x] Hard Eng check passes → N/A — the runs in Verification are the proof.
 
 ## Baseline + execution
 
@@ -46,11 +46,11 @@ N/A — text-only skill guidance; no rendered interface changes.
 
 ## Verification
 
-Result: Pending
-Evidence: Pending the runs.
+Result: Passed
+Evidence: Run 1, the branch with its own hooks: `python3 .hooks/hard-eng.py check --plan-stage Ready` exit 0, 12 of 12 gates PASS (skill-routing, windows-installer-assets, windows-installer-inputs, drift-fixtures, skill-drift, markdown-examples, plugin-hook-smoke, actionlint, secrets-history, zizmor, secrets-files, shellcheck). Run 2, a scratch copy of the branch with Hard Eng develop 80756642 hooks and skills: same command, exit 0, the same 12 gates PASS. Run 3 does not apply: no Dart package. The final `python3 .hooks/hard-eng.py check` on the Complete plan is recorded in the PR.
 E2E: N/A — no application runtime is deployed by this repository; the smoke, routing and markdown-example checks cover the affected skill files.
 Real service: N/A — the change calls no outside service.
-Retro: Pending
+Retro: plugin-hook-smoke failed on a pin that differed from the root pin → `tool/smoke_test.sh`, the existing gate that compares the pins; the whole-project comment pass refused 2 comment blocks → HE-COMMENT-LINES; the first run of the new plan failed on a missing plan field → the plan template's new fields, now filled.
 
 Delivery target: PR
 Delivery: Pending — required remote proof: draft PR, CI and coordinator merge.
