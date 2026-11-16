@@ -190,8 +190,8 @@ app package, and feature code. The host driver may import `dart:async`,
 `dart:io`, `package:test`, `package:flutter_driver` host APIs, or the official
 `integration_test_driver` adapter. Its own code and helper closure MUST NOT
 import `dart:ui`, `package:flutter/rendering.dart`,
-`package:flutter/widgets.dart`, `package:flutter/material.dart`, or the app
-package. Do not place app widgets, providers, repositories, or platform plugin
+`package:flutter/widgets.dart`, `package:flutter/material.dart`,
+`package:material_ui/material_ui.dart`, or the app package. Do not place app widgets, providers, repositories, or platform plugin
 code in `test_driver/`.
 
 Prove the boundary before running the device flow. Run analysis from the

@@ -217,6 +217,36 @@ void main() {
 """
 
 
+MATERIAL_UI_IMPORT = "import 'package:material_ui/material_ui.dart';"
+MATERIAL_UI_FLUTTER = (3, 50)
+
+
+def flutter_version() -> tuple[int, int]:
+    result = subprocess.run(
+        ['flutter', '--version', '--machine'], text=True, capture_output=True
+    )
+    if result.returncode:
+        raise SystemExit(f'flutter --version failed:\n{result.stderr}')
+    major, minor = json.loads(result.stdout)['frameworkVersion'].split('.')[:2]
+    return int(major), int(minor)
+
+
+def for_material(text: str, uses_material_ui: bool) -> str:
+    """Flutter 3.50 and later use material_ui; Flutter 3.47.x keeps material.dart."""
+    if uses_material_ui:
+        return text
+    lines = text.splitlines()
+    imports = [
+        "import 'package:flutter/material.dart';"
+        if line == MATERIAL_UI_IMPORT
+        else line
+        for line in lines
+        if line.startswith('import ')
+    ]
+    rest = [line for line in lines if not line.startswith('import ')]
+    return '\n'.join(sorted(imports) + rest) + '\n'
+
+
 def run(command: list[str], cwd: Path, required_output: tuple[str, ...] = ()) -> str:
     result = subprocess.run(command, cwd=cwd, text=True, capture_output=True)
     output = result.stdout + result.stderr
@@ -404,14 +434,16 @@ def main() -> None:
         (package / 'lib').mkdir()
         (package / 'test').mkdir()
         (package / 'web').mkdir()
-        (package / 'pubspec.yaml').write_text(PUBSPEC)
+        uses_material_ui = flutter_version() >= MATERIAL_UI_FLUTTER
+        pubspec = PUBSPEC if uses_material_ui else PUBSPEC.replace('  material_ui: ^1.11.0\n', '')
+        (package / 'pubspec.yaml').write_text(pubspec)
         (package / 'analysis_options.yaml').write_text(analysis_options(local_plugin))
         (package / 'build.yaml').write_text(BUILD_YAML)
         (package / 'lib/fixture_model.dart').write_text(MODEL)
         (package / 'lib/fixture_provider.dart').write_text(PROVIDER)
         (package / 'lib/hive_adapters.dart').write_text(HIVE)
-        (package / 'lib/fixture_route.dart').write_text(ROUTER)
-        (package / 'lib/main.dart').write_text(MAIN)
+        (package / 'lib/fixture_route.dart').write_text(for_material(ROUTER, uses_material_ui))
+        (package / 'lib/main.dart').write_text(for_material(MAIN, uses_material_ui))
         (package / 'lib/crash.dart').write_text(CRASH)
         (package / 'lib/main_dev.dart').write_text(MAIN_DEV)
         (package / 'web/index.html').write_text(WEB_INDEX)

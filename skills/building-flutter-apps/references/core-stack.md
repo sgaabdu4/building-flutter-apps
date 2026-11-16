@@ -11,7 +11,8 @@
 The compatibility fixture requires Dart `>=3.13.0 <4.0.0` and Flutter
 `>=3.47.0`. It solves this application and generator family together:
 
-This is a tested floor, not a floating "latest" policy. Projects below it must
+The fixture runs on Flutter 3.47.9 (the floor) and on Flutter 3.50.0; both
+pass. This is a tested floor, not a floating "latest" policy. Projects below it must
 upgrade their SDK constraint, CI image, and local toolchain together; do not add
 legacy branches. Re-run the compatibility fixture before raising the floor.
 
@@ -31,8 +32,21 @@ legacy branches. Re-run the compatibility fixture before raising the floor.
 | `hive_ce_generator`   |   `1.11.3` | Hive adapter generation         |
 | `build_runner`        |   `2.16.1` | Build orchestration             |
 | `analyzer`            |   `14.4.0` | Analyzer                        |
-| `material_ui`         |  `^1.11.0` | Material widgets                |
+| `material_ui`         |  `^1.11.0` | Material widgets, Flutter 3.50+ |
 | `flutter_lints`       |    `6.0.0` | Base Flutter lints              |
+
+## Material library
+
+- Flutter 3.50 or later: import `package:material_ui/material_ui.dart`, not
+  `package:flutter/material.dart`, which is deprecated from 3.50.0. Migrate with
+  `dart fix --apply --code=migrate_design_widgets`. Take the localization
+  delegates from `material_ui` (`GlobalMaterialLocalizations.delegates`).
+- Flutter 3.47.x: keep `package:flutter/material.dart` and do not add
+  `material_ui`.
+- Never import both libraries in one app. Mixing them needs the deprecated
+  `MaterialUiCompatibilityBridge`.
+
+The compatibility fixture follows this rule for the Flutter version it runs on.
 
 ## Analyzer plugins
 

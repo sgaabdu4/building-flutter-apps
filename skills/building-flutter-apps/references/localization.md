@@ -57,9 +57,12 @@ import 'package:my_app/l10n/app_localizations.dart';
 
 ## App Wiring
 
+On Flutter 3.50 or later (see Material library in core-stack.md; Flutter 3.47.x
+keeps `package:flutter/material.dart` and the three `flutter_localizations`
+delegates):
+
 ```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:my_app/l10n/app_localizations.dart';
 
 class AppRoot extends StatelessWidget {
@@ -71,9 +74,7 @@ class AppRoot extends StatelessWidget {
       routerConfig: appRouter,
       localizationsDelegates: const [
         AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
+        ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
     );
