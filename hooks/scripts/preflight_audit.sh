@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Stop hook for compatible plugin runtimes.
-# Runs a full pre-flight audit on the active Flutter project before the agent ends the turn.
-# Always exits 0. Emits JSON {"decision":"block","reason":"..."} on stdout to keep the agent going if violations remain.
-# No-ops outside Flutter or Riverpod packages.
+# Always exits 0: a JSON "block" decision on stdout keeps the agent going while violations remain.
 
 set -uo pipefail
 
