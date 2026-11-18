@@ -390,6 +390,86 @@
       "group": "near miss, theme word in a parent of the name",
       "path": "lib/theme.dart/app.dart",
       "theme": false
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "src/tokens.ts",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "Sources/App/Palette.swift",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "src/Colour/page.css",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "Sources/App/AppTheme.swift",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "src/colorPalette.ts",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "Sources/App/Color+Brand.swift",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "Sources/App/UIColor+App.swift",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "Sources/App/View+Theme.swift",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "Sources/App/Color+Extensions.swift",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases",
+      "path": "src/design/themes/dark.css",
+      "theme": true
+    },
+    {
+      "group": "Hard Eng added-line cases, near miss",
+      "path": "src/auth/TokenInput.tsx",
+      "theme": false
+    },
+    {
+      "group": "Hard Eng added-line cases, near miss",
+      "path": "src/components/ThemeToggle.tsx",
+      "theme": false
+    },
+    {
+      "group": "Hard Eng added-line cases, near miss",
+      "path": "src/colorful/Hero.tsx",
+      "theme": false
+    },
+    {
+      "group": "Hard Eng added-line cases, near miss",
+      "path": "Sources/App/ColorPicker.swift",
+      "theme": false
+    },
+    {
+      "group": "Hard Eng added-line cases, near miss",
+      "path": "Sources/App/View+Helpers.swift",
+      "theme": false
+    },
+    {
+      "group": "Hard Eng added-line cases, near miss",
+      "path": "Sources/App/ColorPicker+Layout.swift",
+      "theme": false
     }
   ]
 }
