@@ -9,7 +9,7 @@ import tomllib
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
-from typing import TextIO, cast
+from typing import TextIO
 
 from coverage_sources import (
     erased_swift,
@@ -25,10 +25,7 @@ from fallow_report import finding_lines as fallow_findings
 from fallow_report import sdk_binaries, validate_fallow, write_istanbul
 from gate_config import Gate, Group, JsonObject
 from gate_schedule import QUICK_ROLES
-from project_setup import (
-    dependency_free,
-    package_script_invocation,
-)
+from project_setup import package_script_invocation
 from react_report import finding_lines as react_findings
 from react_report import incomplete_reason
 from scan_findings import (
@@ -42,7 +39,6 @@ from scan_findings import (
 
 SHELL_OPERATOR = re.compile(r"[;&|]")
 WARNINGS_LINE = re.compile(r"^Warnings$", re.MULTILINE)
-SHA256_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 SCAN_PROGRESS_LINE = re.compile(r"Scanning [1-9][0-9]* files?\.\.\.")
 DART_DECIMATE_VERSION = re.compile(r"dart-decimate( \d+\.\d+\.\d+\S*)?")
 KEPT_OR_BROKEN_OUTCOME = re.compile(
@@ -364,109 +360,27 @@ def report_branches(
         )
 
 
-def validate_osv_package(
-    item: JsonObject, source: JsonObject, layers: list[JsonObject], image: bool
-) -> None:
-    package = item["package"]
-    if not isinstance(package, dict):
-        raise TypeError("OSV package must be an object")
-    commit = package.get("commit")
-    if not (isinstance(commit, str) and commit) and not all(
-        isinstance(package.get(key), str) and package[key]
-        for key in ("name", "version", "ecosystem")
-    ):
-        from python_setup import osv_identity
-
-        osv_identity(package, source["path"])
-    if item.get("vulnerabilities", []) != [] or item.get("groups", []) != []:
-        found = item.get("vulnerabilities")
-        entries = found if isinstance(found, list) else []
-        ids = [str(entry.get("id")) for entry in entries if isinstance(entry, dict)]
-        name = f"{package.get('name') or commit}@{package.get('version')}"
-        raise ValueError(f"OSV reports vulnerable packages: {name}: " + ", ".join(ids))
-    if image:
-        origin = package["image_origin_details"]
-        if not isinstance(origin, dict):
-            raise ValueError("OSV image package lacks layer origin details")
-        index = origin["index"]
-        if (
-            source["type"] not in {"artifact", "os", "lockfile"}
-            or type(index) is not int
-            or not 0 <= index < len(layers)
-            or layers[index]["is_empty"]
-        ):
-            raise ValueError("OSV package lacks a valid image layer origin")
-
-
-def osv_layers(report: JsonObject) -> list[JsonObject]:
-    metadata = report["image_metadata"]
-    if not isinstance(metadata, dict):
-        raise TypeError("OSV image metadata must be an object")
-    layers = metadata["layer_metadata"]
-    if not isinstance(layers, list) or not layers:
-        raise ValueError("OSV image report contains no layers")
-    for layer in layers:
-        if not isinstance(layer, dict):
-            raise TypeError("OSV image layer must be an object")
-        if type(layer["is_empty"]) is not bool or (
-            not layer["is_empty"]
-            and (
-                not isinstance(layer["diff_id"], str)
-                or not SHA256_DIGEST.fullmatch(layer["diff_id"])
-            )
-        ):
-            raise ValueError("OSV image report has invalid layer metadata")
-    return cast(list[JsonObject], layers)
-
-
 def validate_osv(
-    path: Path, *, image: bool = False, empty_bun: Path | None = None
+    path: Path,
+    *,
+    empty_bun: Path | None = None,
+    unfixed: Callable[[str], object] | None = None,
 ) -> None:
-    try:
-        report = json.loads(path.read_text())
-        results = report["results"]
-        if (
-            report.get("errors")
-            or report.get("error")
-            or report.get("experimental_generic_findings")
-        ):
-            raise ValueError("OSV reports scan errors or findings")
-        if (
-            results in (None, [])
-            and not image
-            and empty_bun is not None
-            and not (empty_bun / "bun.lock").exists()
-            and dependency_free(empty_bun)
-        ):
-            print(
-                "OSV: package.json declares no dependencies, so Bun keeps no lockfile"
-            )
-            return
-        if not isinstance(results, list):
-            raise TypeError("OSV results must be a list")
-        layers = osv_layers(report) if image else []
-        count = 0
-        for result in results:
-            if not all(
-                isinstance(result["source"][key], str) and result["source"][key]
-                for key in ("path", "type")
-            ):
-                raise ValueError("OSV report is missing its scan source")
-            packages = result["packages"]
-            if not isinstance(packages, list):
-                raise TypeError("OSV packages must be a list")
-            for item in packages:
-                validate_osv_package(item, result["source"], layers, image)
-                count += 1
-        if not count:
-            raise ValueError("OSV report contains no scanned packages")
-        print(f"OSV validated {count} package records; no reported vulnerabilities")
-    except (KeyError, TypeError, AttributeError) as error:
-        raise ValueError("OSV report is incomplete or malformed") from error
+    from osv_report import validate_osv as validate
+
+    validate(path, empty_bun=empty_bun, unfixed=unfixed)
 
 
 def validate_osv_image(path: Path) -> None:
-    validate_osv(path, image=True)
+    from osv_report import validate_osv_image as validate
+
+    validate(path)
+
+
+def osv_unfixed_only(path: Path) -> bool:
+    from osv_report import osv_unfixed_only as unfixed_only
+
+    return unfixed_only(path)
 
 
 def validate_semgrep(path: Path) -> None:
@@ -831,19 +745,24 @@ def validate_scanner_report(
 
 
 def scanner_result(
-    passed: bool,
+    code: int,
     scanner: str,
     gate: Gate,
     path: Path,
     command: list[str],
     directory: Path,
     timeout: float,
-) -> None:
-    """A failed scan shows its findings from its report, as the tool prints none."""
-    if passed:
+) -> bool:
+    """A failed scan shows its findings from its report, as the tool prints none.
+
+    True when the scanner exited 1 and no release fixes any vulnerability it reported.
+    """
+    if code == 0:
         validate_scanner_report(scanner, gate, path, command, directory, timeout)
     elif scanner in {"osv", "osv-image"} and path.is_file():
         try:
+            if code == 1 and scanner == "osv" and osv_unfixed_only(path):
+                return True
             validate_scanner_report(scanner, gate, path, command, directory, timeout)
         except ValueError as error:
             print(error)
@@ -860,6 +779,7 @@ def scanner_result(
             print(
                 f"{gate['name']}: Add a [build-system] table to pyproject.toml and run `uv sync`."
             )
+    return False
 
 
 def missing_build_system(lines: list[str], directory: Path) -> bool:

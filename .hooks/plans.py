@@ -971,3 +971,17 @@ def validate_documents(root: Path) -> None:
             raise ValueError(
                 f"{name} sections must follow the template order without duplicates"
             )
+
+
+def plan_base(root: Path, base: str | None, plan_stage: str | None) -> str | None:
+    from shipping import passed_branch_point
+
+    if base is not None or plan_stage is None:
+        return base
+    if point := passed_branch_point(root):
+        print(
+            f"Base-branch commit {point} passed the required CI checks; "
+            "checking only changes since it.",
+            flush=True,
+        )
+    return point

@@ -37,6 +37,7 @@ ShippingPolicy = TypedDict(
         "ci_seconds": float,
         "pre_push_seconds": float,
         "pre_push_mutation_seconds": float,
+        "pre_push_checks": str,
         "delivery": list[Delivery],
     },
 )
@@ -75,7 +76,10 @@ _CONFIG_KEYS = {
     "pre_push_seconds",
     "delivery",
 }
-_OPTIONAL_KEYS = {"pre_push_mutation_seconds"}  # policies older than the key still load
+_OPTIONAL_KEYS = {
+    "pre_push_mutation_seconds",
+    "pre_push_checks",
+}  # older policies lack them
 _DELIVERY_KEYS = {"name", "command"}
 _BRANCH_PARTS = re.compile(r"^[A-Za-z0-9._/-]+$")
 _SHA = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -305,16 +309,15 @@ def _policy(raw: dict[str, JsonValue]) -> ShippingPolicy:
         "pre_push_mutation_seconds": _number(
             raw.get("pre_push_mutation_seconds", 120), "pre_push_mutation_seconds", True
         ),
+        "pre_push_checks": _pre_push_checks(raw.get("pre_push_checks", "local")),
         "delivery": _delivery_entries(raw["delivery"]),
     }
 
 
-def gate_budget(root: Path) -> float:
-    """Each gate's ceiling: CI's budget in CI, pre-push's elsewhere."""
-    policy = load_policy(root, required=False)
-    if policy is None:
-        return 600
-    return policy["ci_seconds" if os.environ.get("CI") else "pre_push_seconds"]
+def _pre_push_checks(value: JsonValue) -> str:
+    if value not in ("local", "ci"):
+        raise ShippingError('shipping pre_push_checks must be "local" or "ci"')
+    return cast(str, value)
 
 
 def load_policy(root: Path, required: bool = True) -> ShippingPolicy | None:

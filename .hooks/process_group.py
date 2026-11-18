@@ -10,9 +10,12 @@ import threading
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import IO, NamedTuple
+from typing import IO, TYPE_CHECKING, NamedTuple
 
 from project_files import clean_tree
+
+if TYPE_CHECKING:
+    from shipping import ShippingPolicy
 
 BROKER = re.compile(
     r"^\S+ \S*/app-server-broker\.mjs serve --endpoint \S+ --cwd (.+) --pid-file \S+$"
@@ -363,3 +366,47 @@ def stop_idle_codex_brokers(table: list[Process] | None = None) -> tuple[int, in
         brokers += 1
         stopped += len(tree)
     return brokers, stopped
+
+
+def report_gate_edits(root: Path, environment: dict[str, str] | None = None) -> bool:
+    """Name the tracked files that the gates changed: such a result is not the commit that passed."""
+    changed = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    changed = [line[3:] for line in changed]
+    if changed:
+        print(
+            "Hard Eng: a gate changed pushed files: "
+            + ", ".join(changed)
+            + ". The push differs from what passed; apply the change, commit it and push again.",
+            flush=True,
+        )
+    return bool(changed)
+
+
+def policy_at(root: Path, revision: str) -> "ShippingPolicy | None":
+    """The shipping policy committed at a revision; None when it has none or cannot be read."""
+    from project_files import parse_project_text
+    from shipping import ShippingError, _policy_block, git
+
+    try:
+        text = git(root, "cat-file", "blob", f"{revision}:hard-eng.gates.json")
+        return _policy_block(parse_project_text(text, "hard-eng.gates.json"), False)
+    except (ShippingError, ValueError):
+        return None
+
+
+def ci_owns_checks(root: Path, base: str | None) -> bool:
+    """True in CI when the base commit's own policy leaves the push check to CI."""
+    held = policy_at(root, base) if base and os.environ.get("CI") else None
+    return held is not None and held["pre_push_checks"] == "ci"
+
+
+def ci_edits(root: Path, base: str | None) -> bool:
+    """CI has no other guard against a gate that edits files, so a project that leaves the push check to CI gets this one."""
+    return ci_owns_checks(root, base) and report_gate_edits(root)
