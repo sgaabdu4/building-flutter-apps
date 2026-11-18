@@ -73,22 +73,33 @@ def pub_eligible(name: str, fetch: Fetch, cutoff: datetime, ceiling: str) -> str
     )
 
 
+def npm_versions(name: str, fetch: Fetch) -> list[str]:
+    package = fetch(f"https://registry.npmjs.org/{urllib.parse.quote(name, safe='@')}")
+    if not isinstance(package, dict) or not isinstance(package.get("versions"), dict):
+        raise TypeError(f"npm returned an unreadable record for {name}")
+    return list(package["versions"])
+
+
+def pypi_releases(name: str, fetch: Fetch) -> dict[str, list[JsonObject]]:
+    package = fetch(f"https://pypi.org/pypi/{urllib.parse.quote(name)}/json")
+    if not isinstance(package, dict) or not isinstance(package.get("releases"), dict):
+        raise TypeError(f"PyPI returned an unreadable record for {name}")
+    return package["releases"]
+
+
 def pypi_eligible(
     name: str, fetch: Fetch, cutoff: datetime, ceiling: str
 ) -> str | None:
     """The ceiling is uv's latest: it obeys the project's Python range, a newer release may not."""
-    package = fetch(f"https://pypi.org/pypi/{urllib.parse.quote(name)}/json")
-    if not isinstance(package, dict) or not isinstance(package.get("releases"), dict):
-        raise TypeError(f"PyPI returned an unreadable record for {name}")
     return newest(
         [
             version
-            for version, files in package["releases"].items()
+            for version, files in pypi_releases(name, fetch).items()
             if files
             and not all(item.get("yanked") for item in files)
             and not newer(version, ceiling)
             and released_before(
-                min(item["upload_time_iso_8601"] for item in files), cutoff
+                min(str(item["upload_time_iso_8601"]) for item in files), cutoff
             )
         ]
     )

@@ -50,3 +50,13 @@ def record_gate_time(root: Path, key: str, seconds: float) -> None:
         temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
         temporary.write_text(json.dumps(times))
         temporary.replace(path)
+
+
+def gate_budget(root: Path) -> float:
+    """Each gate's ceiling: CI's budget in CI, pre-push's elsewhere."""
+    from shipping import load_policy
+
+    policy = load_policy(root, required=False)
+    if policy is None:
+        return 600
+    return policy["ci_seconds" if os.environ.get("CI") else "pre_push_seconds"]

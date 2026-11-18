@@ -7,7 +7,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gate_config import Group
+    from gate_config import Gate, Group
 
 SOURCE_SUFFIXES = {
     "python": {".py"},
@@ -168,3 +168,30 @@ def readers_above(by_path: dict[str, Group], name: str, nearest: str) -> set[str
         and Path(nearest).is_relative_to(path)
     ]
     return {max(above, key=len)} if above else set()
+
+
+def biome_children(
+    root: Path, group: Group, gate: Gate, groups: list[Group]
+) -> tuple[Path, ...]:
+    command = gate["command"]
+    if (
+        group["path"] != "."
+        or group.get("language") != "javascript"
+        or gate.get("role") not in {"format-lint", "focused-tests", "typing-style"}
+        or gate.get("report")
+        or command[:2] not in (["biome", "ci"], ["biome", "lint"])
+        or "." not in command
+        or any(
+            arg not in {".", "--error-on-warnings"} and not arg.startswith("--only=")
+            for arg in command[2:]
+        )
+    ):
+        return ()
+    return tuple(
+        root / child["path"]
+        for child in child_groups(group, gate.get("role"), groups)
+        if any(
+            check.get("role") == gate.get("role") and check["command"] == command
+            for check in child["checks"]
+        )
+    )
