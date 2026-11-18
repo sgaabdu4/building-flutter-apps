@@ -1,0 +1,395 @@
+{
+  "about": "Paths and whether each is a theme or token file. Built from Hard Eng's is_theme_path in .hooks/ui_rules.py: a folder or a last name word in theme, token, color, colour, palette or their plurals (case-insensitive, name words split on case, _ and -, and on + between parts), or a name that starts with tailwind.config. Hard Eng and the Flutter lint plugin test their rule against every row.",
+  "cases": [
+    {
+      "group": "folder word",
+      "path": "lib/core/color/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/color/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_color.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/color.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "lib/core/colors/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/colors/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_colors.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/colors.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "lib/core/colour/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/colour/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_colour.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/colour.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "lib/core/colours/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/colours/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_colours.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/colours.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "lib/core/palette/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/palette/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_palette.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/palette.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "lib/core/palettes/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/palettes/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_palettes.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/palettes.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "lib/core/theme/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/theme/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_theme.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/theme.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "lib/core/themes/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/themes/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_themes.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/themes.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "lib/core/token/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/token/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_token.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/token.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "lib/core/tokens/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word",
+      "path": "web/src/tokens/index.css",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "lib/app_tokens.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word",
+      "path": "src/design/tokens.ts",
+      "theme": true
+    },
+    {
+      "group": "folder word, any case",
+      "path": "lib/Theme/app.dart",
+      "theme": true
+    },
+    {
+      "group": "folder word, any case",
+      "path": "src/Tokens/dark.css",
+      "theme": true
+    },
+    {
+      "group": "last name word, camel case",
+      "path": "src/appTheme.ts",
+      "theme": true
+    },
+    {
+      "group": "last name word, camel case",
+      "path": "lib/AppColors.dart",
+      "theme": true
+    },
+    {
+      "group": "last name word, kebab case",
+      "path": "src/app-palette.css",
+      "theme": true
+    },
+    {
+      "group": "last name word, upper case",
+      "path": "src/BRAND_TOKENS.ts",
+      "theme": true
+    },
+    {
+      "group": "plus split",
+      "path": "Sources/Theme+Colors.swift",
+      "theme": true
+    },
+    {
+      "group": "plus split",
+      "path": "Sources/Colors+Card.swift",
+      "theme": true
+    },
+    {
+      "group": "plus split",
+      "path": "Sources/Card+Theme.swift",
+      "theme": true
+    },
+    {
+      "group": "tailwind config",
+      "path": "tailwind.config.ts",
+      "theme": true
+    },
+    {
+      "group": "tailwind config",
+      "path": "web/tailwind.config.js",
+      "theme": true
+    },
+    {
+      "group": "tailwind config",
+      "path": "web/tailwind.config.mjs",
+      "theme": true
+    },
+    {
+      "group": "old plugin form",
+      "path": "lib/core/theme/app_colors.dart",
+      "theme": true
+    },
+    {
+      "group": "old plugin form",
+      "path": "lib/core/theme/app_theme.dart",
+      "theme": true
+    },
+    {
+      "group": "old plugin form",
+      "path": "lib/core/theme/x.dart",
+      "theme": true
+    },
+    {
+      "group": "old plugin form",
+      "path": "lib/core/design/spacing_tokens.dart",
+      "theme": true
+    },
+    {
+      "group": "old plugin form",
+      "path": "lib/core/design/x_tokens.dart",
+      "theme": true
+    },
+    {
+      "group": "old plugin form",
+      "path": "packages/ui/lib/src/x_tokens.dart",
+      "theme": true
+    },
+    {
+      "group": "near miss, no theme word",
+      "path": "lib/screens/home_screen.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, no theme word",
+      "path": "lib/main.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, word inside a longer word",
+      "path": "lib/colorful.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, word inside a longer word",
+      "path": "lib/theming.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, word inside a longer word",
+      "path": "lib/tokenizer.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, word inside a longer word",
+      "path": "lib/themed/app.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, word inside a longer word",
+      "path": "lib/themes_old/app.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, word inside a longer word",
+      "path": "lib/colorpicker/app.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, theme word not last",
+      "path": "lib/theme_service.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, theme word not last",
+      "path": "lib/color_picker.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, theme word not last",
+      "path": "lib/token_store.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, theme word not last",
+      "path": "lib/palettes_page.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, theme word not last",
+      "path": "lib/ThemeData.dart",
+      "theme": false
+    },
+    {
+      "group": "near miss, plus split",
+      "path": "Sources/Card+Extensions.swift",
+      "theme": false
+    },
+    {
+      "group": "near miss, plus split",
+      "path": "Sources/Card+Layout.swift",
+      "theme": false
+    },
+    {
+      "group": "near miss, tailwind",
+      "path": "tailwind.configs.ts",
+      "theme": false
+    },
+    {
+      "group": "near miss, tailwind",
+      "path": "my.tailwind.config.ts",
+      "theme": false
+    },
+    {
+      "group": "near miss, tailwind",
+      "path": "tailwindconfig.ts",
+      "theme": false
+    },
+    {
+      "group": "near miss, theme word only in the extension",
+      "path": "lib/app.theme",
+      "theme": false
+    },
+    {
+      "group": "near miss, theme word in a parent of the name",
+      "path": "lib/theme.dart/app.dart",
+      "theme": false
+    }
+  ]
+}
