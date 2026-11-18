@@ -1,6 +1,6 @@
 # One case file for the theme-path rule
 
-Status: Ready
+Status: Complete
 
 ## Outcome + scope
 
@@ -11,8 +11,6 @@ Add `tool/test_fixtures/theme_paths.json`: paths, each marked a theme or token f
 Sources: N/A — the request is the only source, the Hard Eng single-source plan of the Hard Eng repository (Decision 11), which says the cases live once in this repository.
 Reviewer: N/A — one small source.
 Deliverables: None
-
-- The case file in this repository: In scope — the case file holds a row for each theme word as a folder and as a last name word, the plus split, tailwind config names, the plugin's old forms and near misses
 
 ## Repository context
 
@@ -28,7 +26,7 @@ Authority: Human-loop. The coordinator asked for this file on 2026-11-18 for the
 
 ## Acceptance + steps
 
-- [x] The case file holds a row for each theme word as a folder and as a last name word, the plus split, tailwind config names, the plugin's old forms and near misses that must be false → N/A — a data file; Hard Eng's `tests/test_ui_rules.py::test_theme_path_cases_from_the_flutter_skill` reads every row through its submodule and asserts `is_theme_path` for each, and the lint plugin's test does the same in its repository.
+- [x] The case file holds a row for each theme word as a folder and as a last name word, the plus split, tailwind config names, the plugin's old forms and near misses that must be false → N/A — a data file; Hard Eng's test `test_theme_path_cases_from_the_flutter_skill` (in its `tests/test_ui_rules.py`) reads every row through its submodule and asserts `is_theme_path` for each, and the lint plugin's test does the same in its repository.
 
 ## Baseline + execution
 
@@ -46,11 +44,11 @@ N/A — a data file; no interface changes.
 
 ## Verification
 
-Result: Pending
-Evidence: Pending
+Result: Passed
+Evidence: `python3 .hooks/hard-eng.py check --base origin/main --plan-stage Ready` passed all 12 checks on the case file and this plan. The file parses as JSON with 78 rows; every row equals `is_theme_path` of Hard Eng develop aaff1503. Hard Eng's own test of the rows is in its repository and runs after this merges.
 E2E: N/A — a data file with no runtime; the two consumers' tests read it.
 Real service: N/A — no outside service is called.
-Retro: Pending
+Retro: The first check refused a plan with no source list that still held a coverage row; the row went. Nothing else repeated, so no new rule.
 
 Delivery target: Merge
 Delivery: Pending — required remote proof.
