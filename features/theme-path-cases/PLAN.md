@@ -26,7 +26,7 @@ Authority: Human-loop. The coordinator asked for this file on 2026-11-18 for the
 
 ## Acceptance + steps
 
-- [x] The case file holds a row for each theme word as a folder and as a last name word, the plus split, tailwind config names, the plugin's old forms and near misses that must be false → N/A — a data file; Hard Eng's test `test_theme_path_cases_from_the_flutter_skill` (in its `tests/test_ui_rules.py`) reads every row through its submodule and asserts `is_theme_path` for each, and the lint plugin's test does the same in its repository.
+- [x] The case file holds a row for each theme word as a folder and as a last name word, the plus split, tailwind config names, the plugin's old forms and near misses that must be false → N/A — a data file with no behaviour of its own; the proof here is that the file parses, its paths are unique and every row equals `is_theme_path` of Hard Eng develop aaff1503 (78 rows, 0 differences). The consumer tests are not part of this change and are pending: Hard Eng adds its test `test_theme_path_cases_from_the_flutter_skill` and moves its submodule pin to this commit, and the lint plugin adds its own test and pin, each in its own repository.
 
 ## Baseline + execution
 
@@ -45,7 +45,7 @@ N/A — a data file; no interface changes.
 ## Verification
 
 Result: Passed
-Evidence: `python3 .hooks/hard-eng.py check --base origin/main --plan-stage Ready` passed all 12 checks on the case file and this plan. The file parses as JSON with 78 rows; every row equals `is_theme_path` of Hard Eng develop aaff1503. Hard Eng's own test of the rows is in its repository and runs after this merges.
+Evidence: `python3 .hooks/hard-eng.py check --base origin/main --plan-stage Ready` passed all 12 checks on the case file and this plan. The file parses as JSON with 78 rows; every row equals `is_theme_path` of Hard Eng develop aaff1503. The consumer tests (Hard Eng and the plugin) are pending in their own repositories and are not proved by this change.
 E2E: N/A — a data file with no runtime; the two consumers' tests read it.
 Real service: N/A — no outside service is called.
 Retro: The first check refused a plan with no source list that still held a coverage row; the row went. Nothing else repeated, so no new rule.
