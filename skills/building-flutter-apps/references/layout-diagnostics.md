@@ -72,7 +72,7 @@ class ProductSearchBar extends StatelessWidget {
         const Icon(Icons.search),
         const SizedBox(width: Spacing.s8),
         Expanded(
-          child: TextField(
+          child: AppTextField(
             controller: controller,
           ),
         ),

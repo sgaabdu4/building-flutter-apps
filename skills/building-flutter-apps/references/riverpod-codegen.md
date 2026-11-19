@@ -304,14 +304,14 @@ class AddTodoScreen extends ConsumerWidget {
     final l10n = context.l10n;
 
     return switch (addTodo) {
-      MutationIdle() => ElevatedButton(
+      MutationIdle() => AppPrimaryButton(
           onPressed: () => unawaited(_addTodo(ref)),
-          child: Text(l10n.addTodoSubmit),
+          label: l10n.addTodoSubmit,
         ),
       MutationPending() => const CircularProgressIndicator(),
-      MutationError() => ElevatedButton(
+      MutationError() => AppPrimaryButton(
           onPressed: () => unawaited(_addTodo(ref)),
-          child: Text(l10n.addTodoRetry),
+          label: l10n.addTodoRetry,
         ),
       MutationSuccess() => Text(l10n.addTodoDone),
     };

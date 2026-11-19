@@ -322,9 +322,9 @@ Open output JSON in DevTools > App Size tool for per-package breakdown.
 Semantics(
   label: l10n.deleteProductSemantics(product.name),
   button: true,
-  child: IconButton(
+  child: AppIconButton(
     tooltip: l10n.deleteProductTooltip,
-    icon: const Icon(Icons.delete),
+    icon: Icons.delete,
     onPressed: () => onDelete(product.id),
   ),
 )
