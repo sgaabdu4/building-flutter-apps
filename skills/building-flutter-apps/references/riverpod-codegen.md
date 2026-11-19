@@ -277,7 +277,7 @@ try {
 
 Mutations track side-effect state (idle, pending, success, error) separately from provider state. Prevent providers from being disposed while side-effect runs.
 
-Mutation = one file-scope (top-level) `final`, not a class member → rebuilds + consumers share one instance. Name = `<verb><Noun>Mutation` (Riverpod docs).
+Mutation = one file-scope (top-level) `final`, not a class member → rebuilds + consumers share one instance. Name = `<verb><Noun>Mutation`. Both are project rules: Riverpod docs also allow a `static final` on a Notifier and name mutations `addTodo` or `addTodoMutation`.
 
 ```dart
 // features/todos/presentation/screens/add_todo_screen.dart
