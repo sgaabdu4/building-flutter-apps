@@ -1,6 +1,6 @@
 # Fix four plain errors in the skill text
 
-Status: Ready
+Status: Complete
 
 ## Outcome + scope
 
@@ -47,11 +47,11 @@ N/A — skill text; no interface changes.
 
 ## Verification
 
-Result: Pending
-Evidence: Pending — local gate run.
+Result: Passed
+Evidence: `python3 .hooks/hard-eng.py check --base origin/main --plan-stage Ready` passed all 12 gates on the four fixes and this plan (28 drift fixtures, 48 smoke assertions). `python3 tool/run_compatibility_fixture.py` printed `HOSTED_LINT_RESOLUTION_OK flutter_skill_lints=^0.15.0` and `COMPATIBILITY_FIXTURE_OK`.
 E2E: N/A — prose and a version pin; no runtime journey.
 Real service: N/A — no outside service is called.
-Retro: Pending
+Retro: The first CI run refused a Ready plan and a PR body with no Undo line and no Before and after diagrams; the plan went to Complete and the body was fixed. No new rule.
 
 Delivery target: Merge
 Delivery: Pending — required remote proof.
