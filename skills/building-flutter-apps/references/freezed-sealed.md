@@ -142,7 +142,7 @@ return switch (asyncData) {
 };
 ```
 
-Match `hasValue: true` first. It keeps the shown data during a reload and on an error after data, which `AsyncData(:final value)` drops. Bind `requireValue` so the data keeps its non-null type.
+Match `hasValue: true` first. It keeps the shown data during a reload and on an error after data, which `AsyncData(:final value)` drops. Bind `requireValue` so the data keeps the provider's own type.
 
 `AsyncLoading(progress: 0.5)` report loading progress. `AsyncValue.isFromCache` flag offline-persisted data.
 
