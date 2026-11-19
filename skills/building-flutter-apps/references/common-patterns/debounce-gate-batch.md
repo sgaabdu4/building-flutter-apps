@@ -17,6 +17,7 @@ High-frequency boundaries (keystrokes, drag gestures, scroll ticks, sync cycles,
 ### Input callbacks — debounce or move to terminal event
 
 ```dart
+// core/widgets/molecules/product_search_field.dart owns the raw field and takes onChanged; the screen passes the debounced callback below
 // NEVER — fires per keystroke
 TextField(onChanged: (v) {
   ref.read(searchProvider.notifier).search(v); // N requests for "hello"
