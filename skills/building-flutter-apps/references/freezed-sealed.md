@@ -136,11 +136,13 @@ Riverpod `AsyncValue` also sealed:
 final asyncData = ref.watch(myAsyncProvider);
 final l10n = context.l10n;
 return switch (asyncData) {
-  AsyncData(:final value) => Text(value.toString()),
+  AsyncValue(hasValue: true, :final requireValue) => Text(requireValue.toString()),
   AsyncError() => Text(l10n.loadFailed),
-  AsyncLoading() => const ShimmerPlaceholder(), // Prefer skeleton/shimmer over bare CircularProgressIndicator
+  _ => const ShimmerPlaceholder(), // Prefer skeleton/shimmer over bare CircularProgressIndicator
 };
 ```
+
+Match `hasValue: true` first. It keeps the shown data during a reload and on an error after data, which `AsyncData(:final value)` drops. Bind `requireValue` so the data keeps its non-null type.
 
 `AsyncLoading(progress: 0.5)` report loading progress. `AsyncValue.isFromCache` flag offline-persisted data.
 
