@@ -36,6 +36,21 @@ legacy branches. Re-run the compatibility fixture before raising the floor.
 | `intl`                |  `^0.20.3` | Localization formatting         |
 | `flutter_lints`       |    `6.0.0` | Base Flutter lints              |
 
+## Dart SDK migration
+
+When raising `environment.sdk` in `pubspec.yaml` on Dart SDK 3.14 or later, run `dart migrate` instead of hand-editing the constraint and hunting language-version breaks. It checks `pubspec.yaml` dependency compatibility first, then runs migration lints and fixes for the target version even if `analysis_options.yaml` omits them.
+
+```bash
+dart migrate --dry-run
+dart migrate --apply
+dart migrate --dry-run --step=cleanup
+```
+
+- Default steps (`prepare`, `bump`): `prepare` applies required pre-bump fixes; `bump` raises the lower `environment.sdk` bound and re-analyzes.
+- Optional cleanups: `cleanup` is skipped by default; review its summary, then run `dart migrate --apply --step=cleanup` (or run `dart migrate --apply --step=all` instead of the two-step flow to run `prepare`, `bump`, and `cleanup` together).
+- Target version: defaults to the installed Dart SDK; pass `--target-sdk=<version>` (for example, `--target-sdk=3.13.0`) to migrate to an earlier version instead.
+- Finish with `Read first` step 2.
+
 ## Material library
 
 One rule for every supported Flutter version (3.47.0 and later): import
@@ -96,6 +111,7 @@ configuration upgrade. Do not use dependency overrides as compatibility proof.
 
 ## Package sources
 
+- [Dart migrate tool](https://dart.dev/tools/dart-migrate)
 - [Dart package dependencies](https://dart.dev/tools/pub/dependencies)
 - [Dart analyzer plugins](https://dart.dev/tools/analyzer-plugins)
 - [analyzer](https://pub.dev/packages/analyzer)
