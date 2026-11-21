@@ -1,6 +1,7 @@
 """Run current-files scans without ignored build output."""
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -10,6 +11,44 @@ from typing import IO
 from gate_config import Group
 from process_group import run_in_group
 from project_files import GIT_LISTING
+
+TOOL_VARIABLES = re.compile(
+    r"GITLEAKS_CONFIG(?:_TOML)?|FALLOW_\w+|CARGO_ALIAS_\w+|CLIPPY_CONF_DIR|SHELLCHECK_OPTS"
+    r"|CARGO_HOME|RUFF_(?!CACHE_DIR\b|NO_CACHE\b)\w+"
+)
+CONFIG_ASSIGNMENT = re.compile(rf"\b(?:{TOOL_VARIABLES.pattern})[\"']?\s*[:=]")
+
+
+def scan_environment(base: dict[str, str] | None = None) -> dict[str, str]:
+    """The environment of a gate run, without the variables that change what a judged tool reports: the Gitleaks config, every `FALLOW_` variable (a newer release may read more), a Cargo alias, the Clippy config folder, `SHELLCHECK_OPTS`, `CARGO_HOME` (Cargo reads an alias from its config file), `XDG_CONFIG_HOME` (ShellCheck reads a `shellcheckrc` there) and the Ruff variables other than its two cache ones."""
+    return {
+        key: value
+        for key, value in (os.environ if base is None else base).items()
+        if not TOOL_VARIABLES.fullmatch(key) and key != "XDG_CONFIG_HOME"
+    }
+
+
+def config_variable_hits(name: str, text: str) -> list[str]:
+    return [
+        f"{name}:{number} sets {match[0].rstrip(':= "\'')}, which swaps a scanner config or changes what Fallow reports"
+        for number, line in enumerate(text.splitlines(), 1)
+        if not line.lstrip().startswith("#")
+        and (match := CONFIG_ASSIGNMENT.search(line))
+    ]
+
+
+def validate_config_variables(command: list[str]) -> None:
+    found = [
+        piece
+        for word in command
+        for piece in word.split()
+        if CONFIG_ASSIGNMENT.match(piece)
+    ]
+    if found:
+        raise ValueError(
+            "HE-NO-SWITCH-OFF: A gate must not set the variables that swap the Gitleaks config or change what Fallow reports: "
+            + ", ".join(found)
+        )
 
 
 def scan_paths(repository: Path) -> list[Path]:
@@ -101,10 +140,66 @@ def validate_current_files_command(command: list[str]) -> None:
         )
 
 
+NARROWING_FLAGS = {
+    "-b",
+    "--baseline-path",
+    "-i",
+    "--gitleaks-ignore-path",
+    "--enable-rule",
+    "--max-target-megabytes",
+    "--max-decode-depth",
+    "--exit-code",
+    "--pre-commit",
+    "--staged",
+}
+SCAN_REFUSAL = (
+    "HE-NO-SWITCH-OFF: A secret scan must not narrow, baseline or mute itself: "
+    "fix the finding at its cause instead; "
+)
+
+
+def narrowing_flags(command: list[str]) -> list[str]:
+    """Flags that hide findings, and a config path other than `.gitleaks.toml`."""
+    found = []
+    for index, argument in enumerate(command):
+        if not argument.startswith("-") or argument == "-":
+            continue
+        name, equals, value = argument.partition("=")
+        if not argument.startswith("--") and len(argument) > 2:
+            name, value = argument[:2], argument[2:]
+        elif not equals and index + 1 < len(command):
+            value = command[index + 1]
+        if name in NARROWING_FLAGS or (
+            name in {"-c", "--config"} and os.path.normpath(value) != ".gitleaks.toml"
+        ):
+            found.append(argument)
+    return found
+
+
+def validate_history_command(command: list[str]) -> None:
+    """Keep the history gate on every commit, never a range."""
+    if (
+        command[:3] != ["gitleaks", "git", "."]
+        or command.count("--log-opts=--all") != 1
+        or any(a.startswith("--log-opts") and a != "--log-opts=--all" for a in command)
+    ):
+        raise ValueError(
+            "secrets-history requires native `gitleaks git .` over `--log-opts=--all`"
+        )
+
+
 def validate_current_files_gate(role: object, command: list[str]) -> None:
-    """Apply the native scan constraint only to the current-files gate role."""
+    """Apply the native scan constraints to the two secret gate roles."""
+    if role not in {"secrets-files", "secrets-history"}:
+        return
+    if found := narrowing_flags(command):
+        raise ValueError(
+            f"{SCAN_REFUSAL}the {role} gate holds {', '.join(found)}; keep the config `.gitleaks.toml`"
+        )
     if role == "secrets-files":
         validate_current_files_command(command)
+    else:
+        validate_history_command(command)
 
 
 def copy_link_target(
@@ -202,6 +297,7 @@ def run_current_files(
         return subprocess.run(
             rewritten,
             cwd=snapshot,
+            env=scan_environment(),
             check=False,
             timeout=timeout,
             stdout=stdout,
@@ -216,7 +312,7 @@ def new_commits_command(
     if "--log-opts=--all" not in command:
         return command
     pushable = [
-        "--log-opts=--branches --remotes --tags HEAD"
+        "--log-opts=--remotes --tags HEAD"
         if argument == "--log-opts=--all"
         else argument
         for argument in command
@@ -258,7 +354,7 @@ def run_gate_command(
     """Run ordinary gates directly and point current-file scans at a snapshot."""
     if role == "secrets-files":
         return run_current_files(command, directory, timeout, stdout, stderr)
-    environment = {**os.environ, "PNPM_CONFIG_DLX_CACHE_MAX_AGE": "0"}
+    environment = {**scan_environment(), "PNPM_CONFIG_DLX_CACHE_MAX_AGE": "0"}
     if role == "freshness":
         environment["POETRY_SOLVER_MIN_RELEASE_AGE"] = "2"
     with tempfile.TemporaryDirectory(prefix="hard-eng-gate-") as temporary:
@@ -342,7 +438,7 @@ def commit_secret_scan(root: Path, base: str | None, timeout: float) -> int:
     from gate_runner import run_gates
     from tool_setup import provision_tools
 
-    require_ci_base(base)
+    require_ci_base(base, root)
     base = push_base(root, base)
     groups: list[Group] = [
         {

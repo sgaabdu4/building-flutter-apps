@@ -11,10 +11,10 @@ from typing import NamedTuple
 from gate_config import (
     GateConfig,
     Group,
-    generated_sources,
     package_manifests,
     repository_files,
 )
+from generated_marks import generated_sources
 from project_files import read_project_file
 
 WHITESPACE_RUN = re.compile(r"\s+")

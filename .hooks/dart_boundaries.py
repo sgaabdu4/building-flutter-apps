@@ -1,10 +1,21 @@
 """Read a Dart package's Dart Decimate boundary rules and refuse unusable ones."""
 
 import json
+import os
 import subprocess
+import threading
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, TypedDict, cast
 from urllib.parse import unquote, urljoin, urlparse
+
+from generated_marks import (
+    folder_prefix,
+    generated_sources,
+    proven_copies,
+    repository_top,
+    same_on_disk,
+)
+from project_files import GIT_LISTING
 
 if TYPE_CHECKING:
     from gate_config import Group, JsonObject
@@ -50,11 +61,6 @@ DART_TYPING: dict[str, dict[str, dict[str, bool] | list[str]]] = {
     },
 }
 
-NESTED_STEP = (
-    ". This file replaces the package's settings for its folder: give it the `analyzer`"
-    " and `linter` settings of the package's analysis_options.yaml, or remove it"
-)
-
 
 def dart_rule_settings(value: object) -> object:
     if isinstance(value, list):
@@ -69,6 +75,45 @@ def dart_rule_settings(value: object) -> object:
                     "a lint rule of the included set; remove that entry"
                 )
     return value
+
+
+def merge_options(base: object, over: object) -> object:
+    """Later settings win; lint rule lists count as maps so a rule set to false shows."""
+    if not isinstance(base, dict) or not isinstance(over, dict):
+        return over
+    merged = dict(base)
+    for key, value in over.items():
+        if key == "rules" and isinstance(value, (list, dict)):
+            value = {**listed_rules(base.get(key)), **listed_rules(value)}
+        merged[key] = merge_options(base.get(key), value) if key in base else value
+    return merged
+
+
+def listed_rules(value: object) -> dict[str, object]:
+    if isinstance(value, list):
+        return {rule: True for rule in value if isinstance(rule, str)}
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def nested_options(
+    path: Path, root_file: Path, seen: frozenset[Path] = frozenset()
+) -> object | None:
+    """The settings of a nested file merged over what its relative include chain reaches; None when the chain misses the package's own file."""
+    own = dart_options(path)
+    includes = own.get("include", [])
+    for include in [includes] if isinstance(includes, str) else includes:
+        target = (path.parent / include).resolve()
+        if include.startswith("package:") or target in seen | {path.resolve()}:
+            continue
+        if target == root_file.resolve():
+            return merge_options(dart_options(root_file), own)
+        if (
+            target.is_file()
+            and (base := nested_options(target, root_file, seen | {path.resolve()}))
+            is not None
+        ):
+            return merge_options(base, own)
+    return None
 
 
 def validate_dart_plugins(options: "JsonObject") -> None:
@@ -95,6 +140,52 @@ def validate_dart_plugins(options: "JsonObject") -> None:
         )
 
 
+def local_dart_includes(root: Path, path: Path, options: "JsonObject") -> list[Path]:
+    raw = options.get("include")
+    entries = [raw] if isinstance(raw, str) else raw if isinstance(raw, list) else []
+    base = root.resolve()
+    found: list[Path] = []
+    for entry in entries:
+        if not isinstance(entry, str) or entry.startswith("package:"):
+            continue
+        candidate = (path.parent / entry).resolve()
+        if candidate.is_file() and candidate.is_relative_to(base):
+            found.append(candidate)
+    return found
+
+
+def migrate_included_dart_plugins(
+    root: Path,
+    path: Path,
+    options: "JsonObject",
+    source: Path,
+    changes: dict[str, str],
+    seen: set[Path] | None = None,
+) -> None:
+    from copy import deepcopy
+
+    import yaml
+
+    from project_setup import migrate_dart_plugins
+
+    visited = seen if seen is not None else {path.resolve()}
+    for included in local_dart_includes(root, path, options):
+        if included in visited:
+            continue
+        visited.add(included)
+        relative = included.relative_to(root.resolve()).as_posix()
+        raw = changes.get(relative)
+        child = cast(
+            "JsonObject",
+            yaml.safe_load(raw) if raw is not None else dart_options(included),
+        )
+        original = deepcopy(child)
+        migrate_dart_plugins(child, source)
+        if child != original:
+            changes[relative] = yaml.safe_dump(child, sort_keys=False)
+        migrate_included_dart_plugins(root, included, child, source, changes, visited)
+
+
 def dart_options(path: Path) -> DartOptions:
     try:
         import yaml
@@ -111,12 +202,14 @@ def dart_options(path: Path) -> DartOptions:
     return cast(DartOptions, options)
 
 
-def nested_package_patterns(group: "Group", groups: "list[Group]") -> frozenset[str]:
+def nested_package_patterns(
+    group: "Group", groups: "list[Group]", role: str = "types"
+) -> frozenset[str]:
     from dependency_graph import child_groups
 
     return frozenset(
         f"{PurePosixPath(child['path']).relative_to(group['path'])}/**"
-        for child in child_groups(group, "types", groups)
+        for child in child_groups(group, role, groups)
     )
 
 
@@ -129,20 +222,26 @@ def localization_file(options: object) -> PurePosixPath | None:
     return PurePosixPath(str(folder), PurePosixPath(str(name)).name)
 
 
-def localization_exclusions(directory: Path) -> frozenset[str]:
-    """Flutter 3.50's gen-l10n lists deprecated delegates in its main file (flutter/flutter#191072)."""
+def localization_main(directory: Path) -> PurePosixPath | None:
+    """The main file that gen-l10n writes in a package folder, from its l10n.yaml."""
     path = directory / "l10n.yaml"
     if not path.is_file():
-        return frozenset()
+        return None
     import yaml
 
     try:
         main = localization_file(yaml.safe_load(path.read_text()) or {})
     except yaml.YAMLError:
-        return frozenset()
+        return None
     if main is None or main.is_absolute() or ".." in main.parts:
-        return frozenset()
-    return frozenset({main.as_posix()})
+        return None
+    return main
+
+
+def localization_exclusions(directory: Path) -> frozenset[str]:
+    """Flutter 3.50's gen-l10n lists deprecated delegates in its main file (flutter/flutter#191072)."""
+    main = localization_main(directory)
+    return frozenset({main.as_posix()}) if main else frozenset()
 
 
 def add_exclusions(options: "JsonObject", patterns: frozenset[str]) -> None:
@@ -152,20 +251,118 @@ def add_exclusions(options: "JsonObject", patterns: frozenset[str]) -> None:
         exclude.extend(sorted(patterns - set(exclude)))
 
 
+def excludes_here(directory: Path, pattern: str) -> bool:
+    """Whether a pattern from an included file matches a path here; the analyzer applies it from this folder. Python glob expands no braces and no partial `**`, so those count as a match."""
+    if "{" in pattern or "}" in pattern:
+        return True
+    if any("**" in part and part != "**" for part in pattern.split("/")):
+        return True
+    folder = pattern.rstrip("/").removesuffix("/**").rstrip("/")
+    try:
+        return any(
+            next(directory.glob(form), None) is not None for form in {pattern, folder}
+        )
+    except (ValueError, NotImplementedError):
+        return True
+
+
+def validate_dart_exclusions(
+    directory: Path,
+    values: object,
+    children: frozenset[str] = frozenset(),
+    holder: Path | None = None,
+    origin: Path | None = None,
+    marked: frozenset[str] = frozenset(),
+) -> None:
+    """Refuse excludes of project files; holder is the file that writes them, and a holder in a parent folder is that folder's own options, included here. An inherited pattern is judged from origin, the folder of the options file the analyzer reads."""
+    from project_setup import FLUTTER_PLATFORM_ROOTS, dependency_command
+
+    allowed = {
+        ".dart_tool/**",
+        "**/*.g.dart",
+        "**/*.freezed.dart",
+        "**/*.gr.dart",
+        "**/*.arb",
+    }
+    flutter = (directory / "pubspec.yaml").is_file() and dependency_command(
+        directory, "dart"
+    )[0] == "flutter"
+    native = {"build/**"} if flutter else set()
+    native.update(
+        f"{root}/**"
+        for root in FLUTTER_PLATFORM_ROOTS
+        if flutter and (directory / root).is_dir()
+    )
+    options = holder or directory / "analysis_options.yaml"
+    inherited = options.resolve().parent in directory.resolve().parents
+    if not isinstance(values, list):
+        raise TypeError(f"exclude in {options} must be a list of patterns")
+    known = allowed | native | children
+    if not known.issuperset(value for value in values if isinstance(value, str)):
+        known |= localization_exclusions(directory)
+    refused = [
+        value
+        for value in values
+        if not isinstance(value, str)
+        or (
+            value not in known
+            and (not inherited or excludes_here(origin or directory, value))
+        )
+    ]
+    if refused:
+        raise ValueError(
+            "Dart strict analysis cannot exclude project files: remove "
+            f"{', '.join(repr(value) for value in refused)} from exclude in {options}"
+        )
+    roots = {pattern.split("/", 1)[0] for pattern in set(values) & native}
+    matches = {
+        path
+        for pattern in set(values) - native - children - {".dart_tool/**"}
+        for path in (origin or directory if inherited else directory).glob(pattern)
+        if path.relative_to(directory).parts[0] not in roots
+    }
+    if roots:
+        listing = [*GIT_LISTING, "ls-files", "-zco", "--exclude-standard", "--"]
+        names = subprocess.check_output(
+            [*listing, *sorted(roots)], cwd=directory, text=True
+        ).split("\0")
+        matches.update(
+            directory / name
+            for name in names
+            if name
+            and (Path(name).suffix == ".dart" or (directory / name).is_symlink())
+        )
+    names = [str(path.relative_to(directory)) for path in matches]
+    generated = generated_sources(directory, names) | marked
+    for path in matches:
+        relative = path.relative_to(directory)
+        if ".dart_tool/**" in values and relative.parts[0] == ".dart_tool":
+            continue
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"Dart generated exclusion matches an unsafe path: {path}")
+        if path.suffix != ".dart" or str(relative) in generated:
+            continue
+        with path.open("rb") as source:
+            header = source.read(2048).splitlines()[:10]
+        if b"// GENERATED CODE - DO NOT MODIFY BY HAND" not in header:
+            raise ValueError(f"Dart exclusion matches handwritten source: {path}")
+
+
 def validate_dart_includes(
     path: Path,
     directory: Path,
     seen: set[Path] | None = None,
     packaged: bool = False,
     children: frozenset[str] = frozenset(),
+    origin: Path | None = None,
 ) -> None:
     seen = set() if seen is None else seen
     path = path.resolve()
+    origin = origin or path.parent
     if path in seen:
         raise ValueError(f"Recursive Dart analysis include: {path}")
     seen.add(path)
     from gate_config import JsonObject
-    from project_setup import validate_dart_exclusions
 
     options = dart_options(path)
 
@@ -175,7 +372,13 @@ def validate_dart_includes(
         raise ValueError(
             f"Remove obsolete Dart language flags; use no_dynamic_casts and no_raw_types: {path}"
         )
-    validate_dart_exclusions(directory, analyzer.get("exclude", []), children)
+    validate_dart_exclusions(
+        directory,
+        analyzer.get("exclude", []),
+        children,
+        path,
+        origin,
+    )
     if any(value == "ignore" for value in analyzer.get("errors", {}).values()):
         raise ValueError(
             f"Dart strict analysis cannot exclude files or ignore diagnostics: {path}"
@@ -202,7 +405,7 @@ def validate_dart_includes(
         package = include.startswith("package:")
         try:
             validate_dart_includes(
-                included, directory, seen.copy(), packaged or package, children
+                included, directory, seen.copy(), packaged or package, children, origin
             )
         except ValueError as error:
             if packaged or not package:
@@ -213,13 +416,33 @@ def validate_dart_includes(
             ) from error
 
 
+def pubspec_lines(directory: Path) -> list[str]:
+    pubspec = directory / "pubspec.yaml"
+    return pubspec.read_text().splitlines() if pubspec.is_file() else []
+
+
+def flutter_package(directory: Path) -> bool:
+    return any(line.split() == ["sdk:", "flutter"] for line in pubspec_lines(directory))
+
+
 def flutter_without_test(directory: Path) -> bool:
     """A Flutter project that does not list `test` cannot run its outside-lib tests on the Dart VM."""
-    pubspec = directory / "pubspec.yaml"
-    lines = pubspec.read_text().splitlines() if pubspec.is_file() else []
-    return any(line.split() == ["sdk:", "flutter"] for line in lines) and not any(
-        line.split(":")[0].strip() == "test" for line in lines
+    return flutter_package(directory) and not any(
+        line.split(":")[0].strip() == "test" for line in pubspec_lines(directory)
     )
+
+
+def require_flutter_skill_lints(
+    options: DartOptions, path: Path, package_root: Path | None
+) -> None:
+    if package_root not in (None, path.parent) or not flutter_package(path.parent):
+        return
+    plugins = cast("JsonObject", options).get("plugins")
+    if not isinstance(plugins, dict) or "flutter_skill_lints" not in plugins:
+        raise ValueError(
+            f"A Flutter package needs the flutter_skill_lints plugin, which holds the Flutter rules: add it under `plugins` in {path}, "
+            "as .agents/skills/building-flutter-apps/references/analysis_options.yaml lists it"
+        )
 
 
 def has_dart_file(directory: Path, prefix: str) -> bool:
@@ -235,10 +458,15 @@ def has_dart_file(directory: Path, prefix: str) -> bool:
     )
 
 
+def scans_here(command: list[str]) -> bool:
+    """A `dart-decimate check` of the folder the command runs in; `./` names it as `.` does."""
+    return command[:2] == ["dart-decimate", "check"] and command[2:3] in (["."], ["./"])
+
+
 def validate_dart_boundaries(
     command: list[str], directory: Path, timeout: float
 ) -> None:
-    if command[:3] != ["dart-decimate", "check", "."]:
+    if not scans_here(command):
         return
     from tool_setup import managed_command
 
@@ -289,6 +517,38 @@ def validate_dart_boundaries(
                     f"{directory.name}: the boundary prefix {prefix} in {settings_file} "
                     "matches no .dart file; correct the prefix or remove the rule"
                 )
+    validate_crap_limit(settings, f"{directory.name}: {settings_file}")
+
+
+def validate_crap_limit(settings: "JsonObject", where: str) -> None:
+    from fallow_report import HEALTH_LIMITS
+
+    max_crap = HEALTH_LIMITS["max_crap_threshold"]
+    health = settings.get("health")
+    limit = health.get("max_crap") if isinstance(health, dict) else None
+    if type(limit) is not int or not 1 <= limit <= max_crap:
+        raise ValueError(
+            f'{where}: Dart Decimate must fail the CRAP scores that Fallow fails. Set "health": '
+            f'{{"max_crap": {max_crap}}} in that file: from release 0.0.76 it fails a score equal '
+            "to its limit, so 30 matches the limit that Fallow uses"
+        )
+
+
+def typing_options(
+    path: Path, directory: Path, package_root: Path | None
+) -> DartOptions:
+    """A nested file is judged by its settings merged over the package's own file."""
+    if package_root is None or package_root == directory:
+        return dart_options(path)
+    root_file = package_root / "analysis_options.yaml"
+    merged = nested_options(path, root_file)
+    if merged is None:
+        link = os.path.relpath(root_file, directory)
+        raise ValueError(
+            f"A nested Dart settings file must include the package settings: {path}. "
+            f"Add `include: {link}` to it, or remove the file"
+        )
+    return cast(DartOptions, merged)
 
 
 def validate_dart_typing(
@@ -296,13 +556,13 @@ def validate_dart_typing(
     sources: list[str] | tuple[str, ...],
     package_root: Path | None,
     children: frozenset[str] = frozenset(),
+    copies: frozenset[str] = frozenset(),
 ) -> None:
     from gate_config import JsonObject
-    from project_setup import validate_dart_exclusions
 
     path = directory / "analysis_options.yaml"
-    options = dart_options(path)
-    where = f": {path}" + ("" if package_root in (None, directory) else NESTED_STEP)
+    options = typing_options(path, directory, package_root)
+    where = f": {path}"
     for section, groups in DART_TYPING.items():
         for group, settings in groups.items():
             section_options = cast(JsonObject, options).get(section)
@@ -323,7 +583,161 @@ def validate_dart_typing(
                     f"Dart requires strict {section}.{group} settings{where}"
                 )
     validate_dart_includes(path, package_root or directory, children=children)
+    require_flutter_skill_lints(options, path, package_root)
     for source in {*sources, "test", "tests"}:
         for nested in (directory / source).rglob("analysis_options.yaml"):
-            if nested.parent != directory:
+            if nested.parent != directory and not any(
+                nested.parent.relative_to(directory).is_relative_to(copy)
+                for copy in copies
+            ):
                 validate_dart_typing(nested.parent, (), package_root or directory)
+
+
+JUDGED: dict[tuple[Path, str, tuple[str, ...]], bool] = {}
+JUDGE_LOCKS: dict[tuple[Path, str, tuple[str, ...]], threading.Lock] = {}
+JUDGING = threading.Lock()
+
+
+def judged_in_full(
+    root: Path, source: "Group", groups: "list[Group]", timeout: float
+) -> bool:
+    """Once for each source in a run: whether a group runs every Dart gate that judges a package in full (strict typing, Dart Decimate with the CRAP limit, tests with coverage) and its settings pass them now."""
+    key = (
+        root / source["path"],
+        json.dumps(source, sort_keys=True),
+        tuple(group["path"] for group in groups),
+    )
+    with JUDGING:
+        lock = JUDGE_LOCKS.setdefault(key, threading.Lock())
+    with lock:
+        if key not in JUDGED:
+            JUDGED[key] = judged_once(root, source, groups, timeout)
+    return JUDGED[key]
+
+
+def judged_once(
+    root: Path, source: "Group", groups: "list[Group]", timeout: float
+) -> bool:
+    from gate_config import dart_scan_includes_boundaries
+    from resolved_settings import validate_resolved
+    from tool_setup import managed_command, quick_mode
+
+    checks = source["checks"]
+    scans = [gate for gate in checks if dart_scan_includes_boundaries(gate)]
+    tests = [
+        gate
+        for gate in checks
+        if gate.get("role") == "tests"
+        and gate.get("report", {}).get("type") == "dart-tests"
+        and gate["report"].get("coverage")
+    ]
+    if (
+        source.get("language") != "dart"
+        or not scans
+        or not tests
+        or not any(gate.get("role") == "types" for gate in checks)
+    ):
+        return False
+    directory = root / source["path"]
+    try:
+        validate_dart_typing(
+            directory,
+            source.get("sources", []),
+            None,
+            nested_package_patterns(source, groups),
+        )
+        if not quick_mode():
+            validate_dart_boundaries(
+                managed_command(scans[0]["command"], directory), directory, timeout
+            )
+            validate_resolved(root, [source], timeout, groups, scans[0])
+    except (ValueError, TypeError):
+        return False
+    return True
+
+
+def judged_copies(
+    root: Path, group: "Group", groups: "list[Group]", timeout: float
+) -> frozenset[str]:
+    """The folders below the group's folder, relative to it, that are proven byte copies of a package whose own group judges it in full; a copy that fails any step stays judged in place."""
+    from tool_setup import quick_mode
+
+    directory = root / group["path"]
+    top = repository_top(root)
+    prefix = folder_prefix(directory.resolve().relative_to(top).as_posix())
+    by_folder = {
+        (root / other["path"]).resolve().relative_to(top).as_posix(): other
+        for other in groups
+    }
+    return frozenset(
+        held[len(prefix) :]
+        for held, source in proven_copies(root, directory).items()
+        if source in by_folder
+        and (quick_mode() or same_on_disk(top, held, source))
+        and judged_in_full(root, by_folder[source], groups, timeout)
+    )
+
+
+def typing_scope(
+    root: Path, group: "Group", groups: "list[Group]", timeout: float
+) -> tuple[frozenset[str], frozenset[str]]:
+    """The child package patterns and the judged copies that a group's Dart typing check leaves to other groups."""
+    copies = (
+        judged_copies(root, group, groups, timeout)
+        if group.get("language") == "dart"
+        else frozenset()
+    )
+    return nested_package_patterns(group, groups), copies
+
+
+def package_roots(directory: Path, selectors: list[str], timeout: float) -> list[str]:
+    """The folders of the local pub packages that Dart Decimate finds in a folder, narrowed by the selectors; `.` stands for the folder itself."""
+    from tool_setup import managed_command
+
+    command = ["dart-decimate", "workspaces", ".", "--format", "json"]
+    for selector in selectors:
+        command += ["--workspace", selector]
+    output = subprocess.check_output(
+        managed_command(command, directory),
+        cwd=directory,
+        text=True,
+        timeout=timeout,
+    )
+    return sorted(item["root"] or "." for item in json.loads(output)["workspaces"])
+
+
+def held_by(name: str, copies: frozenset[str]) -> bool:
+    return any(PurePosixPath(name).is_relative_to(copy) for copy in copies)
+
+
+def leave_out_copies(
+    root: Path,
+    command: list[str],
+    group: "Group",
+    groups: "list[Group]",
+    timeout: float,
+) -> list[str]:
+    """Scope a Dart Decimate scan to the package folders that no proven copy holds, so a copy is judged once, at its source. The tool matches a selector against package names too, so it may also pick a package of a copy, which only judges more; a selector that drops a kept folder or picks a package outside the copies fails the gate, because the tool drops what no selector names, in silence."""
+    if not scans_here(command) or "--workspace" in command:
+        return command
+    directory = root / group["path"]
+    copies = judged_copies(root, group, groups, timeout)
+    if not copies:
+        return command
+    kept = [
+        name
+        for name in package_roots(directory, [], timeout)
+        if not held_by(name, copies)
+    ]
+    if not kept:
+        return command
+    picked = package_roots(directory, kept, timeout)
+    inside = [name for name in picked if name not in kept and held_by(name, copies)]
+    if sorted(set(picked) - set(inside)) != sorted(kept):
+        raise ValueError(
+            f"{group['path']}: Dart Decimate does not select exactly the package folders {kept} and the packages of a proven copy, so the scan would drop code that no copy holds or scan more"
+        )
+    return [
+        *command,
+        *(argument for name in kept for argument in ("--workspace", name)),
+    ]

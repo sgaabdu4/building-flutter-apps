@@ -1,6 +1,7 @@
 """Read a project file that a person edits; a syntax error names the file."""
 
 import json
+import re
 import subprocess
 import sys
 import threading
@@ -22,6 +23,8 @@ INSTALL_LOCKS = {
 INSTALL_STEP = "run the project's install to write the file, "
 KINDS = {".toml": "TOML", ".yaml": "YAML", ".yml": "YAML"}
 KEPT: dict[str, dict[tuple[str, ...], object]] = {}
+JSONC = re.compile(r'("(?:\\.|[^"\\])*")|//[^\n]*|/\*.*?\*/', re.DOTALL)
+TRAILING_COMMA = re.compile(r",(\s*[}\]])")
 # A file watcher answers late on a busy Mac; a listing gains nothing from it.
 GIT_LISTING = ("git", "-c", "core.fsmonitor=")
 
@@ -269,3 +272,30 @@ def json_text(
     )
     opening, closing = "{}" if isinstance(value, dict) else "[]"
     return f"{opening}\n{body}\n{indent}{closing}"
+
+
+def biome_formatters(
+    path: Path, seen: set[Path]
+) -> tuple[dict[str, int | str], dict[str, int | str]]:
+    """The formatter and json.formatter options of a Biome file after the local files it extends."""
+    path = path.resolve()
+    if path in seen or not path.is_file():
+        return {}, {}
+    seen.add(path)
+    try:
+        text = JSONC.sub(lambda match: match[1] or "", path.read_text())
+        config = json.loads(TRAILING_COMMA.sub(r"\1", text))
+    except (OSError, ValueError):
+        return {}, {}
+    extends = config.get("extends", [])
+    formatter: dict[str, int | str] = {}
+    own: dict[str, int | str] = {}
+    for name in [extends] if isinstance(extends, str) else extends:
+        if not isinstance(name, str):
+            continue
+        inherited = biome_formatters(path.parent / name, seen)
+        formatter, own = {**formatter, **inherited[0]}, {**own, **inherited[1]}
+    return (
+        {**formatter, **config.get("formatter", {})},
+        {**own, **config.get("json", {}).get("formatter", {})},
+    )

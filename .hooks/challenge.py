@@ -2,7 +2,10 @@
 
 import json
 import os
+import shlex
 import subprocess
+import tempfile
+from contextlib import nullcontext
 from pathlib import Path
 
 from change_size import size_verdict
@@ -38,16 +41,74 @@ HISTORY_BYTES, REVIEW_BYTES, DECLINED_BYTES = 24_000, 8_000, 4_000
 RESETS = ("branch: Created from", "branch: Reset to")
 
 
-def reviewer_for(host: str | None) -> str:
-    """The agent that reviews: the one the running host is not."""
-    claude = os.environ.get("CLAUDECODE") == "1"
-    if host is None and claude != bool(os.environ.get("CODEX_THREAD_ID")):
-        host = "claude" if claude else "codex"
+REVIEWER_ORDER: dict[str, tuple[str, ...]] = {
+    "claude": ("codex", "agy"),
+    "codex": ("claude", "agy"),
+    "agy": ("codex", "claude"),
+}
+
+
+def agy_read_only_paths(root: Path) -> list[Path]:
+    """Concrete repo and Git metadata directories mounted read-only in Antigravity's sandbox."""
+    paths = [root.resolve()]
+    for query in ("--git-common-dir", "--git-dir"):
+        try:
+            directory = Path(
+                git_text(root, "rev-parse", "--path-format=absolute", query)
+            ).resolve()
+        except subprocess.CalledProcessError:
+            continue
+        if not any(directory.is_relative_to(existing) for existing in paths):
+            paths.append(directory)
+    return paths
+
+
+def agy_read_only_settings(root: Path) -> str:
+    return json.dumps(
+        {
+            "agentMode": "default",
+            "toolPermission": "proceed-in-sandbox",
+            "enableTerminalSandbox": True,
+            "permissions": {
+                "deny": [
+                    "write_file(*)",
+                    "mcp(*)",
+                    "read_url(*)",
+                    "execute_url(*)",
+                    "download_url(*)",
+                ],
+                "allow": [f"read_file({path}/)" for path in agy_read_only_paths(root)],
+            },
+        },
+        separators=(",", ":"),
+    )
+
+
+def reviewers_for(host: str | None) -> tuple[str, ...]:
+    """Ordered fallback reviewers: the other agents, never the running host."""
     if host is None:
+        detected = [
+            name
+            for name, active in (
+                ("claude", os.environ.get("CLAUDECODE") == "1"),
+                ("codex", bool(os.environ.get("CODEX_THREAD_ID"))),
+                ("agy", os.environ.get("ANTIGRAVITY_AGENT") == "1"),
+            )
+            if active
+        ]
+        if len(detected) == 1:
+            host = detected[0]
+    if host not in REVIEWER_ORDER:
         raise ValueError(
-            "Cannot tell whether Claude Code or Codex is running; pass --host claude or --host codex"
+            "Cannot tell whether Claude Code, Codex or Antigravity is running; "
+            "pass --host claude, --host codex or --host agy"
         )
-    return "codex" if host == "claude" else "claude"
+    return REVIEWER_ORDER[host]
+
+
+def reviewer_for(host: str | None) -> str:
+    """The primary reviewer for the running host."""
+    return reviewers_for(host)[0]
 
 
 def command(reviewer: str, prompt: str, root: Path) -> list[str]:
@@ -63,6 +124,21 @@ def command(reviewer: str, prompt: str, root: Path) -> list[str]:
             "--cd",
             str(root),
             prompt,
+        ]
+    if reviewer == "agy":
+        repo = root.resolve()
+        location = (
+            f"The repository to inspect read-only is at {repo}. "
+            f"Run git with `git -C {shlex.quote(str(repo))}` and read files under {repo}.\n"
+        )
+        return [
+            "agy",
+            "-p",
+            "--sandbox",
+            "--disable-slash-commands",
+            "--settings",
+            agy_read_only_settings(root),
+            location + prompt,
         ]
     # A Bash(git diff *) rule would also allow --output=<file>; built-in read-only git forms refuse it.
     return [
@@ -87,6 +163,10 @@ def without_host_markers() -> dict[str, str]:
         for name, value in os.environ.items()
         if name != "CLAUDECODE"
         and (name == "CODEX_HOME" or not name.startswith("CODEX_"))
+        and (
+            name == "AGY_CLI_DISABLE_AUTO_UPDATE"
+            or not name.startswith(("ANTIGRAVITY_", "AGY_"))
+        )
     }
 
 
@@ -96,11 +176,9 @@ def git_text(root: Path, *arguments: str) -> str:
     ).stdout.strip()
 
 
-def store(root: Path, revision: str) -> Path:
+def store(root: Path, revision: str, kind: str = "challenge") -> Path:
     return (
-        root
-        / git_text(root, "rev-parse", "--git-path", "hard-eng/challenge")
-        / revision
+        root / git_text(root, "rev-parse", "--git-path", f"hard-eng/{kind}") / revision
     )
 
 
@@ -244,28 +322,36 @@ def review(
             "",
         )
     prompt = prompt_for(root, point, revision)
+    workspace_context = (
+        tempfile.TemporaryDirectory(prefix="hard-eng-challenge-")
+        if reviewer == "agy"
+        else nullcontext(str(root))
+    )
     try:
-        result = run_in_group(
-            command(reviewer, prompt, root),
-            cwd=root,
-            env=without_host_markers(),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=TIMEOUT_SECONDS,
-        )
+        with workspace_context as workspace:
+            result = run_in_group(
+                command(reviewer, prompt, root),
+                cwd=Path(workspace),
+                env=without_host_markers(),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=TIMEOUT_SECONDS,
+            )
     except FileNotFoundError:
         return f"not done: {reviewer} is not installed", ""
     except subprocess.TimeoutExpired:
+        if git_text(root, "rev-parse", "HEAD") != revision:
+            return f"not done: HEAD moved from {revision} during the review", ""
         return f"not done: {reviewer} timed out after {TIMEOUT_SECONDS}s", ""
+    if git_text(root, "rev-parse", "HEAD") != revision:
+        return f"not done: HEAD moved from {revision} during the review", result.stdout
     if result.returncode != 0:
         reason = result.stderr.strip().rpartition("\n")[2] or "no error output"
         return f"not done: {reviewer} exited {result.returncode}: {reason}", ""
     lines = result.stdout.strip().splitlines() or [""]
     if lines[-1].strip() not in VERDICTS:
         return f"not done: {reviewer} gave no exact VERDICT line", result.stdout
-    if git_text(root, "rev-parse", "HEAD") != revision:
-        return f"not done: HEAD moved from {revision} during the review", result.stdout
     return VERDICTS[lines[-1].strip()], result.stdout
 
 
@@ -288,8 +374,20 @@ def covered_point(root: Path, base: str | None) -> tuple[str | None, str | None]
     return start, (point if complete and earlier.get("covers") == point else None)
 
 
+def unavailable(outcome: str, reviewer: str) -> bool:
+    return outcome.startswith(
+        (
+            f"not done: {reviewer} is not installed",
+            f"not done: {reviewer} timed out",
+            f"not done: {reviewer} exited ",
+            f"not done: {reviewer} gave no exact VERDICT line",
+        )
+    )
+
+
 def challenge(root: Path, base: str | None, host: str | None) -> int:
-    reviewer = reviewer_for(host)
+    candidates = reviewers_for(host)
+    reviewer = candidates[0]
     revision = git_text(root, "rev-parse", "HEAD")
     start, covers = covered_point(root, base)
     if base is not None and covers is None:
@@ -298,7 +396,17 @@ def challenge(root: Path, base: str | None, host: str | None) -> int:
             "",
         )
     else:
-        outcome, output = review(root, reviewer, start, revision)
+        reasons: list[str] = []
+        outcome, output = "", ""
+        for candidate in candidates:
+            reviewer = candidate
+            outcome, output = review(root, candidate, start, revision)
+            if not unavailable(outcome, candidate):
+                break
+            reasons.append(outcome.removeprefix("not done: "))
+        else:
+            reviewer = candidates[0]
+            outcome = "not done: " + "; ".join(reasons)
     path = store(root, revision)
     path.parent.mkdir(parents=True, exist_ok=True)
     if outcome.startswith("not done") and path.with_suffix(".json").is_file():

@@ -10,6 +10,7 @@ from collections.abc import Iterator
 from fnmatch import fnmatchcase
 from pathlib import Path
 
+from command_words import PACKAGE_COMMANDS, flagged_built_in
 from coverage_sources import owned_files, source_roots
 from fallow_report import fallow_report_path, validate_scanner_command
 from gate_config import (
@@ -21,13 +22,11 @@ from gate_config import (
     JsonObject,
     Report,
     dart_scan_includes_boundaries,
-    generated_sources,
     repository_files,
-    typescript_packages,
 )
+from generated_marks import generated_sources
 from hook_chain import is_own
 from project_files import (
-    GIT_LISTING,
     INSTALL_LOCKS,
     dependency_free,
     missing_lock_error,
@@ -35,6 +34,7 @@ from project_files import (
     refuse_ignored_locks,
 )
 
+JSON_INDENT = re.compile(r"\n([ \t]+)\"")
 CARET_VERSION = re.compile(r"\^?(\d+)\.(\d+)\.(\d+)")
 REGEX_SPECIAL_CHARACTER = re.compile(r"([.\[\]()*+?{}|^$\\])")
 SHELL_SHEBANG = re.compile(rb"^#![^\n]*\b(?:bash|sh)(?:\s|$)")
@@ -76,75 +76,6 @@ def migrate_dart_plugins(options: JsonObject, source: Path) -> None:
             )
 
 
-def validate_dart_exclusions(
-    directory: Path, values: object, children: frozenset[str] = frozenset()
-) -> None:
-    allowed = {
-        ".dart_tool/**",
-        "**/*.g.dart",
-        "**/*.freezed.dart",
-        "**/*.gr.dart",
-        "**/*.arb",
-    }
-    flutter = (directory / "pubspec.yaml").is_file() and dependency_command(
-        directory, "dart"
-    )[0] == "flutter"
-    native = {"build/**"} if flutter else set()
-    native.update(
-        f"{root}/**"
-        for root in FLUTTER_PLATFORM_ROOTS
-        if flutter and (directory / root).is_dir()
-    )
-    options = directory / "analysis_options.yaml"
-    if not isinstance(values, list):
-        raise TypeError(f"exclude in {options} must be a list of patterns")
-    known = allowed | native | children
-    if not known.issuperset(value for value in values if isinstance(value, str)):
-        from dart_boundaries import localization_exclusions
-
-        known |= localization_exclusions(directory)
-    refused = [
-        value for value in values if not isinstance(value, str) or value not in known
-    ]
-    if refused:
-        raise ValueError(
-            "Dart strict analysis cannot exclude project files: remove "
-            f"{', '.join(repr(value) for value in refused)} from exclude in {options}"
-        )
-    roots = {pattern.split("/", 1)[0] for pattern in set(values) & native}
-    matches = {
-        path
-        for pattern in set(values) - native - children - {".dart_tool/**"}
-        for path in directory.glob(pattern)
-        if path.relative_to(directory).parts[0] not in roots
-    }
-    if roots:
-        listing = [*GIT_LISTING, "ls-files", "-zco", "--exclude-standard", "--"]
-        names = subprocess.check_output(
-            [*listing, *sorted(roots)], cwd=directory, text=True
-        ).split("\0")
-        matches.update(
-            directory / name
-            for name in names
-            if name
-            and (Path(name).suffix == ".dart" or (directory / name).is_symlink())
-        )
-    names = [str(path.relative_to(directory)) for path in matches]
-    generated = generated_sources(directory, names)
-    for path in matches:
-        relative = path.relative_to(directory)
-        if ".dart_tool/**" in values and relative.parts[0] == ".dart_tool":
-            continue
-        if path.is_symlink() or not path.is_file():
-            raise ValueError(f"Dart generated exclusion matches an unsafe path: {path}")
-        if path.suffix != ".dart" or str(relative) in generated:
-            continue
-        with path.open("rb") as source:
-            header = source.read(2048).splitlines()[:10]
-        if b"// GENERATED CODE - DO NOT MODIFY BY HAND" not in header:
-            raise ValueError(f"Dart exclusion matches handwritten source: {path}")
-
-
 def validate_command_output(
     command: list[str], directory: Path, report: Report
 ) -> None:
@@ -160,7 +91,7 @@ def validate_command_output(
         raise ValueError(
             "Verification cannot suppress all Node warnings; repair the warning owner or use a justified narrow native exception"
         )
-    validate_scanner_command(arguments, report)
+    validate_scanner_command(arguments, report, directory)
 
 
 def is_shell_script(path: Path) -> bool:
@@ -258,6 +189,31 @@ def gate_script_arguments(group: Group, gate: Gate, directory: Path) -> list[str
         raise TypeError(f"{group['path']}: gate {gate['name']}: {error}") from error
 
 
+def project_scripts(directory: Path) -> dict[str, object]:
+    """The scripts of the folder's package.json, or none when it has no readable one."""
+    try:
+        scripts = read_project_file(directory / "package.json").get("scripts", {})
+    except (OSError, ValueError, TypeError):
+        return {}
+    return scripts if isinstance(scripts, dict) else {}
+
+
+def script_text(arguments: list[str], directory: Path) -> str:
+    """The script that `<manager> run <name>` runs; a flag in the name place is refused by name."""
+    if arguments[2].startswith("-"):
+        raise ValueError(
+            f"the flag {arguments[2]} after `run` is not allowed: write `{arguments[0]} run <script>` with no flag"
+        )
+    script = (
+        read_project_file(directory / "package.json")
+        .get("scripts", {})
+        .get(arguments[2])
+    )
+    if not isinstance(script, str):
+        raise TypeError(f"package script {arguments[2]} is missing from package.json")
+    return script
+
+
 def package_script_invocation(
     command: list[str], directory: Path, bun_only: bool = False
 ) -> tuple[list[str], Path]:
@@ -277,6 +233,22 @@ def package_script_invocation(
                 raise ValueError(
                     "Use an explicit package directory and run script for verification; package selectors are not supported"
                 )
+            if (
+                len(arguments) > 1
+                and arguments[1].startswith("-")
+                and not flagged_built_in(arguments)
+            ):
+                raise ValueError(
+                    f"the flag {arguments[1].split('=')[0]} before the script name hides the script from the checks: write `{arguments[0]} run <script>` with no flag"
+                )
+        if (
+            executable in {"pnpm", "yarn", "bun"}
+            and len(arguments) > 1
+            and arguments[1] not in PACKAGE_COMMANDS
+            and not arguments[1].startswith("-")
+            and arguments[1] in project_scripts(directory)
+        ):
+            arguments = [arguments[0], "run", *arguments[1:]]
         if (
             executable not in {"npm", "pnpm", "yarn", "bun"}
             or len(arguments) <= 2
@@ -287,12 +259,7 @@ def package_script_invocation(
         if identity in scripts_seen:
             raise ValueError("Recursive package test script")
         scripts_seen.add(identity)
-        package = read_project_file(directory / "package.json")
-        script = package.get("scripts", {}).get(arguments[2])
-        if not isinstance(script, str):
-            raise TypeError(
-                f"package script {arguments[2]} is missing from package.json"
-            )
+        script = script_text(arguments, directory)
         arguments = shlex.split(script) + arguments[3:]
         if not arguments:
             raise ValueError("Configured package test script is empty")
@@ -436,14 +403,13 @@ def dependency_command(directory: Path, language: str) -> tuple[str, list[str], 
 def adapt_packages(root: Path, config: GateConfig) -> None:
     files = repository_files(root)
     owned = owned_files(root, config["packages"], files)
-    typescript = typescript_packages(root, files)
     tracked = {str(path.relative_to(root)) for path in files}
     locks: dict[str, Path] = {}
     for package in config["packages"]:
         directory = root / package["path"]
         adapt_sources(root, package, owned[directory])
         locks[package["path"]] = directory / adapt_package(directory, package)
-        adapt_boundaries(package, typescript)
+        adapt_boundaries(package)
         for gate in package["checks"]:
             if gate.get("role") == "security":
                 gate["command"] = [
@@ -457,7 +423,43 @@ def adapt_packages(root: Path, config: GateConfig) -> None:
     refuse_ignored_locks(root, own, tracked, ask_git=True)
 
 
-def adapt_boundaries(package: Group, typescript: set[str]) -> None:
+OLD_STARTER_SCRIPTS = {
+    "fallow architecture --fail-on-issues",
+    "fallow architecture --boundaries --fail-on-issues",
+}
+GENERATED_BOUNDARY: Gate = {
+    "name": "lint:boundaries",
+    "role": "boundaries",
+    "command": ["bun", "run", "lint:boundaries"],
+}
+
+
+def retire_boundary_gate(root: Path, package: Group, changes: dict[str, str]) -> None:
+    """Remove the `lint:boundaries` gate that Hard Eng added and the starter script it ran, because the combined Fallow scan checks the boundary rules; a script or gate of the project's own stays."""
+    if package.get("language") == "dart" or GENERATED_BOUNDARY not in package["checks"]:
+        return
+    manifest = root / package["path"] / "package.json"
+    scripts = read_project_file(manifest).get("scripts", {})
+    body = scripts.get("lint:boundaries")
+    if body is not None and body not in OLD_STARTER_SCRIPTS:
+        return
+    package["checks"].remove(GENERATED_BOUNDARY)
+    if body is None:
+        return
+    text = manifest.read_text()
+    data = json.loads(text)
+    del data["scripts"]["lint:boundaries"]
+    indent = JSON_INDENT.search(text)
+    separators = None if indent or '": ' in text else (",", ":")
+    changes[str(manifest.relative_to(root))] = json.dumps(
+        data,
+        indent=indent[1] if indent else None,
+        separators=separators,
+        ensure_ascii=False,
+    ) + ("\n" if text.endswith("\n") else "")
+
+
+def adapt_boundaries(package: Group) -> None:
     if package.get("language") == "dart" and any(
         dart_scan_includes_boundaries(gate) for gate in package["checks"]
     ):
@@ -479,21 +481,20 @@ def adapt_boundaries(package: Group, typescript: set[str]) -> None:
             gate for gate in package["checks"] if gate not in generated
         ]
         return
-    required = (
-        str(Path(package["path"])) in typescript or package.get("language") == "dart"
-    )
-    if required and not any(
+    if package.get("language") == "dart" and not any(
         gate.get("role") == "boundaries" for gate in package["checks"]
     ):
         package["checks"].append(
             {
                 "name": "lint:boundaries",
                 "role": "boundaries",
-                "command": (
-                    ["dart-decimate", "check", ".", "--boundary-violations", "--strict"]
-                    if package.get("language") == "dart"
-                    else ["bun", "run", "lint:boundaries"]
-                ),
+                "command": [
+                    "dart-decimate",
+                    "check",
+                    ".",
+                    "--boundary-violations",
+                    "--strict",
+                ],
             }
         )
 
@@ -718,7 +719,7 @@ def adapt_performance(directory: Path, package: Group) -> None:
 
 def strict_scanner_flags(package: Group) -> None:
     """Give an older scanner gate the flags the check now requires of it."""
-    from fallow_report import native_scanner_command, option
+    from fallow_report import add_health, native_scanner_command, option
 
     for gate in package["checks"]:
         invocation = native_scanner_command(gate["command"])
@@ -733,6 +734,7 @@ def strict_scanner_flags(package: Group) -> None:
             required = required if option(invocation, "--gate") else ["--gate", "all"]
         else:
             required = ["--fail-on-issues"]
+            gate["command"] = add_health(gate["command"])
         if required and required[0] not in invocation:
             gate["command"] = [*gate["command"], *required]
 
@@ -989,7 +991,6 @@ def adapt_javascript(directory: Path, package: Group, manager: str) -> None:
         ("test:integration", "integration"),
         ("test:ui", "ui"),
         ("check:generated", "generated"),
-        ("lint:boundaries", "boundaries"),
     ):
         if script in manifest.get("scripts", {}):
             package["checks"].append(

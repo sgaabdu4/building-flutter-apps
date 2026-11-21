@@ -673,9 +673,9 @@ def prepare_update(root: Path, repair: bool = False) -> str:
 
 
 def free_step(root: Path, worktree: Path) -> str:
-    from stale_updates import registered_worktrees
+    from ship_actions import worktrees
 
-    if worktree == Path(registered_worktrees(root)[0]["worktree"]):
+    if worktree == Path(worktrees(root)[0]["worktree"]):
         return f"switch the main checkout to another branch with `git -C {worktree} switch <branch>`"
     return (
         f"free it with `git -C {worktree} switch --detach` or "
@@ -877,21 +877,28 @@ def run_update(root: Path) -> int:
                 process_group=0,
                 pass_fds=(handle.fileno(),),
             )
-        except (OSError, subprocess.SubprocessError) as error:
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
             record_result(root, failed_update(error))
             print(last_result(root))
             return 1
         signal.signal(signal.SIGTERM, interrupt_update)
-        with suppress(subprocess.SubprocessError):
-            try:
-                update.wait()
-            finally:
-                signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        interrupted = False
+        try:
+            update.wait()
+        except subprocess.SubprocessError:
+            interrupted = True
+        finally:
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
         stop_group(update)
         if update.returncode != 0:
             record_result(root, failed_update(f"update exited {update.returncode}"))
-        with suppress(OSError, subprocess.SubprocessError):
+        with suppress(OSError, ValueError, subprocess.SubprocessError):
             remove_stale_candidates(root)
+    if not interrupted and update_blocker(root) is None:
+        from stale_updates import tidy
+
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        tidy(root)
     result = last_result(root)
     print(result)
     return 1 if "Hard Eng update failed" in result else 0

@@ -726,7 +726,7 @@ def project_workflows(root: Path) -> list[Path]:
 def adapt_ci(
     root: Path, source: Path, config: GateConfig, changes: dict[str, str]
 ) -> None:
-    from shards import split_test_shards
+    from shards import add_fallow_report, split_test_shards
 
     name = ".github/workflows/hard-eng.yml"
     workflows = project_workflows(root)
@@ -743,6 +743,10 @@ def adapt_ci(
         )
         migrated = migrate_affected_tools(root, source, config, migrated)
         migrated = migrate_docs_token(migrate_impact_token(migrated))
+        template = source / TEMPLATE
+        migrated = add_fallow_report(
+            template.read_text() if template.is_file() else "", migrated
+        )
         migrated = migrate_swift_runner(
             config, migrate_runner_variable(migrate_launcher(source, migrated))
         )
@@ -862,7 +866,55 @@ def add_workflow_checks(config: GateConfig) -> None:
         )
 
 
-def require_ci_base(base: str | None) -> None:
+def job_repository(root: Path) -> bool:
+    """Whether the check root belongs to the repository that the CI job checked out: the repository of the workspace itself (a package below it included), or a repository inside the workspace whose origin is GITHUB_REPOSITORY (a checkout with `path:`). A repository that a test or the canary creates, and a clone outside the workspace, are other trees."""
+    workspace = os.environ.get("GITHUB_WORKSPACE", "")
+    top = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    if not workspace or not top:
+        return False
+    top_path, base = Path(top).resolve(), Path(workspace).resolve()
+    if top_path == base:
+        return True
+    name = os.environ.get("GITHUB_REPOSITORY", "").lower()
+    origin = (
+        subprocess.run(
+            ["git", "config", "--get", "remote.origin.url"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        .stdout.strip()
+        .lower()
+    )
+    return bool(
+        name
+        and base in top_path.parents
+        and origin.removesuffix(".git").endswith(("/" + name, ":" + name))
+    )
+
+
+def require_ci_base(base: str | None, root: Path) -> None:
+    sha = os.environ.get("GITHUB_SHA", "")
+    if os.environ.get("GITHUB_ACTIONS") == "true" and sha and job_repository(root):
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
+        if head != sha:
+            raise ValueError(
+                f"The checkout is at {head or 'no commit'}, not at GITHUB_SHA {sha}, so the check would judge another tree; "
+                "remove `ref:` from the checkout step and any step that moves HEAD before the check"
+            )
     if (
         os.environ.get("GITHUB_ACTIONS") == "true"
         and os.environ.get("GITHUB_EVENT_NAME")

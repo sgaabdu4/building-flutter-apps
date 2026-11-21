@@ -83,14 +83,14 @@ verify(() => mock.fetchAll()).called(1);
 
 ## ProviderContainer.test
 
-Auto-dispose each test. Sync `Notifier` with deferred `_load` has no `.future` → read the provider, then `await pumpEventQueue()` to drain the load and its awaited repository call; one microtask is not enough.
+Auto-dispose each test. An `AsyncNotifier` that loads in `build()` exposes `.future` → await it so the test waits on the real work.
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('fetches products on init', () async {
+  test('build fetches products', () async {
     final mockRepo = MockIProductRepository();
     when(() => mockRepo.fetchAll()).thenAnswer((_) async => [
       Product(id: ProductId('1'), name: DisplayName('Widget'), price: .usd(9.99)),
@@ -102,10 +102,8 @@ void main() {
       ],
     );
 
-    container.read(productProvider);
-    await pumpEventQueue();
+    final state = await container.read(productProvider.future);
 
-    final state = container.read(productProvider);
     expect(state.items, hasLength(1));
     expect(state.items.first.name.value, 'Widget');
     verify(() => mockRepo.fetchAll()).called(1);
@@ -300,14 +298,13 @@ test('deleteItem removes from state', () async {
     ],
   );
 
-  // Wait for initial load (sync Notifier with deferred load)
-  container.read(productProvider);
-  await pumpEventQueue();
+  // Wait for initial load
+  await container.read(productProvider.future);
 
   // Delete and verify
   await container.read(productProvider.notifier).deleteItem('1');
 
-  final state = container.read(productProvider);
+  final state = container.read(productProvider).requireValue;
   expect(state.items, hasLength(1));
   expect(state.items.first.id.value, '2');
 });
@@ -356,14 +353,13 @@ test('refetches source of truth after remote update event', () async {
     ],
   );
 
-  container.read(productProvider);
-  await pumpEventQueue();
+  await container.read(productProvider.future);
 
   repo.items = [Product(id: ProductId('p1'), name: DisplayName('New'), price: .usd(1))];
   events.emit(const .updated(id: 'p1'));
   await pumpEventQueue();
 
-  expect(container.read(productProvider).items.single.name.value, 'New');
+  expect(container.read(productProvider).requireValue.items.single.name.value, 'New');
 });
 ```
 
@@ -442,8 +438,8 @@ test('auth state transitions', () async {
   final initial = container.read(authProvider);
   expect(initial, isA<AuthLoading>());
 
-  // Wait for session check
-  await pumpEventQueue();
+  // The app's start-up owner calls checkSession() on launch; the test awaits it.
+  await container.read(authProvider.notifier).checkSession();
 
   final state = container.read(authProvider);
   expect(state, isA<Authenticated>());

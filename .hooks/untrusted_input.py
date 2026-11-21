@@ -8,14 +8,8 @@ import sys
 from itertools import takewhile
 from pathlib import Path, PurePosixPath
 
-from gate_config import (
-    JSONC,
-    Group,
-    JsonObject,
-    JsonValue,
-    biome_formatters,
-    json_file,
-)
+from gate_config import Gate, Group, JsonObject, JsonValue, json_file
+from project_files import JSONC, biome_formatters
 
 OPENING_BRACE = re.compile(r"\{(\s*)")
 TRAILING_COMMA = re.compile(r",(\s*[}\]])")
@@ -24,10 +18,87 @@ DECLARATIONS = Path(".hooks/untrusted-input.d.ts")
 CAST_RULE = "--only=nursery/noUnsafeTypeAssertion"
 
 
+LEGACY_BANNED_API = [
+    "--config",
+    'lint.flake8-tidy-imports.banned-api."typing.Any".msg = "Use a precise type instead of Any"',
+    "--config",
+    'lint.flake8-tidy-imports.banned-api."typing_extensions.Any".msg = "Use a precise type instead of Any"',
+]
+
+
+RUFF_VALUE_FLAGS = {"--select", "--config"}
+
+
+def annotation_extras(old: list[str], template: list[str]) -> list[str]:
+    """What a project annotations gate adds to the template gate: a rule, a config line, a flag or a path outside the template's `.` scope."""
+    if old[:2] != ["ruff", "check"] or template[:2] != ["ruff", "check"]:
+        return ["a command that is not `ruff check`"]
+    rules = {
+        code
+        for index, word in enumerate(template)
+        if word == "--select"
+        for code in template[index + 1].split(",")
+    }
+    configs = {
+        template[index + 1] for index, word in enumerate(template) if word == "--config"
+    } | {value for value in LEGACY_BANNED_API if value != "--config"}
+    extras: list[str] = []
+    selected = False
+    words, at = old[2:], 0
+    while at < len(words):
+        name, equals, value = words[at].partition("=")
+        if name in RUFF_VALUE_FLAGS and not equals and at + 1 < len(words):
+            value, at = words[at + 1], at + 1
+        if name == "--select":
+            selected = True
+            extras += [
+                code
+                for code in value.split(",")
+                if not any(code.startswith(r) for r in rules)
+            ]
+        elif name == "--config":
+            extras += [value.split(" = ")[0]] if value not in configs else []
+        elif (
+            name.startswith("-") or Path(name).is_absolute() or ".." in Path(name).parts
+        ):
+            extras.append(name)
+        at += 1
+    return extras if selected else [*extras, "the default rules"]
+
+
+def retire_covered_annotations(package: Group, template: Gate) -> None:
+    """Two annotations gates side by side are two copies of one rule: drop the project's when the template gate covers it, keep it and say what it adds when it does not."""
+    for gate in [
+        g for g in package["checks"] if g.get("role") == "project-annotations"
+    ]:
+        extras = annotation_extras(gate["command"], template["command"])
+        if extras:
+            print(
+                f"Kept the project's annotations gate {gate['name']}: it adds {', '.join(extras)}; the template gate runs beside it.",
+                file=sys.stderr,
+            )
+        else:
+            package["checks"].remove(gate)
+            print(
+                f"Retired the project's annotations gate {gate['name']}: the template gate covers it.",
+                file=sys.stderr,
+            )
+
+
 def strict_typing_rules(package: Group) -> None:
-    """Give an older Biome typing-style gate the rules the template now requires."""
+    """Give an older gate what the template now requires: the Biome cast rule, and one banned-api table in place of two Ruff lines that kept one entry."""
+    from resolved_settings import ANNOTATION_CONFIG
+
+    size = len(LEGACY_BANNED_API)
     for gate in package["checks"]:
         command = gate["command"]
+        for at in range(len(command) - size + 1):
+            if (
+                gate.get("role") == "annotations"
+                and command[at : at + size] == LEGACY_BANNED_API
+            ):
+                command[at : at + size] = ANNOTATION_CONFIG
+                break
         rules = [n for n, value in enumerate(command) if value.startswith("--only=")]
         typing = gate.get("role") == "typing-style" and "biome" in command
         if typing and rules and CAST_RULE not in command:

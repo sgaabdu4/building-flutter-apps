@@ -71,7 +71,7 @@
           "command": [
             "fallow",
             "--only",
-            "dead-code,dupes",
+            "dead-code,dupes,health",
             "--max-file-size",
             "0",
             "--fail-on-issues",

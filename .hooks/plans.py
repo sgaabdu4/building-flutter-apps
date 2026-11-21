@@ -212,8 +212,8 @@ def plan_sections(content: str, *, allow_placeholders: bool = False) -> dict[str
     return sections
 
 
-def usability_rules() -> list[tuple[str, list[str]]]:
-    """The Usability rule names of the UX reference, each with the unit words its Pass line counts."""
+def usability_lines() -> list[str]:
+    """The rule lines of the Usability list in the UX reference, each without its `  - ` marker."""
     reference = Path(__file__).resolve().parents[1] / UX_REFERENCE
     try:
         lines = reference.read_text().splitlines()
@@ -222,11 +222,19 @@ def usability_rules() -> list[tuple[str, list[str]]]:
             f"UX Rules cannot read {UX_REFERENCE}: {error}; restore it with `git checkout HEAD -- {UX_REFERENCE}`"
         ) from error
     start = [n for n, line in enumerate(lines) if line.startswith("- Usability =")]
-    rules = []
+    found: list[str] = []
     for line in lines[start[0] + 1 :] if start else []:
         if not line.startswith("  - "):
             break
-        name, marker, rest = line[4:].partition(" (count: ")
+        found.append(line[4:])
+    return found
+
+
+def usability_rules() -> list[tuple[str, list[str]]]:
+    """The Usability rule names of the UX reference, each with the unit words its Pass line counts."""
+    rules = []
+    for line in usability_lines():
+        name, marker, rest = line.partition(" (count: ")
         if marker:
             units = rest.partition("):")[0].split(", ")
         else:
@@ -348,8 +356,28 @@ def judged_rules(content: str, age: Callable[[], bool] | None) -> None:
             raise
 
 
+def judged_plan_controls(
+    content: str, plan: Path | None, age: Callable[[], bool] | None
+) -> None:
+    """A plain `Controls: None — reason` line needs no part checks, so the Stop path loads no new module for it."""
+    lines = [x for x in content.splitlines() if x.startswith("Controls:")]
+    if (
+        len(lines) == 1
+        and lines[0].startswith("Controls: None — ")
+        and lines[0][17:18].strip()
+    ):
+        return
+    from plan_controls import judged_controls, plan_root
+
+    judged_controls(content, plan and plan_root(plan), age)
+
+
 def ux_proof(
-    content: str, *, legacy: bool = False, age: Callable[[], bool] | None = None
+    content: str,
+    *,
+    legacy: bool = False,
+    age: Callable[[], bool] | None = None,
+    plan: Path | None = None,
 ) -> None:
     if NOT_APPLICABLE_WITH_REASON.fullmatch(content.strip()):
         return
@@ -385,6 +413,7 @@ def ux_proof(
     for name in ("Capture", "Review"):
         evidence_field(content, name)
     if not legacy:
+        judged_plan_controls(content, plan, age)
         judged_rules(content, age)
 
 
@@ -394,6 +423,7 @@ def readiness_errors(
     *,
     legacy: bool = False,
     age: Callable[[], bool] | None = None,
+    plan: Path | None = None,
 ) -> list[str]:
     errors = []
     for name in ("Baseline + execution", "ux_reference"):
@@ -401,7 +431,7 @@ def readiness_errors(
             if name == "Baseline + execution":
                 proof(sections[name], {"Passed"})
             else:
-                ux_proof(sections[name], legacy=legacy, age=age)
+                ux_proof(sections[name], legacy=legacy, age=age, plan=plan)
         except ValueError as error:
             errors.append(f"{name}: {error}")
     from plan_coverage import coverage_errors
@@ -532,6 +562,8 @@ def reasoned(value: str, name: str) -> None:
 
 def claimed_tests(sections: dict[str, str]) -> dict[str, list[tuple[str, str]]]:
     """The `path::test` names of test files in each Same cause and Retro value, by field."""
+    from plan_tests import names_tests
+
     found: dict[str, list[tuple[str, str]]] = {}
     for text in (sections["Repository context"], sections["Verification"]):
         name = ""
@@ -544,7 +576,9 @@ def claimed_tests(sections: dict[str, str]) -> dict[str, list[tuple[str, str]]]:
                 found.setdefault(name, []).extend(
                     (path, test.split("[", 1)[0])
                     for path, test in TEST_REFERENCE.findall(line)
-                    if _is_test(PurePosixPath(path))
+                    if (names_tests if name == "Retro" else _is_test)(
+                        PurePosixPath(path)
+                    )
                 )
     return found
 
@@ -595,7 +629,7 @@ def validate_plan(path: Path, *, changed: bool = True) -> str:
         return asked[0]
 
     soft = age if status == "Complete" else None
-    errors = readiness_errors(sections, status, legacy=legacy, age=soft)
+    errors = readiness_errors(sections, status, legacy=legacy, age=soft, plan=path)
     if errors:
         raise ValueError("; ".join(errors))
     newer_fields(sections, status, legacy=legacy, changed=changed, age=soft)
@@ -644,38 +678,6 @@ def untested_requirements(root: Path, requirements: set[str]) -> list[str]:
     )
 
 
-HASH_COMMENT_SUFFIXES = {".py", ".rb", ".sh", ".bash", ".zsh", ".pl", ".ex", ".exs"}
-
-
-def uncommented(file: Path) -> str:
-    """The file's text without whole-line comments, which cannot define a test."""
-    marker = "#" if file.suffix in HASH_COMMENT_SUFFIXES else "//"
-    return "\n".join(
-        line
-        for line in file.read_text().splitlines()
-        if not line.lstrip().startswith(marker)
-    )
-
-
-def missing_tests(root: Path, references: list[tuple[str, str]]) -> list[str]:
-    missing = []
-    for path, name in references:
-        file = (root / path).resolve()
-        quoted = rf"[\"'`]{re.escape(name)}[\"'`]"
-        definition = {
-            ".py": rf"\bdef\s+{re.escape(name)}\s*\(",
-            ".swift": rf"\bfunc\s+{re.escape(name)}\s*\(|{quoted}",
-        }.get(file.suffix, quoted)
-        if not (
-            file.is_relative_to(root.resolve())
-            and _is_test(PurePosixPath(path))
-            and file.is_file()
-            and re.search(definition, uncommented(file))
-        ):
-            missing.append(f"{path}::{name}")
-    return missing
-
-
 def _validate_shipping(root: Path, path: Path, status: str) -> None:
     content = path.read_text()
     if status in {"Ready", "Complete"} and DELIVERY_TARGET_FIELD.search(content):
@@ -687,6 +689,8 @@ def _validate_shipping(root: Path, path: Path, status: str) -> None:
 
 
 def plan_stage(root: Path, path: Path, changed: set[str]) -> str:
+    from plan_tests import missing_tests
+
     try:
         edited = str(path.relative_to(root)) in changed
         status = validate_plan(path, changed=edited)
@@ -770,6 +774,7 @@ def validate_plans(
         plan_not_needed,
         update_only,
     )
+    from plan_tests import unchanged_plan_test_problem
 
     explicit_stage = stage is not None
     typed = base is None
@@ -789,6 +794,9 @@ def validate_plans(
         print("Plan: only files the verified Hard Eng update wrote; no plan needed.")
         return stage
     changed, paths, applicable = judged_plans(root, base, changed)
+    unchanged_plan_test_problem(
+        root, paths, [p for p in paths if str(p.relative_to(root)) in changed], changed
+    )
     asks_size = bool(changed) and not any(
         str(path.relative_to(root)) in changed for path in paths
     )

@@ -3,7 +3,7 @@
 import re
 from pathlib import Path, PurePosixPath
 
-from gate_config import generated_sources
+from generated_marks import generated_sources
 from plans import _is_test as is_test_path
 
 UNOWNED = (".hooks/", ".agents/", ".claude/")

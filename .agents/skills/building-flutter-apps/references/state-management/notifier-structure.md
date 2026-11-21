@@ -46,12 +46,9 @@ CounterState build() {
 ```
 
 ```dart
-// RIGHT: direct seed, then defer the load past build().
+// RIGHT: a sync build() only seeds. State that loads belongs in AsyncNotifier.build(), below.
 @override
-CounterState build() {
-  unawaited(.microtask(_load));
-  return const CounterState(isLoading: true);
-}
+CounterState build() => const CounterState();
 ```
 
 ## AsyncNotifier
@@ -69,13 +66,13 @@ class ProfileNotifier extends _$ProfileNotifier {
 }
 ```
 
-For app state with explicit flags, keep a Freezed state object behind a sync notifier: seed state in `build()` and defer the first load with `unawaited(.microtask(_load))` (the `avoid_sync_notifier_state_read` fix). Exception: pause-sensitive startup starts from its durable owner after the watch/listen path exists, through an idempotent `load()` ([pause boundaries](../state-management-lifecycle.md#pause-projection-and-mode-boundaries)). Do not rely on `Future.microtask` ordering there to beat route pause or listener attachment.
+State that must load as soon as a screen reads it goes in `AsyncNotifier.build()`. The first read or watch starts the load, so no screen code starts it. This is the fix for `avoid_sync_notifier_state_read`, which refuses load calls inside a sync `build()`. Keep a Freezed state object with explicit flags inside the `AsyncValue` when the UI needs them, such as `isLoadingMore`. Later work, such as the next page, a refresh or a retry, starts from the event that causes it: scroll, pull to refresh or a button. Never call `ref.read` in `initState` to start a load. Never delay a load with a frame callback or a zero-delay wait ([the forms](../flutter-optimizations.md#start-work-at-its-trigger)). Exception: pause-sensitive startup starts from its durable owner after the watch/listen path exists, through an idempotent `load()` ([pause boundaries](../state-management-lifecycle.md#pause-projection-and-mode-boundaries)). Do not rely on `Future.microtask` ordering there to beat route pause or listener attachment: it is one of the refused forms.
 
 ## Loading and progress
 
 Keep initial loading, background refresh, and load-more state distinct:
 
-- `isLoading`: first load only.
+- `isLoading`: on a sync state, work that an event starts. A first load that starts in `AsyncNotifier.build()` uses the `AsyncValue` loading state instead.
 - `isRefreshing`: already-rendered data is being refreshed.
 - `isLoadingMore`: paginated append.
 - `progress`: long-running visible operation with bounded UI updates.

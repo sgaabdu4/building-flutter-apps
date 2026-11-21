@@ -51,16 +51,13 @@
           "command": [
             "ruff",
             "check",
-            "src",
-            "tests",
+            ".",
             "--select",
             "ANN,TID251,RUF017,ASYNC210",
             "--config",
             "lint.flake8-annotations.ignore-fully-untyped = false",
             "--config",
-            "lint.flake8-tidy-imports.banned-api.\"typing.Any\".msg = \"Use a precise type instead of Any\"",
-            "--config",
-            "lint.flake8-tidy-imports.banned-api.\"typing_extensions.Any\".msg = \"Use a precise type instead of Any\""
+            "lint.flake8-tidy-imports.banned-api = {\"typing.Any\" = {msg = \"Use a precise type instead of Any\"}, \"typing_extensions.Any\" = {msg = \"Use a precise type instead of Any\"}}"
           ]
         },
         {

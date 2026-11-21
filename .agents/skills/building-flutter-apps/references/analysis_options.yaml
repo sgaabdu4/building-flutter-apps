@@ -2,7 +2,7 @@ include: package:flutter_lints/flutter.yaml
 
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.13.4
+  flutter_skill_lints: ^0.14.0
 
 analyzer:
   exclude:
@@ -10,6 +10,7 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.freezed.dart"
     - "**/*.gr.dart"
+    - "lib/l10n/app_localizations.dart"
     - "**/*.arb"
   language:
     strict-inference: true

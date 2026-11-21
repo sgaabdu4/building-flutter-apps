@@ -11,7 +11,8 @@
 The compatibility fixture requires Dart `>=3.13.0 <4.0.0` and Flutter
 `>=3.47.0`. It solves this application and generator family together:
 
-This is a tested floor, not a floating "latest" policy. Projects below it must
+The fixture passes on Flutter 3.47.9 (the newest 3.47 patch) and on Flutter
+3.50.0; the floor is 3.47.0. This is a tested floor, not a floating "latest" policy. Projects below it must
 upgrade their SDK constraint, CI image, and local toolchain together; do not add
 legacy branches. Re-run the compatibility fixture before raising the floor.
 
@@ -23,15 +24,35 @@ legacy branches. Re-run the compatibility fixture before raising the floor.
 | `freezed_annotation`  |    `3.1.0` | Immutable models                |
 | `freezed`             |    `4.0.2` | Immutable-model generation      |
 | `json_annotation`     |  `^4.12.0` | JSON annotations                |
-| `json_serializable`   |   `6.14.1` | JSON generation                 |
+| `json_serializable`   |   `6.15.2` | JSON generation                 |
 | `go_router`           |  `^18.0.1` | Routing                         |
-| `go_router_builder`   |    `4.5.0` | Typed-route generation          |
+| `go_router_builder`   |    `4.5.3` | Typed-route generation          |
 | `hive_ce`             |  `^2.20.0` | Local persistence               |
 | `hive_ce_flutter`     |   `^2.3.4` | Flutter persistence integration |
 | `hive_ce_generator`   |   `1.11.3` | Hive adapter generation         |
 | `build_runner`        |   `2.16.1` | Build orchestration             |
 | `analyzer`            |   `14.4.0` | Analyzer                        |
+| `material_ui`         |  `^1.11.0` | Material widgets                |
+| `intl`                |  `^0.20.3` | Localization formatting         |
 | `flutter_lints`       |    `6.0.0` | Base Flutter lints              |
+
+## Material library
+
+One rule for every supported Flutter version (3.47.0 and later): import
+`package:material_ui/material_ui.dart` and never `package:flutter/material.dart`.
+
+- Why: every `go_router` 18.x depends on `material_ui` and detects a Material app
+  with `material_ui`'s own `MaterialApp`. An app built with `flutter/material.dart`
+  gets `NoTransitionPage` pages and the plain error screen, on 3.47.9 and 3.50.0
+  alike. The fixture proves `MaterialPage` for a `MaterialApp.router` app.
+- Migrate: add the package (`flutter pub add material_ui`), then run
+  `dart fix --apply --code=migrate_design_widgets`. It works on 3.47.9. By hand,
+  change each `import 'package:flutter/material.dart';` to
+  `import 'package:material_ui/material_ui.dart';`.
+- Localization delegates come from `material_ui`:
+  `...GlobalMaterialLocalizations.delegates` (see localization.md).
+- Never import both libraries in one app. Mixing them needs the deprecated
+  `MaterialUiCompatibilityBridge`.
 
 ## Analyzer plugins
 
@@ -42,10 +63,10 @@ Flutter/Riverpod packages use both plugins in the root
 ```yaml
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.13.4
+  flutter_skill_lints: ^0.14.0
 ```
 
-`flutter_skill_lints ^0.13.4` is built against analyzer `^14.4.0`,
+`flutter_skill_lints ^0.14.0` is built against analyzer `^14.4.0`,
 `analyzer_plugin ^0.14.17`, and `analysis_server_plugin ^0.3.23`.
 `riverpod_lint ^3.1.9` shares the analyzer-plugin configuration above.
 
@@ -55,12 +76,13 @@ these Flutter/Riverpod plugins.
 ## Compatibility proof
 
 `tool/run_compatibility_fixture.py` resolves the application family, generates
-Riverpod, Freezed, Hive, JSON, and typed-route code, confirms analyzer
-`14.4.0`, then runs the analyzer with both plugins. Its deliberate probe
-requires a `flutter_skill_lints` `avoid_null_bang` diagnostic and a
+Riverpod, Freezed, Hive, JSON, typed-route, and gen-l10n code, confirms
+analyzer `14.4.0`, then runs `dart analyze --fatal-infos` with both plugins.
+Its deliberate probe requires a `flutter_skill_lints` `avoid_null_bang` diagnostic and a
 `riverpod_lint` `missing_provider_scope` diagnostic while rejecting
 `server.pluginError`. It removes the probe before the Flutter test and web
-build.
+build. Hard Eng's check of the analyzer exclusions must accept the options and refuse the old`app_localizations*.dart` glob. The Flutter test asserts that `go_router` builds a `MaterialPage` under
+`MaterialApp.router` and that the generated localizations load.
 
 The fixture uses the top-level hosted plugin configuration without a local path
 or dependency override. Its analyzer probe proves that both plugins load and

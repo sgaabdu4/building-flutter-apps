@@ -8,7 +8,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from gate_config import Gate, Group, JsonObject, Report, generated_sources
+from fallow_flags import SHORT_VALUE_FLAGS, SUBCOMMANDS, VALUE_FLAGS
+from gate_config import Gate, Group, JsonObject, Report
+from generated_marks import generated_sources
 from project_files import GIT_LISTING
 
 
@@ -108,6 +110,13 @@ def _chain_commands(commands: list[list[str]]) -> list[str]:
     ]
 
 
+HEALTH_LIMITS = {
+    "max_cyclomatic_threshold": 20,
+    "max_cognitive_threshold": 15,
+    "max_crap_threshold": 30,
+    "max_unit_size_threshold": 60,
+}
+ANALYSIS_COMMANDS = {"dead-code", "dupes", "flags", "security", "similar-code"}
 SCANNERS = {"fallow", "dart-decimate", "react-doctor"}
 TOLERANCE_FLAGS = {
     "--baseline",
@@ -138,21 +147,153 @@ def native_fallow_command(arguments: list[str]) -> list[str] | None:
     return invocation if invocation and invocation[0] == "fallow" else None
 
 
+def split_option(argument: str) -> tuple[str, str | None]:
+    """The flag of an argument and the value attached to it, as Fallow reads `--flag=value`, `-fVALUE` and `-f=VALUE`."""
+    if argument.startswith("--"):
+        flag, equals, value = argument.partition("=")
+        return flag, value if equals else None
+    if len(argument) > 2 and argument[:2] in SHORT_VALUE_FLAGS:
+        return argument[:2], argument[2:].removeprefix("=")
+    return argument, None
+
+
 def option(invocation: list[str], flag: str) -> str | None:
     for index, argument in enumerate(invocation):
-        key, separator, value = argument.partition("=")
+        key, value = split_option(argument)
         if key == flag:
-            return value if separator else next(iter(invocation[index + 1 :]), "")
+            return (
+                value if value is not None else next(iter(invocation[index + 1 :]), "")
+            )
     return None
 
 
+def reads_coverage(command: list[str]) -> bool:
+    only = option(native_scanner_command(command) or [], "--only")
+    return command[:2] == ["bun", "run"] or only is None or "health" in only.split(",")
+
+
+def add_health(command: list[str]) -> list[str]:
+    """A Fallow scan that names its analyses gets the health analysis too."""
+    for index, part in enumerate(command):
+        key, equals, value = part.partition("=")
+        if key != "--only" or "health" in value.split(","):
+            continue
+        if equals:
+            return [*command[:index], f"{part},health", *command[index + 1 :]]
+        following = command[index + 1 : index + 2]
+        if following and "health" not in following[0].split(","):
+            return [
+                *command[: index + 1],
+                f"{following[0]},health",
+                *command[index + 2 :],
+            ]
+    return command
+
+
+def positionals(invocation: list[str]) -> list[str]:
+    """The words after the global options of a Fallow command."""
+    words: list[str] = []
+    skip = False
+    for argument in invocation[1:]:
+        if skip:
+            skip = False
+        elif argument.startswith("-"):
+            flag, value = split_option(argument)
+            skip = value is None and flag in VALUE_FLAGS
+        else:
+            words.append(argument)
+    return words
+
+
+def subcommand(invocation: list[str]) -> str | None:
+    """The first word after the global options of a Fallow command."""
+    return next(iter(positionals(invocation)), None)
+
+
+def narrowing(invocation: list[str]) -> list[str]:
+    """Words and flags that cut files out of a scan; an audit with a base judges only the changed files."""
+    words = positionals(invocation)
+    found = words[1:] if words[:1] and words[0] in SUBCOMMANDS else words
+    flags = {
+        "-w",
+        "--workspace",
+        "-r",
+        "--root",
+        "--changed-since",
+        "--base",
+        "--changed-workspaces",
+    }
+    return [*found, *(a for a in invocation if split_option(a)[0] in flags)]
+
+
+def named_config(invocation: list[str]) -> str | None:
+    return option(invocation, "--config") or option(invocation, "-c")
+
+
+FALLOW_VALUES = {
+    "--only",
+    "--format",
+    "-f",
+    "--output-file",
+    "--config",
+    "-c",
+    "--max-file-size",
+    "--max-crap",
+    "--gate",
+    "--coverage",
+}
+FALLOW_SWITCHES = {"--fail-on-issues", "--quiet", "-q", "--no-cache"}
+
+
+def unlisted_fallow(invocation: list[str]) -> list[str]:
+    """Each flag of a Fallow gate that no pass form lists, and a `--max-file-size` other than 0."""
+    found = []
+    skip = False
+    for argument in invocation[1:]:
+        if skip:
+            skip = False
+        elif argument.startswith("-"):
+            flag, value = split_option(argument)
+            if flag in FALLOW_VALUES:
+                skip = value is None
+            elif flag not in FALLOW_SWITCHES:
+                found.append(argument)
+    if option(invocation, "--max-file-size") not in (None, "0"):
+        found.append("--max-file-size other than 0")
+    return found
+
+
 def fallow_failure(invocation: list[str], report: Report) -> str | None:
+    known = fallow_known_failure(invocation, report)
+    if known or not (left := unlisted_fallow(invocation)):
+        return known
+    return (
+        "HE-NO-SWITCH-OFF: A Fallow gate may use only the listed flags (--only, --format, --output-file, "
+        "--config, --max-file-size 0, --max-crap, --gate, --coverage, --fail-on-issues, --quiet, --no-cache); remove "
+        + ", ".join(left)
+    )
+
+
+def fallow_known_failure(invocation: list[str], report: Report) -> str | None:
     crap = option(invocation, "--max-crap")
     if crap is not None and (not math.isfinite(float(crap)) or float(crap) <= 0):
         return "Fallow CRAP enforcement cannot be disabled; repair its coverage input"
+    if left := narrowing(invocation):
+        return (
+            "Fallow scans must cover the whole project; remove "
+            + ", ".join(left)
+            + " from the gate command; to scan one package, give it its own gate group in that package's folder; a gate that only checks boundary rules is not needed, so delete this gate and its package script, because the combined scan already checks them"
+        )
     if "audit" not in invocation:
         if "--fail-on-issues" not in invocation:
             return "Fallow scans must fail on every finding; add --fail-on-issues"
+        only = option(invocation, "--only")
+        if (word := subcommand(invocation)) in ANALYSIS_COMMANDS:
+            return f"Fallow scans must check health, so complex and untested code fails; drop the {word} subcommand to run the combined scan; a gate that only checks boundary rules is not needed, so delete this gate and its package script, because the combined scan already checks them"
+        if only is not None and "health" not in only.split(","):
+            return "Fallow scans must check health, so complex and untested code fails; add health to --only"
+        if "health" in (option(invocation, "--skip") or "").split(","):
+            return "Fallow scans must check health, so complex and untested code fails; remove health from --skip"
         return None
     if report.get("type") != "fallow":
         return "Fallow audit gates require a native fallow report; exit status alone cannot prove enabled metrics"
@@ -177,7 +318,9 @@ def scanner_failure(invocation: list[str], report: Report) -> str | None:
     return None
 
 
-def validate_scanner_command(arguments: list[str], report: Report) -> None:
+def validate_scanner_command(
+    arguments: list[str], report: Report, directory: Path | None = None
+) -> None:
     """Every finding fails; none may be baselined, tolerated or suppressed."""
     invocation = native_scanner_command(arguments)
     if invocation is None:
@@ -190,6 +333,15 @@ def validate_scanner_command(arguments: list[str], report: Report) -> None:
     failure = scanner_failure(invocation, report)
     if failure is not None:
         raise ValueError(failure)
+    path = named_config(invocation) if invocation[0] == "fallow" else None
+    if path and directory is not None:
+        from fallow_settings import named_config_hits
+
+        if hits := named_config_hits(directory, path):
+            raise ValueError(
+                "HE-NO-SWITCH-OFF: A Fallow gate must not name a config that raises a limit or skips files: "
+                + "; ".join(hits)
+            )
 
 
 def fallow_report_path(arguments: list[str]) -> str | None:
@@ -211,7 +363,16 @@ def fallow_report_path(arguments: list[str]) -> str | None:
 def validate_fallow_audit(report: JsonObject) -> None:
     if report["command"] != "audit" or report["verdict"] != "pass":
         raise ValueError("Fallow requires a passing native audit")
-    complexity = report["complexity"]
+    validate_complexity(report["complexity"])
+
+
+def validate_health(report: JsonObject) -> None:
+    if "health" not in report:
+        return
+    validate_complexity(report["health"])
+
+
+def validate_complexity(complexity: object) -> None:
     if not isinstance(complexity, dict) or complexity["findings"] != []:
         raise ValueError("Fallow audit reports missing complexity analysis or findings")
     summary = complexity["summary"]
@@ -225,6 +386,16 @@ def validate_fallow_audit(report: JsonObject) -> None:
         or threshold <= 0
     ):
         raise ValueError("Fallow CRAP enforcement is disabled or invalid")
+    for key, limit in HEALTH_LIMITS.items():
+        value = summary[key]
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or value > limit
+        ):
+            raise ValueError(
+                f"Fallow {key} is above {limit}; remove the raised health limit from the Fallow settings"
+            )
     for key in (
         "functions_above_threshold",
         "severity_critical_count",
@@ -411,6 +582,8 @@ def installed_above(directory: Path | None) -> bool:
 
 def optional_notes(directory: Path | None) -> set[str]:
     notes = {"boundaries-not-configured", "rule-packs-not-configured"}
+    notes |= {"coverage-auto-detected", "shallow-clone"}
+    notes |= {"change-coupling-skipped", "hotspots-skipped"}
     return notes | {"node-modules-missing"} if installed_above(directory) else notes
 
 
@@ -426,13 +599,16 @@ def validate_fallow(
             return
         if audit:
             validate_fallow_audit(report)
+            dead_code = dict(report["dead_code"])
             report = {
                 **report,
                 "kind": "combined",
-                "check": report["dead_code"],
+                "check": dead_code,
                 "dupes": report["duplication"],
+                "workspace_diagnostics": dead_code.pop("workspace_diagnostics", []),
             }
         check, dupes = report["check"], report["dupes"]
+        validate_health(report)
         stats = dupes["stats"]
         counts = [check["total_issues"], check["summary"]["total_issues"]]
         counts += [stats["clone_groups"], stats["duplication_percentage"]]
@@ -477,6 +653,11 @@ def own_place(item: JsonObject) -> tuple[str, str] | None:
     """Where a finding without a path of its own sits, and what names it."""
     if "path" in item:
         return located(item["path"], item.get("line")), ""
+    if "from_path" in item:
+        through = f" via {item['via_path']}" if item.get("via_path") else ""
+        return located(item["from_path"], item.get("line")), (
+            f"{item.get('to_path', '')}{through}"
+        )
     for key in ("imported_from", "used_in"):
         sites = item.get(key)
         if isinstance(sites, list) and sites and isinstance(sites[0], dict):
@@ -487,13 +668,33 @@ def own_place(item: JsonObject) -> tuple[str, str] | None:
     return None
 
 
+def complexity_line(item: JsonObject) -> str:
+    """One function over a complexity or CRAP limit, with the numbers that Fallow measured."""
+    numbers = ", ".join(
+        f"{key} {item[key]}"
+        for key in (
+            "cyclomatic",
+            "cognitive",
+            "crap",
+            "coverage_pct",
+            "coverage_source",
+            "coverage_tier",
+        )
+        if key in item
+    )
+    return (
+        f"{located(item.get('path'), item.get('line'))} complexity {item.get('name', '')} "
+        f"(exceeded {item.get('exceeded', 'a limit')}; {numbers})"
+    )
+
+
 def finding_lines(path: Path, directory: Path | None = None) -> list[str]:
     try:
         report = json.loads(path.read_text())
         set_aside_generated_clones(report, directory)
         audit = report.get("kind") == "audit"
         found: list[str] = []
-        for kind, items in report["dead_code" if audit else "check"].items():
+        for kind, items in report.get("dead_code" if audit else "check", {}).items():
             if not isinstance(items, list) or kind == "workspace_diagnostics":
                 continue
             for item in items:
@@ -512,6 +713,10 @@ def finding_lines(path: Path, directory: Path | None = None) -> list[str]:
                 for copy in group["instances"]
             ]
             found.append("copied code " + " ".join(copies))
+        health = report if report.get("kind") == "health" else None
+        health = health or report.get("complexity" if audit else "health")
+        items = health.get("findings") if isinstance(health, dict) else None
+        found += [complexity_line(i) for i in items or [] if isinstance(i, dict)]
         return found
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return []

@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 from comments import is_test_path
 from flutter_screens import screen_files
-from gate_config import generated_sources
+from generated_marks import generated_sources
 from project_files import GIT_LISTING
 from text_readers import Block, FileBlocks, read
 

@@ -25,6 +25,8 @@ RUNNING: set[int] = set()
 STOPPED = threading.Event()
 STOP_SIGNAL: list[int] = []
 STARTING = threading.Lock()
+MAIN_STARTING = threading.Event()
+DEFERRED_STOP = threading.Event()
 INSTALLS: dict[str, bool] = {}
 INSTALLED_FILE = "hard-eng-installed"
 PASSED_FILE = "hard-eng-passed"
@@ -54,17 +56,26 @@ def run_in_group(
         with STARTING:
             if STOPPED.is_set():
                 raise KeyboardInterrupt
-            process = subprocess.Popen(
-                command,
-                cwd=cwd,
-                env=env,
-                stdin=stdin,
-                stdout=stdout,
-                stderr=stderr,
-                text=True,
-                start_new_session=True,
-            )
-            RUNNING.add(process.pid)
+            main = threading.current_thread() is threading.main_thread()
+            if main:
+                DEFERRED_STOP.clear()
+                MAIN_STARTING.set()
+            try:
+                process = subprocess.Popen(
+                    command,
+                    cwd=cwd,
+                    env=env,
+                    stdin=stdin,
+                    stdout=stdout,
+                    stderr=stderr,
+                    text=True,
+                    start_new_session=True,
+                )
+                RUNNING.add(process.pid)
+            finally:
+                MAIN_STARTING.clear()
+                if DEFERRED_STOP.is_set():
+                    raise SystemExit(128 + STOP_SIGNAL[0])
         out, err = process.communicate(timeout=timeout)
     except BaseException:
         if process is not None:
@@ -83,6 +94,9 @@ def exit_when_stopped() -> None:
 
     def stop(number: int, _frame: object) -> None:
         STOP_SIGNAL[:] = [number]
+        if MAIN_STARTING.is_set():
+            DEFERRED_STOP.set()
+            return
         raise SystemExit(128 + number)
 
     for number in (signal.SIGTERM, signal.SIGHUP):
@@ -101,8 +115,8 @@ def stop_groups() -> None:
 
 
 def stopped_note(code: int) -> str:
-    """The text for a gate that ended because the check was stopped."""
-    if code == 0 or not STOPPED.is_set():
+    """The text for a gate that the stop killed; a gate that exited by itself keeps its own result."""
+    if code >= 0 or not STOPPED.is_set():
         return ""
     cause = f" by {signal.Signals(STOP_SIGNAL[0]).name}" if STOP_SIGNAL else ""
     return f"\nThe check was stopped{cause}, so this gate was ended before it finished."

@@ -88,7 +88,8 @@ Future<void> remove(String id) => _remote.remove(id);
 ```
 
 ```dart
-// Notifier — MUST catch here. Translate to typed AppError; never store raw String.
+// ProductListNotifier: its state holds its own error.
+// MUST catch here. Translate to typed AppError; never store raw String.
 Future<void> _load() async {
   try {
     final items = await ref.read(productRepositoryProvider).fetchAll();
@@ -97,7 +98,7 @@ Future<void> _load() async {
   } on Exception catch (e, s) {
     if (!ref.mounted) return;
     state = state.copyWith(error: AppErrorMapper.from(e));
-    Crash.error(e, s, reason: 'ProductNotifier._load');
+    Crash.error(e, s, reason: 'ProductListNotifier._load');
   }
 }
 ```
@@ -140,17 +141,17 @@ Use in notifier state, pattern-match in UI:
 ```dart
 // State holds typed error instead of raw string
 @freezed
-sealed class ProductState with _$ProductState {
-  const factory ProductState({
+sealed class ProductListState with _$ProductListState {
+  const factory ProductListState({
     @Default([]) List<Product> items,
     @Default(false) bool isLoading,
     AppError? error,
-  }) = _ProductState;
+  }) = _ProductListState;
 }
 
 // UI pattern-matches for user-friendly display
 if (state.error case NetworkError(:final message))
-  ErrorBanner(message: message, onRetry: () => unawaited(ref.read(productProvider.notifier).refresh()))
+  ErrorBanner(message: message, onRetry: () => unawaited(ref.read(productListProvider.notifier).refresh()))
 else if (state.error case NotFoundError(:final resource))
   Text(l10n.resourceNotFound(resource))
 ```

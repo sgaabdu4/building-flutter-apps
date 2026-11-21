@@ -1,7 +1,9 @@
 """Guard the mutations following verified PR delivery."""
 
+import json
 import os
 import plistlib
+import posixpath
 import re
 import shutil
 import signal
@@ -11,18 +13,20 @@ import tempfile
 import time
 from collections.abc import Callable, Generator, Iterator
 from contextlib import contextmanager, suppress
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from xml.parsers.expat import ExpatError
 
 from challenge import shipping_note
 from gate_config import Group
 from process_group import (
+    STOP_SIGNAL,
     exit_when_stopped,
     passed_minutes,
     passed_note,
     policy_at,
     report_gate_edits,
 )
+from ship_record import SETTING_NAMES
 from shipping import (
     PendingCheck,
     Shipment,
@@ -78,14 +82,13 @@ def _stale_rebase_report(root: Path, repository: str, base: str, head: str) -> b
     )
 
 
-def rebase_problem(root: Path, repository: str, base: str, head: str) -> str:
+def rebase_problem(root: Path, repository: str, base: str, head: str) -> str | None:
+    """Why a PR GitHub cannot rebase is refused; None when the repository allows another method."""
     try:
-        allowed = merge_settings(root, repository, ("rebaseMergeAllowed",)).get(
-            "rebaseMergeAllowed"
-        )
+        allowed = merge_settings(root, repository, SETTING_NAMES)
     except ShippingError:
         return rebase_step(base)
-    if allowed is not False:
+    if allowed.get("rebaseMergeAllowed") is not False:
         if _stale_rebase_report(root, repository, base, head):
             return (
                 f"GitHub reports that it cannot rebase this PR onto {base}, but the "
@@ -95,6 +98,8 @@ def rebase_problem(root: Path, repository: str, base: str, head: str) -> str:
                 "it, cut its commits (HE-PR-COMMITS)."
             )
         return rebase_step(base)
+    if any(allowed.get(name) is True for name in SETTING_NAMES[1:]):
+        return None
     return (
         "This repository does not allow rebase merges, and Hard Eng merges by "
         "rebase only, so nothing was merged. Allow rebase merges in the "
@@ -118,6 +123,27 @@ def remote_base(root: Path, branch: str | None) -> str | None:
     revision = advertised[0]
     git(root, "fetch", "--no-tags", "--no-write-fetch-head", "origin", revision)
     return revision
+
+
+def stop_number(code: int) -> int | None:
+    """The signal that ended a check, from its exit code or its wait status."""
+    return next(
+        (
+            int(number)
+            for number in (signal.SIGTERM, signal.SIGHUP)
+            if code in {128 + number, -number}
+        ),
+        None,
+    )
+
+
+def stopped_line(number: int) -> str:
+    return (
+        f"Hard Eng: the pre-push check was stopped by {signal.Signals(number).name} "
+        "before it finished. The stop is not a fault in the project, and neither is "
+        "a gate that the stop ended. Fix any other failure printed above, then run "
+        "the push again."
+    )
 
 
 def run_hard_eng(
@@ -170,20 +196,136 @@ def local_files(root: Path) -> Iterator[tuple[str, bool]]:
     )
     for name in filter(None, ignored.split("\0")):
         source = root / name
-        if (
-            Path(name).name.startswith(".env") and source.is_file()
-        ) or name in LOCAL_FILES:
+        if name in LOCAL_FILES or (
+            (Path(name).name.startswith(".env") or name.endswith(".dart"))
+            and source.is_file()
+        ):
             yield name, False
         elif source.resolve() == hooks.resolve():
             # Git ignores files inside a linked folder, not the link; Husky's folder holds only shims.
             yield name, True
 
 
+DIRECTIVE = re.compile(r"^[ \t]*(?:import|export|part)\s+([^;]*);", re.MULTILINE)
+QUOTED = re.compile(r"""['"]([^'"]+)['"]""")
+PACKAGE_NAME = re.compile(r"""^name:\s*["']?([^\s"']+)""", re.MULTILINE)
+
+
+type LocalizationOutput = tuple[PurePosixPath | None, str] | None
+
+
+def written_by_generator(
+    checkout: Path, name: str, mains: dict[Path, LocalizationOutput]
+) -> bool:
+    """A file that a tool of the project writes again; a link would let that tool write into the main checkout. `mains` holds each package's main gen-l10n file, read once."""
+    path = PurePosixPath(name)
+    if path.name.count(".") > 1:
+        return True
+    for folder in path.parents:
+        package = checkout / folder
+        if (package / "l10n.yaml").is_file():
+            if package not in mains:
+                mains[package] = main_localization_file(package)
+            main = mains[package]
+            if main is None:
+                return False
+            output, file = main
+            relative = path.relative_to(folder)
+            stem, _, extension = file.partition(".")
+            # gen-l10n writes `<stem>_<language>.<extension>` only for each bare language code.
+            return output in (None, relative.parent) and (
+                relative.name == file
+                or re.fullmatch(
+                    rf"{re.escape(stem)}_[a-z]{{2,3}}\.{re.escape(extension)}",
+                    relative.name,
+                )
+                is not None
+            )
+    return False
+
+
+def main_localization_file(package: Path) -> LocalizationOutput:
+    """The output folder and main file of gen-l10n; a python3 without PyYAML cannot read l10n.yaml, so the default name stands in any folder (None)."""
+    from dart_boundaries import localization_file, localization_main
+
+    try:
+        main = localization_main(package)
+    except ImportError:
+        default = localization_file({})
+        return None if default is None else (None, default.name)
+    return None if main is None else (main.parent, main.name)
+
+
+def dart_target(uri: str, folder: str, package: tuple[str, str] | None) -> str | None:
+    """The project path that a Dart import names, or None for a library of another package."""
+    if uri.startswith("package:"):
+        name, _, rest = uri.removeprefix("package:").partition("/")
+        if package is None or name != package[1]:
+            return None
+        return posixpath.normpath(posixpath.join(package[0], "lib", rest))
+    if ":" in uri:
+        return None
+    return posixpath.normpath(posixpath.join(folder, uri))
+
+
+def imported_files(checkout: Path, candidates: set[str]) -> set[str]:
+    """The candidates that a Dart file of this commit imports, exports or takes as a part by path."""
+    packages: dict[str, tuple[str, str] | None] = {}
+
+    def package_of(folder: str) -> tuple[str, str] | None:
+        if folder not in packages:
+            pubspec = checkout / folder / "pubspec.yaml"
+            match = (
+                PACKAGE_NAME.search(pubspec.read_text()) if pubspec.is_file() else None
+            )
+            if match:
+                packages[folder] = (folder, match.group(1))
+            else:
+                packages[folder] = (
+                    None
+                    if folder == "."
+                    else package_of(posixpath.dirname(folder) or ".")
+                )
+        return packages[folder]
+
+    found: set[str] = set()
+    for name in filter(
+        None, git(checkout, "ls-files", "-z", "--", "*.dart").split("\0")
+    ):
+        text = (checkout / name).read_text(errors="replace")
+        folder = posixpath.dirname(name) or "."
+        for directive in DIRECTIVE.findall(text):
+            for uri in QUOTED.findall(directive):
+                target = dart_target(uri, folder, package_of(folder))
+                if target in candidates:
+                    found.add(target)
+    return found
+
+
 def link_local_files(root: Path, checkout: Path) -> None:
-    """Builds read ignored local .env* files; link them and local settings without reading them."""
-    for name, copied in local_files(root):
+    """Builds read ignored local .env* files and ignored Dart files that tracked code imports; link them and local settings without reading them."""
+    wanted = list(local_files(root))
+    dart = {
+        name
+        for name, _ in wanted
+        if name.endswith(".dart") and not Path(name).name.startswith(".env")
+    }
+    mains: dict[Path, LocalizationOutput] = {}
+    missing = {
+        name
+        for name in dart
+        if not (checkout / name).exists()
+        and not (checkout / name).is_symlink()
+        and not written_by_generator(checkout, name, mains)
+    }
+    imported = imported_files(checkout, missing) if missing else set()
+    for name, copied in wanted:
+        if name in dart and name not in imported:
+            continue
         source = root / name
         target = checkout / name
+        if name in dart:
+            target.parent.mkdir(parents=True, exist_ok=True)
         if not target.parent.is_dir() or target.exists() or target.is_symlink():
             continue
         if copied:
@@ -242,13 +384,17 @@ def post_checkout(checkout: Path) -> int:
 
 
 @contextmanager
-def snapshot(root: Path, revision: str, environment: dict[str, str]) -> Generator[Path]:
+def snapshot(
+    root: Path, revision: str, environment: dict[str, str], prepare: bool = True
+) -> Generator[Path]:
+    """A copy of a revision; without `prepare` it holds only tracked files, and no hook runs."""
     with tempfile.TemporaryDirectory(
         prefix="hard-eng-push-", dir=temporary_root()
     ) as temporary:
         checkout = Path(temporary) / "project"
+        hooks = [] if prepare else ["-c", "core.hooksPath=/dev/null"]
         subprocess.run(
-            ["git", "worktree", "add", "--detach", str(checkout), revision],
+            ["git", *hooks, "worktree", "add", "--detach", str(checkout), revision],
             cwd=root,
             env=environment,
             check=True,
@@ -257,7 +403,8 @@ def snapshot(root: Path, revision: str, environment: dict[str, str]) -> Generato
             environment[TOOL_OWNER] = os.pathsep.join(
                 [str(checkout.resolve()), str(root.resolve())]
             )
-            prepare_checkout(root, checkout, environment)
+            if prepare:
+                prepare_checkout(root, checkout, environment)
             yield checkout
         finally:
             subprocess.run(
@@ -347,9 +494,9 @@ def spared(root: Path, revision: str, base: str | None) -> bool:
 def runner_text(checkout: Path) -> str:
     """The script text of a pushed revision; an older revision has no runner module."""
     hooks = checkout / ".hooks"
-    module = hooks / "gate_runner.py"
-    return (hooks / "hard-eng.py").read_text() + (
-        module.read_text() if module.is_file() else ""
+    modules = (hooks / name for name in ("gate_runner.py", "ci_jobs.py"))
+    return (hooks / "hard-eng.py").read_text() + "".join(
+        module.read_text() for module in modules if module.is_file()
     )
 
 
@@ -422,8 +569,37 @@ def push_checks(
     return int(report_gate_edits(checkout, environment))
 
 
+def package_in_submodule(root: Path, revision: str) -> bool:
+    """A package of the pushed gates file that sits in a submodule needs its files in the copy."""
+    try:
+        config = json.loads(git(root, "show", f"{revision}:hard-eng.gates.json"))
+        listing = git(root, "ls-tree", "-r", "-z", revision)
+    except (ShippingError, ValueError):
+        return True
+    modules = [
+        Path(entry.partition("\t")[2])
+        for entry in listing.split("\0")
+        if entry.startswith("160000 ")
+    ]
+    return any(
+        ".." in Path(package["path"]).parts
+        or Path(os.path.normpath(package["path"])).is_relative_to(module)
+        for package in config.get("packages", [])
+        for module in modules
+    )
+
+
 def pre_push(root: Path) -> int:
     exit_when_stopped()
+    try:
+        return check_pushes(root)
+    except SystemExit as stop:
+        if STOP_SIGNAL and stop.code == 128 + STOP_SIGNAL[0]:
+            print(stopped_line(STOP_SIGNAL[0]), flush=True)
+        raise
+
+
+def check_pushes(root: Path) -> int:
     started, mutating = time.monotonic(), 0.0
     for line in sys.stdin:
         fields = line.split()
@@ -445,10 +621,17 @@ def pre_push(root: Path) -> int:
         warn_ssh(root)
         environment = snapshot_environment(root)
         ci = base_leaves_checks_to_ci(root, policy)
-        with snapshot(root, revision, environment) as checkout:
+        scan_only = (
+            ci
+            and (base is None or not policy["pre_push_mutation_seconds"])
+            and not package_in_submodule(root, revision)
+        )
+        with snapshot(root, revision, environment, not scan_only) as checkout:
             if returncode := push_checks(
                 checkout, environment, base, policy, ci, passed
             ):
+                if (number := stop_number(returncode)) is not None:
+                    print(stopped_line(number), flush=True)
                 return returncode
             if base is not None and (limit := policy["pre_push_mutation_seconds"]):
                 began = time.monotonic()
@@ -637,12 +820,12 @@ def merge(target: Path, plan: Path | None, shipment: Shipment, method: str) -> S
             shipment.head_sha,
         )
     except ShippingError as failure:
-        if _pull(target, *_pr_url(shipment.pr_url)).rebaseable is False:
-            raise ShippingError(
-                rebase_problem(
-                    target, shipment.repository, shipment.base, shipment.head_sha
-                )
-            ) from failure
+        if _pull(target, *_pr_url(shipment.pr_url)).rebaseable is False and (
+            problem := rebase_problem(
+                target, shipment.repository, shipment.base, shipment.head_sha
+            )
+        ):
+            raise ShippingError(problem) from failure
         raise
     try:
         return verify(target, plan, shipment.pr_url, "delivered")
@@ -702,7 +885,7 @@ def run(
         print(shipment.rule_note)
     bypassed = shipment.review_bypass
     if stage == "merge":
-        shipment = merge(target, plan_path, shipment, str(merge_method))
+        shipment = merge(target, plan_path, shipment, shipment.method)
     if stage == "cleanup":
         cleanup(coordinator, shipment)
     revision = shipment.merged_sha or shipment.head_sha
