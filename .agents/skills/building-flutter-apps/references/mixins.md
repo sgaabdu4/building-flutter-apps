@@ -56,24 +56,17 @@ mixin ConnectivityMixin {
   }
 }
 
-// Usage in a notifier
+// Usage in a notifier; noRetry shows the thrown error at once (riverpod-codegen.md#automatic-retry)
+@Riverpod(retry: noRetry)
 class ProductNotifier extends _$ProductNotifier with ConnectivityMixin {
   @override
-  ProductState build() {
-    unawaited(.microtask(_load)); // Defer — see notifier-structure.md "Sync notifier init trap"
-    return const ProductState();
-  }
-
-  Future<void> _load() async {
-    if (!ref.mounted) return;
+  Future<ProductState> build() async {
     final connected = checkConnectivity(
       ref.read(connectivityServiceProvider),
     );
-    if (!connected) {
-      state = state.copyWith(error: 'No connection');
-      return;
-    }
+    if (!connected) throw const AppError.network('No connection');
     // ...fetch from remote
+    return const ProductState();
   }
 }
 ```

@@ -1,6 +1,6 @@
 # Playwright walkthrough skill
 
-Workflow owner for the bundled recorder, review and MP4 delivery scripts. Run commands from this package directory. Use the existing runtime when available; install missing dependencies only within task authorization.
+Workflow owner for the bundled recorder, review and MP4 delivery scripts. Scripts run by path from any directory. In each command, replace `<skill>` with the path of this package directory. Only Setup runs inside this package directory. Use the existing runtime when available; install missing dependencies only within task authorization.
 
 ## Setup
 
@@ -81,7 +81,7 @@ Do not invent text, selectors, routes, or product behavior. Prefer role, label, 
 ## Phase 2: scaffold and configure
 
 ```bash
-bun scripts/scaffold.mjs \
+bun <skill>/scripts/scaffold.mjs \
   --repo /absolute/path/to/repository \
   --out /absolute/path/to/repository/.walkthrough \
   --base-url http://127.0.0.1:3000/ \
@@ -140,7 +140,7 @@ Confirm:
 Never overwrite a prior attempt.
 
 ```bash
-bun scripts/run-walkthrough.mjs \
+bun <skill>/scripts/run-walkthrough.mjs \
   --config /absolute/path/to/repository/.walkthrough/walkthrough.config.json \
   --output-dir /absolute/path/to/repository/.walkthrough/artifacts-attempt-01
 ```
@@ -160,7 +160,7 @@ Reject the attempt immediately if the run report is not `passed`, contains an er
 ## Phase 6: run the unapproved mechanical review
 
 ```bash
-bun scripts/review-video.mjs \
+bun <skill>/scripts/review-video.mjs \
   --video /path/to/artifacts-attempt-01/feature-walkthrough.webm \
   --timeline /path/to/artifacts-attempt-01/feature-walkthrough-run-report.json \
   --output-dir /path/to/artifacts-attempt-01/video-review \
@@ -232,7 +232,7 @@ Continue until both the automated report and complete visual review are clean. P
 ## Phase 9: approve the accepted WebM
 
 ```bash
-bun scripts/review-video.mjs \
+bun <skill>/scripts/review-video.mjs \
   --video /path/to/accepted/feature-walkthrough.webm \
   --timeline /path/to/accepted/feature-walkthrough-run-report.json \
   --output-dir /path/to/accepted/video-review \
@@ -249,7 +249,7 @@ The approval command must itself play the exact current file from zero through `
 ## Phase 10: convert through the hash gate
 
 ```bash
-bun scripts/convert-mp4.mjs \
+bun <skill>/scripts/convert-mp4.mjs \
   --input /path/to/accepted/feature-walkthrough.webm \
   --review /path/to/accepted/video-review.json \
   --output /absolute/path/to/Downloads/feature-walkthrough.mp4
@@ -262,7 +262,7 @@ Conversion must fail when the WebM hash differs from the approved report, the re
 Run the reviewer against the MP4 with a distinct output directory and report. Bind it to the accepted source review:
 
 ```bash
-bun scripts/review-video.mjs \
+bun <skill>/scripts/review-video.mjs \
   --video /absolute/path/to/Downloads/feature-walkthrough.mp4 \
   --timeline /path/to/accepted/feature-walkthrough-run-report.json \
   --derived-from /path/to/accepted/video-review.json \

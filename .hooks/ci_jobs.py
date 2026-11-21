@@ -70,6 +70,29 @@ def add_walls_command(add_parser: Callable[..., ArgumentParser]) -> None:
     walls.add_argument("--stdin", action="store_true")
 
 
+def add_scope_options(checks: ArgumentParser) -> None:
+    checks.add_argument(
+        "--without-dependents",
+        action="store_true",
+        help="Check changed packages only; CI checks their dependents",
+    )
+    checks.add_argument(
+        "--related-tests",
+        action="store_true",
+        help="Run only JavaScript tests related to the change; CI runs them all",
+    )
+    checks.add_argument(
+        "--quick",
+        action="store_true",
+        help="Run only format, lint, types and the file secret scan; the Stop hook uses it",
+    )
+    checks.add_argument(
+        "--commit-secrets",
+        action="store_true",
+        help="Run only the secret scan of the commits since --base, the plan checks and the changed-line text rules; pre-push uses it when CI runs the full check",
+    )
+
+
 NO_LANGUAGES = LanguageFilter()
 
 
@@ -173,7 +196,7 @@ def impact_outputs(
     from ci_setup import impact_tools, push_base, require_ci_base
     from gate_config import affected_groups, parse_config
 
-    require_ci_base(base)
+    require_ci_base(base, root)
     base = push_base(root, base) or base
     done = False
     with redirect_stdout(sys.stderr), suppress(OSError, subprocess.SubprocessError):
@@ -345,8 +368,10 @@ def migrate_runner_variable(content: str) -> str:
     return content
 
 
-def load_checked_policy(root: Path, config: GateConfig) -> None:
-    """Load the shipping policy; leaving the push check to CI needs that CI and a commit secret scan."""
+def load_checked_policy(
+    root: Path, config: GateConfig, workflow_checked: bool = False
+) -> None:
+    """Load the shipping policy; leaving the push check to CI needs that CI and a commit secret scan. A run inside the workflow needs no check of the workflow."""
     from shipping import ShippingError, load_policy
 
     policy = load_policy(root)
@@ -359,7 +384,8 @@ def load_checked_policy(root: Path, config: GateConfig) -> None:
             'shipping pre_push_checks "ci" needs the secrets-history gate and '
             "scan_git_history on: pre-push still scans the pushed commits for secrets"
         )
-    if gap := ci_check_gap(root):
+    sharded = any("shards" in g for p in config["packages"] for g in p["checks"])
+    if not workflow_checked and (gap := ci_check_gap(root, sharded)):
         raise ShippingError(
             f'shipping pre_push_checks "ci" needs a workflow that runs `hard-eng.py check` '
             f"on every pull request: {gap}. Branch protection cannot be read offline, "
@@ -389,33 +415,21 @@ def workflow_events(workflow: object) -> set[str]:
 
 
 def pull_request_filters(workflow: object) -> list[str]:
+    from workflow_blocking import narrowing_filters
+
     triggers = (
         workflow.get("on", workflow.get(True)) if isinstance(workflow, dict) else None
     )
-    event = triggers.get("pull_request") if isinstance(triggers, dict) else None
-    names = ("branches", "branches-ignore", "paths", "paths-ignore", "types")
-    return [
-        name
-        for name in names
-        if isinstance(event, dict)
-        and name in event
-        and not (name == "branches" and covers_every_branch(event[name]))
-    ]
-
-
-def covers_every_branch(patterns: object) -> bool:
-    return (
-        isinstance(patterns, list)
-        and "**" in patterns
-        and not any(str(p).startswith("!") for p in patterns)
-    )
+    return sorted(narrowing_filters(triggers))
 
 
 def skips_a_run(node: dict[object, object]) -> str | None:
-    """The `if` of a job or step, or None when it has none or only `!cancelled()` or `always()`."""
+    """The `if` of a step, or None when it has none or only `${{ !cancelled() }}`."""
+    from workflow_blocking import JOB_IF
+
     condition = node.get("if")
-    text = str(condition).strip().removeprefix("${{").removesuffix("}}").strip()
-    return None if condition is None or text in {"!cancelled()", "always()"} else text
+    text = str(condition).strip()
+    return None if condition is None or JOB_IF.fullmatch(text) else text
 
 
 def calling_jobs(workflow: object, called: str) -> list[object]:
@@ -454,50 +468,141 @@ def whole_check_arguments(command: str) -> bool:
     return options <= {"--base", "--shard", "--plan-stage"} and stage == ["Complete"]
 
 
-def job_always_runs(
-    name: object, jobs: dict[object, object], seen: tuple[object, ...] = ()
-) -> bool:
-    """A job with no `if`, whose `needs` jobs also always run."""
-    job = jobs.get(name)
-    if not isinstance(job, dict) or skips_a_run(job) or name in seen:
-        return False
-    needs = job.get("needs") or []
-    return all(
-        job_always_runs(n, jobs, (*seen, name))
-        for n in ([needs] if isinstance(needs, str) else needs)
+def check_scope(command: str) -> str:
+    """ "" for a check with no --shard, else `rest`, `merge` or `part` (a numbered shard)."""
+    import shlex
+
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        return "part"
+    if "--shard" not in words[:-1]:
+        return ""
+    value = words[words.index("--shard") + 1]
+    return value if value in {"rest", "merge"} else "part"
+
+
+def job_always_runs(name: object, jobs: dict[object, object]) -> bool:
+    """A job that no condition, and no `needs` job with one, can skip."""
+    from workflow_blocking import skippable_jobs
+
+    return isinstance(jobs.get(name), dict) and name not in skippable_jobs(jobs)
+
+
+CHAIN_BREAK = re.compile(r"[|;]|(?<!&)&(?!&)")
+PRINTED_OR_CONDITIONAL = re.compile(r"^(echo|printf)\b|[|;!]|(?<!&)&(?!&)")
+
+
+def ends_the_command(rest: str) -> bool:
+    """The check is the last command of the run: it ends its line or is followed by `&&` and a command with no pipe, `;` or lone `&`, and no later line follows, so the step takes the check's exit status."""
+    line, _, later = rest.partition("\n")
+    line = line.strip()
+    return not later.strip() and (
+        not line or (line.startswith("&&") and not CHAIN_BREAK.search(line))
     )
 
 
-def runs_whole_check(workflow: object) -> bool:
-    """An always-running job whose check steps cover every case: one has no `if`, or two have the `== 'true'` and `!= 'true'` forms of one condition."""
-    from ci_setup import HARD_ENG_CHECK_COMMAND
+SHELL_OPEN = {"if", "case", "for", "while", "until"}
+SHELL_CLOSE = {"fi", "esac", "done"}
+SHELL_BRANCH = {"then", "else", "elif", "do"}
+CHAIN_OPERATORS = re.compile(r"[;&|]")
+STEP_ENDING = re.compile(
+    r"(?<![\w$.-])(?:exit|return)(?![\w-])(?!\s+[1-9]\d*(?![\w$]))"
+)
+FAILING_EXIT = re.compile(r"exit\s+[1-9]\d*")
+BODY_AFTER_KEYWORD = re.compile(r"\b(then|do)\s+\S|\b(fi|done|esac)\b")
 
-    jobs = workflow_jobs(workflow)
-    for name, job in jobs.items():
-        conditions: set[object] = set()
-        steps = job.get("steps") if isinstance(job, dict) else None
-        for step in (steps if job_always_runs(name, jobs) else None) or []:
-            run = step.get("run") if isinstance(step, dict) else None
-            text = "\n".join(
-                without_comment(line)
-                for line in str(run).replace("\\\n", " ").splitlines()
-            )
-            if any(
-                whole_check_arguments(m[0])
-                for m in HARD_ENG_CHECK_COMMAND.finditer(text)
-            ):
-                conditions.add(skips_a_run(step))
-        if None in conditions or any(
-            isinstance(c, str)
-            and PAIRED_CONDITION.fullmatch(c)
-            and c.replace("!= 'true'", "== 'true'") in conditions
-            for c in conditions
+
+def control_lines_only_fail(lines: list[str]) -> bool:
+    """Each shell block before the check ends closed and only prints or exits non-zero, so it cannot skip the check with a pass; the generated launcher line is allowed."""
+    from workflow_blocking import LAUNCHER, SPACES
+
+    depth = 0
+    for line in lines:
+        words = line.split()
+        if not words or LAUNCHER.fullmatch(SPACES.sub(" ", line.strip())):
+            continue
+        if words[0] in SHELL_OPEN:
+            if BODY_AFTER_KEYWORD.search(line):
+                return False
+            depth += 1
+        elif words[0] in SHELL_CLOSE:
+            depth -= 1
+        elif words[0] in SHELL_BRANCH:
+            if BODY_AFTER_KEYWORD.search(line):
+                return False
+        elif depth and not (
+            (words[0] in {"echo", "printf"} and not CHAIN_OPERATORS.search(line))
+            or FAILING_EXIT.fullmatch(line.strip())
         ):
-            return True
-    return False
+            return False
+    return depth == 0
 
 
-def ci_check_gap(root: Path) -> str | None:
+def shell_runs_it(raw: str, text: str, start: int) -> bool:
+    """No shell condition, loop or earlier `exit` or `return` that can end the step with success can skip the command, and its line does not only print it."""
+    if STEP_ENDING.search(text[:start]):
+        return False
+    lines = raw.splitlines()
+    index = text.count("\n", 0, start)
+    if not control_lines_only_fail(lines[: index + 1]):
+        return False
+    first = lines[index].split()
+    if first and first[0] in SHELL_OPEN | SHELL_CLOSE | SHELL_BRANCH:
+        return False
+    before = text[text.rfind("\n", 0, start) + 1 : start].strip()
+    return not PRINTED_OR_CONDITIONAL.search(before)
+
+
+def step_runs_check(job: object, step: object, scope: str = "") -> bool:
+    """The step runs `check` whole, or the one `scope` of its shards, and neither the job, the step nor the shell line turns a failure into a pass."""
+    from ci_setup import HARD_ENG_CHECK_COMMAND
+    from workflow_blocking import SAFE_FALSE
+
+    if not isinstance(job, dict) or not isinstance(step, dict):
+        return False
+    if any(n.get("continue-on-error", False) not in SAFE_FALSE for n in (job, step)):
+        return False
+    raw = str(step.get("run")).replace("\\\n", " ")
+    text = "\n".join(without_comment(line) for line in raw.splitlines())
+    return any(
+        whole_check_arguments(m[0])
+        and check_scope(m[0]) == scope
+        and ends_the_command(text[m.end() :])
+        and shell_runs_it(raw, text, m.start())
+        for m in HARD_ENG_CHECK_COMMAND.finditer(text)
+    )
+
+
+def job_covers(
+    name: object, job: object, jobs: dict[object, object], scope: str
+) -> bool:
+    """An always-running job whose steps for `scope` cover every case: one has no `if`, or two have the `== 'true'` and `!= 'true'` forms of one condition."""
+    steps = job.get("steps") if isinstance(job, dict) else None
+    conditions = {
+        skips_a_run(step)
+        for step in (steps if job_always_runs(name, jobs) else None) or []
+        if step_runs_check(job, step, scope)
+    }
+    return None in conditions or any(
+        isinstance(c, str)
+        and PAIRED_CONDITION.fullmatch(c)
+        and c.replace("!= 'true'", "== 'true'") in conditions
+        for c in conditions
+    )
+
+
+def runs_whole_check(workflow: object, sharded: bool = False) -> bool:
+    """The always-running jobs cover every gate: one check with no --shard, or `--shard rest` alone with no sharded gate, or `rest` and `merge` with sharded gates (the merge fails when a numbered shard sent no report)."""
+    jobs = workflow_jobs(workflow)
+
+    def covered(scope: str) -> bool:
+        return any(job_covers(n, j, jobs, scope) for n, j in jobs.items())
+
+    return covered("") or (covered("rest") and (not sharded or covered("merge")))
+
+
+def ci_check_gap(root: Path, sharded: bool = False) -> str | None:
     """Why no workflow runs the check on every pull request, or None when one does."""
     import yaml
 
@@ -511,7 +616,7 @@ def ci_check_gap(root: Path) -> str | None:
             continue
     gap = "no workflow in .github/workflows runs it on every pull_request, directly or by calling the one that has only workflow_call"
     for name, workflow in loaded.items():
-        if not runs_whole_check(workflow):
+        if not runs_whole_check(workflow, sharded):
             continue
         if filters := pull_request_filters(workflow):
             gap = f"the pull_request trigger of {name} has a `{filters[0]}` filter"

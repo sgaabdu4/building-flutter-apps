@@ -44,9 +44,9 @@ Create one app-owned shell so every preview gets theme, localization, text
 scale, and provider overrides consistently.
 
 ```dart
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:material_ui/material_ui.dart';
 
 class AppPreviewShell extends StatelessWidget {
   const AppPreviewShell({
@@ -78,9 +78,9 @@ Target = inline `Consumer` surface binding the real provider → plain widget in
 
 ```dart
 // features/products/presentation/previews/product_card_provider_preview.dart
-import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
 
 @Preview(name: 'Product card - in stock')
 Widget productCardInStockPreview() {
@@ -96,7 +96,7 @@ Widget productCardInStockPreview() {
     ],
     child: Consumer(
       builder: (context, ref, _) {
-        final product = ref.watch(productProvider.select((s) => s.items.firstOrNull));
+        final product = ref.watch(productProvider.select((s) => s.value?.items.firstOrNull));
         if (product == null) return const SizedBox.shrink();
         return ProductCard(
           item: ProductItemViewData(id: product.id, name: product.name),

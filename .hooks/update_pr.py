@@ -10,7 +10,6 @@ from pathlib import Path
 from gate_config import SOURCE_FILE, JsonValue
 from review_bypass import author_only_review_block
 from shipping import ShippingError, _pr_url, gh, load_policy, merge_settings
-from stale_updates import registered_worktrees
 from update_runner import (
     REPAIR_SUBJECT,
     UPDATE_BRANCH,
@@ -134,7 +133,9 @@ def check_state(pull: dict[str, JsonValue], required: list[str] | None = None) -
 
 
 def branch_worktree(root: Path) -> Path | None:
-    for fields in registered_worktrees(root):
+    from ship_actions import worktrees
+
+    for fields in worktrees(root):
         if fields.get("branch") == f"refs/heads/{UPDATE_BRANCH}":
             return Path(fields["worktree"])
     return None
@@ -461,9 +462,14 @@ def publish(root: Path, merge: bool = True) -> int:
     if pushed.returncode:
         print(
             f"The push of {UPDATE_BRANCH} failed; the lines above give the reason. "
-            "When the pre-push check refused it, the new release found a fault in "
-            f"this project: fix it on the branch {UPDATE_BRANCH} in its own "
-            f"worktree, as its own commit, then run `{UPDATE_COMMAND}` again."
+            "If the output says the check was stopped before it finished, the stop is "
+            "not a fault, and neither is a gate that the stop ended: fix any other "
+            f"failure printed above, then run `{UPDATE_COMMAND}` again. If a failing "
+            "check is printed above with no stop line, the new release found a fault "
+            f"in this project: fix it on the branch {UPDATE_BRANCH} in its own "
+            f"worktree, as its own commit, then run `{UPDATE_COMMAND}` again. If no "
+            "failing check is printed, the project is not at fault: run "
+            f"`{UPDATE_COMMAND}` again."
         )
         return 1
     title = REPAIR_TITLE if repair else f"Update Hard Eng to {revision[:12]}"

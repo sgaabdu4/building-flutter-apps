@@ -29,7 +29,7 @@ Add dependencies:
 
 ```bash
 flutter pub add flutter_localizations --sdk=flutter
-flutter pub add intl:any
+flutter pub add intl
 ```
 
 Enable generation:
@@ -55,11 +55,39 @@ With the config above, generated output is `lib/l10n/app_localizations.dart`; im
 import 'package:my_app/l10n/app_localizations.dart';
 ```
 
+Generated output and `--fatal-infos`: on Flutter 3.50 and later `flutter
+gen-l10n` writes `GlobalMaterialLocalizations` and `GlobalCupertinoLocalizations`
+from `flutter_localizations` into the main file `app_localizations.dart`, and the
+analyzer reports two `deprecated_member_use` infos there. gen-l10n has no option
+that avoids it. The per-language files (`app_localizations_en.dart` and the
+others) have no deprecated uses. Keep `dart analyze --fatal-infos` green by
+excluding only the main file, by its exact path (`lib/l10n/app_localizations.dart`
+by default; a project with `output-dir` or `output-localization-file` in
+`l10n.yaml` uses that path):
+
+```yaml
+analyzer:
+  exclude:
+    - "lib/l10n/app_localizations.dart"
+```
+
+Do not use a glob such as `**/app_localizations*.dart` and do not add an ignore
+comment. In a project with Hard Eng installed the exclusion is accepted only for
+that one file and only when it is marked generated, so add this line to
+`.gitattributes`:
+
+```text
+lib/l10n/app_localizations.dart linguist-generated=true
+```
+
+The fixture runs `flutter gen-l10n`, Hard Eng's check of the analyzer
+exclusions and `dart analyze --fatal-infos` on 3.47.9 and 3.50.0, and requires
+Hard Eng to refuse the old glob.
+
 ## App Wiring
 
 ```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:my_app/l10n/app_localizations.dart';
 
 class AppRoot extends StatelessWidget {
@@ -71,9 +99,7 @@ class AppRoot extends StatelessWidget {
       routerConfig: appRouter,
       localizationsDelegates: const [
         AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
+        ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
     );

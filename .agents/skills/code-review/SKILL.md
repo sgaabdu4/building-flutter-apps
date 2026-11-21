@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review PR, branch, commit or working-tree changes for concrete defects and fidelity to intended behavior. Also use when explicitly asked to independently challenge a prepared plan, diagnosis or verification claim.
+description: Review PR, branch, commit, working-tree or pasted-diff changes for concrete defects and fidelity to intended behavior. Also use when explicitly asked to independently challenge a prepared plan, diagnosis or verification claim.
 ---
 
 # Code Review

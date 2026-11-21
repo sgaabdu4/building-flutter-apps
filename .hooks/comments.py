@@ -5,22 +5,33 @@ Installed agent skills under .agents/ are vendored tooling and are not checked.
 
 import codecs
 import io
+import os
 import re
 import subprocess
 import tokenize
 from pathlib import Path, PurePosixPath
 
-from debt import git_file
 from gate_config import (
     ALL_ZERO_OBJECT_ID,
     changed_files,
-    generated_sources,
     initial_point,
 )
+from generated_marks import generated_sources
 from plans import _is_test as is_test_path
 from plans import default_branch_point
 from project_files import GIT_LISTING
+from source_scan import (
+    JAVASCRIPT,
+    SLASH,
+    code_without_comments,
+    comment_spans,
+    literal_free_lines,
+    string_end,
+    without_literals,
+)
+from workflow_blocking import hard_eng_workflow, workflow_hits
 
+DIRECTIVE_PAIR = re.compile(r"([\w-]+)=(\S*)")
 DISABLED_CALL = re.compile(r"\.disabled\(")
 QUOTE_OR_BACKSLASH = re.compile(r"[\\'\"]")
 UI_SUFFIXES = (
@@ -54,12 +65,9 @@ UI_MARKS = (
 TEST_ATTRIBUTE = re.compile(r"@(?:Test|Suite)\s*\(")
 DIFF_HUNK_HEADER = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,(\d+))?")
 WALL_SUFFIXES = (".tsx", ".jsx", "hard-eng.gates.json")
-CONTROL_KEYWORD_BEFORE = re.compile(r"\b(if|while|for|with)\s*$")
 STRING_LITERAL = re.compile(r'"(?:\\.|[^"\\\n])*"')
 
 HASH = {".py", ".pyi", ".sh", ".bash", ".zsh"}
-JAVASCRIPT = {".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"}
-SLASH = {".dart", ".rs", ".swift", *JAVASCRIPT}
 DIRECTIVE = re.compile(
     r"^(#!|#\s*-\*-|//\s*ignore(_for_file)?:|///\s*<reference|//go:|//\s*\+build"
     r"|//\s*#(region|endregion))|(eslint|prettier|biome|jscpd|istanbul|c8|coverage)[-:]"
@@ -76,128 +84,36 @@ NEUTRAL = re.compile(
 )
 
 
-def python_comment_lines(text: str) -> dict[int, str] | None:
-    """Full-line comments by tokenizer, so `#` inside strings is not a comment."""
+def python_comment_lines(text: str, trailing: bool = False) -> dict[int, str] | None:
+    """Full-line comments by tokenizer, so `#` inside strings is not a comment; trailing adds comments after code."""
     try:
         tokens = tokenize.generate_tokens(io.StringIO(text).readline)
         return {
             token.start[0]: token.string
             for token in tokens
-            if token.type == tokenize.COMMENT and token.line.strip().startswith("#")
+            if token.type == tokenize.COMMENT
+            and (trailing or token.line.strip().startswith("#"))
         }
     except (tokenize.TokenError, SyntaxError):
         return None
 
 
-CHARACTER = re.compile(r"'(\\.[^']{0,8}|[^'\\\n])'")
 ARITHMETIC = re.compile(r"\$?\(\(.*?\)\)")
 HEREDOC = re.compile(r"(?<!<)<<(?!<)(-?)\s*((?:'[^']*'|\"[^\"]*\"|[^\s<>|&;()'\"])+)")
-RAW = {".rs": re.compile(r'b?r(#*)"'), ".dart": re.compile(r"r('''|\"\"\"|'|\")")}
-QUOTE = re.compile(r"'''|\"\"\"|['\"]")
-REGEX_BEFORE = re.compile(
-    r"(^|[(,=:\[!&|?{};+\-*%<>~^]"
-    r"|\b(return|typeof|case|do|else|in|of|new|delete|void|throw|yield|await))\s*$"
-)
-REGEX = re.compile(r"/(?![/*])(\\.|\[(\\.|[^\]\\\n])*\]|[^/\\\[\n])+/")
 
 
-def string_end(text: str, index: int, quote: str, raw: bool, line: bool = False) -> int:
-    """Index just past the string that opens at index with quote; a line string stops at a newline."""
-    while index < len(text):
-        if text[index] == "\\" and not raw:
-            index += 2
-        elif text.startswith(quote, index):
-            return index + len(quote)
-        elif line and text[index] == "\n":
-            return index
-        else:
-            index += 1
-    return len(text)
-
-
-def string_at(text: str, index: int, suffix: str) -> int | None:
-    """Index just past a string or regex literal starting at index, else None."""
-    previous = text[index - 1 : index]
-    raw = None if previous.isalnum() or previous == "_" else RAW.get(suffix)
-    opened = raw.match(text, index) if raw is not None else None
-    if opened is not None:
-        closing = '"' + opened.group(1) if suffix == ".rs" else opened.group(1)
-        return string_end(text, opened.end(), closing, True)
-    quote = QUOTE.match(text, index)
-    if quote is not None and (quote.group(0) != "'" or suffix != ".rs"):
-        line = len(quote.group(0)) == 1 and suffix != ".rs"
-        return string_end(text, quote.end(), quote.group(0), False, line)
-    regex = REGEX.match(text, index) if suffix in JAVASCRIPT else None
-    return regex.end() if regex and regex_allowed(text, index) else None
-
-
-def regex_allowed(text: str, index: int) -> bool:
-    """Whether `/` at index starts a regex: after an operator, keyword or control condition."""
-    before = text[max(0, index - 200) : index].rstrip()
-    if not before.endswith(")"):
-        return REGEX_BEFORE.search(before[-16:]) is not None
-    depth = 0
-    for position in range(len(before) - 1, -1, -1):
-        depth += {")": 1, "(": -1}.get(before[position], 0)
-        if depth == 0:
-            return CONTROL_KEYWORD_BEFORE.search(before[:position]) is not None
-    return False
-
-
-def template_end(text: str, index: int) -> tuple[int, bool]:
-    """Index just past a template's text, and whether a ${ expression opened there."""
-    while index < len(text):
-        if text[index] == "\\":
-            index += 2
-        elif text[index] == "`":
-            return index + 1, False
-        elif text.startswith("${", index):
-            return index + 2, True
-        else:
-            index += 1
-    return len(text), False
-
-
-def code_step(text: str, index: int, suffix: str, depths: list[int]) -> int | None:
-    """Index past a template segment, interpolation brace or literal at index, else None."""
-    character = text[index]
-    if suffix in JAVASCRIPT and (
-        character == "`" or (character == "}" and depths[-1:] == [0])
-    ):
-        if character == "}":
-            depths.pop()
-        close, interpolating = template_end(text, index + 1)
-        depths.extend([0] if interpolating else [])
-        return close
-    if depths and character in "{}":
-        depths[-1] += 1 if character == "{" else -1
-        return index + 1
-    return string_at(text, index, suffix)
-
-
-def slash_comment_lines(text: str, suffix: str) -> dict[int, str]:
-    """Comment text of each line that opens with a comment or lies in a spanning block."""
+def slash_comment_lines(
+    text: str, suffix: str, trailing: bool = False
+) -> dict[int, str]:
+    """Comment text of each line that opens with a comment or lies in a spanning block; trailing adds comments after code."""
     found: dict[int, str] = {}
-    index, line, blank = 0, 1, True
-    depths: list[int] = []
-    while index < len(text):
-        character = text[index]
-        if character == "\n":
-            index, line, blank = index + 1, line + 1, True
-        elif character in " \t\r":
-            index += 1
-        elif text.startswith(("//", "/*"), index):
-            close = text.find("\n" if text[index + 1] == "/" else "*/", index + 2)
-            close = len(text) if close < 0 else close + (text[index + 1] == "*") * 2
-            parts = text[index:close].split("\n")
-            if blank or len(parts) > 1:
-                found.update(enumerate(parts, line))
-            index, line, blank = close, line + len(parts) - 1, False
-        elif (close := code_step(text, index, suffix, depths)) is not None:
-            index, line, blank = close, line + text.count("\n", index, close), False
-        else:
-            literal = CHARACTER.match(text, index) if character == "'" else None
-            index, blank = (literal.end() if literal else index + 1), False
+    line, counted = 1, 0
+    for start, close, blank in comment_spans(text, suffix):
+        line, counted = line + text.count("\n", counted, start), start
+        parts = text[start:close].split("\n")
+        if blank or trailing or len(parts) > 1:
+            for number, part in enumerate(parts, line):
+                found[number] = f"{found[number]} {part}" if number in found else part
     return found
 
 
@@ -219,8 +135,8 @@ def shell_code(line: str, quote: str | None) -> tuple[str, set[int], str | None]
     return code, quoted, quote
 
 
-def hash_comment_lines(lines: list[str]) -> dict[int, str]:
-    """Full-line `#` comments outside shell strings and heredocs."""
+def hash_comment_lines(lines: list[str], trailing: bool = False) -> dict[int, str]:
+    """Full-line `#` comments outside shell strings and heredocs; trailing adds comments after a command."""
     found: dict[int, str] = {}
     heredocs: list[tuple[str, bool]] = []
     quote: str | None = None
@@ -234,6 +150,8 @@ def hash_comment_lines(lines: list[str]) -> dict[int, str]:
             found[number] = line
             continue
         code, quoted, quote = shell_code(line, quote)
+        if trailing and len(code) < len(line):
+            found[number] = line[len(code) :]
         quoted |= {i for m in ARITHMETIC.finditer(code) for i in range(*m.span())}
         heredocs = [
             (QUOTE_OR_BACKSLASH.sub("", opened.group(2)), opened.group(1) == "-")
@@ -243,17 +161,25 @@ def hash_comment_lines(lines: list[str]) -> dict[int, str]:
     return found
 
 
+def comment_map(path: Path, text: str, trailing: bool = False) -> dict[int, str]:
+    """Comment text by line number: full-line comments, and comments after code when trailing."""
+    comments = (
+        python_comment_lines(text, trailing) if path.suffix in {".py", ".pyi"} else None
+    )
+    if comments is None:
+        comments = (
+            slash_comment_lines(text, path.suffix, trailing)
+            if path.suffix in SLASH
+            else hash_comment_lines(text.splitlines(), trailing)
+        )
+    return comments
+
+
 def comment_blocks(path: Path, text: str | None = None) -> list[tuple[int, int, int]]:
     """(first narration line, narration lines, last line) of each block with more than one."""
     text = path.read_text(errors="replace") if text is None else text
     lines = text.splitlines()
-    comments = python_comment_lines(text) if path.suffix in {".py", ".pyi"} else None
-    if comments is None:
-        comments = (
-            slash_comment_lines(text, path.suffix)
-            if path.suffix in SLASH
-            else hash_comment_lines(lines)
-        )
+    comments = comment_map(path, text)
     blocks: list[tuple[int, int, int]] = []
     start, length, last = 0, 0, 0
     for number in range(1, len(lines) + 2):
@@ -268,16 +194,24 @@ def comment_blocks(path: Path, text: str | None = None) -> list[tuple[int, int, 
     return blocks
 
 
-def installed_blocks(root: Path, base: str, name: str) -> set[tuple[str, ...]]:
-    """Blocks a file held before the change that installs Hard Eng: old code its tools may touch."""
-    text = git_file(root, base, name)
-    if text is None:
-        return set()
-    lines = text.splitlines()
-    return {
-        tuple(lines[start - 1 : last])
-        for start, _, last in comment_blocks(root / name, text)
-    }
+def block_hits(name: str, path: Path, text: str) -> list[str]:
+    return [
+        f"{name}:{start} holds a {length}-line comment block"
+        for start, length, _ in comment_blocks(path, text)
+    ]
+
+
+COMMENT_HEADER = (
+    "HE-COMMENT-LINES: Code comments are none by default: fix each block below at its cause, "
+    "so that naming, types, structure or a test carry the meaning, then delete the block; "
+    "keep one terse line of why only where they cannot carry a needed non-obvious constraint. "
+    "A file that a tool writes passes when .gitattributes marks it linguist-generated by its exact path or a .g.dart, .gr.dart or .freezed.dart suffix. "
+    "Never suppress it."
+)
+
+
+def comment_refusal(found: list[str]) -> str:
+    return f"{COMMENT_HEADER} " + "; ".join(found)
 
 
 def validate_comments(root: Path, base: str | None) -> None:
@@ -296,31 +230,21 @@ def validate_comments(root: Path, base: str | None) -> None:
         and not (root / name).is_symlink()
     )
     skipped = generated_sources(root, sources)
-    installing = (root / ".hooks/hard-eng.py").is_file() and (
-        git_file(root, base, ".hooks/hard-eng.py") is None
-    )
-    found: list[str] = []
-    for name in sources:
-        if name in skipped:
-            continue
-        older = installed_blocks(root, base, name) if installing else set()
-        lines = (root / name).read_text(errors="replace").splitlines()
-        found += [
-            f"{name}:{start} holds a {length}-line comment block"
-            for start, length, last in comment_blocks(root / name)
-            if tuple(lines[start - 1 : last]) not in older
-        ]
-    if found:
-        raise ValueError(
-            "HE-COMMENT-LINES: Code comments are none by default: delete each block below, and add one "
-            "terse line of why only where naming, types, structure or a test cannot "
-            "carry a needed non-obvious constraint. " + "; ".join(found)
+    found = [
+        hit
+        for name in sources
+        if name not in skipped
+        for hit in block_hits(
+            name, root / name, (root / name).read_text(errors="replace")
         )
+    ]
+    if found:
+        raise ValueError(comment_refusal(found))
 
 
 PYTHON_OFF = re.compile(
     r"#\s*((?:(?:ruff|flake8)\s*:\s*)?(?i:noqa)|type:\s*ignore|pyrefly:\s*ignore"
-    r"|pyright:\s*ignore|pyre-(?:ignore|fixme)|pylint:\s*disable|pragma:\s*no cover"
+    r"|pyright:\s*ignore|pyre-(?:ignore|fixme)|pylint:\s*disable"
     r"|ruff:\s*(?:file-ignore|ignore|disable)\["
     r"|(?:ruff:\s*)?isort:\s*(?:skip_file|skip|off)\b|fmt:\s*(?:off|skip)\b|yapf:\s*disable\b)|\b(pytest\.)?mark\.(skip(if)?|xfail)\b|pytest\.(skip|xfail)\("
     r"|\bunittest\.([Ss]kip\w*|expectedFailure)\b|\bskipTest\(|\bimportorskip\("
@@ -331,12 +255,19 @@ SCRIPT_OFF = re.compile(
     r"eslint-disable|@ts-(ignore|expect-error|nocheck)|biome-ignore"
     r"|\b(it|test|describe|suite)(?:\.(?:concurrent|sequential|shuffle))*\.(skip|only|fixme|todo|fail|failing|fails|if|runIf)(If)?(?:[.(]|\b)"
     r"|\b(xit|xtest|xdescribe|fit|fdescribe)\("
-    r"|(/\*|//)\s*(istanbul|c8|v8) ignore"
 )
 DART_OFF = re.compile(r"//\s*ignore(_for_file)?:|@Skip\(")
 SWIFT_OFF = re.compile(
     r"swift-format-ignore|\bXCTSkip|<(Skipped|Selected)Tests>"
     r'|"(skipped|selected)Tests"|\bskipped\s*=\s*"YES"|\.enabled\(if:\s*false\)'
+)
+RUST_OFF = re.compile(
+    r"#\s*!?\s*\[\s*(?:allow|expect)\s*\(|#\s*!?\s*\[\s*ignore\b"
+    r"|\brustfmt\s*::\s*skip\b"
+)
+RUST_CFG_ATTR = re.compile(
+    r"#\s*!?\s*\[\s*cfg_attr\s*\([^\]]*?\b(?:(?:allow|expect)\s*\(|ignore\b)"
+    r"|#\s*!?\s*\[\s*cfg(?:_attr)?\s*\([^\]]*?\bnot\s*\(\s*clippy\s*\)"
 )
 TEST_OFF = {
     ".dart": r"\b(skip|solo):(?=\s*(?!false\b)\S)",
@@ -344,9 +275,18 @@ TEST_OFF = {
 }
 SECURITY_OFF = re.compile(
     r"\bno(semgrep|sem)\b|gitleaks:allow|jscpd:ignore|fallow-ignore"
-    r"|shellcheck\s+disable=|zizmor:\s*ignore|coverage:ignore-",
+    r"|shellcheck\s+(?:[\w-]+=\S+\s+)*(?:(?:disable|shell)=|source=\S*)|zizmor:\s*ignore|coverage:ignore-",
     re.IGNORECASE,
 )
+RAW_OFF = {
+    ".py": re.compile(
+        r"#\s*(?:pragma:\s*no cover|(?:(?:ruff|flake8)\s*:\s*)?(?i:noqa)"
+        r"|pyre-(?:ignore|fixme)|type:\s*ignore"
+        r"|(?:ruff:\s*)?isort:\s*(?:skip_file|skip|off)\b)"
+    ),
+    ".dart": re.compile(r"//\s*dart-decimate-ignore-(?:next-line(?![\w-])|file\b)"),
+    **dict.fromkeys(JAVASCRIPT, re.compile(r"(/\*|//)\s*(istanbul|c8|v8) ignore")),
+}
 RETRY_WORDS = ("retry", "Retry", "retries", "rerun", "flaky")
 SCAN_IGNORES = {".gitleaksignore", ".semgrepignore", ".gitleaks.toml"}
 UNOWNED = (".hooks/", ".agents/", ".claude/")
@@ -441,7 +381,74 @@ def switch_off_pattern(name: str) -> re.Pattern[str] | None:
         return DART_OFF
     if suffix in {".swift", ".xcscheme", ".xctestplan"}:
         return SWIFT_OFF
+    if suffix == ".rs":
+        return RUST_OFF
     return SCRIPT_OFF if suffix in JAVASCRIPT else None
+
+
+def pattern_switch_offs(
+    root: Path, name: str, lines: list[tuple[int, str]], verb: str
+) -> list[str]:
+    """Suppressions, skips and focus marks in the lines of one source file."""
+    pattern = switch_off_pattern(name)
+    if pattern is None:
+        return []
+    in_test = is_test_path(PurePosixPath(name))
+    tested = in_test and TEST_OFF.get(Path(name).suffix)
+
+    def off(text: str) -> re.Match[str] | None:
+        return off_hit(pattern, text, in_test) or (
+            re.search(tested, text) if tested else None
+        )
+
+    raw = RAW_OFF.get(Path(name).suffix)
+    code = literal_free_lines(root, name)
+    wrapped = (
+        rust_cfg_attr_hits(root, name, lines, verb) if name.endswith(".rs") else []
+    )
+    found = []
+
+    def masked(number: int, text: str) -> re.Match[str] | None:
+        first = off(text)
+        return first and off(code(number, text, text[: first.start()]))
+
+    for number, text in lines:
+        if hit := (raw.search(text) if raw else None) or masked(number, text):
+            found.append(f"{name}:{number} {verb} {hit[0].strip()!r}")
+    return found + wrapped + marks_in_file(root, name, lines)
+
+
+def rust_cfg_attr_hits(
+    root: Path, name: str, lines: list[tuple[int, str]], verb: str
+) -> list[str]:
+    """A `cfg_attr` that allows or ignores, or a `cfg` or `cfg_attr` that holds `not(clippy)`, read as Rust reads it: across lines, outside comments and strings."""
+    try:
+        raw = (root / name).read_text(errors="replace")
+    except OSError:
+        return []
+    if "cfg" not in raw:
+        return []
+    masked = without_literals(name, code_without_comments(raw, ".rs"))
+    wanted = {number for number, _ in lines}
+    found = []
+    for hit in RUST_CFG_ATTR.finditer(masked):
+        first = masked.count("\n", 0, hit.start()) + 1
+        last = first + hit[0].count("\n")
+        if wanted.intersection(range(first, last + 1)):
+            found.append(f"{name}:{first} {verb} {' '.join(hit[0].split())!r}")
+    return found
+
+
+SWITCH_OFF_HEADER = (
+    "HE-NO-SWITCH-OFF: A change must not switch a check off: fix the cause instead of "
+    "suppressing, skipping, retrying or deleting the check. A file that a tool writes "
+    "passes when .gitattributes marks it linguist-generated by its exact path or a "
+    ".g.dart, .gr.dart or .freezed.dart suffix."
+)
+
+
+def switch_off_refusal(found: list[str]) -> str:
+    return f"{SWITCH_OFF_HEADER} " + "; ".join(found)
 
 
 def diff_base(root: Path, base: str) -> tuple[str, bool]:
@@ -522,7 +529,9 @@ def diff_lines(
         text=True,
     )
     for other in filter(None, untracked.split("\0")):
-        if (root / other).is_file() and not (root / other).is_symlink():
+        if (root / other).is_symlink():
+            added[other] = [(1, os.readlink(root / other))]
+        elif (root / other).is_file():
             text = (root / other).read_text(errors="replace")
             added[other] = list(enumerate(text.splitlines(), 1))
     return added, removed
@@ -688,28 +697,79 @@ def lost_assertions(
     return lost
 
 
+def entry_file(root: Path, name: str, names: set[str]) -> bool:
+    """A file of ignore entries that every line refuses; a regular root .gitleaksignore is judged by the full check's scan instead."""
+    return PurePosixPath(name).name in names and (
+        name != ".gitleaksignore" or (root / name).is_symlink()
+    )
+
+
+SHELLCHECK_FIX = "read the file without a dynamic `source`"
+
+
+def followed_source(root: Path, name: str, marker: str) -> bool:
+    """A shellcheck directive that hides nothing: no `disable=` or `shell=` key, and every `source=` names a file in the project, which shellcheck then reads; /dev/null and a missing path hide the finding."""
+    keys = DIRECTIVE_PAIR.findall(marker)
+    if any(key in {"disable", "shell"} for key, _ in keys):
+        return False
+    sources = [value for key, value in keys if key == "source"]
+    return bool(sources) and all(
+        any(
+            (base / value).is_file()
+            for base in (root / PurePosixPath(name).parent, root)
+        )
+        for value in sources
+    )
+
+
+def security_hits(
+    root: Path,
+    name: str,
+    lines: list[tuple[int, str]],
+    verb: str,
+    entries: bool,
+) -> list[str]:
+    """Inline markers, ignore entries and test retries in the lines of one file; entries marks a file of ignore entries."""
+    found: list[str] = []
+    for number, text in lines:
+        entry = text.strip()
+        if (hit := SECURITY_OFF.search(text)) and not followed_source(
+            root, name, hit[0]
+        ):
+            fix = (
+                f"; {SHELLCHECK_FIX}"
+                if "shellcheck" in hit[0] and "disable=" not in hit[0]
+                else ""
+            )
+            if PurePosixPath(name).name == "gradlew":
+                fix += "; Gradle generates this wrapper: mark its exact path `<path> linguist-generated=true` in .gitattributes"
+            found.append(f"{name}:{number} {verb} {hit[0]!r}{fix}")
+        elif entries and entry and not entry.startswith("#"):
+            found.append(f"{name}:{number} {verb} {entry!r}")
+        elif any(word in text for word in RETRY_WORDS):
+            from retry_forms import retry_form, table_retry
+
+            if form := retry_form(name, text) or table_retry(root / name, number, text):
+                found.append(f"{name}:{number} {verb} {form!r}")
+    return found
+
+
 def security_switch_offs(
     root: Path, added: dict[str, list[tuple[int, str]]]
 ) -> list[str]:
-    """Inline markers, ignore entries and test retries in any file hide a failing check."""
     names = sorted(name for name in added if not name.startswith(UNOWNED))
     skipped = generated_sources(root, names)
-    found: list[str] = []
-    for name in (name for name in names if name not in skipped):
-        ignore = PurePosixPath(name).name in SCAN_IGNORES
-        for number, text in added[name]:
-            entry = text.strip()
-            if hit := SECURITY_OFF.search(text):
-                found.append(f"{name}:{number} adds {hit[0]!r}")
-            elif ignore and entry and not entry.startswith("#"):
-                found.append(f"{name}:{number} adds {entry!r}")
-            elif any(word in text for word in RETRY_WORDS):
-                from retry_forms import retry_form, table_retry
-
-                if form := retry_form(name, text) or table_retry(
-                    root / name, number, text
-                ):
-                    found.append(f"{name}:{number} adds {form!r}")
+    found = [
+        hit
+        for name in names
+        if name not in skipped
+        for hit in security_hits(
+            root, name, added[name], "adds", entry_file(root, name, SCAN_IGNORES)
+        )
+    ]
+    for name in names:
+        if hard_eng_workflow(name) and (root / name).is_file():
+            found += workflow_hits(name, (root / name).read_text())
     return found
 
 
@@ -811,7 +871,41 @@ def text_walls_check(
         wall_check(root, added, removed, joins, point)
 
 
-def validate_suppressions(root: Path, base: str | None, screens: bool = True) -> None:
+def added_switch_offs(
+    root: Path,
+    added: dict[str, list[tuple[int, str]]],
+    names: list[str],
+    skipped: set[str],
+) -> list[str]:
+    found = security_switch_offs(root, added)
+    for name in names:
+        if name not in skipped:
+            found += pattern_switch_offs(root, name, added.get(name, []), "adds")
+    return found
+
+
+def whole_refusals(root: Path) -> list[str]:
+    from whole_project import validate_whole_project
+
+    try:
+        validate_whole_project(root)
+    except ValueError as error:
+        return [str(error)]
+    return []
+
+
+def validate_rules(
+    root: Path, base: str | None, screens: bool = True, full: bool = False
+) -> None:
+    """The full check leaves changed-line findings to the whole-project pass, which holds them all, so one run lists everything."""
+    if not full:
+        validate_comments(root, base)
+    validate_suppressions(root, base, screens, full)
+
+
+def validate_suppressions(
+    root: Path, base: str | None, screens: bool = True, full: bool = False
+) -> None:
     joins: dict[str, list[int]] = {}
     try:
         point, empty = diff_base(root, base or default_branch_point(root) or "HEAD")
@@ -825,22 +919,7 @@ def validate_suppressions(root: Path, base: str | None, screens: bool = True) ->
     lost, gained = assertion_balance(root, added, removed, skipped)
     if len(lost) > gained and base and (whole := whole_branch_balance(root, point)):
         point, lost, gained = whole
-    found = security_switch_offs(root, added)
-    for name in names:
-        pattern = switch_off_pattern(name)
-        if name in skipped or pattern is None:
-            continue
-        in_test = is_test_path(PurePosixPath(name))
-        tested = in_test and TEST_OFF.get(Path(name).suffix)
-        found += [
-            f"{name}:{number} adds {hit[0].strip()!r}"
-            for number, text in added.get(name, [])
-            if (
-                hit := off_hit(pattern, text, in_test)
-                or (tested and re.search(tested, text))
-            )
-        ]
-        found += marks_in_file(root, name, added.get(name, []))
+    found = [] if full else added_switch_offs(root, added, names, skipped)
     if len(lost) > gained:
         found.append(
             f"tests lose {len(lost) - gained} assertion lines net "
@@ -852,11 +931,10 @@ def validate_suppressions(root: Path, base: str | None, screens: bool = True) ->
             "for it(), test() and testWidgets(). An assertion in a test that stays "
             "must stay or get an equal check"
         )
-    if found:
-        raise ValueError(
-            "HE-NO-SWITCH-OFF: A change must not switch a check off: fix the cause instead of "
-            "suppressing, skipping, retrying or deleting the check. " + "; ".join(found)
-        )
+    refusals = [switch_off_refusal(found)] if found else []
+    refusals += whole_refusals(root) if full else []
+    if refusals:
+        raise ValueError("\n".join(refusals))
     if not empty:
         ui_source_check(root, added)
         if screens:

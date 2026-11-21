@@ -1,11 +1,9 @@
 """Validate required documents and gate configuration before execution."""
 
-import json
 import os
 import re
 import stat
 import subprocess
-import sys
 from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 
@@ -18,8 +16,10 @@ from dependency_graph import (
     readers_above,
     shared_only,
 )
+from generated_marks import LISTED, generated_sources, listed_with_blobs
 from project_files import (
     GIT_LISTING,
+    biome_formatters,
     group_locks,
     json_text,
     keep,
@@ -34,37 +34,8 @@ type JsonValue = (
 type JsonObject = dict[str, JsonValue]
 
 
-JSONC = re.compile(r'("(?:\\.|[^"\\])*")|//[^\n]*|/\*.*?\*/', re.DOTALL)
-TRAILING_COMMA = re.compile(r",(\s*[}\]])")
 ALL_ZERO_OBJECT_ID = re.compile(r"0{40}|0{64}")
 SOURCE_FILE = ".hooks/hard-eng-source.json"
-
-
-def biome_formatters(
-    path: Path, seen: set[Path]
-) -> tuple[dict[str, int | str], dict[str, int | str]]:
-    """The formatter and json.formatter options of a Biome file after the local files it extends."""
-    path = path.resolve()
-    if path in seen or not path.is_file():
-        return {}, {}
-    seen.add(path)
-    try:
-        text = JSONC.sub(lambda match: match[1] or "", path.read_text())
-        config = json.loads(TRAILING_COMMA.sub(r"\1", text))
-    except (OSError, ValueError):
-        return {}, {}
-    extends = config.get("extends", [])
-    formatter: dict[str, int | str] = {}
-    own: dict[str, int | str] = {}
-    for name in [extends] if isinstance(extends, str) else extends:
-        if not isinstance(name, str):
-            continue
-        inherited = biome_formatters(path.parent / name, seen)
-        formatter, own = {**formatter, **inherited[0]}, {**own, **inherited[1]}
-    return (
-        {**formatter, **config.get("formatter", {})},
-        {**own, **config.get("json", {}).get("formatter", {})},
-    )
 
 
 def json_layout(root: Path) -> tuple[str, int, int]:
@@ -122,6 +93,7 @@ GateConfig = TypedDict(
         "version": NotRequired[int],
         "scan_git_history": NotRequired[bool],
         "shipping": NotRequired[JsonObject],
+        "browser": NotRequired[JsonObject],
         "file_size_exceptions": NotRequired[dict[str, dict[str, str]]],
     },
 )
@@ -178,12 +150,7 @@ def fixture_manifest(root: Path, manifest: Path, manifests: list[Path]) -> bool:
 
 
 def listed_names(root: Path) -> list[str]:
-    names = subprocess.check_output(
-        [*GIT_LISTING, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-        cwd=root,
-        text=True,
-    )
-    return sorted(set(names.split("\0")) - {""})
+    return listed_with_blobs(root)
 
 
 def regular_file(path: Path) -> bool:
@@ -234,66 +201,6 @@ def dart_test_support(path: str, language: str | None, packages: list[Group]) ->
     )
 
 
-def typescript_packages(root: Path, files: list[Path]) -> set[str]:
-    manifests = {path.parent for path in files if path.name == "package.json"}
-    packages = set()
-    for path in files:
-        relative = path.relative_to(root)
-        if (
-            path.suffix not in {".ts", ".tsx", ".mts", ".cts"}
-            or nonproduction_source(relative)
-            or {".hooks", ".agents"} & set(relative.parts)
-        ):
-            continue
-        owner = next((parent for parent in path.parents if parent in manifests), None)
-        if owner is not None:
-            packages.add(str(owner.relative_to(root)))
-    return packages
-
-
-LISTED: dict[Path, tuple[frozenset[str], set[str]]] = {}
-
-
-def generated_sources(root: Path, names: list[str]) -> set[str]:
-    if not names:
-        return set()
-    listed, generated = LISTED.get(root, (frozenset(), set()))
-    if listed.issuperset(names):
-        return generated.intersection(names)
-    import tempfile
-
-    # A live stdin pipe deadlocked against git's per-path output on macOS (issue 375).
-    with tempfile.TemporaryFile() as paths:
-        paths.write(("\0".join(names) + "\0").encode())
-        paths.seek(0)
-        listed = subprocess.run(
-            [*GIT_LISTING, "check-attr", "-z", "--all", "--stdin"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            stdin=paths,
-            check=False,
-        )
-    if listed.returncode:
-        repository = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            cwd=root,
-            capture_output=True,
-            check=False,
-        )
-        if repository.returncode:
-            return set()  # Standalone source directories have no Git attributes.
-        sys.stderr.write(listed.stderr)
-        listed.check_returncode()
-    attributes = listed.stdout.split("\0")
-    return {
-        name
-        for name, key, value in zip(attributes[::3], attributes[1::3], attributes[2::3])
-        if key in {"linguist-generated", "linguist-vendored"}
-        and value in {"set", "true"}
-    }
-
-
 def validate_file_sizes(
     root: Path, exceptions: dict[str, dict[str, str]], listed: list[Path] | None = None
 ) -> None:
@@ -340,7 +247,7 @@ def validate_file_sizes(
         raise ValueError(
             "HE-FILE-LENGTH: Handwritten files exceed 1000 physical lines: "
             + "; ".join(failures)
-            + ". Split the file; or mark generator output with `<pattern> linguist-generated=true` in .gitattributes;"
+            + ". Split the file; or mark each generator output file by its exact path with `<path> linguist-generated=true` in .gitattributes;"
             + " or add a `file_size_exceptions` entry for the exact file, with `reason` and `evidence`, in hard-eng.gates.json"
         )
 
@@ -395,6 +302,18 @@ def validate_gate(gate: Gate, directory: Path, report_paths: set[Path]) -> None:
     from gitleaks_scan import validate_current_files_gate
 
     validate_current_files_gate(gate.get("role"), command)
+    from command_words import direct
+    from gitleaks_scan import validate_config_variables
+
+    validate_config_variables(command)
+    found = direct(command, directory)
+    parts = [found] if found else []
+    from ruff_settings import validate_ruff_command
+
+    validate_ruff_command(parts, directory, gate.get("role"))
+    from rust_settings import validate_rust_command
+
+    validate_rust_command(parts)
     validate_named_output(gate, command, directory, report)
 
 
@@ -420,7 +339,8 @@ def dart_scan_includes_boundaries(gate: Gate) -> bool:
     report = gate.get("report", {})
     return (
         gate.get("role") == "dead-code-duplicates"
-        and command[:3] == ["dart-decimate", "check", "."]
+        and command[:2] == ["dart-decimate", "check"]
+        and command[2:3] in (["."], ["./"])
         and options == {"--threshold": "0", "--format": "json", "--strict": ""}
         and report.get("type") == "dart-decimate"
         and report.get("stdout") is True
@@ -737,9 +657,9 @@ def validate_group(root: Path, group: Group, report_paths: set[Path]) -> int:
     from tool_setup import require_role_tool
 
     for index, gate in enumerate(group["checks"]):
-        validate_gate(gate, directory, report_paths)
         command = scripts[index] if scripts else gate["command"]
         require_role_tool(group.get("language", ""), gate, command)
+        validate_gate(gate, directory, report_paths)
     validate_performance(group)
     return len(group["checks"])
 
@@ -831,14 +751,7 @@ def validate_required_checks(
         ): group
         for group in config["packages"]
     }
-    typescript = typescript_packages(root, files)
     for group in config["packages"]:
-        if str(Path(group["path"])) in typescript:
-            require_roles(
-                group["path"],
-                {"boundaries"},
-                {gate.get("role", "") for gate in group["checks"]},
-            )
         validate_package_services(
             root,
             group,
@@ -912,7 +825,6 @@ def validate_package_services(
                 "test:integration": "integration",
                 "test:ui": "ui",
                 "check:generated": "generated",
-                "lint:boundaries": "boundaries",
             }.items()
             if script in manifest.get("scripts", {})
         )
@@ -942,17 +854,26 @@ def load_groups(
     *,
     dependents: bool = True,
     starting: bool = False,
+    workflow_checked: bool = False,
 ) -> list[Group]:
     from plans import validate_documents
 
     validate_documents(root)
     config = parse_config((root / "hard-eng.gates.json").read_text())
-    if type(config.get("scan_git_history", True)) is not bool:
-        raise TypeError("scan_git_history must be true or false")
+    if config.get("scan_git_history", True) is not True:
+        raise ValueError(
+            "HE-NO-SWITCH-OFF: The Git-history secret scan must stay on: remove scan_git_history "
+            "from hard-eng.gates.json. Move each history finding to an exact line in the root "
+            ".gitleaksignore (the full check judges each line), or fix it at its cause; never suppress."
+        )
+    if "browser" in config:
+        from browser import browser_roles
+
+        browser_roles(config)
     if "shipping" in config:
         from ci_jobs import load_checked_policy
 
-        load_checked_policy(root, config)
+        load_checked_policy(root, config, workflow_checked)
     raw = listed_names(root)
     listed = repository_files(root, raw)
     start = len(str(root)) + 1
@@ -973,10 +894,6 @@ def checked_groups(
     starting: bool,
 ) -> list[Group]:
     validate_file_sizes(root, config.get("file_size_exceptions", {}), listed)
-    if config.get("scan_git_history", True) is False:
-        config["shared"] = [
-            gate for gate in config["shared"] if gate.get("role") != "secrets-history"
-        ]
     groups: list[Group] = [
         *config["packages"],
         {"path": ".", "checks": config["shared"]},

@@ -48,8 +48,11 @@ def attachment_urls(body: str, paths: list[str], patterns: list[str]) -> list[st
     urls = before + after
     if not before or len(before) != len(after) or len(set(urls)) != len(urls):
         raise ValueError(
-            "UI changes require distinct Before and After attachments or an explained unchanged appearance; "
-            "upload the pair with `gh pr edit <url> --body-file <body.md> --attach <before> --attach <after>` "
+            "UI changes require distinct Before and After attachments or an explained unchanged appearance. "
+            "The body needs a `Before:` line and an `After:` line, each followed by its image or video "
+            "(a local path in the body file before `--attach`, or an uploaded asset). "
+            "An `--attach` with no labelled local reference appends unlabelled images that do not count. "
+            "Upload with `gh pr edit <url> --body-file <body.md> --attach <before> --attach <after>` "
             "(he-ship checks: UI evidence in the PR)"
         )
     return urls

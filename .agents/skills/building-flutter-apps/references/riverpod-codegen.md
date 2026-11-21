@@ -128,15 +128,9 @@ Future<List<Product>> productsByCategory(Ref ref, String category) async {
 @riverpod
 class ProductEditorNotifier extends _$ProductEditorNotifier {
   @override
-  ProductFormState build(String productId) {
-    unawaited(.microtask(() => _loadProduct(productId)));
-    return const ProductFormState();
-  }
-
-  Future<void> _loadProduct(String id) async {
-    final product = await ref.read(productRepositoryProvider).fetchById(id);
-    if (!ref.mounted) return;
-    state = state.copyWith(name: product.name, price: product.price);
+  Future<ProductFormState> build(String productId) async {
+    final product = await ref.read(productRepositoryProvider).fetchById(productId);
+    return ProductFormState(name: product.name, price: product.price);
   }
 }
 ```
@@ -248,6 +242,18 @@ Future<Config> appConfig(Ref ref) async {
 }
 ```
 
+A provider whose screen shows the error with a retry button, a failed view, turns the automatic retry off. With the default, a failed load stays in the loading state through about ten retries, roughly 38 seconds, and each manual retry starts that delay again. With `noRetry`, the error shows at once.
+
+```dart
+// core/providers/no_retry.dart
+Duration? noRetry(int _, Object _) => null;
+
+@Riverpod(keepAlive: true, retry: noRetry)
+class ProductNotifier extends _$ProductNotifier {
+  // ...
+}
+```
+
 ## ProviderException
 
 Provider errors wrap in `ProviderException`. Distinguishes "provider failed" from "dependency of provider failed":
@@ -277,9 +283,9 @@ Mutation = one file-scope (top-level) `final`, not a class member → rebuilds +
 // features/todos/presentation/screens/add_todo_screen.dart
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/experimental/mutation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:my_app/core/extensions/extensions.dart';
 
 final addTodoMutation = Mutation<void>(); // experimental API — may change without major bump

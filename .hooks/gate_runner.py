@@ -12,28 +12,35 @@ import xml.etree.ElementTree as ET
 from collections.abc import Generator
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from pathlib import Path
-from typing import IO, TYPE_CHECKING
+from typing import IO, TYPE_CHECKING, TextIO
 
+import gate_times
 import swift_setup
+from browser import add_browser_command
 from ci_jobs import (
     NO_LANGUAGES,
     LanguageFilter,
     add_language_filters,
+    add_scope_options,
     add_shard_option,
     add_walls_command,
     language_filter,
     language_groups,
 )
-from dart_boundaries import validate_dart_boundaries, validate_dart_typing
-from debt import OUTPUTS, remember, ruff_check
+from dart_boundaries import (
+    leave_out_copies,
+    validate_dart_boundaries,
+    validate_dart_typing,
+)
+from debt import OUTPUTS, remember, without_fixes
 from dependency_graph import SOURCE_SUFFIXES, biome_children
 from gate_config import (
     Gate,
     Group,
     Report,
-    generated_sources,
     nonproduction_source,
 )
+from generated_marks import generated_sources
 from project_files import keeping, stop_keeping
 from project_setup import package_script_arguments as test_arguments
 from python_setup import (
@@ -42,7 +49,7 @@ from python_setup import (
     require_import_contract,
     validate_pyrefly,
 )
-from tool_setup import lost_scanner_note, managed_command, provision_tools
+from tool_setup import gate_scanner, lost_scanner_note, managed_command, provision_tools
 from untrusted_input import (
     next_route_types,
     project_command,
@@ -75,11 +82,12 @@ def validate_typing(
     language: str | None,
     sources: list[str] | tuple[str, ...] = (),
     children: frozenset[str] = frozenset(),
+    copies: frozenset[str] = frozenset(),
 ) -> None:
     if language == "python":
         validate_pyrefly(directory, ROOT)
     elif language == "dart":
-        validate_dart_typing(directory, sources, None, children)
+        validate_dart_typing(directory, sources, None, children, copies)
 
 
 def reject_test_filters(
@@ -154,18 +162,16 @@ def production_files(
     return files
 
 
-def without_fixes(command: list[str]) -> list[str]:
-    """`fix = true` in ruff's settings makes `ruff check` rewrite files and exit 0."""
-    tool = ruff_check(command)
-    if tool < 0:
-        return command
-    return [*command[: tool + 2], "--no-fix", *command[tool + 2 :]]
+def every_group(groups: list[Group] | None) -> list[Group]:
+    """A run with a base holds only the changed groups, yet a parent needs its child groups to know what they cover."""
+    return CONFIGURED or groups or []
 
 
 def prepare_command(
     group: Group, gate: Gate, timeout: float, groups: list[Group] | None = None
 ) -> list[str]:
     from reports import osv_lockfiles
+    from shellcheck_rc import ignoring_settings
 
     command = osv_lockfiles(
         managed_command(gate["command"], ROOT / group["path"]), ROOT / group["path"]
@@ -174,7 +180,9 @@ def prepare_command(
         return []
     from hot_paths import semgrep_options
 
-    command = without_fixes(semgrep_options(ROOT, group, gate, command))
+    command = ignoring_settings(
+        without_fixes(semgrep_options(ROOT, group, gate, command))
+    )
     if command[0] == "biome" and "." in command:
         from project_setup import javascript_files
 
@@ -193,10 +201,10 @@ def prepare_command(
     if gate.get("role") == "types":
         directory = ROOT / group["path"]
         language = group.get("language")
-        from dart_boundaries import nested_package_patterns
+        from dart_boundaries import typing_scope
 
-        children = nested_package_patterns(group, CONFIGURED or groups or [])
-        validate_typing(directory, language, group.get("sources", []), children)
+        children, copies = typing_scope(ROOT, group, every_group(groups), timeout)
+        validate_typing(directory, language, group.get("sources", []), children, copies)
         if language == "python":
             from project_setup import python_interpreter
 
@@ -294,15 +302,13 @@ def run_gate(
     related_base: str | None = None,
 ) -> bool:
     """Run a gate under its own limit and record how long a pass took."""
-    from gate_times import gate_limit, record_gate_time
     from process_group import install_key, note_install
 
-    key = f"{group['path']}/{gate['name']}" + ("@related" if related_base else "")
-    if part := gate.get("part"):
-        key += "@shard" if part.isdecimal() else "@merge"
-    limit = gate_limit(ROOT, key, timeout)
+    key = gate_times.gate_key(group, gate, related_base)
+    limit = gate_times.gate_limit(ROOT, key, timeout)
     name = f"{group['path']}/{gate['name']}"
     OUTPUTS.pop(name, None)
+    gate_times.STOPPED_AT_LIMIT.discard(key)
     files = CHANGED_DART.get(name)
     if files is not None and changed_dart_pass(group, gate, files, limit, groups):
         return False
@@ -312,14 +318,13 @@ def run_gate(
         from debt import judge
 
         failed = judge(ROOT, group, gate, failed, OUTPUTS.get(name, ""))
+    failed = gate_times.settle_gate_time(ROOT, key, failed, time.monotonic() - started)
     note_install(install_key(group), gate.get("role"), failed)
     if failed:
         FAILED_GATES.append(key)
         if note := lost_scanner_note(OUTPUTS.get(name, "")):
             with output_lock:
                 print(note, flush=True)
-    else:
-        record_gate_time(ROOT, key, time.monotonic() - started)
     return failed
 
 
@@ -395,27 +400,6 @@ def run_projects(
     return next((result for result in results if result.returncode), results[-1])
 
 
-def gate_scanner(group: Group, gate: Gate, scanner: str | None) -> str | None:
-    scanner = {
-        "secrets-files": "gitleaks",
-        "secrets-history": "gitleaks",
-        "security": "semgrep",
-        "vulnerabilities": "osv",
-        "freshness": "freshness",
-        "container-vulnerabilities": "osv-image",
-        "react": "react-doctor",
-        "deployment": "trivy",
-    }.get(gate.get("role", ""), scanner)
-    return {
-        ("python", "imports"): "import-linter",
-        ("python", "dependencies"): "deptry",
-        ("python", "duplicates"): "jscpd",
-        ("swift", "duplicates"): "jscpd",
-        ("dart", "dead-code-duplicates"): "dart-decimate",
-        ("javascript", "dead-code-duplicates"): "fallow",
-    }.get((group.get("language", ""), gate.get("role", "")), scanner)
-
-
 def shard_command(
     group: Group,
     gate: Gate,
@@ -459,6 +443,27 @@ def remembered_output(
     return note + remember(group, gate, text)
 
 
+def prepared_command(
+    group: Group, gate: Gate, timeout: float, groups: list[Group] | None
+) -> list[str]:
+    """The command to run, after the settings its tool will read are judged."""
+    command = prepare_command(group, gate, timeout, groups)
+    if command:
+        from resolved_settings import judge_before_run
+
+        judge_before_run(ROOT, group, gate, every_group(groups), timeout)
+    return command
+
+
+def judge_scanner_log(scanner: str | None, log: TextIO, code: int) -> None:
+    """A gate that the stop killed left no complete log to judge."""
+    from process_group import stopped_note
+    from reports import validate_scanner_log
+
+    if not stopped_note(code):
+        validate_scanner_log(scanner, log)
+
+
 def run_limited_gate(
     group: Group,
     gate: Gate,
@@ -473,7 +478,7 @@ def run_limited_gate(
         report_path = coverage_path = None
         directory = ROOT / group["path"]
         expected_sources: set[Path] = set()
-        command = prepare_command(group, gate, timeout, groups)
+        command = prepared_command(group, gate, timeout, groups)
         if not command:
             reason = (
                 ": uv.lock locks no third-party package to scan"
@@ -489,7 +494,6 @@ def run_limited_gate(
             emit_dart_test_failure,
             related_command,
             scanner_result,
-            validate_scanner_log,
         )
 
         report = gate.get("report", {})
@@ -500,7 +504,13 @@ def run_limited_gate(
             report_path, coverage_path, directory, expected_sources = prepare_reports(
                 group, report, kind, tests, scanner, command
             )
-        command = leave_out_children(ROOT, command, group, gate)
+        command = leave_out_copies(
+            ROOT,
+            leave_out_children(ROOT, command, group, gate),
+            group,
+            every_group(groups),
+            timeout,
+        )
         command, coverage_path = related_command(
             command, coverage_path, gate, groups or [group], directory, related_base
         )
@@ -536,7 +546,7 @@ def run_limited_gate(
                         remembered_output(group, gate, command, result, log)
                     )
                     emit_dart_test_failure(result, tests, kind, report_path)
-            validate_scanner_log(scanner, log)
+            judge_scanner_log(scanner, log, result.returncode)
         shard_reports(group, gate)
         unfixed = False
         if scanner and report_path is not None:
@@ -573,7 +583,7 @@ def run_limited_gate(
         subprocess.TimeoutExpired,
         subprocess.CalledProcessError,
     ) as error:
-        unrun = isinstance(error, (ImportError, OSError, subprocess.TimeoutExpired))
+        unrun = gate_times.run_not_finished(error, group, gate, related_base)
         text = str(error) if unrun else remember(group, gate, str(error))
         print(
             f"FAIL {gate['name']}: {text}; "
@@ -631,6 +641,10 @@ def run_gates(groups: list[Group], timeout: float, related: str | None) -> bool 
     )
 
 
+def merging_in_workflow(shard: str | None) -> bool:
+    return shard == "merge" and os.environ.get("GITHUB_ACTIONS") == "true"
+
+
 @keeping("references", "listings")
 def check(
     timeout: float | None = None,
@@ -657,7 +671,7 @@ def check(
     )
     from reports import quick_groups
 
-    require_ci_base(base)
+    require_ci_base(base, ROOT)
     base = push_base(ROOT, base)
     parse_config((ROOT / "hard-eng.gates.json").read_text())
     if shard == "merge":
@@ -682,10 +696,13 @@ def check(
             or shard is not None
         )
         start = clean_start(lock, ROOT, base, plan_stage, partial)
-        groups = load_groups(
-            ROOT, plans.plan_base(ROOT, base, plan_stage), dependents=dependents
+        every = load_groups(
+            ROOT,
+            plans.plan_base(ROOT, base, plan_stage),
+            dependents=dependents,
+            workflow_checked=merging_in_workflow(shard),
         )
-        groups = quick_groups(language_groups(groups, languages), quick, installed)
+        groups = quick_groups(language_groups(every, languages), quick, installed)
         if shard:
             from shards import shard_groups
 
@@ -695,17 +712,18 @@ def check(
         require_shrink(ROOT, base)
         timeout = timeout or gate_budget(ROOT)
         import change_size
-        from comments import validate_comments, validate_suppressions
+        from comments import validate_rules
 
         if verify_plan:
             plan_stage = change_size.judged_stage(ROOT, base, plan_stage)
-        validate_comments(ROOT, base)
-        validate_suppressions(ROOT, base, screens=shard != "merge")
+        validate_rules(ROOT, base, shard != "merge", full=not quick)
         plans.validate_records(ROOT, base)
         before_gates(groups, quick, base)
         stop_keeping("listings")
         if shard != "merge":
             provision_tools(ROOT, groups, timeout)
+            if not quick:
+                judge_settings(groups, timeout)
         related = base if related_tests else None
         started, failed = time.time(), run_gates(groups, timeout, related) is not False
         save_installed(lock, installed, ROOT)
@@ -720,6 +738,16 @@ def check(
 
             mark_shard(ROOT, shard, False)
         return int(failed)
+
+
+def judge_settings(groups: list[Group], timeout: float) -> None:
+    """The full check judges what the tools print and what the ignore file hides, once they are installed; each group is judged against every group of the project, not only the changed ones."""
+    from gate_config import load_groups
+    from gitleaks_entries import validate_entries
+    from resolved_settings import validate_resolved
+
+    validate_entries(ROOT, timeout)
+    validate_resolved(ROOT, groups, timeout, load_groups(ROOT))
 
 
 def before_gates(groups: list[Group], quick: bool, base: str | None) -> None:
@@ -764,6 +792,10 @@ def deliver(args: "Namespace") -> int:
         from text_walls import walls_command
 
         return walls_command(ROOT, args.paths, args.stdin)
+    if args.command == "pr-text":
+        from pr_text import pr_text_command
+
+        return pr_text_command(ROOT, args.pr)
     if args.command == "gap-issue":
         from gap_issue import file_gap
 
@@ -801,14 +833,16 @@ def check_command(args: "Namespace") -> int:
     from process_group import exit_when_stopped
     from tool_setup import ensure_python_runtime
 
-    if args.shard != "merge":
+    if not merging_in_workflow(args.shard):
         ensure_python_runtime()
     exit_when_stopped()
     if args.commit_secrets:
         from gate_times import gate_budget
         from gitleaks_scan import commit_secret_scan
+        from push_text import push_text_checks
 
-        return commit_secret_scan(ROOT, args.base, gate_budget(ROOT))
+        judged = push_text_checks(ROOT, args.base)
+        return commit_secret_scan(ROOT, args.base, gate_budget(ROOT)) or judged
     return check(
         base=args.base,
         plan_stage=args.plan_stage,
@@ -838,26 +872,7 @@ def main() -> int:
     )
     checks.add_argument("--base", help="Git base; unknown impact runs all checks")
     checks.add_argument("--plan-stage", choices=("Draft", "Ready", "Complete"))
-    checks.add_argument(
-        "--without-dependents",
-        action="store_true",
-        help="Check changed packages only; CI checks their dependents",
-    )
-    checks.add_argument(
-        "--related-tests",
-        action="store_true",
-        help="Run only JavaScript tests related to the change; CI runs them all",
-    )
-    checks.add_argument(
-        "--quick",
-        action="store_true",
-        help="Run only format, lint, types and the file secret scan; the Stop hook uses it",
-    )
-    checks.add_argument(
-        "--commit-secrets",
-        action="store_true",
-        help="Run only the secret scan of the commits since --base; pre-push uses it when CI runs the full check",
-    )
+    add_scope_options(checks)
     impacts = add_language_filters(
         commands.add_parser(
             "impact",
@@ -880,6 +895,7 @@ def main() -> int:
         help="List known slow patterns in the named files, else the whole repository",
     ).add_argument("paths", nargs="*")
     add_walls_command(commands.add_parser)
+    add_browser_command(commands.add_parser)
     mutating = commands.add_parser(
         "mutation",
         help="Report changed lines whose tests miss small deliberate bugs",
@@ -911,9 +927,12 @@ def main() -> int:
     )
     challenging.add_argument(
         "--host",
-        choices=("claude", "codex"),
+        choices=("claude", "codex", "agy"),
         help="The running agent, only when it cannot be detected",
     )
+    commands.add_parser(
+        "pr-text", help="Run the CI PR text check on a pull request"
+    ).add_argument("--pr", required=True, help="PR URL or number")
     commands.add_parser(
         "gap-issue", help="File a Hard Eng issue for a check it lacks"
     ).add_argument("text", help="the missing check, described generically")
@@ -931,7 +950,7 @@ def main() -> int:
     shipping.add_argument("--merge-method", choices=("rebase",), default="rebase")
     for event in ("session", "stop"):
         hook = commands.add_parser(event, help=f"Handle a native {event} hook")
-        hook.add_argument("agent", choices=("claude", "codex"))
+        hook.add_argument("agent", choices=("claude", "codex", "agy"))
     args = parser.parse_args()
     if args.command == "check":
         return check_command(args)
@@ -952,6 +971,7 @@ def main() -> int:
         "gap-issue",
         "ci-usage",
         "hot-paths",
+        "pr-text",
         "text-walls",
     }:
         return deliver(args)

@@ -47,6 +47,7 @@ Evidence: [TODO: Preview shown + inspected; nonvisual work replaces this section
 Surface: [TODO: Existing, New or Mock — actual route/design-system owners]
 Before: [TODO: Markdown image; only Mock or no-prior-UI New may explain N/A — reason]
 Proposed: [TODO: Markdown image of rendered proposal]
+Controls: [TODO: one entry per control that the plan adds or changes, or `None — <reason>`; see the Record rule in ux.md]
 Capture: [TODO: Rendering/capture method + observed result]
 Review: [TODO: Inspected flow/states/devices + direction]
 Rules:
@@ -61,4 +62,4 @@ E2E: Required — [TODO: Journey + E2E test + expected proof; Complete needs Pas
 Real service: Required — [TODO: <name of the service>: the changed calls that will run one time against the real service, per HE-REAL-SERVICE-RUN; Complete needs Passed — <service>: what ran + what it returned; no outside service called → N/A — reason; no approved test account → keep Required, set the plan to Draft + ask the user; only the user can approve a skip: N/A — user, <place of the decision>: <reason>]
 Retro: [TODO: Required on Complete plans; write it at task end per HE Learn's Retro section, before setting Status: Complete]
 
-[TODO: If shipping: Delivery target: PR, Merge or Deploy; Delivery: Pending — required remote proof.]
+[TODO: If shipping: a line `Delivery target: PR`, `Merge` or `Deploy` with nothing else on it, then a line `Delivery: Pending — required remote proof.`]

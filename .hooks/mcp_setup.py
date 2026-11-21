@@ -129,6 +129,10 @@ def repository_launcher(root: Path, command: object) -> str | None:
     return command
 
 
+def server_url(server: JsonObject) -> object:
+    return server.get("url") or server.get("serverUrl")
+
+
 def appwrite_cloud_url(value: object) -> bool:
     return value in (APPWRITE_CLOUD_MCP_URL, APPWRITE_CLOUD_MCP_URL.rstrip("/"))
 
@@ -148,6 +152,7 @@ def existing_servers(root: Path, service: str) -> list[JsonObject]:
         ".mcp.json",
         ".github/mcp.json",
         ".codex/config.toml",
+        ".agents/mcp_config.json",
     ):
         path = root / name
         if not path.exists():
@@ -190,7 +195,9 @@ def appwrite_server(root: Path) -> JsonObject | None:
             "Conflicting Appwrite launcher definitions; resolve the intended service before setup"
         )
     configured_launcher = next(iter(launchers), None)
-    configured_cloud = any(appwrite_cloud_url(server.get("url")) for server in existing)
+    configured_cloud = any(
+        appwrite_cloud_url(server_url(server)) for server in existing
+    )
     cloud = (
         appwrite_cloud_endpoint(endpoint_value)
         if endpoint_value is not None
@@ -247,7 +254,7 @@ def sentry_server(root: Path) -> JsonObject | None:
     existing = existing_servers(root, "sentry")
     host = service_value(existing, "SENTRY_HOST")
     cloud = host is not None and (host == "sentry.io" or host.endswith(".sentry.io"))
-    targets = {str(server.get("url") or server.get("command")) for server in existing}
+    targets = {str(server_url(server) or server.get("command")) for server in existing}
     if os.environ.get("SENTRY_MCP_URL"):
         targets.add(os.environ["SENTRY_MCP_URL"])
     if len(targets) > 1:
@@ -611,12 +618,39 @@ def configure_mcp(root: Path, changes: dict[str, str]) -> list[str]:
         changes[settings_name] = json_file(root, settings)
     approve_claude_servers(root, changes, sorted(detected.keys() & existing.keys()))
     codex_retired, codex_config = configure_codex_mcp(root, changes, detected)
-    retired += codex_retired + retire_copilot_mcp(root, existing, codex_config)
+    agy_retired = configure_agy_mcp(root, changes, detected)
+    retired += (
+        codex_retired + agy_retired + retire_copilot_mcp(root, existing, codex_config)
+    )
     if any(not contained(root, root / name) for name in retired):
         raise ValueError(
             "Retired files are reached through a linked directory; preserve the shared targets before setup"
         )
     return retired
+
+
+def configure_agy_mcp(
+    root: Path, changes: dict[str, str], detected: dict[str, JsonObject]
+) -> list[str]:
+    name = ".agents/mcp_config.json"
+    target = root / name
+    current: JsonObject = read_project_file(target, root) if target.exists() else {}
+    before = json.dumps(current)
+    existing = current.setdefault("mcpServers", {})
+    if not isinstance(existing, dict):
+        raise TypeError(f"Conflicting MCP servers in {name}; expected an object")
+    for server in {
+        key for key, settings in existing.items() if retired_server(key, settings)
+    }:
+        del existing[server]
+    for plugin in sorted(detected.keys() - existing.keys()):
+        existing[plugin] = detected[plugin]
+    if json.dumps(current) == before:
+        return []
+    if current == {"mcpServers": {}}:
+        return [name] if target.exists() else []
+    changes[name] = json_file(root, current)
+    return []
 
 
 def configure_codex_mcp(

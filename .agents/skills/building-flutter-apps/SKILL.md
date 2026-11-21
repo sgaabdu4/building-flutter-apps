@@ -116,7 +116,7 @@ Internal check after each `.dart` / `pubspec.yaml` / `build.yaml` / `analysis_op
 ### T1 — State / Notifier / Mutation
 
 - [ ] Mutation deps resolve lazily via stateless helper/mixin; no notifier-local repo/service cache except disposable lifecycle owners.
-- [ ] Sync `Notifier.build()` avoids pre-return `state` reads; async primary state uses `AsyncNotifier.build`; durable sync startup does not depend on microtask timing before its owner/listener exists.
+- [ ] Sync `Notifier.build()` avoids pre-return `state` reads; async primary state uses `AsyncNotifier.build`; later work starts at the event that causes it, with no frame callback or zero-delay wait.
 - [ ] `ref.onDispose()` cancels subscriptions/controllers/timers; durable status/snackbar/teardown belongs to notifier state.
 - [ ] Long-running sync/auth/import guards stale writes; no `ref.watch` inside notifier methods.
 - [ ] Pause-sensitive projections watch base state directly; route pause/resume keeps the first update; auth/form mode changes clear transient errors.

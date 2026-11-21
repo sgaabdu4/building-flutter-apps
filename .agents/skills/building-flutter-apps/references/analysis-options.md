@@ -53,7 +53,14 @@ feature code needs them.
   Dart setters cannot be `async`, and these mutation methods must remain
   awaitable.
 - Codegen warnings stay visible. Fix an annotation package or generator constraint when generated annotations are incompatible. Do not silence annotation diagnostics with an analyzer error override.
-- Exclude: `*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`
+- Exclude: `*.g.dart`, `*.freezed.dart`, `*.gr.dart`, `*.arb`, and the one gen-l10n
+  main file (`lib/l10n/app_localizations.dart` by default; use the path from
+  `output-dir` and `output-localization-file` in `l10n.yaml`). Never exclude
+  with a glob such as `app_localizations*.dart`: it hides handwritten files and
+  the per-language files. In a Hard Eng project every excluded file must be
+  generated: mark the gen-l10n main file and any generator output without the
+  generated header (for example `hive_registrar.g.dart`) `linguist-generated`
+  in `.gitattributes`.
 
 ## Install
 
@@ -66,7 +73,7 @@ Plugin block:
 ```yaml
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.13.4
+  flutter_skill_lints: ^0.14.0
 ```
 
 Match bundled [`references/analysis_options.yaml`](analysis_options.yaml)

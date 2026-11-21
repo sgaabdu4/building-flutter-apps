@@ -365,17 +365,17 @@ Notifier structure = [state-management/notifier-structure.md](state-management/n
 sealed class ProductState with _$ProductState {
   const factory ProductState({
     @Default([]) List<Product> items,
-    @Default(false) bool isLoading,
-    AppError? error,
   }) = _ProductState;
 }
 
-@Riverpod(keepAlive: true)
+// noRetry: the failed view shows at once. See riverpod-codegen.md#automatic-retry.
+@Riverpod(keepAlive: true, retry: noRetry)
 class ProductNotifier extends _$ProductNotifier {
+  // The first read or watch starts the load; AsyncValue carries loading and error. See notifier-structure.md.
   @override
-  ProductState build() {
-    unawaited(.microtask(_load)); // Defer — see notifier-structure.md "Sync notifier init trap"
-    return const ProductState(isLoading: true);
+  Future<ProductState> build() async {
+    final items = await ref.read(productRepositoryProvider).fetchAll();
+    return ProductState(items: items);
   }
 
   // ... see notifier-structure.md and async-mutations.md.
@@ -389,15 +389,18 @@ class ProductListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isLoading = ref.watch(
-      productProvider.select((s) => s.isLoading),
+    final failed = ref.watch(
+      productProvider.select((s) => s.hasError && !s.isLoading),
     );
 
     final items = ref.watch(
-      productProvider.select((s) => s.items),
+      productProvider.select((s) => s.value?.items),
     );
 
-    if (isLoading) return const Center(child: CircularProgressIndicator());
+    if (items == null && failed) {
+      return ProductLoadFailedView(onRetry: () => ref.invalidate(productProvider));
+    }
+    if (items == null) return const Center(child: CircularProgressIndicator());
 
     return ProductListView(
       items: UnmodifiableListView([

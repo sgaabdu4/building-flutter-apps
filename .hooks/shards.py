@@ -21,6 +21,7 @@ from retry_forms import PYTEST_FILES
 COLLECTED_FILE = re.compile(r"^(\S.*): [0-9]+$", re.MULTILINE)
 KEPT = "coverage/shards"
 PROVEN = "proven.txt"
+FALLOW_STEP = "      - name: Keep the Fallow report"
 RAN = "ran.txt"
 RELEASE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 MINIMUM_DECIMALS_FROM = (7, 17, 1)
@@ -596,6 +597,31 @@ def split_job(content: str, numbers: str) -> str | None:
         + UPLOAD_STEP
         + "\n"
         + GATE_JOB % checkout[0]
+    )
+
+
+def add_fallow_report(template: str, content: str) -> str:
+    """Add the failure-only Fallow report upload that the template ends with, to a generated one-job or split workflow that lacks it."""
+    start = template.find(FALLOW_STEP)
+    if start < 0 or "hard-eng-fallow-report" in content:
+        return content
+    step = template[start:]
+    names = JOB_NAME.findall(content.partition("\njobs:\n")[2])
+    last = content.rstrip("\n").rpartition("\n")[2]
+    if names == ["hard-eng"] and last.endswith('check --base "$BASE_SHA"'):
+        return content.rstrip("\n") + "\n" + step
+    if names != ["checks", "tests", "hard-eng"]:
+        return content
+    checks, _, rest = content.partition("\n  tests:\n")
+    if not checks.rstrip("\n").endswith("--shard rest"):
+        return content
+    upload = "      - name: Keep the shard reports\n"
+    return (
+        checks.rstrip("\n")
+        + "\n"
+        + step
+        + "\n  tests:\n"
+        + rest.replace(upload, step + upload, 1)
     )
 
 

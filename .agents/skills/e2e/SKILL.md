@@ -27,6 +27,13 @@ flowchart LR
 
 OS-owned dialogs → platform control beyond the app tree. Browser exploration → durable regressions in existing tests. API/CLI journeys need UI runtime only when the journey includes it.
 
+## Drive a browser
+
+- A browser step or capture that is not part of the project's own browser tests → `python3 .hooks/hard-eng.py browser`. It installs agent-browser itself, so install or run no other browser tool.
+- `browser --session S <step>` runs one plain step. `browser capture` writes whole-page images at 390, 768 and 1280 px. It adds red boxes, hides emails and phone numbers, and writes a record of measured findings next to each image. `python3 .hooks/hard-eng.py look <image>...` opens each image in the other agent CLI ([challenge](../code-review/references/challenge.md)) and judges it against the Usability rules. If that CLI is missing, it uses a fresh session of this agent. Run it on the After images after the last commit. Put its block in the PR body before you run `challenge` and `ship --stage ready`. `browser signin` saves a sign-in for `--state`. It reads the username and password itself, from the environment or from the role's `env_file`. Never open, print or copy that file or those values.
+- Every `browser` call needs `--session NAME`. Use one name for all the plain steps of one agent, and a separate name for each `capture` or `signin`. Never `close --all`. Close each session that you opened with plain steps.
+- Before the first call, read [the browser command](references/browser.md): capture limits, sign-in roles, and Codex and Linux setup.
+
 ## Prove the journey
 
 - Establish requested behavior, environment/build, actors, permissions and starting data. A reused server or app must run this checkout's current build. Exercise the real user path with stable semantic selectors and observable state waits.

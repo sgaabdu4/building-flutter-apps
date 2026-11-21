@@ -450,18 +450,45 @@ class _ProductTabState extends State<ProductTab>
 }
 ```
 
-## Post-Frame Callbacks
+## Start Work at Its Trigger
 
-Defer work til after current frame render:
+The trigger is the event that causes the work. Start the work there. Never defer it to the next frame with `addPostFrameCallback`, `scheduleFrameCallback` or `endOfFrame`. Never delay it with a zero-delay wait: `scheduleMicrotask`, `Future.microtask`, `Future.delayed(Duration.zero)`, `Timer(Duration.zero)`, `Timer.run` or `await null`. Also refused: a `Future(...)` call that runs the work in a later turn of the event loop, and `await Future.value()` that only yields.
+
+- User action: run the work in the event handler.
+- State change: the notifier method that changes state also records that a reaction is due, here as a serial number. A widget that is already mounted reacts with `ref.listen` in `build()` ([UI effects](state-management/async-mutations.md#ui-effects)).
 
 ```dart
-@override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!context.mounted) return;
-    ref.read(welcomeProvider.notifier).maybeShowWelcomeMessage();
-  });
+@Riverpod(keepAlive: true)
+class WelcomeNotifier extends _$WelcomeNotifier {
+  @override
+  WelcomeState build() => const WelcomeState();
+
+  // The sign-in success path calls this.
+  void maybeShowWelcomeMessage() {
+    if (state.welcomeShown) return;
+    state = state.copyWith(
+      welcomeShown: true,
+      messageSerial: state.messageSerial + 1,
+    );
+  }
 }
 
+class SignInScreen extends ConsumerWidget {
+  const SignInScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(
+      welcomeProvider.select((state) => state.messageSerial),
+      (previous, next) {
+        if (previous != next && context.mounted) {
+          showWelcomeSnackBar(context, context.l10n);
+        }
+      },
+    );
+    return const SignInView();
+  }
+}
 ```
+
+This listener belongs to one screen. Use it only when that screen stays on display until the message shows, as `SignInScreen` does while sign-in runs. If the screen can pause or leave first, keep the message in durable state with an event identity, deliver it as the pause boundaries list says, and acknowledge it after it shows ([pause boundaries](state-management-lifecycle.md#pause-projection-and-mode-boundaries)).

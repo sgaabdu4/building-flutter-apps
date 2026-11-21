@@ -16,14 +16,13 @@ from urllib.parse import urlparse
 from agent_hooks import reject_attribution
 from gate_config import JsonValue
 from project_files import parse_project_text, read_project_file
-from ship_evidence import attachment_urls
 
 REPOSITORY_NAME_PART = re.compile(r"[A-Za-z0-9_.-]+")
-HTTP_STATUS_LINE = re.compile(r"(?im)^HTTP/\S+\s+(\d{3})\b")
-CONTENT_TYPE_HEADER = re.compile(r"(?im)^content-type:\s*([^\r\n]+)")
-CONTENT_LENGTH_HEADER = re.compile(r"(?im)^content-length:\s*([^\r\n]+)")
 DELIVERY_TARGET_LINE = re.compile(
     r"(?im)^\s*(?:[-*+]\s+)?Delivery target:\s*(PR|Merge|Deploy)\s*$"
+)
+ONE_TARGET = (
+    "Verification needs one Delivery target: PR, Merge or Deploy, alone on its line"
 )
 
 Delivery = TypedDict("Delivery", {"name": str, "command": list[str]})
@@ -58,6 +57,7 @@ class Shipment:
     delivery_target: str
     review_bypass: bool = False
     rule_note: str | None = None
+    method: str = "rebase"
 
 
 class ShippingError(ValueError):
@@ -113,6 +113,7 @@ class _PullRequest:
     merge_commit_sha: str | None
     commits: int
     rebaseable: bool | None = field(compare=False)
+    default_branch: str | None = field(default=None, compare=False)
 
 
 def _run(
@@ -431,6 +432,11 @@ def _pull(root: Path, owner: str, name: str, number: int) -> _PullRequest:
         ),
         commits=commits,
         rebaseable=rebaseable,
+        default_branch=_optional_text(
+            _object(base.get("repo"), "PR base repository"),
+            "default_branch",
+            "PR base repository",
+        ),
     )
 
 
@@ -560,6 +566,7 @@ def _checks(
     *,
     completed_only: bool = False,
     push_only: bool = False,
+    branch: str | None = None,
 ) -> None:
     endpoint = (
         f"repos/{repository}/commits/{revision}/check-runs?per_page=100&filter=all"
@@ -579,7 +586,7 @@ def _checks(
             and (finished or not completed_only)
         ):
             by_name[name].append(item)
-    base = policy["base"]
+    base = branch or policy["base"]
     suites = _push_suites(root, repository, revision, base) if push_only else set()
     for name, candidates in by_name.items():
         if not candidates:
@@ -622,70 +629,19 @@ def passed_branch_point(root: Path) -> str | None:
     return point
 
 
-def changed_paths(root: Path, owner: str, name: str, number: int) -> list[str]:
-    endpoint = f"repos/{owner}/{name}/pulls/{number}/files?per_page=100"
-    items = _api_items(root, endpoint, "files", "PR files query")
-    paths: list[str] = []
-    for item in items:
-        filename = item.get("filename")
-        if not isinstance(filename, str) or not filename.strip():
-            raise ShippingError("PR files query has an invalid filename")
-        paths.append(filename)
-        previous = item.get("previous_filename")
-        if previous is not None:
-            if not isinstance(previous, str) or not previous.strip():
-                raise ShippingError("PR files query has an invalid previous filename")
-            paths.append(previous)
-    return sorted(set(paths))
-
-
-def _check_attachment(root: Path, url: str) -> None:
-    parsed = urlparse(url)
-    if (
-        parsed.scheme != "https"
-        or parsed.hostname != "github.com"
-        or parsed.query
-        or parsed.fragment
-        or not parsed.path.startswith("/user-attachments/assets/")
-    ):
-        raise ShippingError("UI evidence URL is not an allowed GitHub attachment")
-    # Signed attachment redirects can reject HEAD; keep binary data out of stdout.
-    request = ("api", "--method", "GET", "--include", "--silent")
-    try:
-        response = gh(root, *request, "-H", "Range: bytes=0-0", url)
-    except ShippingError:
-        # GitHub can time out ranged requests while a plain GET succeeds.
-        try:
-            response = gh(root, *request, url)
-        except ShippingError as error:
-            raise ShippingError(
-                f"UI evidence attachment is unavailable: {url} ({error})"
-            ) from error
-    statuses = HTTP_STATUS_LINE.findall(response)
-    if not statuses or not 200 <= int(statuses[-1]) < 300:
-        raise ShippingError(f"UI evidence attachment is unavailable: {url}")
-    content_types = CONTENT_TYPE_HEADER.findall(response)
-    content_type = content_types[-1].lower() if content_types else ""
-    if not content_type.startswith(("image/", "video/")):
-        raise ShippingError("UI evidence attachment is not image or video")
-    lengths = CONTENT_LENGTH_HEADER.findall(response)
-    if lengths:
-        try:
-            if int(lengths[-1]) <= 0:
-                raise ValueError
-        except ValueError as error:
-            raise ShippingError("UI evidence attachment has invalid length") from error
-
-
 def _ui_evidence(
-    root: Path, pull: _PullRequest, paths: list[str], policy: ShippingPolicy
+    root: Path,
+    pull: _PullRequest,
+    files: list[dict[str, JsonValue]],
+    policy: ShippingPolicy,
+    plan: Path | None,
 ) -> None:
+    from ui_proof import check_attachment, ui_evidence
+
     try:
-        urls = attachment_urls(pull.body, paths, policy["ui_paths"])
+        ui_evidence(root, pull, files, policy["ui_paths"], plan, check_attachment)
     except ValueError as error:
         raise ShippingError(str(error)) from error
-    for url in urls:
-        _check_attachment(root, url)
 
 
 def _root_and_branch(root: Path, require_branch: bool) -> tuple[Path, str, str]:
@@ -744,6 +700,12 @@ def _plan_target(root: Path, plan: Path) -> tuple[Path, str]:
 
         if validate_plan(resolved_plan) != "Complete":
             raise ShippingError("shipping requires a Complete plan")
+        from plan_controls import plan_root, tracked_problem
+
+        if problem := tracked_problem(
+            resolved_plan.read_text(), plan_root(resolved_plan)
+        ):
+            raise ShippingError(problem)
         sections = plan_sections(resolved_plan.read_text())
     except ShippingError:
         raise
@@ -753,9 +715,7 @@ def _plan_target(root: Path, plan: Path) -> tuple[Path, str]:
         ) from error
     targets = DELIVERY_TARGET_LINE.findall(sections["Verification"])
     if len(targets) != 1:
-        raise ShippingError(
-            "Verification needs one Delivery target: PR, Merge or Deploy"
-        )
+        raise ShippingError(ONE_TARGET)
     return resolved_plan, targets[0]
 
 
@@ -769,11 +729,11 @@ def target_problem(target: str, delivery: list[Delivery]) -> str | None:
 
 def plan_target_problem(root: Path, verification: str) -> str | None:
     """Why the delivery target in a plan's Verification does not fit the shipping policy."""
+    targets = DELIVERY_TARGET_LINE.findall(verification)
+    if len(targets) != 1:
+        return ONE_TARGET
     policy = load_policy(root)
-    target = DELIVERY_TARGET_LINE.search(verification)
-    if policy is None or not target:
-        return None
-    return target_problem(target[1], policy["delivery"])
+    return None if policy is None else target_problem(targets[0], policy["delivery"])
 
 
 def _delivery_scope(
@@ -850,10 +810,14 @@ def _compare(root: Path, repository: str, base: str, head: str) -> dict[str, Jso
 
 
 def _current_with_base(
-    root: Path, identity: tuple[str, str, int], base: str, head: str
+    root: Path, identity: tuple[str, str, int], pull: _PullRequest, shipping_base: str
 ) -> None:
-    comparison = _compare(root, "/".join(identity[:2]), base, head)
-    behind = comparison.get("behind_by")
+    from ship_record import route
+
+    if route(root, pull, shipping_base) in ("release", "join"):
+        return
+    repository, base = "/".join(identity[:2]), pull.base_ref
+    behind = _compare(root, repository, base, pull.head_sha).get("behind_by")
     if type(behind) is not int:
         raise ShippingError("PR comparison with its base is invalid")
     if behind:
@@ -875,7 +839,7 @@ def _ready_state(
         raise ShippingError("PR must be open and ready for review")
     if branch != pull.head_ref or local_head != pull.head_sha:
         raise ShippingError("local task branch or HEAD does not match PR")
-    if branch == policy["base"]:
+    if branch == policy["base"] and pull.base_ref == policy["base"]:
         raise ShippingError("shipping requires a task branch distinct from base")
     threads = _complete_nodes(
         _graphql_pull(root, *identity, _THREADS_QUERY)[1].get("reviewThreads")
@@ -883,20 +847,23 @@ def _ready_state(
     if threads is None or any(node.get("isResolved") is not True for node in threads):
         raise ShippingError("a review conversation is unresolved or uncounted")
     from change_size import commits_problem
-    from pr_text import body_problem
+    from pr_text import body_problem, ready_problem
     from ship_actions import rebase_problem
+    from ship_record import route
 
+    found = route(root, pull, policy["base"])
     if problem := (
-        body_problem(pull.body)
-        or commits_problem(pull.commits)
+        ready_problem(pull, root, identity[2])
+        or body_problem(pull.body)
+        or (None if found in ("release", "join") else commits_problem(pull.commits))
         or (
             rebase_problem(root, "/".join(identity[:2]), pull.base_ref, pull.head_sha)
-            if pull.rebaseable is False
+            if pull.rebaseable is False and found is None
             else None
         )
     ):
         raise ShippingError(problem)
-    _current_with_base(root, identity, pull.base_ref, pull.head_sha)
+    _current_with_base(root, identity, pull, policy["base"])
     if pull.mergeable is not True or pull.mergeable_state != "clean":
         _checks(root, "/".join(identity[:2]), pull.head_sha, policy, True)
     bypass = pull.mergeable is True and pull.mergeable_state == "blocked"
@@ -930,7 +897,28 @@ def _delivery(root: Path, policy: ShippingPolicy, revision: str, pr_url: str) ->
             )
 
 
+def _plan_scope(
+    root: Path,
+    plan: Path | None,
+    policy: ShippingPolicy,
+    identity: tuple[str, str, int],
+) -> tuple[Path | None, str]:
+    """The plan and delivery target; a release, hotfix or join needs no plan even when the branch is big."""
+    from ship_record import route
+
+    try:
+        return _delivery_scope(root, plan, policy["delivery"])
+    except ShippingError:
+        found = route(root, _pull(root, *identity), policy["base"])
+        if plan is not None or found not in ("release", "join"):
+            raise
+        return None, "Deploy" if policy["delivery"] else "Merge"
+
+
 def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
+    from ship_record import base_matches, ship_method
+    from ui_proof import changed_files
+
     if stage not in {"ready", "delivered"}:
         raise ShippingError("shipping stage must be ready or delivered")
     policy = cast(ShippingPolicy, load_policy(root, required=True))
@@ -942,12 +930,14 @@ def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
     if repository != f"{owner}/{name}".lower():
         raise ShippingError("PR URL repository does not match origin")
     _clean(resolved_root)
-    resolved_plan, target = _delivery_scope(resolved_root, plan, policy["delivery"])
+    resolved_plan, target = _plan_scope(
+        resolved_root, plan, policy, (owner, name, number)
+    )
     if problem := target_problem(target, policy["delivery"]):
         raise ShippingError(problem)
     pull = _pull(resolved_root, owner, name, number)
     reject_attribution(resolved_root, "pr", pull.body, "PR body", ShippingError)
-    if pull.base_ref != policy["base"]:
+    if not base_matches(resolved_root, pull, policy["base"]):
         raise ShippingError("PR base branch does not match shipping policy")
     if pull.base_repository != repository or pull.head_repository != repository:
         raise ShippingError("PR repository or head repository does not match origin")
@@ -964,11 +954,11 @@ def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
             )
             revision, merged_sha = pull.head_sha, None
         else:
-            revision = _delivered(resolved_root, pull, policy["base"], origin_url)
+            revision = _delivered(resolved_root, pull, pull.base_ref, origin_url)
             merged_sha = revision
         if policy["ui_paths"]:
-            paths = changed_paths(resolved_root, owner, name, number)
-            _ui_evidence(resolved_root, pull, paths, policy)
+            files = changed_files(resolved_root, owner, name, number)
+            _ui_evidence(resolved_root, pull, files, policy, resolved_plan)
         _checks(
             resolved_root,
             repository,
@@ -976,12 +966,14 @@ def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
             policy,
             True,
             push_only=stage == "delivered",
+            branch=pull.base_ref,
         )
         if stage == "delivered" and target == "Deploy":
             _delivery(resolved_root, policy, revision, url)
         current = _pull(resolved_root, owner, name, number)
         if current != pull:
             raise ShippingError("PR changed during shipping verification")
+    method = ship_method(resolved_root, repository, pull, policy["base"], stage, number)
     return Shipment(
         root=resolved_root,
         plan=resolved_plan,
@@ -996,4 +988,5 @@ def verify(root: Path, plan: Path | None, pr_url: str, stage: str) -> Shipment:
         delivery_target=target,
         review_bypass=review_bypass,
         rule_note=rule_note,
+        method=method,
     )

@@ -3,8 +3,8 @@
 import re
 from pathlib import Path, PurePosixPath
 
-from comments import JAVASCRIPT
 from plans import _is_test
+from source_scan import JAVASCRIPT
 
 NONZERO = r"(?!\s*(?:0|false|null)\b)\s*\S"
 COUNT = r"\s*[1-9]\d*\s*(?:[,})]|$)"
