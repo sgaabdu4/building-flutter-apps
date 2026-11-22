@@ -285,7 +285,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, sys.argv[1])
-from project_setup import validate_dart_exclusions
+from dart_boundaries import validate_dart_exclusions
 
 package = Path(sys.argv[2])
 options = yaml.safe_load((package / 'analysis_options.yaml').read_text())
