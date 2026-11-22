@@ -1,0 +1,6 @@
+interface:
+  display_name: "Client Report"
+  short_description: "Make a client change report as a PDF from the approved template"
+  default_prompt: "Use $client-report to make the client's change report as a PDF from the project's approved template and live pictures."
+policy:
+  allow_implicit_invocation: true

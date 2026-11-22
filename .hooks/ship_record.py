@@ -96,11 +96,12 @@ def base_matches(root: Path, pull: Pull, base: str) -> bool:
 
 
 def merge_method(root: Path, repository: str, pull: Pull, base: str) -> str:
-    """rebase; a merge commit for a release, hotfix or join; or the method a rebase-forbidding repository allows."""
+    """rebase; a merge commit for a release or hotfix; join for a join, which needs its protection step; or the method a rebase-forbidding repository allows."""
     from shipping import ShippingError, merge_settings
 
-    if route(root, pull, base) is not None:
-        return "merge"
+    found = route(root, pull, base)
+    if found is not None:
+        return "join" if found == "join" else "merge"
     if pull.rebaseable is not False:
         return "rebase"
     try:

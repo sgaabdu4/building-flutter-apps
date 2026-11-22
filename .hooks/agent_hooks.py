@@ -332,7 +332,12 @@ CODEX_MERGE_RULE = "".join(
 
 def codex_rule_change(root: Path) -> dict[str, str]:
     rules = root / CODEX_RULES_FILE
-    if rules.is_file() and rules.read_text() == CODEX_MERGE_RULE:
+    if (
+        not rules.is_symlink()
+        and rules.is_file()
+        and rules.resolve() == root.resolve() / CODEX_RULES_FILE
+        and rules.read_text() == CODEX_MERGE_RULE
+    ):
         return {}
     return {CODEX_RULES_FILE: CODEX_MERGE_RULE}
 

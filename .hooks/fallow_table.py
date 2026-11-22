@@ -48,6 +48,7 @@ FALLOW_KEYS = {
     "health.coverageRoot": "free",
     "health.ignore": "patterns",
     "health.suggestInlineSuppression": "equal",
+    "health.inlineThresholdOverrides": "free",
     "health.thresholdOverrides": "limits",
     "rules": "rules",
     "overrides": "rules",

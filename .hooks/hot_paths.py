@@ -52,6 +52,20 @@ JS_TIMEOUT = re.compile(
     rf"(?<![\w$.])(?:(?:window|globalThis|self|global){BREAK}\.{BREAK})?setTimeout{BREAK}\(",
     re.DOTALL,
 )
+PROMISE_TIMER_ESM = re.compile(
+    r"import\s*(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}\s*from\s*[\"'](?:node:)?timers/promises[\"']",
+    re.DOTALL,
+)
+PROMISE_TIMER_CJS = re.compile(
+    r"^(?:const|let|var)\s*\{([^}]*)\}\s*=\s*require\s*\(\s*[\"'](?:node:)?timers/promises[\"']\s*\)",
+    re.DOTALL | re.MULTILINE,
+)
+PROMISE_TIMER_ESM_BINDING = re.compile(
+    r"(?<![\w$])setTimeout(?:\s+as\s+([A-Za-z_$][\w$]*))?(?![\w$])"
+)
+PROMISE_TIMER_CJS_BINDING = re.compile(
+    r"(?<![\w$])setTimeout(?:\s*:\s*([A-Za-z_$][\w$]*))?(?![\w$])"
+)
 SHORT_NUMBER = re.compile(r"(?:\d+(?:\.\d*)?|\.\d+)")
 GENERIC = r"(?:<[^()]*>)?"
 DART_FORMS = re.compile(
@@ -129,6 +143,18 @@ def call_arguments(text: str, start: int, suffix: str) -> list[str] | None:
     return None
 
 
+def promise_timer_names(source: str) -> set[str]:
+    names: set[str] = set()
+    for pattern, binding in (
+        (PROMISE_TIMER_ESM, PROMISE_TIMER_ESM_BINDING),
+        (PROMISE_TIMER_CJS, PROMISE_TIMER_CJS_BINDING),
+    ):
+        for block in pattern.findall(source):
+            for match in binding.finditer(block):
+                names.add(match[1] or "setTimeout")
+    return names
+
+
 def short_javascript_delay(arguments: list[str] | None) -> bool:
     if arguments is None or len(arguments) < 2:
         return True
@@ -136,22 +162,51 @@ def short_javascript_delay(arguments: list[str] | None) -> bool:
     return bool(SHORT_NUMBER.fullmatch(delay)) and float(delay) < 17
 
 
+def short_promise_delay(arguments: list[str] | None) -> bool:
+    if arguments is None or not arguments:
+        return True
+    delay = arguments[0].strip()
+    if delay in {"", "undefined"}:
+        return True
+    return bool(SHORT_NUMBER.fullmatch(delay)) and float(delay) < 17
+
+
 def short_dart_delay(arguments: list[str] | None) -> bool:
     return arguments is None or bool(SHORT_DURATION.fullmatch(arguments[0].strip()))
 
 
-def hidden_deferral(text: str, suffix: str) -> str | None:
+def hidden_js_timeout(text: str, suffix: str, promise_names: set[str]) -> str | None:
+    for call in JS_TIMEOUT.finditer(text):
+        unqualified = "." not in call[0]
+        checker = (
+            short_promise_delay
+            if unqualified and "setTimeout" in promise_names
+            else short_javascript_delay
+        )
+        if checker(call_arguments(text, call.end(), suffix)):
+            return " ".join(call[0].split())
+    for name in sorted(promise_names - {"setTimeout"}):
+        alias_calls = re.compile(rf"(?<![\w$.]){re.escape(name)}{BREAK}\(", re.DOTALL)
+        for call in alias_calls.finditer(text):
+            if short_promise_delay(call_arguments(text, call.end(), suffix)):
+                return " ".join(call[0].split())
+    return None
+
+
+def hidden_deferral(text: str, suffix: str, file_text: str | None = None) -> str | None:
     """The first zero-delay or next-frame call that the text holds, as the text spells it."""
     dart = suffix == ".dart"
-    forms, calls = (DART_FORMS, DART_DELAY) if dart else (JS_FORMS, JS_TIMEOUT)
-    short = short_dart_delay if dart else short_javascript_delay
-    text = code_without_comments(text, suffix)
-    if found := forms.search(text):
+    forms = DART_FORMS if dart else JS_FORMS
+    cleaned = code_without_comments(text, suffix)
+    if found := forms.search(cleaned):
         return " ".join(found[0].split())
-    for call in calls.finditer(text):
-        if short(call_arguments(text, call.end(), suffix)):
-            return " ".join(call[0].split())
-    return None
+    if dart:
+        for call in DART_DELAY.finditer(cleaned):
+            if short_dart_delay(call_arguments(cleaned, call.end(), suffix)):
+                return " ".join(call[0].split())
+        return None
+    full = cleaned if file_text is None else code_without_comments(file_text, suffix)
+    return hidden_js_timeout(cleaned, suffix, promise_timer_names(full))
 
 
 def span_text(lines: list[str], span: Span) -> str:
@@ -177,7 +232,8 @@ def refuse_hidden_deferrals(spans: list[Span], root: Path) -> None:
         if name in generated:
             continue
         lines = (root / name).read_text(errors="replace").splitlines()
-        if form := hidden_deferral(span_text(lines, span), Path(name).suffix):
+        full = "\n".join(lines)
+        if form := hidden_deferral(span_text(lines, span), Path(name).suffix, full):
             found.append(f"{name}:{span['start']['line']} ({form})")
     if found:
         raise ValueError(

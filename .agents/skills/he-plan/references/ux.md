@@ -3,6 +3,7 @@
 Apply to visible changes; preview only the flow and states needed for the decision.
 
 - Grounding = inspect the actual website/screen, affected flow and token/theme/component owners in `DESIGN.md` + production code. A dashboard shell alone cannot support decisions about unseen workflows. Missing relevant context → expose the gap; never invent a baseline. A requested change that conflicts with an existing app rule (a rule in `PRODUCT.md`, `DESIGN.md` or `docs/requirements.md`, or behaviour that the code enforces) → find the rule + its reason first; say so before agreeing.
+- Before UI work, keep the real baseline for the PR comparison, even after a mock; prepare task isolation.
 - Usability = judge every proposal, mockup, review and after screenshot against each rule. A Fail means fix the design and inspect it again, before it is shown to anyone. A Pass line you type is a claim, not proof. `ship` refuses an After image with no finding-free record from `browser capture` or `browser measure`. `ship` skips this only when every changed screen file ends in `.dart` or `.swift`. For a Flutter app with a web build, take the browser capture yourself anyway. Judge against these rules:
   - Mistake-proof: risky choices blocked, right answer prefilled; ask "how could a rushed person get this wrong?".
   - Least effort (count: clicks): the app acts when sure and shows a person only what needs them, with a prefilled suggestion. Count the clicks per journey; remove any that are not essential.
