@@ -48,8 +48,7 @@ Check the dry-run's proposed lower bound against the Dart SDK bundled with your 
 
 ```bash
 # Run the --apply command printed by the dry run (for example: dart migrate --apply --target-sdk=3.13.0)
-flutter pub get
-dart migrate --dry-run --step=cleanup
+flutter pub get && dart migrate --dry-run --step=cleanup
 ```
 
 - Default steps (`prepare`, `bump`): `prepare` applies required pre-bump fixes; `bump` raises the lower `environment.sdk` bound and re-analyzes.
