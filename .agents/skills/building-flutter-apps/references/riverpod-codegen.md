@@ -277,7 +277,7 @@ try {
 
 Mutations track side-effect state (idle, pending, success, error) separately from provider state. Prevent providers from being disposed while side-effect runs.
 
-Mutation = one file-scope (top-level) `final`, not a class member → rebuilds + consumers share one instance. Name = `<verb><Noun>Mutation` (Riverpod docs).
+Mutation = one file-scope (top-level) `final`, not a class member → rebuilds + consumers share one instance. Name = `<verb><Noun>Mutation`. Both are project rules: Riverpod docs also allow a `static final` on a Notifier and name mutations `addTodo` or `addTodoMutation`.
 
 ```dart
 // features/todos/presentation/screens/add_todo_screen.dart
@@ -287,6 +287,7 @@ import 'package:flutter_riverpod/experimental/mutation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:my_app/core/extensions/extensions.dart';
+import 'package:my_app/core/widgets/atoms/app_primary_button.dart';
 
 final addTodoMutation = Mutation<void>(); // experimental API — may change without major bump
 
@@ -304,14 +305,14 @@ class AddTodoScreen extends ConsumerWidget {
     final l10n = context.l10n;
 
     return switch (addTodo) {
-      MutationIdle() => ElevatedButton(
+      MutationIdle() => AppPrimaryButton(
           onPressed: () => unawaited(_addTodo(ref)),
-          child: Text(l10n.addTodoSubmit),
+          label: l10n.addTodoSubmit,
         ),
       MutationPending() => const CircularProgressIndicator(),
-      MutationError() => ElevatedButton(
+      MutationError() => AppPrimaryButton(
           onPressed: () => unawaited(_addTodo(ref)),
-          child: Text(l10n.addTodoRetry),
+          label: l10n.addTodoRetry,
         ),
       MutationSuccess() => Text(l10n.addTodoDone),
     };

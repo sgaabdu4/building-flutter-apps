@@ -38,7 +38,8 @@ void _onQueryChanged(String query) {
   });
 }
 
-TextField(onChanged: _onQueryChanged);
+// core/widgets/molecules/app_search_field.dart composes AppTextField (which owns the raw TextField); the screen passes _onQueryChanged
+AppSearchField(onChanged: _onQueryChanged);
 
 // Slider/RangeSlider — defer terminal effects
 Slider(

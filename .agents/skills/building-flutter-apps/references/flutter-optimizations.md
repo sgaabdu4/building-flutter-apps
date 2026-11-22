@@ -34,7 +34,7 @@ ListView.builder(
 
 Rules:
 
-- Never make key inside `build()` — defeat purpose
+- Never create `UniqueKey` or `GlobalKey` in `build()`: a new key each build throws away the subtree state. Build `ValueKey`/`ObjectKey` inline from stable data, as above; never hold a key in a local variable in `build()`. Lints: `flutter_key_created_in_build`, `flutter_unique_or_global_key`.
 - Key only when state preservation matter
 - Prefer `ValueKey` > `ObjectKey` > `UniqueKey` > `GlobalKey`
 
@@ -322,9 +322,9 @@ Open output JSON in DevTools > App Size tool for per-package breakdown.
 Semantics(
   label: l10n.deleteProductSemantics(product.name),
   button: true,
-  child: IconButton(
+  child: AppIconButton(
     tooltip: l10n.deleteProductTooltip,
-    icon: const Icon(Icons.delete),
+    icon: Icons.delete,
     onPressed: () => onDelete(product.id),
   ),
 )

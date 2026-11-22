@@ -10,7 +10,7 @@
 - Before editing: state the single change, files touched + verification.
 - This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it. In code you change: fix faults at their cause, merge its copies, move code to its owner (1 commit each). Optional improvements + extra infra only on explicit request; never for robustness/best practice/future needs.
 - Scope = user request + accepted constraints; preserve unrelated work.
-- Project rules = `AGENTS.md` (Claude + Codex); move `CLAUDE.md` rules there; never recreate import wrappers or publish private local instructions.
+- Project rules = `AGENTS.md` (Claude + Codex + Antigravity); move `CLAUDE.md` rules there; no import wrappers; never publish private local rules.
 - HE-* IDs = rules in [requirements](.agents/skills/he/references/requirements.md); read the entry, cite the ID, never restate it. Project rules → `docs/requirements.md` `REQ-` IDs.
 - Before recording tracked content or publishing → apply [publication privacy](.agents/skills/he-ship/references/checks.md#publication-privacy) for the audience.
 - HE-YAGNI = ultra unless user changes it. Understand the real flow; reuse files/code/stdlib/native commands + installed deps first. Explain additions in updates; no justification files.

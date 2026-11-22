@@ -87,7 +87,7 @@ Before code, read only the narrowest matching [Trigger Map](#trigger-map) row(s)
 | Flutter/Riverpod `analysis_options.yaml`, `dart analyze`, plugin wiring, `riverpod_lint` version pin, analyzer crash | [analysis-options.md](references/analysis-options.md) + [analysis_options.yaml](references/analysis_options.yaml) |
 | Skill setup, Git pre-push, hook/scanner registration | [setup.md](references/setup.md) |
 | `build_runner`, missing generated parts, clean checkout, Xcode selection, Flutter SwiftPM generated package, Apple device build, local-vs-CI mismatch | [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
-| Package constraints, dependency upgrade, generator/analyzer compatibility | [core-stack.md](references/core-stack.md) |
+| Package constraints, dependency upgrade, Dart SDK upgrade, `dart migrate`, generator/analyzer compatibility | [core-stack.md](references/core-stack.md) |
 | Flutter Windows desktop packaging, GitHub Actions Windows installer, Inno Setup, `inno_bundle`, updater/auto-update, CRT DLLs, PowerShell/native installer process, installer/version/AppId failure | [windows-installer-pipeline.md](references/windows-installer-pipeline.md) + [build-reproducibility.md](references/build-reproducibility.md) + [core-stack.md](references/core-stack.md) |
 | Dart Decimate, dead code, circular dependency, duplicate code, complexity, dependency hygiene, full zero-finding scan | [dart-decimate.md](references/dart-decimate.md) |
 | Navigation / form / list / debounce / route-param-fallback pattern that no narrower row covers | [common-patterns.md](references/common-patterns.md) |

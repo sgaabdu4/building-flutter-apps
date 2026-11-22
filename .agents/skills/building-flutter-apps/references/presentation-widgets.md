@@ -68,8 +68,8 @@ final class ContentView extends StatelessWidget {
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
-        return ListTile(
-          title: Text(item.title),
+        return ContentItemTile(
+          title: item.title,
           onTap: () => onItemTap(item),
         );
       },
