@@ -41,11 +41,29 @@ void _onQueryChanged(String query) {
 // core/widgets/molecules/app_search_field.dart composes AppTextField (which owns the raw TextField); the screen passes _onQueryChanged
 AppSearchField(onChanged: _onQueryChanged);
 
-// Slider/RangeSlider — defer terminal effects
-Slider(
+// lib/core/widgets/atoms/app_slider.dart owns raw Slider and forwards onChangeEnd:
+// class AppSlider extends StatelessWidget {
+//   const AppSlider({
+//     required this.value,
+//     required this.onChanged,
+//     this.onChangeEnd,
+//     super.key,
+//   });
+//   final double value;
+//   final ValueChanged<double> onChanged;
+//   final ValueChanged<double>? onChangeEnd;
+//   @override
+//   Widget build(BuildContext context) => Slider(
+//     value: value,
+//     onChanged: onChanged,
+//     onChangeEnd: onChangeEnd,
+//   );
+// }
+// Feature call site — defer terminal effects to onChangeEnd:
+AppSlider(
   value: _local,
   onChanged: (v) => setState(() => _local = v),       // local UI only
-  onChangeEnd: (v) => ref.read(p.notifier).set(v),    // one notifier call
+  onChangeEnd: (v) => ref.read(p.notifier).set(v),    // sync setter (use unawaited if async)
 );
 ```
 
