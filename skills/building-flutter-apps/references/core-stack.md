@@ -44,10 +44,11 @@ When raising `environment.sdk` in `pubspec.yaml` on Dart SDK 3.14 or later, run 
 dart migrate --dry-run
 ```
 
-Check the dry-run's proposed lower bound against your running Dart SDK before applying (a pre-release SDK such as `3.14.0-beta` cannot satisfy `^3.14.0`). Then apply the migration and preview optional cleanups:
+Check the dry-run's proposed lower bound against the Dart SDK bundled with your project's Flutter toolchain (not just a standalone `dart` binary, and note that a pre-release SDK such as `3.14.0-beta` cannot satisfy `^3.14.0`). Then run the `--apply` command printed by the dry run (preserving any `--target-sdk` or `--step` flags), refresh `.dart_tool/package_config.json`, and preview optional cleanups:
 
 ```bash
-dart migrate --apply
+# Run the --apply command printed by the dry run (for example: dart migrate --apply --target-sdk=3.13.0)
+flutter pub get
 dart migrate --dry-run --step=cleanup
 ```
 
