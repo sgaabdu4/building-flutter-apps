@@ -39,7 +39,7 @@ void _onQueryChanged(String query) {
   });
 }
 
-TextField(onChanged: _onQueryChanged);
+ProductSearchField(onChanged: _onQueryChanged);
 
 // Slider/RangeSlider — defer terminal effects
 Slider(
