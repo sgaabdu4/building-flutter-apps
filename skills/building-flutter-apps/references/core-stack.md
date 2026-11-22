@@ -42,13 +42,18 @@ When raising `environment.sdk` in `pubspec.yaml` on Dart SDK 3.14 or later, run 
 
 ```bash
 dart migrate --dry-run
+```
+
+Check the dry-run's proposed lower bound against your running Dart SDK before applying (a pre-release SDK such as `3.14.0-beta` cannot satisfy `^3.14.0`). Then apply the migration and preview optional cleanups:
+
+```bash
 dart migrate --apply
 dart migrate --dry-run --step=cleanup
 ```
 
 - Default steps (`prepare`, `bump`): `prepare` applies required pre-bump fixes; `bump` raises the lower `environment.sdk` bound and re-analyzes.
 - Optional cleanups: `cleanup` is skipped by default; review its summary, then run `dart migrate --apply --step=cleanup` (or run `dart migrate --apply --step=all` instead of the two-step flow to run `prepare`, `bump`, and `cleanup` together).
-- Target version: without `--target-sdk`, `dart migrate` advances the lower `environment.sdk` bound by one minor version (for example, `^3.12.0` to `^3.13.0`); pass `--target-sdk=<version>` with a supported stable minor release using a `.0` patch (such as `3.13.0`, up to the installed Dart SDK version) to target a specific version (including across multiple minor releases). Check the dry-run's proposed lower bound against your running Dart SDK before applying (a pre-release SDK such as `3.14.0-beta` cannot satisfy `^3.14.0`).
+- Target version: without `--target-sdk`, `dart migrate` advances the lower `environment.sdk` bound by one minor version (for example, `^3.12.0` to `^3.13.0`); pass `--target-sdk=<version>` with a supported stable minor release using a `.0` patch (such as `3.13.0`, up to the installed Dart SDK version) to target a specific version (including across multiple minor releases).
 - Finish with `Read first` step 2.
 
 ## Material library
