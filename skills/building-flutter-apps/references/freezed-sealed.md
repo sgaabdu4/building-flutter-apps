@@ -142,7 +142,7 @@ return switch (asyncData) {
 };
 ```
 
-Match `hasValue: true` first when the previous value still belongs to the same account or query. It keeps the shown data during a reload and on an error after data, which `AsyncData(:final value)` drops. Bind `requireValue` so the data keeps the provider's own type. When an account or query switches, reset the provider or handle `AsyncLoading` and `AsyncError` first so stale data cannot stay visible or hide a fetch failure.
+Match `hasValue: true` first when the previous value still belongs to the same account or query. It keeps the shown data during a reload and on an error after data, which `AsyncData(:final value)` drops. Keep `hasValue: true` before `:final requireValue` inside the pattern: Dart checks object-pattern fields left-to-right, so reversing them evaluates `requireValue` on empty states and throws. Binding `requireValue` preserves the provider's type; use `_` as the final arm because Dart's exhaustiveness checker cannot prove `AsyncValue(hasValue: true)` covers `AsyncData`. When an account or query switches, reset the provider or handle `AsyncLoading` and `AsyncError` first so stale data cannot stay visible or hide a fetch failure.
 
 `AsyncLoading(progress: 0.5)` report loading progress. `AsyncValue.isFromCache` flag offline-persisted data.
 
