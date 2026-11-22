@@ -61,7 +61,7 @@ Future<void> main() async {
 }
 ```
 
-- Crashlytics branch = initialize Firebase + enable collection + inside `Crash.init` set `FlutterError.onError` → `recordFlutterFatalError` and `PlatformDispatcher.instance.onError` → `recordError(error, stack, fatal: true)` + call `appRunner`.
+- Crashlytics branch = initialize Firebase + enable collection + inside `Crash.init` set `FlutterError.onError` to forward to `FirebaseCrashlytics.instance.recordFlutterFatalError` and `PlatformDispatcher.instance.onError` to a synchronous callback that invokes `FirebaseCrashlytics.instance.recordError(error, stack, fatal: true)` and returns `true` (attach an async error handler such as `unawaited(...catchError(...))` to both returned futures so a Crashlytics recording failure cannot escape to `PlatformDispatcher.instance.onError` and loop) + call `appRunner`.
 - Sentry branch = configure current installed `sentry_flutter` API + pass `appRunner` to `SentryFlutter.init`.
 - Init failure before `appRunner` = local diagnostic + run app without remote telemetry; startup must not brick.
 - Send failure = contained fire-and-forget diagnostic; never recurse into `Crash.error`.
