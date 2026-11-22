@@ -10070,13 +10070,124 @@ rules:
       callback, layout effect or animation that owns it. A delay of 17 ms or more is no fix for an order fault.
     paths: *paths
     pattern-either:
-      - pattern: setTimeout($F)
-      - pattern: setTimeout($F, 0)
       - patterns:
-          - pattern: setTimeout($F, $D, ...)
-          - metavariable-comparison:
-              metavariable: $D
-              comparison: $D < 17
+          - pattern-either:
+              - pattern: setTimeout($F)
+              - pattern: setTimeout($F, 0)
+              - patterns:
+                  - pattern: setTimeout($F, $D, ...)
+                  - metavariable-comparison:
+                      metavariable: $D
+                      comparison: $D < 17
+          - pattern-not-inside: |
+              import { ..., setTimeout, ... } from "node:timers/promises"
+              ...
+          - pattern-not-inside: |
+              import { ..., setTimeout, ... } from "timers/promises"
+              ...
+          - pattern-not-inside: |
+              const { ..., setTimeout, ... } = require("node:timers/promises")
+              ...
+          - pattern-not-inside: |
+              const { ..., setTimeout, ... } = require("timers/promises")
+              ...
+      - patterns:
+          - pattern-either:
+              - pattern-inside: |
+                  import { ..., setTimeout as $S, ... } from "node:timers/promises"
+                  ...
+              - pattern-inside: |
+                  import { ..., setTimeout as $S, ... } from "timers/promises"
+                  ...
+              - pattern-inside: |
+                  const { ..., setTimeout: $S, ... } = require("node:timers/promises")
+                  ...
+              - pattern-inside: |
+                  const { ..., setTimeout: $S, ... } = require("timers/promises")
+                  ...
+          - metavariable-regex:
+              metavariable: $S
+              regex: ^(?!setTimeout$)[A-Za-z_$][A-Za-z0-9_$]*$
+          - pattern-either:
+              - pattern: setTimeout($F)
+              - pattern: setTimeout($F, 0)
+              - patterns:
+                  - pattern: setTimeout($F, $D, ...)
+                  - metavariable-comparison:
+                      metavariable: $D
+                      comparison: $D < 17
+      - patterns:
+          - pattern-either:
+              - pattern-inside: |
+                  import { ..., setTimeout, ... } from "node:timers/promises"
+                  ...
+              - pattern-inside: |
+                  import { ..., setTimeout, ... } from "timers/promises"
+                  ...
+              - pattern-inside: |
+                  const { ..., setTimeout, ... } = require("node:timers/promises")
+                  ...
+              - pattern-inside: |
+                  const { ..., setTimeout, ... } = require("timers/promises")
+                  ...
+          - pattern-not-inside: |
+              import { ..., setTimeout as $S, ... } from "node:timers/promises"
+              ...
+          - pattern-not-inside: |
+              import { ..., setTimeout as $S, ... } from "timers/promises"
+              ...
+          - pattern-not-inside: |
+              const { ..., setTimeout: $S, ... } = require("node:timers/promises")
+              ...
+          - pattern-not-inside: |
+              const { ..., setTimeout: $S, ... } = require("timers/promises")
+              ...
+          - pattern-either:
+              - pattern: setTimeout()
+              - pattern: setTimeout(0)
+              - pattern: setTimeout(0, ...)
+              - pattern: setTimeout(undefined)
+              - pattern: setTimeout(undefined, ...)
+              - patterns:
+                  - pattern: setTimeout($D)
+                  - metavariable-comparison:
+                      metavariable: $D
+                      comparison: $D < 17
+              - patterns:
+                  - pattern: setTimeout($D, ...)
+                  - metavariable-comparison:
+                      metavariable: $D
+                      comparison: $D < 17
+      - patterns:
+          - pattern-either:
+              - pattern-inside: |
+                  import { ..., setTimeout as $S, ... } from "node:timers/promises"
+                  ...
+              - pattern-inside: |
+                  import { ..., setTimeout as $S, ... } from "timers/promises"
+                  ...
+              - pattern-inside: |
+                  const { ..., setTimeout: $S, ... } = require("node:timers/promises")
+                  ...
+              - pattern-inside: |
+                  const { ..., setTimeout: $S, ... } = require("timers/promises")
+                  ...
+          - pattern-either:
+              - pattern: $S()
+              - pattern: $S(0)
+              - pattern: $S(0, ...)
+              - pattern: $S(undefined)
+              - pattern: $S(undefined, ...)
+              - patterns:
+                  - pattern: $S($D)
+                  - metavariable-comparison:
+                      metavariable: $D
+                      comparison: $D < 17
+              - patterns:
+                  - pattern: $S($D, ...)
+                  - metavariable-comparison:
+                      metavariable: $D
+                      comparison: $D < 17
       - patterns:
           - pattern-either:
               - pattern: $G.setTimeout($F)

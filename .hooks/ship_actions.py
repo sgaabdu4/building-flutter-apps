@@ -809,20 +809,29 @@ def merge(target: Path, plan: Path | None, shipment: Shipment, method: str) -> S
     if shipment.delivery_target == "PR":
         raise ValueError("The plan authorizes PR delivery, not merging")
     try:
-        gh(
-            target,
-            "pr",
-            "merge",
-            shipment.pr_url,
-            f"--{method}",
-            *(["--admin"] if shipment.review_bypass else []),
-            "--match-head-commit",
-            shipment.head_sha,
-        )
+        if method == "join":
+            from join_merge import merge_join
+
+            merge_join(shipment)
+        else:
+            gh(
+                target,
+                "pr",
+                "merge",
+                shipment.pr_url,
+                f"--{method}",
+                *(["--admin"] if shipment.review_bypass else []),
+                "--match-head-commit",
+                shipment.head_sha,
+            )
     except ShippingError as failure:
-        if _pull(target, *_pr_url(shipment.pr_url)).rebaseable is False and (
-            problem := rebase_problem(
-                target, shipment.repository, shipment.base, shipment.head_sha
+        if (
+            method != "join"
+            and _pull(target, *_pr_url(shipment.pr_url)).rebaseable is False
+            and (
+                problem := rebase_problem(
+                    target, shipment.repository, shipment.base, shipment.head_sha
+                )
             )
         ):
             raise ShippingError(problem) from failure

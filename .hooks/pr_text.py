@@ -14,7 +14,32 @@ if TYPE_CHECKING:
     from shipping import _PullRequest
 
 UNDO_LINE = re.compile(r"^[ \t]*Undo:[ \t]*\S", re.MULTILINE)
-MERMAID_BLOCK = re.compile(r"^[ \t]*(?:```|~~~)[ \t]*mermaid\b", re.MULTILINE)
+MERMAID_FENCE = re.compile(
+    r"^[ \t]*(`{3,}|~{3,})[ \t]*(\w*)[^\n]*\n?(.*?)(?:^[ \t]*\1[`~]*[ \t]*$|\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+MAX_LABEL_CHARACTERS = 13
+FLOW_HEAD = re.compile(r"(?:flowchart|graph)\b(?:[ \t]+(?:TD|TB|BT|RL|LR)\b)?[ \t]*;?")
+NON_LABEL_STATEMENT = re.compile(
+    r"(?:%%|subgraph\b|end\b|style\b|classDef\b|class\b|linkStyle\b|direction\b"
+    r"|click\b|acc(?:Title|Descr)\b|title\b(?![ \t]*[\[({>]))"
+)
+ENTITY_CODE = re.compile(r"#\w+;")
+DASH_LABEL = re.compile(r"(?:--|==|-\.)[ \t]+(.+?)[ \t]+(?:-->|==>|\.->|---|===|-\.-)")
+QUOTED_PIPE_LABEL = re.compile(r'\|("[^"\n]*")\|')
+PIPE_LABEL = re.compile(r"\|([^|\n]*)\|")
+ATTRIBUTE_LABEL = re.compile(
+    r"""(\w[\w-]*)@\{[^}\n]*?label:[ \t]*["']([^"'\n]*)["'][^}\n]*\}"""
+)
+SHAPE_LABEL = re.compile(
+    r"(\w[\w-]*)(\(\(\(|\(\[|\[\(|\(\(|\[\[|\{\{|\[[/\\]?|[({>])[ \t]*"
+    r'("[^"\n]*"|.*?)[ \t]*(\)\)\)|\]\)|\)\]|\)\)|\]\]|\}\}|[/\\]?\]|[)}])'
+)
+ACC_BLOCK = re.compile(r"accDescr[ \t]*\{")
+CLASS_SUFFIX = re.compile(r":::[\w-]+")
+ARROW = re.compile(r"[<>ox]?(?:--+|==+|-\.+)[>ox]?|~~~+|&")
+BARE_ID = re.compile(r"\w[\w-]*")
+LINE_BREAK = re.compile(r"<br[ \t]*/?>", re.IGNORECASE)
 NOT_CHECKED_LINE = re.compile(r"^[ \t]*(?:[-*][ \t]+)?Not checked:(.*)$", re.MULTILINE)
 EMPTY_ANSWER = re.compile(r"(?:none|nothing|n/a)?[ \t]*[-—–]*", re.IGNORECASE)
 DEPENDENCY_BOTS = frozenset({"dependabot[bot]", "renovate[bot]"})
@@ -81,16 +106,137 @@ def _size_problem(body: str) -> str | None:
     return None
 
 
+def _diagrams(body: str) -> list[str]:
+    """The text of each Mermaid block that GitHub draws; examples in other fences and comments do not count."""
+    text = HTML_COMMENT.sub(_blank, body.replace("\r\n", "\n"))
+    return [
+        fence.group(3)
+        for fence in MERMAID_FENCE.finditer(text)
+        if fence.group(2).lower() == "mermaid"
+    ]
+
+
+def _split_statements(line: str) -> list[str]:
+    """Split a line at semicolons that are outside quotes and brackets."""
+    parts: list[str] = []
+    depth = 0
+    quoted = False
+    start = 0
+    for index, char in enumerate(line):
+        if char == '"':
+            quoted = not quoted
+        elif not quoted and char in "([{":
+            depth += 1
+        elif not quoted and char in ")]}":
+            depth = max(depth - 1, 0)
+        elif char == ";" and not quoted and depth == 0:
+            parts.append(line[start:index])
+            start = index + 1
+    return [*parts, line[start:]]
+
+
+def _flow_statements(block: str) -> list[str]:
+    lines = [line.strip() for line in block.split("\n")]
+    if lines and lines[0] == "---" and "---" in lines[1:]:
+        lines = lines[lines.index("---", 1) + 1 :]
+    statements: list[str] = []
+    header = False
+    closing = ""
+    for line in lines:
+        if closing:
+            closing = "" if closing in line else closing
+            continue
+        if line.startswith("%%{") and "}%%" not in line:
+            closing = "}%%"
+        if ACC_BLOCK.match(line) and "}" not in line:
+            closing = "}"
+        if not line or line.startswith("%%"):
+            continue
+        if not header:
+            head = FLOW_HEAD.match(line)
+            if not head:
+                return []
+            header = True
+            line = line[head.end() :]
+        statements.extend(_split_statements(ENTITY_CODE.sub("\x00", line)))
+    return [
+        statement.strip()
+        for statement in statements
+        if statement.strip() and not NON_LABEL_STATEMENT.match(statement.strip())
+    ]
+
+
+def _statement_labels(statement: str, defined: set[str]) -> tuple[list[str], list[str]]:
+    """The label texts a statement defines, and the node IDs it only mentions."""
+    labels: list[str] = []
+
+    def attribute(match: re.Match[str]) -> str:
+        defined.add(match.group(1))
+        labels.append(match.group(2).strip())
+        return " "
+
+    def node(match: re.Match[str]) -> str:
+        defined.add(match.group(1))
+        label = match.group(3).strip().strip('"')
+        closer = match.group(4)
+        if closer in ("/]", "\\]") and match.group(2) not in ("[/", "[\\"):
+            label += closer[0]
+        labels.append(label)
+        return " "
+
+    def edge(match: re.Match[str]) -> str:
+        labels.append(match.group(1).strip().strip('"'))
+        return " "
+
+    statement = QUOTED_PIPE_LABEL.sub(edge, statement)
+    statement = SHAPE_LABEL.sub(node, ATTRIBUTE_LABEL.sub(attribute, statement))
+    statement = DASH_LABEL.sub(edge, PIPE_LABEL.sub(edge, statement))
+    rest = ARROW.sub(" ", CLASS_SUFFIX.sub(" ", statement))
+    return labels, BARE_ID.findall(rest)
+
+
+def _label_problem(body: str) -> str | None:
+    """Name the first flowchart label line over the limit; None when all fit."""
+    for block in _diagrams(body):
+        defined: set[str] = set()
+        labels: list[str] = []
+        mentioned: list[str] = []
+        for statement in _flow_statements(block):
+            found, bare = _statement_labels(statement, defined)
+            labels += found
+            mentioned += bare
+        labels += [name for name in mentioned if name not in defined]
+        for label in labels:
+            for part in LINE_BREAK.split(label):
+                shown = part.strip()
+                if len(shown) > MAX_LABEL_CHARACTERS:
+                    note = (
+                        "; each entity code such as #quot; counts as one character"
+                        if "\x00" in shown
+                        else ""
+                    )
+                    return (
+                        f'Mermaid label line "{shown.replace(chr(0), "#;")}" has '
+                        f"{len(shown)} characters; the limit is {MAX_LABEL_CHARACTERS}, "
+                        "because GitHub cuts longer lines at zoom levels other than 100%. "
+                        'Split the label with <br> into shorter lines, such as A["Pull request<br>opened"]'
+                        f"{note}"
+                    )
+    return None
+
+
 def body_problem(body: str) -> str | None:
     """Name what a PR body lacks or has too much of; None when it passes."""
     if not UNDO_LINE.search(body):
         return "PR body needs a line that starts `Undo:` and lists the undo steps"
-    if len(MERMAID_BLOCK.findall(body)) < 2:
+    if len(_diagrams(body)) < 2:
         return (
             "PR body needs a `Before and after` part with two or more Mermaid diagrams: "
             "one of the old flow and one of the new flow for each main change, "
             "or two or more of the new flows when no old flow exists"
         )
+    if problem := _label_problem(body):
+        return problem
     for found in NOT_CHECKED_LINE.findall(body):
         if not EMPTY_ANSWER.fullmatch(found.strip().rstrip(".")):
             return _size_problem(body)
@@ -212,6 +358,8 @@ def ui_problem(
 ) -> str | None:
     """The screen-evidence form of a PR that changes a UI file; CI has no captures, so it checks forms only."""
     from look import block_problem
+    from plan_parent import named_parents
+    from plans import is_plan_path
     from ship_evidence import UI_APPEARANCE_UNCHANGED, attachment_urls
     from shipping import ShippingError, gh
     from ui_proof import (
@@ -248,16 +396,23 @@ def ui_problem(
     plans = [
         str(item["filename"])
         for item in files
-        if str(item["filename"]).endswith("PLAN.md") and item.get("status") != "removed"
+        if is_plan_path(Path(str(item["filename"]))) and item.get("status") != "removed"
     ]
     if not plans and (problem := reference_problem("", visible, body, note)):
         return problem
+    texts = {}
     for plan in plans:
         endpoint = f"repos/{owner}/{name}/contents/{plan}?ref={head_sha}"
         try:
-            text = gh(root, "api", "-H", "Accept: application/vnd.github.raw", endpoint)
+            texts[plan] = gh(
+                root, "api", "-H", "Accept: application/vnd.github.raw", endpoint
+            )
         except ShippingError as error:
             return f"The plan {plan} cannot be read at the PR head ({error})"
-        if problem := reference_problem(text, visible, body, note):
+    parents = named_parents(texts)
+    for plan, text in texts.items():
+        if plan not in parents and (
+            problem := reference_problem(text, visible, body, note)
+        ):
             return problem
     return None

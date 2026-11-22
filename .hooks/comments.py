@@ -253,6 +253,7 @@ PYTHON_OFF = re.compile(
 )
 SCRIPT_OFF = re.compile(
     r"eslint-disable|@ts-(ignore|expect-error|nocheck)|biome-ignore"
+    r"|(?:^\s*(?:\*(?=\s))?\s*|(?://|/\*+(?:\s+\*(?=\s))?)\s*)fallow-override-threshold-next-line\b[\s,]+max(?:Cyclomatic|Cognitive|Crap|UnitSize)\s*="
     r"|\b(it|test|describe|suite)(?:\.(?:concurrent|sequential|shuffle))*\.(skip|only|fixme|todo|fail|failing|fails|if|runIf)(If)?(?:[.(]|\b)"
     r"|\b(xit|xtest|xdescribe|fit|fdescribe)\("
 )

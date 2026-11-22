@@ -689,11 +689,13 @@ def _validate_shipping(root: Path, path: Path, status: str) -> None:
 
 
 def plan_stage(root: Path, path: Path, changed: set[str]) -> str:
+    from plan_parent import parent_problem
     from plan_tests import missing_tests
 
     try:
         edited = str(path.relative_to(root)) in changed
         status = validate_plan(path, changed=edited)
+        parent_problem(root, path)
         if status == "Complete" and edited:
             sections = plan_sections(path.read_text())
             references, requirements = acceptance_tests(sections)
@@ -774,6 +776,7 @@ def validate_plans(
         plan_not_needed,
         update_only,
     )
+    from plan_parent import may_ride_along
     from plan_tests import unchanged_plan_test_problem
 
     explicit_stage = stage is not None
@@ -819,8 +822,8 @@ def validate_plans(
     effective_stage = "Complete"
     for path, status in statuses.items():
         if STAGES.index(status) < STAGES.index(stage):
-            # A Draft plan claims no implementation, so it may ride along with finished work.
-            if status == "Draft" and reached:
+            # A Draft plan claims no implementation, and a Ready parent holds the open steps; both may ride along with finished work.
+            if reached and may_ride_along(root, path, status, statuses, stage):
                 continue
             steps = {"Draft": DRAFT_STEP, "Ready": f". {BUILD_STEP}" * typed}
             step = steps[status] if stage == "Complete" and not explicit_stage else ""

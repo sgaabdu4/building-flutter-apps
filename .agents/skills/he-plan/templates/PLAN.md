@@ -34,7 +34,7 @@ Authority: [TODO: Task mode + user's actual scope/approval; pending if absent]
 
 Result: Pending
 Evidence: [TODO: Starting command + actual result]
-Execution: [TODO: Builder/reviewer + first slice; dependencies if parallel]
+Execution: [TODO: Builder/reviewer + first slice; dependencies if parallel; a step of a larger effort → a `Parent:` line under Status naming the parent plan]
 
 ## Risks + recovery
 

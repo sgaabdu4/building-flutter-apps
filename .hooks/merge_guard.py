@@ -26,6 +26,11 @@ REBASE_STEP = (
     "merge --merge-method rebase --pr <PR URL> --plan <plan>`, which checks base "
     "currency right before it merges."
 )
+JOIN_STEP = (
+    "A join into a branch that requires linear history needs a merge commit, so the "
+    "merge lifts only that rule and puts it back. Run `python3 .hooks/hard-eng.py "
+    "ship --stage merge --pr <PR URL> --plan <plan>`."
+)
 STEP = "Merge with `python3 .hooks/hard-eng.py ship --pr <PR URL> --stage merge`."
 
 
@@ -81,6 +86,8 @@ def pr_merge_problem(arguments: list[str], cwd: str) -> str | None:
     record = record_for(cwd, int(found[1]))
     if record is None or record.get("result") != "passed":
         return f"no passed `ship` record for PR {found[1]}. {STEP}"
+    if record.get("method") == "join":
+        return JOIN_STEP
     if head != record.get("head"):
         return f"gh pr merge needs `--match-head-commit {record.get('head')}`, the head that `ship` passed. {STEP}"
     if methods != {record.get("method")}:

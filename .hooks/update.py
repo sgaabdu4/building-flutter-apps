@@ -817,6 +817,7 @@ INSTALLED_FILES = {
     ".github/workflows/hard-eng.yml",
     ".github/workflows/pr-text.yml",
     *agent_hooks.HOOK_FILES.values(),
+    agent_hooks.CODEX_RULES_FILE,
 }
 
 

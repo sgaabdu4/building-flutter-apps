@@ -372,9 +372,19 @@ def validate_health(report: JsonObject) -> None:
     validate_complexity(report["health"])
 
 
+def _validate_inline_overrides(complexity: JsonObject) -> None:
+    if complexity.get("inline_threshold_overrides") or complexity.get(
+        "inline_threshold_override_problems"
+    ):
+        raise ValueError(
+            "Fallow reports inline threshold override comments; remove them and simplify the functions"
+        )
+
+
 def validate_complexity(complexity: object) -> None:
     if not isinstance(complexity, dict) or complexity["findings"] != []:
         raise ValueError("Fallow audit reports missing complexity analysis or findings")
+    _validate_inline_overrides(complexity)
     summary = complexity["summary"]
     if not isinstance(summary, dict):
         raise TypeError("Fallow audit complexity summary must be an object")

@@ -1,5 +1,6 @@
 """Decide whether a branch change is small enough to need no plan."""
 
+import re
 import subprocess
 from pathlib import Path, PurePosixPath
 
@@ -345,12 +346,82 @@ def moved_plans(root: Path, base: str | None, changed: set[str]) -> set[str]:
     return moved
 
 
+ACCEPTANCE_HEADING = re.compile(r"(?m)^## Acceptance \+ steps\s*$")
+NEXT_HEADING = re.compile(r"(?m)^## ")
+ACCEPTANCE_ARROW = re.compile(r"(?:→|->)")
+REF_CONNECTORS = re.compile(
+    r"^[\s,.;:()+/&-]*(?:(?:and|or)[\s,.;:()+/&-]*)*$", re.IGNORECASE
+)
+
+
 def plan_words(text: str) -> list[str]:
     """The words of a plan; every table rule counts as one form."""
     return [
         "---" if word.count("-") > 2 and not word.strip("-:") else word
         for word in text.split()
     ]
+
+
+def normalize_acceptance_line(line: str) -> str:
+    from plans import CHECKBOX_REST, TEST_REFERENCE
+
+    if not CHECKBOX_REST.match(line) or not TEST_REFERENCE.search(line):
+        return line
+    arrows = list(ACCEPTANCE_ARROW.finditer(line))
+    if arrows:
+        cut = arrows[-1].end()
+        tail = line[cut:]
+        if TEST_REFERENCE.search(tail) and REF_CONNECTORS.fullmatch(
+            TEST_REFERENCE.sub("", tail)
+        ):
+            return line[:cut] + " <TEST_REFS>"
+    return TEST_REFERENCE.sub("<TEST_REF>", line)
+
+
+def words_without_acceptance_refs(text: str) -> list[str] | None:
+    """Words of a Complete plan with acceptance test references normalized so test-ref-only repairs match."""
+    if plan_status(text) != "Complete":
+        return None
+    heading = ACCEPTANCE_HEADING.search(text)
+    if heading is None:
+        return None
+    end_match = NEXT_HEADING.search(text, heading.end())
+    end = end_match.start() if end_match else len(text)
+    body = "\n".join(
+        normalize_acceptance_line(line)
+        for line in text[heading.end() : end].splitlines()
+    )
+    return plan_words(f"{text[: heading.end()]}\n{body}\n{text[end:]}")
+
+
+def _repo_paths(root: Path, text: str) -> set[str]:
+    rel = PurePosixPath(text)
+    paths = {
+        rel.as_posix(),
+        *(parent.as_posix() for parent in rel.parents if parent != PurePosixPath(".")),
+    }
+    try:
+        paths.add((root / text).resolve().relative_to(root.resolve()).as_posix())
+    except ValueError:
+        pass
+    return paths
+
+
+def _acceptance_row_refs(text: str) -> list[list[tuple[str, str]]]:
+    from plans import CHECKBOX_REST, TEST_REFERENCE
+
+    sections = plan_sections(text, allow_placeholders=True)
+    return [
+        [(path, name.split("[", 1)[0]) for path, name in TEST_REFERENCE.findall(line)]
+        for line in CHECKBOX_REST.findall(sections["Acceptance + steps"])
+    ]
+
+
+def held_text(root: Path, reference: str, name: str) -> str | None:
+    try:
+        return _git_output(root, "show", f"{reference}:{name}")
+    except (subprocess.CalledProcessError, OSError):
+        return None
 
 
 def fails_todays_rules(path: Path) -> bool:
@@ -364,14 +435,61 @@ def fails_todays_rules(path: Path) -> bool:
 
 
 def held_words(root: Path, reference: str, name: str) -> list[str] | None:
+    text = held_text(root, reference, name)
+    return None if text is None else plan_words(text)
+
+
+def verified_test_ref_repair(
+    root: Path, references: set[str], name: str, changed: set[str]
+) -> bool:
+    """True when an old Complete plan changed only acceptance test refs and every changed/affected test exists."""
+    from plan_tests import missing_tests
+
+    current = (root / name).read_text()
+    normalized = words_without_acceptance_refs(current)
+    if normalized is None:
+        return False
+    base_texts = [held_text(root, reference, name) for reference in references]
+    if not base_texts or any(
+        text is None or words_without_acceptance_refs(text) != normalized
+        for text in base_texts
+    ):
+        return False
     try:
-        return plan_words(_git_output(root, "show", f"{reference}:{name}"))
-    except (subprocess.CalledProcessError, OSError):
-        return None
+        acceptance_tests(plan_sections(current, allow_placeholders=True))
+        new_rows = _acceptance_row_refs(current)
+    except ValueError:
+        return False
+    base_rows: list[list[list[tuple[str, str]]]] = []
+    for text in base_texts:
+        assert text is not None
+        try:
+            base_rows.append(_acceptance_row_refs(text))
+        except ValueError:
+            base_rows.append([])
+    checked: list[tuple[str, str]] = []
+    for index, row in enumerate(new_rows):
+        common = (
+            set.intersection(*(set(rows[index]) for rows in base_rows))
+            if base_rows and all(index < len(rows) for rows in base_rows)
+            else set()
+        )
+        checked.extend(
+            ref
+            for ref in row
+            if ref not in common or (_repo_paths(root, ref[0]) & changed)
+        )
+    if missing := missing_tests(root, checked):
+        raise ValueError(
+            f"{name}: acceptance names tests that do not exist: "
+            + ", ".join(missing)
+            + ". Update that plan to the replacement test"
+        )
+    return True
 
 
 def reformatted_plans(root: Path, base: str | None, changed: set[str]) -> set[str]:
-    """Changed Complete plans that fail today's rules but keep every word of the copy that the base and the branch point hold."""
+    """Changed Complete plans that fail today's rules but keep every word (or only repair acceptance test refs) from base and branch point."""
     failing = [
         name
         for name in changed
@@ -393,6 +511,7 @@ def reformatted_plans(root: Path, base: str | None, changed: set[str]) -> set[st
             held_words(root, reference, name) == plan_words((root / name).read_text())
             for reference in references
         )
+        or verified_test_ref_repair(root, references, name, changed)
     }
 
 

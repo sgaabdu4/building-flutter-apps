@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Change report</title>
+<style>
+:root {
+  --page: #ffffff;
+  --text: #1b2430;
+  --quiet: #566273;
+  --line: #d5dbe3;
+  --card: #f4f6f9;
+  --live: #0b6b3a;
+  --live-tint: #dff3e7;
+  --wait: #8a4b00;
+  --wait-tint: #fdeccf;
+  --off: #8f1d2c;
+  --off-tint: #fbdfe2;
+  --mark: #e00000;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #11161d;
+    --text: #e8edf3;
+    --quiet: #a3afbf;
+    --line: #2f3a48;
+    --card: #1a222c;
+    --live: #6fd49a;
+    --live-tint: #143523;
+    --wait: #f0b45f;
+    --wait-tint: #3d2a0c;
+    --off: #ff9aa6;
+    --off-tint: #43161d;
+  }
+}
+@page { size: A4; margin: 16mm 14mm; }
+@media print {
+  :root {
+    --page: #ffffff;
+    --text: #1b2430;
+    --quiet: #566273;
+    --line: #d5dbe3;
+    --card: #f4f6f9;
+    --live: #0b6b3a;
+    --live-tint: #dff3e7;
+    --wait: #8a4b00;
+    --wait-tint: #fdeccf;
+    --off: #8f1d2c;
+    --off-tint: #fbdfe2;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body {
+  margin: 0 auto;
+  max-width: 820px;
+  padding: 24px 16px;
+  background: var(--page);
+  color: var(--text);
+  font: 15px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+h1 { font-size: 28px; line-height: 1.2; margin: 0 0 4px; }
+h2 { font-size: 20px; margin: 28px 0 10px; break-after: avoid; }
+h3 { font-size: 16px; margin: 18px 0 6px; break-after: avoid; }
+p { margin: 0 0 10px; }
+.date, .caption, .quiet { color: var(--quiet); font-size: 13px; }
+.box {
+  display: block;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--live);
+  background: var(--card);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  break-inside: avoid;
+}
+.box.fix { border-left-color: var(--wait); }
+.box h3 { margin-top: 0; }
+.chip {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.chip.live { color: var(--live); background: var(--live-tint); }
+.chip.wait { color: var(--wait); background: var(--wait-tint); }
+.chip.off { color: var(--off); background: var(--off-tint); }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  break-inside: avoid;
+}
+th { font-size: 13px; color: var(--quiet); }
+.pair td { width: 50%; border-bottom: 0; padding: 4px 6px 4px 0; }
+.pair td + td { padding: 4px 0 4px 6px; }
+figure { display: block; margin: 0; break-inside: avoid; }
+figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
+figcaption { margin-top: 4px; color: var(--quiet); font-size: 13px; }
+.question {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  break-inside: avoid;
+}
+.question p { margin-bottom: 6px; }
+.question .ask { font-weight: 700; }
+ul, ol { margin: 0 0 10px; padding-left: 22px; }
+li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<h1>[Product name]: what changed and what is left</h1>
+<p class="date">[Date]</p>
+
+<h2>Where it stands</h2>
+<p>[One or two lines: what is live now.]</p>
+<h2>What finishes it</h2>
+<p>[One or two lines: what must happen next.]</p>
+
+<div class="box">
+  <h3>What is needed before each next stage</h3>
+  <p><strong>Stage: [name of the stage].</strong> Needed before it starts:</p>
+  <ol>
+    <li>[Item written in full.]</li>
+  </ol>
+  <p class="quiet">Does not block this stage: [item]. Limit of this stage: [limit].</p>
+</div>
+
+<div class="box fix">
+  <h3>Correction</h3>
+  <p>[What an earlier report said, what is true, and what changes. Delete this box when no earlier report was wrong.]</p>
+</div>
+
+<h2>What is live</h2>
+<table>
+  <thead><tr><th>Area</th><th>Status</th><th>What a person can do, and where</th></tr></thead>
+  <tbody>
+    <tr><td>[Area]</td><td><span class="chip live">Live</span></td><td>[What a person can do, and where.]</td></tr>
+    <tr><td>[Area]</td><td><span class="chip off">Not built</span></td><td>[Why not, and when.]</td></tr>
+    <tr><td>[Area]</td><td><span class="chip wait">Waiting for an answer</span></td><td>[Which answer we wait for.]</td></tr>
+  </tbody>
+</table>
+
+<h2>Before and after</h2>
+<h3>[Change name]</h3>
+<table class="pair">
+  <tr>
+    <td><figure><img src="before.png" alt="[Before: what the screen shows]"><figcaption>Before, live. The red line marks [part].</figcaption></figure></td>
+    <td><figure><img src="after.png" alt="[After: what the screen shows]"><figcaption>After, live. The red line marks [part].</figcaption></figure></td>
+  </tr>
+</table>
+<p class="quiet">Pictures with no live copy: [each state, with the reason].</p>
+
+<h2>How it was checked</h2>
+<ul>
+  <li>[One line for each check that ran, with its result.]</li>
+</ul>
+<h3>Not checked</h3>
+<ul>
+  <li>[Each thing not checked, with the reason.]</li>
+</ul>
+
+<h2>Everything left</h2>
+<h3>Our team</h3>
+<ul>
+  <li>[Item.] <span class="quiet">Stage: [name].</span></li>
+</ul>
+<h3>Questions for [who must answer]</h3>
+<div class="question">
+  <p class="ask">[The question, written in full.]</p>
+  <p><strong>Why we ask:</strong> [Reason.]</p>
+  <p><strong>Until you answer, we</strong> [what the live product does today]. <span class="quiet">Stage: [name].</span></p>
+</div>
+<h3>Things only the client can give</h3>
+<ul>
+  <li>[Item.] <span class="quiet">Stage: [name].</span></li>
+</ul>
+<h3>Client staff</h3>
+<ul>
+  <li>[Item.] <span class="quiet">Stage: [name].</span></li>
+</ul>
+
+<h2>Small gaps and later work</h2>
+<ul>
+  <li>[Gap or later item.]</li>
+</ul>
+<h2>When it is done</h2>
+<ul>
+  <li>[One line for each thing that must be true.]</li>
+</ul>
+<h2>How to undo a release</h2>
+<p>[The steps, in order.]</p>
+
+</body>
+</html>
