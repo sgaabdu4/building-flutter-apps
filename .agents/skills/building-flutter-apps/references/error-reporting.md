@@ -6,7 +6,7 @@
 2. Adding/replacing/dual-running a provider = material external-data change → explicit approval + `security-review`.
 3. Accepted/present provider only → `Crash` = one tiny provider-neutral facade; public API = `init`, `log`, `error`.
 4. SDK imports/calls = `crash_service.dart` only; feature code calls `Crash`.
-5. Startup = one owner; SDK-managed error integration replaces hand-wired zone/framework/dispatcher handlers.
+5. Startup = one owner (`Crash.init`); Sentry's SDK integration installs the handlers; Crashlytics handlers are set only inside `Crash.init`; no zone handlers.
 6. Event payloads, breadcrumbs, tags, extras, screenshots, view hierarchy, replay, request capture, and user identity = no PII by default.
 7. Current SDK behavior = installed lockfile/API + official package docs; memory/example-version copying = no proof.
 
@@ -61,7 +61,7 @@ Future<void> main() async {
 }
 ```
 
-- Crashlytics branch = initialize Firebase + enable collection + call `appRunner`.
+- Crashlytics branch = initialize Firebase + enable collection + inside `Crash.init` set `FlutterError.onError` to forward to `FirebaseCrashlytics.instance.recordFlutterFatalError` and `PlatformDispatcher.instance.onError` to a synchronous callback that invokes `FirebaseCrashlytics.instance.recordError(error, stack, fatal: true)` and returns `true` (wrap both calls in `unawaited(Future<void>.sync(...).catchError(...))` so neither a synchronous throw nor an async recording rejection can escape to `PlatformDispatcher.instance.onError` and loop) + call `appRunner`.
 - Sentry branch = configure current installed `sentry_flutter` API + pass `appRunner` to `SentryFlutter.init`.
 - Init failure before `appRunner` = local diagnostic + run app without remote telemetry; startup must not brick.
 - Send failure = contained fire-and-forget diagnostic; never recurse into `Crash.error`.

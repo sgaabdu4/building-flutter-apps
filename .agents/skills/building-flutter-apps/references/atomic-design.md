@@ -173,7 +173,7 @@ class AppBadge extends StatelessWidget {
 }
 ```
 
-Common atoms: `AppBadge`, `AppIconButton`, `AppTextField`, `LoadingIndicator`, `AppDivider`, `AppAvatar`.
+Common atoms: `AppBadge`, `AppIconButton`, `AppPrimaryButton`, `AppTextField`, `LoadingIndicator`, `AppDivider`, `AppAvatar`.
 
 ## Molecules
 

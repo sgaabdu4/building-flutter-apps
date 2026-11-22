@@ -1,6 +1,7 @@
 """Configure repository MCP servers without guessing service targets."""
 
 import json
+import math
 import os
 import re
 import subprocess
@@ -336,14 +337,19 @@ def marionette_server(root: Path) -> JsonObject | None:
     return None
 
 
-def detected_servers(root: Path) -> dict[str, JsonObject]:
+def detected_servers(
+    root: Path, services: list[str] | None = None
+) -> dict[str, JsonObject]:
     from agent_hooks import integrated_services
 
     optional: dict[str, JsonObject | None] = {
         "Dart": {"command": "dart", "args": ["mcp-server"]},
         "Marionette": marionette_server(root),
     }
-    services = [*integrated_services(root), "Marionette"]
+    active = [
+        *(integrated_services(root) if services is None else services),
+        "Marionette",
+    ]
     if any(
         server.get("command") == "dart"
         and server.get("args") == ["run", "dart_mcp_server@"]
@@ -352,13 +358,13 @@ def detected_servers(root: Path) -> dict[str, JsonObject]:
         raise ValueError(
             "Legacy Dart MCP entry: replace only its package command with dart mcp-server, preserving custom settings, then rerun setup"
         )
-    if "Appwrite" in services:
+    if "Appwrite" in active:
         optional["Appwrite"] = appwrite_server(root)
-    if "Sentry" in services:
+    if "Sentry" in active:
         optional["Sentry"] = sentry_server(root)
     return {
         service.lower(): settings
-        for service in services
+        for service in active
         if (settings := optional.get(service)) is not None
     }
 
@@ -554,7 +560,7 @@ def retire_copilot_hooks(root: Path, command: str) -> list[str]:
             for native, entries in wiring.items()
         ):
             raise ValueError(
-                f"Harness migration required: {name} contains project hooks; preserve their checks in Claude or Codex and remove the retired registration before setup."
+                f"Harness migration required: {name} contains project hooks; preserve their checks in Claude, Codex or Antigravity and remove the retired registration before setup."
             )
         if target.is_symlink() or not contained(root, target):
             raise ValueError(f"Preserve linked retired harness config: {name}")
@@ -582,9 +588,16 @@ def retired_integration_files(root: Path) -> list[str]:
 
 
 def configure_mcp(root: Path, changes: dict[str, str]) -> list[str]:
+    from agent_hooks import integrated_services
     from update import contained
 
-    detected = detected_servers(root)
+    services = integrated_services(root)
+    detected = detected_servers(root, services)
+    pending: set[str] = {
+        service.lower()
+        for service in services
+        if service in {"Appwrite", "Sentry"} and service.lower() not in detected
+    }
     target = root / ".mcp.json"
     current: JsonObject = read_project_file(target, root) if target.exists() else {}
     before = json.dumps(current)
@@ -618,7 +631,9 @@ def configure_mcp(root: Path, changes: dict[str, str]) -> list[str]:
         changes[settings_name] = json_file(root, settings)
     approve_claude_servers(root, changes, sorted(detected.keys() & existing.keys()))
     codex_retired, codex_config = configure_codex_mcp(root, changes, detected)
-    agy_retired = configure_agy_mcp(root, changes, detected)
+    agy_retired = configure_agy_mcp(
+        root, changes, detected, existing, codex_config, pending
+    )
     retired += (
         codex_retired + agy_retired + retire_copilot_mcp(root, existing, codex_config)
     )
@@ -629,8 +644,244 @@ def configure_mcp(root: Path, changes: dict[str, str]) -> list[str]:
     return retired
 
 
+def _nonempty_str(value: JsonValue) -> str | None:
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _string_list(value: JsonValue) -> list[JsonValue] | None:
+    if (
+        isinstance(value, list)
+        and value
+        and all(isinstance(item, str) for item in value)
+    ):
+        return list(value)
+    return None
+
+
+def _string_dict(value: JsonValue) -> JsonObject | None:
+    if (
+        isinstance(value, dict)
+        and value
+        and all(isinstance(item, str) for item in value.values())
+    ):
+        return dict(value)
+    return None
+
+
+def _timeout_seconds(value: JsonValue) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or value <= 0:
+        return None
+    return value if isinstance(value, int) else math.ceil(value)
+
+
+def _copy_stdio_fields(source: JsonObject, target: JsonObject) -> None:
+    if (args := _string_list(source.get("args"))) is not None:
+        target["args"] = args
+    if (env := _string_dict(source.get("env"))) is not None:
+        target["env"] = env
+    if (cwd := _nonempty_str(source.get("cwd"))) is not None:
+        target["cwd"] = cwd
+
+
+def _copy_agy_common_fields(source: JsonObject, target: JsonObject) -> None:
+    if isinstance(disabled := source.get("disabled"), bool):
+        target["disabled"] = disabled
+    for key in ("disabledTools", "enabledTools"):
+        if (items := _string_list(source.get(key))) is not None:
+            target[key] = items
+    if (timeout := _timeout_seconds(source.get("timeoutSeconds"))) is not None:
+        target["timeoutSeconds"] = timeout
+    if isinstance(tools := source.get("tools"), dict) and tools:
+        target["tools"] = dict(tools)
+
+
+def _agy_stdio_from_claude(settings: JsonObject, command: str) -> JsonObject:
+    mirrored: JsonObject = {"command": command}
+    _copy_stdio_fields(settings, mirrored)
+    _copy_agy_common_fields(settings, mirrored)
+    return mirrored
+
+
+def _agy_http_from_claude(settings: JsonObject, url: str) -> JsonObject | None:
+    if settings.get("headersHelper"):
+        return None
+    mirrored: JsonObject = {"url": url}
+    if (headers := _string_dict(settings.get("headers"))) is not None:
+        mirrored["headers"] = headers
+    _copy_agy_common_fields(settings, mirrored)
+    if (auth := _nonempty_str(settings.get("authProviderType"))) is not None:
+        mirrored["authProviderType"] = auth
+    if isinstance(oauth := settings.get("oauth"), dict) and oauth:
+        mirrored["oauth"] = dict(oauth)
+    return mirrored
+
+
+def _agy_server_from_claude(settings: JsonValue) -> JsonObject | None:
+    if not isinstance(settings, dict) or settings.get("enabledTools") == []:
+        return None
+    transport = settings.get("type")
+    if transport not in (None, "stdio", "http"):
+        return None
+    command = _nonempty_str(settings.get("command"))
+    url = _nonempty_str(settings.get("url")) or _nonempty_str(settings.get("serverUrl"))
+    if transport is None and command and url:
+        return None
+    if command and transport in (None, "stdio"):
+        return _agy_stdio_from_claude(settings, command)
+    if url and transport in (None, "http"):
+        return _agy_http_from_claude(settings, url)
+    return None
+
+
+def _merge_codex_tool_filters(target: JsonObject, codex: JsonValue) -> None:
+    if not isinstance(codex, dict):
+        return
+    if "enabledTools" not in target and codex.get("enabled_tools") == []:
+        target["disabled"] = True
+    for codex_key, agy_key in (
+        ("disabled_tools", "disabledTools"),
+        ("enabled_tools", "enabledTools"),
+    ):
+        if (
+            agy_key not in target
+            and (items := _string_list(codex.get(codex_key))) is not None
+        ):
+            target[agy_key] = items
+
+
+CODEX_DEFAULT_STARTUP_TIMEOUT = 10
+CODEX_DEFAULT_TOOL_TIMEOUT = 60
+
+
+def _codex_timeout(settings: JsonObject) -> int | None:
+    tool = _timeout_seconds(settings.get("tool_timeout_sec"))
+    startup = _timeout_seconds(settings.get("startup_timeout_sec"))
+    if tool is None and startup is None:
+        return None
+    return max(
+        tool if tool is not None else CODEX_DEFAULT_TOOL_TIMEOUT,
+        startup if startup is not None else CODEX_DEFAULT_STARTUP_TIMEOUT,
+    )
+
+
+def _agy_http_from_codex(settings: JsonObject, url: str) -> JsonObject | None:
+    if (
+        settings.get("bearer_token_env_var")
+        or settings.get("env_http_headers")
+        or settings.get("http_headers_helper")
+    ):
+        return None
+    mirrored: JsonObject = {"url": url}
+    if (headers := _string_dict(settings.get("http_headers"))) is not None:
+        mirrored["headers"] = headers
+    return mirrored
+
+
+def _agy_server_from_codex(settings: JsonValue) -> JsonObject | None:
+    if (
+        not isinstance(settings, dict)
+        or settings.get("enabled_tools") == []
+        or settings.get("environment_id") not in (None, "", "local")
+    ):
+        return None
+    command = _nonempty_str(settings.get("command"))
+    url = _nonempty_str(settings.get("url"))
+    if command and url:
+        return None
+    if command:
+        stdio: JsonObject = {"command": command}
+        _copy_stdio_fields(settings, stdio)
+        mirrored: JsonObject | None = stdio
+    elif url:
+        mirrored = _agy_http_from_codex(settings, url)
+    else:
+        return None
+    if mirrored is None:
+        return None
+    if settings.get("enabled") is False:
+        mirrored["disabled"] = True
+    _merge_codex_tool_filters(mirrored, settings)
+    if (timeout := _codex_timeout(settings)) is not None:
+        mirrored["timeoutSeconds"] = timeout
+    return mirrored
+
+
+def _git_tracked(root: Path, relative: str) -> bool:
+    spec = ":(literal)" + relative
+    return (
+        subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", spec],
+            cwd=root,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+
+def _is_git_ignored(root: Path, name: str) -> bool:
+    path = root / name
+    if not path.exists() and not path.is_symlink():
+        return False
+    resolved = path.resolve()
+    root_resolved = root.resolve()
+    if not resolved.is_relative_to(root_resolved):
+        return True
+    target = resolved.relative_to(root_resolved).as_posix()
+    if target != name:
+        return not (_git_tracked(root, name) and _git_tracked(root, target))
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", "--", name],
+        cwd=root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if ignored.returncode == 1:
+        return False
+    if ignored.returncode != 0:
+        return (root / ".git").exists()
+    return not _git_tracked(root, name)
+
+
+def _mirror_agy_servers(
+    existing: JsonObject,
+    covered: set[str],
+    claude_servers: JsonObject,
+    codex_servers: JsonObject,
+) -> None:
+    for server in sorted(claude_servers.keys() - existing.keys() - covered):
+        settings = claude_servers[server]
+        if retired_server(server, settings):
+            continue
+        mirrored = _agy_server_from_claude(settings)
+        if mirrored is None:
+            continue
+        codex_entry = codex_servers.get(server)
+        if codex_entry is not None and not retired_server(server, codex_entry):
+            _merge_codex_tool_filters(mirrored, codex_entry)
+        existing[server] = mirrored
+    for server in sorted(
+        codex_servers.keys() - existing.keys() - covered - claude_servers.keys()
+    ):
+        settings = codex_servers[server]
+        if retired_server(server, settings):
+            continue
+        mirrored = _agy_server_from_codex(settings)
+        if mirrored is not None:
+            existing[server] = mirrored
+
+
 def configure_agy_mcp(
-    root: Path, changes: dict[str, str], detected: dict[str, JsonObject]
+    root: Path,
+    changes: dict[str, str],
+    detected: dict[str, JsonObject],
+    claude_servers: JsonObject,
+    codex_config: str,
+    pending: set[str] | None = None,
 ) -> list[str]:
     name = ".agents/mcp_config.json"
     target = root / name
@@ -645,6 +896,24 @@ def configure_agy_mcp(
         del existing[server]
     for plugin in sorted(detected.keys() - existing.keys()):
         existing[plugin] = detected[plugin]
+    parsed_codex = (
+        tomllib.loads(codex_config).get("mcp_servers", {}) if codex_config else {}
+    )
+    codex_servers: JsonObject = parsed_codex if isinstance(parsed_codex, dict) else {}
+    mirrored_claude = (
+        {} if claude_servers and _is_git_ignored(root, ".mcp.json") else claude_servers
+    )
+    mirrored_codex = (
+        {}
+        if codex_servers and _is_git_ignored(root, ".codex/config.toml")
+        else codex_servers
+    )
+    _mirror_agy_servers(
+        existing,
+        detected.keys() | (pending or set()),
+        mirrored_claude,
+        mirrored_codex,
+    )
     if json.dumps(current) == before:
         return []
     if current == {"mcpServers": {}}:

@@ -240,11 +240,11 @@ Widgets:
 ```dart
 final l10n = context.l10n;
 
-IconButton(
+AppIconButton(
   key: const ValueKey(AppWidgetKeys.productCloseButton),
   tooltip: l10n.closeProductTooltip,
   onPressed: onClose,
-  icon: const Icon(Icons.close),
+  icon: Icons.close,
 )
 ```
 

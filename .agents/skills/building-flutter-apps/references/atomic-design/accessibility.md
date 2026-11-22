@@ -15,9 +15,9 @@ Signals: semantics, tooltip, semanticLabel, image alt text, tap target, contrast
 Action/icon buttons need localized tooltips and at least 48x48 tap targets:
 
 ```dart
-IconButton(
+AppIconButton(
   tooltip: l10n.deleteOrderTooltip,
-  icon: const Icon(Icons.delete_outline),
+  icon: Icons.delete_outline,
   onPressed: onDelete,
 )
 ```

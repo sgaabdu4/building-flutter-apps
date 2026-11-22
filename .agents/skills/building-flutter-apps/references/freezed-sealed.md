@@ -136,11 +136,13 @@ Riverpod `AsyncValue` also sealed:
 final asyncData = ref.watch(myAsyncProvider);
 final l10n = context.l10n;
 return switch (asyncData) {
-  AsyncData(:final value) => Text(value.toString()),
+  AsyncValue(hasValue: true, :final requireValue) => Text(requireValue.toString()),
   AsyncError() => Text(l10n.loadFailed),
-  AsyncLoading() => const ShimmerPlaceholder(), // Prefer skeleton/shimmer over bare CircularProgressIndicator
+  _ => const ShimmerPlaceholder(), // Prefer skeleton/shimmer over bare CircularProgressIndicator
 };
 ```
+
+Match `hasValue: true` first when the previous value still belongs to the same scope. It keeps the shown data during a reload and on an error after data, which `AsyncData(:final value)` drops. Keep `hasValue: true` before `:final requireValue` inside the pattern: Dart checks object-pattern fields left-to-right, so reversing them evaluates `requireValue` on empty states and throws. Binding `requireValue` preserves the provider's type; use `_` as the final arm because Dart's exhaustiveness checker cannot prove `AsyncValue(hasValue: true)` covers `AsyncData`. Include every scoping key that determines the result (for example, both account ID and query) in the provider's family parameter so each key selects its own provider state (which may already be cached while watched) instead of displaying another scope's value.
 
 `AsyncLoading(progress: 0.5)` report loading progress. `AsyncValue.isFromCache` flag offline-persisted data.
 

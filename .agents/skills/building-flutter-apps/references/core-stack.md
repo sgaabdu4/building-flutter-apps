@@ -36,6 +36,26 @@ legacy branches. Re-run the compatibility fixture before raising the floor.
 | `intl`                |  `^0.20.3` | Localization formatting         |
 | `flutter_lints`       |    `6.0.0` | Base Flutter lints              |
 
+## Dart SDK migration
+
+When raising `environment.sdk` in `pubspec.yaml` on Dart SDK 3.14 or later, run `dart migrate` instead of hand-editing the constraint and hunting language-version breaks. It checks `pubspec.yaml` dependency compatibility first, then runs migration lints and fixes for the target version even if `analysis_options.yaml` omits them.
+
+```bash
+dart migrate --dry-run
+```
+
+Check the dry-run's proposed lower bound against the Dart SDK bundled with your project's Flutter toolchain (not just a standalone `dart` binary, and note that a pre-release SDK such as `3.14.0-beta` cannot satisfy `^3.14.0`). Then run the `--apply` command printed by the dry run (preserving any `--target-sdk` or `--step` flags), refresh `.dart_tool/package_config.json`, and preview optional cleanups:
+
+```bash
+# Run the --apply command printed by the dry run (for example: dart migrate --apply --target-sdk=3.13.0)
+flutter pub get && dart migrate --dry-run --step=cleanup
+```
+
+- Default steps (`prepare`, `bump`): `prepare` applies required pre-bump fixes; `bump` raises the lower `environment.sdk` bound and re-analyzes.
+- Optional cleanups: `cleanup` is skipped by default; review its summary, then run `dart migrate --apply --step=cleanup` (or run `dart migrate --apply --step=all` instead of the two-step flow to run `prepare`, `bump`, and `cleanup` together).
+- Target version: without `--target-sdk`, `dart migrate` advances the lower `environment.sdk` bound by one minor version (for example, `^3.12.0` to `^3.13.0`); pass `--target-sdk=<version>` with a supported stable minor release using a `.0` patch (such as `3.13.0`, up to the installed Dart SDK version) to target a specific version (including across multiple minor releases).
+- Finish with `Read first` step 2.
+
 ## Material library
 
 One rule for every supported Flutter version (3.47.0 and later): import
@@ -63,10 +83,10 @@ Flutter/Riverpod packages use both plugins in the root
 ```yaml
 plugins:
   riverpod_lint: ^3.1.9
-  flutter_skill_lints: ^0.14.0
+  flutter_skill_lints: ^0.15.0
 ```
 
-`flutter_skill_lints ^0.14.0` is built against analyzer `^14.4.0`,
+`flutter_skill_lints ^0.15.0` is built against analyzer `^14.4.0`,
 `analyzer_plugin ^0.14.17`, and `analysis_server_plugin ^0.3.23`.
 `riverpod_lint ^3.1.9` shares the analyzer-plugin configuration above.
 
@@ -96,6 +116,7 @@ configuration upgrade. Do not use dependency overrides as compatibility proof.
 
 ## Package sources
 
+- [Dart migrate tool](https://dart.dev/tools/dart-migrate)
 - [Dart package dependencies](https://dart.dev/tools/pub/dependencies)
 - [Dart analyzer plugins](https://dart.dev/tools/analyzer-plugins)
 - [analyzer](https://pub.dev/packages/analyzer)
